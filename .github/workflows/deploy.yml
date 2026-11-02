@@ -15,8 +15,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
           cache: npm
@@ -31,8 +31,8 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
           cache: npm
@@ -45,7 +45,16 @@ jobs:
         if: github.ref != 'refs/heads/main' && env.CLOUDFLARE_API_TOKEN != ''
         run: |
           alias=$(echo "$GITHUB_REF_NAME" | tr 'A-Z' 'a-z' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//' | cut -c1-40 | sed -E 's/-+$//')
-          npx wrangler versions upload --preview-alias "$alias" --message "$GITHUB_SHA"
+          # Worker がまだ一度も本番へ公開されていない（main にまだ入っていない）間は、プレビューを作れないので飛ばす
+          if ! out=$(npx wrangler versions upload --preview-alias "$alias" --message "$GITHUB_SHA" 2>&1); then
+            echo "$out"
+            if echo "$out" | grep -q "does not yet exist"; then
+              echo "::notice::本番の Worker がまだ無いので、プレビューを飛ばしました（main に入って本番が一度公開されると、ブランチのプレビューも作られます）"
+              exit 0
+            fi
+            exit 1
+          fi
+          echo "$out"
       - name: Secrets が無いので公開を飛ばした
         if: env.CLOUDFLARE_API_TOKEN == ''
         run: echo "::notice::CLOUDFLARE_API_TOKEN が無いので公開を飛ばしました（ビルドまでは通っています）"
