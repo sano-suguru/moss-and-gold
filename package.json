@@ -21,7 +21,8 @@
     "gallery": "node build.mjs && esbuild tools/gallery/scenes.ts --bundle --platform=node --outfile=build/scenes.js --log-level=warning && node tools/gallery/shoot.mjs",
     "probe": "node tools/analysis/launch.mjs probe",
     "check": "node tools/analysis/launch.mjs check",
-    "metric": "node tools/analysis/launch.mjs metric"
+    "metric": "node tools/analysis/launch.mjs metric",
+    "bench": "node tools/analysis/launch.mjs bench"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
