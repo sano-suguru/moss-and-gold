@@ -11,6 +11,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { parseArgs } from './common';
+import { World } from '../../src/world';
 
 const args = parseArgs(process.argv.slice(2));
 const runs = (args.runs || '').split(',').filter(Boolean);
@@ -23,7 +24,7 @@ const median = (a: number[]) => {
 };
 const f1 = (v: number) => (isFinite(v) ? v.toFixed(1) : '—');
 
-interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number }
+interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number }
 function measure(dir: string): M {
   const S = rd(dir, 'samples.jsonl');
   const D = rd(dir, 'deaths.jsonl');
@@ -90,6 +91,26 @@ function measure(dir: string): M {
         gobBorn: cnt(B, 12, (b) => b.origin === 'born'), gobMax: Math.max(0, ...gs), gobLast: gs[gs.length - 1] ?? 0,
         gobGone: Math.max(0, ...gs) > 0 && (gs[gs.length - 1] ?? 0) === 0 && (gs[gs.length - 2] ?? 0) === 0,
         gobEnd, gobAdv: cnt(D, 12, (d) => d.by === 25), gobByKob: cnt(D, 12, (d) => d.by === 10), kobByGob: cnt(D, 10, (d) => d.by === 12),
+        gobByOrc: cnt(D, 12, (d) => d.by === 13), gobByOther: cnt(D, 12, (d) => d.by >= 0 && d.by !== 25 && d.by !== 13 && d.by !== 10 && d.cause !== 'starve'),
+        vassals: rd(dir, 'settle.jsonl').filter((x) => x.k === 12 && x.ev === 'vassal').length,
+        tributes: rd(dir, 'settle.jsonl').filter((x) => x.k === 13 && x.ev === 'tribute').length,
+        tributeFood: rd(dir, 'settle.jsonl').filter((x) => x.k === 13 && x.ev === 'tribute').reduce((a, x) => a + (x.n ?? 0), 0),
+        lairDur: (() => {
+          const f = new Map<string, number>();
+          const l = new Map<string, number>();
+          for (const s of S) for (const id of s.settle?.orc ?? []) {
+            if (!f.has(id)) f.set(id, s.day);
+            l.set(id, s.day);
+          }
+          return [...f].map(([id, d]) => (l.get(id) as number) - d + 0.25);
+        })(),
+        ratShaftArr: cnt(B, 2, (b) => b.origin === 'shaft'), ratMouthArr: cnt(B, 2, (b) => b.origin === 'mouth'),
+        // 天井の裂け目から15マス以内での大ネズミの飢え死に（裂け目の場所は地図から）
+        ratStarveShaft: (() => {
+          const m = new World(meta.seed).map;
+          const sh = m.shafts.map((q) => [q.x * 16 + 8, q.y * 16 + 8]);
+          return D.filter((d) => d.k === 2 && d.cause === 'starve' && sh.some(([x, y]) => Math.hypot(x - d.x, y - d.y) < 15 * 16)).length;
+        })(),
         advDeaths: cnt(D, 25), gobStarveExit: cnt(X, 12, (x) => x.reason === 'starving'), gobAbandonExit: cnt(X, 12, (x) => x.reason === 'abandoned'), gobStarveDeath: cnt(D, 12, (d) => d.cause === 'starve'),
       };
     })(),
@@ -152,6 +173,8 @@ const METRICS: Record<string, (ms: M[]) => number> = {
   gobByKob: (ms) => sum(ms, (m) => m.gobByKob),
   kobByGob: (ms) => sum(ms, (m) => m.kobByGob),
   advDeaths: (ms) => sum(ms, (m) => m.advDeaths),
+  tributes: (ms) => sum(ms, (m) => m.tributes),
+  ratStarveShaft: (ms) => sum(ms, (m) => m.ratStarveShaft),
   // 豊かさで上半分（豊かなシード）と下半分（乏しいシード）に分けた目安
   richWarrenMedian: (ms) => median(halves(ms)[0].flatMap((m) => m.dur)),
   poorKobArr: (ms) => sum(halves(ms)[1], (m) => m.kobArr),
@@ -190,6 +213,8 @@ L.push('## 大ネズミ', '');
 tbl('飢え死に', (m) => m.ratStarve, (ms) => sum(ms, (m) => m.ratStarve));
 tbl('飢え死にのうち、道のり10マス以内に食べられる苔があった割合', (m) => (m.ratNearKnown ? `${Math.round((100 * m.ratNear) / m.ratNearKnown)}％（${m.ratNear}/${m.ratNearKnown}）` : '—'), (ms) => { const k = sum(ms, (m) => m.ratNearKnown); return k ? `${Math.round((100 * sum(ms, (m) => m.ratNear)) / k)}％` : '—'; });
 tbl('来た / 中で生まれた / 群れで出ていった（dispersed）', (m) => `${m.ratArr} / ${m.ratBorn} / ${m.ratDisp}`, (ms) => `${sum(ms, (m) => m.ratArr)} / ${sum(ms, (m) => m.ratBorn)} / ${sum(ms, (m) => m.ratDisp)}`);
+tbl('来た：地表の横穴 / 天井の裂け目', (m) => `${m.ratMouthArr} / ${m.ratShaftArr}`, (ms) => `${sum(ms, (m) => m.ratMouthArr)} / ${sum(ms, (m) => m.ratShaftArr)}`);
+tbl('天井の裂け目から15マス以内での飢え死に', (m) => m.ratStarveShaft, (ms) => sum(ms, (m) => m.ratStarveShaft));
 tbl('巣穴の引っ越し', (m) => m.ratMoves, (ms) => sum(ms, (m) => m.ratMoves));
 tbl('最多 / 最後の数（✝ は最後の2回の記録で0）', (m) => `${m.ratMax} / ${m.ratLast}${m.ratGone ? ' ✝' : ''}`, (ms) => `絶えた ${ms.filter((m) => m.ratGone).length} シード`);
 L.push('## ゴブリン', '');
@@ -199,7 +224,10 @@ tbl('来た / 中で生まれた / 最多 / 最後の数（✝ は最後の2回�
 const ER = ['food', 'raids', 'alone', 'dragon', 'empty'];
 tbl('集落の終わり方：蓄えが尽きた / 襲われた / 1匹 / 竜 / 皆いなくなった（settle.jsonl があるときだけ）', (m) => ER.map((r) => m.gobEnd[r] ?? 0).join(' / '), (ms) => ER.map((r) => sum(ms, (m) => m.gobEnd[r] ?? 0)).join(' / '));
 tbl('去り方：一匹ずつ飢えて / 集落ごと群れで / 飢え死に', (m) => `${m.gobStarveExit} / ${m.gobAbandonExit} / ${m.gobStarveDeath}`, (ms) => `${sum(ms, (m) => m.gobStarveExit)} / ${sum(ms, (m) => m.gobAbandonExit)} / ${sum(ms, (m) => m.gobStarveDeath)}`);
-tbl('冒険者に倒されたゴブリン', (m) => m.gobAdv, (ms) => sum(ms, (m) => m.gobAdv));
+tbl('ゴブリンを倒した種：冒険者 / オーク / コボルト / そのほか', (m) => `${m.gobAdv} / ${m.gobByOrc} / ${m.gobByKob} / ${m.gobByOther}`, (ms) => `${sum(ms, (m) => m.gobAdv)} / ${sum(ms, (m) => m.gobByOrc)} / ${sum(ms, (m) => m.gobByKob)} / ${sum(ms, (m) => m.gobByOther)}`);
+L.push('## オーク', '');
+tbl('従えた集落 / 取り立て（回）/ 取り立てた食べ物', (m) => `${m.vassals} / ${m.tributes} / ${m.tributeFood}`, (ms) => `${sum(ms, (m) => m.vassals)} / ${sum(ms, (m) => m.tributes)} / ${sum(ms, (m) => m.tributeFood)}`);
+tbl('縄張りが続いた日数（中央値 / 最長 / 数）', (m) => `${f1(median(m.lairDur))} / ${f1(Math.max(0, ...m.lairDur))} / ${m.lairDur.length}`, (ms) => `中央値 ${f1(median(ms.flatMap((m) => m.lairDur)))}`);
 tbl('コボルトに倒されたゴブリン / ゴブリンに倒されたコボルト', (m) => `${m.gobByKob} / ${m.kobByGob}`, (ms) => `${sum(ms, (m) => m.gobByKob)} / ${sum(ms, (m) => m.kobByGob)}`);
 L.push('## ほかの種', '');
 tbl('死んだ冒険者', (m) => m.advDeaths, (ms) => sum(ms, (m) => m.advDeaths));

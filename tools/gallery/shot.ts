@@ -6,7 +6,7 @@
  *   npm run shot -- --seed abc --find kind:24 --day 6 --zoom 3 --lit
  *   npm run shot -- --seed abc --find xy:120,40 --day 10
  *
- * --find：warren（横穴を掘り終え罠が2つ以上の住処）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、kind:番号（その種の生き物）、xy:マスx,マスy
+ * --find：warren（横穴を掘り終え罠が2つ以上の住処）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、kind:番号（その種の生き物）、xy:マスx,マスy
  * --day 探し始める日（既定 0）、--until 探すのをやめる日（既定 25）、--zoom 拡大率（既定 4）、--lit 確認用の明かり（#lit）、
  * --fog 霧をそのまま（既定は見たマスを地図全体にする）、--name 書き出す名前（既定は find から）、--out 書き出す先（既定 build/shots）
  *
@@ -62,6 +62,14 @@ function look(): Hit | null {
       if (find === 'hide' && wr.hide === 1 && e.warrenMembers(wr).some((c: any) => e.isHidden(c))) return { cam: { x: Math.round(wr.x), y: Math.round(wr.y), zoom }, marks: warrenMarks(wr), title: '隠れている住処' };
     }
     return null;
+  }
+  if (find === 'tribute') {
+    const o = e.list.find((c: any) => c.k === 13 && !c.dead && !c.away && c.st === 6 && c.units > 0);
+    if (!o) return null;
+    const cp = e.camps.find((q: any) => q.id >= 0 && q.kind === 0 && q.lx === o.hx && q.ly === o.hy);
+    const marks: Mark[] = [{ x: o.x, y: o.y, label: `貢ぎ物 ${o.units}`, color: '#ffd24a', size: 2 }];
+    if (cp) marks.push({ x: cp.x, y: cp.y, label: '従う集落', color: '#80ff9a', size: 2 });
+    return { cam: { x: Math.round(o.x), y: Math.round(o.y), zoom }, marks, title: 'オークが貢ぎ物を持ち帰る' };
   }
   if (find === 'gobhide' || find === 'camp') {
     for (const cp of e.camps) {

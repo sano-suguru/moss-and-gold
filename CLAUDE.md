@@ -118,6 +118,8 @@ npm run shot -- --seed かしたれ --find warren         # 見たいもの（wa
   ゴブリンの集落（`Camp` の kind 0）もコボルトと同じ枠組み：場所は `pickGoblinCamp`（暗い、人の気配が薄い、冒険者の通り道（`routeDist`）から15マス以上、竜30・トロールとバジリスク15・コボルトの住処15マス離れ、まわり14マスの食べ物 `campFood` が `GOBLIN_MIN_FOOD` 以上）、口ごとの来訪 `gobMouthOk`、
   蓄え `store`（養分の帳簿に入る。狩り・死骸・盗みの余りを持ち帰る `st 4`）、蓄えからの出産、`watchCamps`（一行が明らかに強ければ `hide 1`：集落のまわりの暗がりに散って隠れる＝`st 7`、影の姿と光る目で描く。弱ければ `hide 2`：暗がりで待ち伏せ。見つかる・劣勢なら逃げ散って `raids` に数える）、
   `abandonCamp`（蓄えが尽きて1/3日たち皆が飢えかけ、`raids` 4、1匹で1日、竜。開いた横穴があれば `st 10` で群れごと去る＝exits `abandoned`、なければ移る）、`goblinShun`。ゴブリンの頭（elite 5）のいる集落は盗みと待ち伏せに大胆。settle.jsonl に k 12 の出来事も残る
+- 五巡目：大ネズミの判定と巣穴の範囲は道のり `RAT_DOOR_REACH`（18マス）。オークはゴブリンを獲物にも敵にもせず（`HUNT_ORC`）、縄張りから20マス以内の集落を従える（`Camp.lx/ly`、`updateVassals`）。地上の約1日ごとに一匹が蓄えの3割を取り立て（`sendCollectors`、オークの `st 5` 行く / `st 6` 袋＝`units` を担いで帰る、settle.jsonl の `{k:13, ev:'tribute'}`）、従う集落のそばのコボルトを追い払う（`guardVassals`）。
+  ゴブリンはコボルトの住処から12マス（`inKoboldLand`）の中の苔・獲物・死骸を目当てにせず、道筋もできるだけ避ける（`findPath` が先に避けて探す）。コボルトも住処をゴブリンの集落から15マス離す。ゴブリンは狩りと死骸あさり（`goblinCarrion`）が主で、苔とキノコは腹の4割までの足し、狩りの食べ残しを蓄えに。meta は 57
 - 描画だけ：攻撃の技の演出（`fxAttacks`、`creatureView.drawAttacks`）、気づいた印、のけぞり、飛び散る粒。見本は `dist/index.html#fxdemo`。画面の部品を隠すのは `#clean`。
 
 ## 変更するときの注意
