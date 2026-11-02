@@ -49,7 +49,7 @@ npm run metric -- --runs runs/ab-x/base,runs/ab-x/new --name campStore --days 10
 npm run metric -- --runs runs/b16 --expr "e.warrens.length"                           # 式（w, e, m, s, K）
 
 # 回す・並べる（保存庫を使い回す。同じ版・シードを前に回していれば回さない。足りなければ続きから）
-npm run sim -- --seed かしたれ --days 30 --out runs/kashitare     # 画面なしで全速（地上1日あたり約3〜5秒。生き物が増える終盤ほど遅い）。snap/ に1日ごとの状態
+npm run sim -- --seed かしたれ --days 30 --out runs/kashitare     # 画面なしで全速（地上1日あたり約2.5〜4秒。生き物が増える終盤ほど遅い）。snap/ に1日ごとの状態
 npm run sim -- --resume runs/kashitare                              # 時間切れで止まった所から続ける（記録も状態も通しと1バイトも違わない）
 npm run sim -- --seed abc --days 5 --out runs/t --trace 1234        # 生き物1234の一生を毎刻み記録
 npm run report -- --run runs/kashitare                              # report.md と deaths.png / births.png
@@ -62,6 +62,7 @@ npm run compare -- --runs ... --paired --since 10                            # �
 npm run compare -- --runs ... --goals tools/analysis/goals-settling.json     # 目安に届いたか（✅/❌）の表をつける
 npm run autopsy -- --seed seed7 --days 25 --kind 2 --cause starve   # probe deaths の別名（0〜25日目すべて）
 npm run stuckmap -- --seed seed7 --days 12 --kind 2                 # probe stuck の別名
+npm run bench -- --repeat 3                                         # 速さ：seed4・かしたれ・seed7 を10日目の状態から1日ずつ（同時に回さない）。手直しの前後は続けて測る（揺れが1割ほどある）
 ```
 
 手直しの効き目は、1シードでは分からない（展開が少しの違いで大きく分かれる）。`ab --preset quick`（同じ途中の状態から前の版といまの版を続ける対にした比較）で見て、compare.md の「対にした比較」の目安が「はっきり」のものだけを効き目とみなす。「ばらつきの内」は、その差がシードごとの展開の揺れで説明できる大きさということ（16シードでも1シードの出来事に引っ張られることがあるので、「1シードの寄与」の列も見る）。
@@ -155,11 +156,13 @@ samples.jsonl は、刻みが `DAY_TICKS/4` の倍数のときに記録する（
   道筋の見つからない目当てはあきらめる（`paths` の gk で判定）。飢えが7割を越えた者・着ける口のない者は群れで出ていかない（`ratDisperse`）。向かい合った仲間には列の間合いを働かせない。おびえたら目当てを替える（`gait` に避ける目当て）。
   ゴブリンの食べ物の主は、集めに出た者（`st 4`）が集落のまわり14マスで摘んで持ち帰るキノコと苔（袋＝`units`、20まで）。狩り（8マス）と死骸（`goblinCarrion`）は足し。腹を空かせたら苔とキノコを腹の7割まで。
   貢ぎ物の取り立てには、腹ぺこのオークも飢えて去る途中（`st 9`）のオークも行く（取り立ては飢えて去るより先に扱う）。samples の `settle.campStore` に集落の蓄え
+- 速さのための間引き（docs/speed-experiments）：ウィスプ（光の精を除く）は生き物の1歩の4回に1回だけ判断し、その回に4回ぶん動いて食べる（`Ecology.WISP_EVERY`、`wispIdle`。描画は `moveAlpha` で4回ぶんの時間をかけて補間）。苔とキノコは40刻みごとに2回ぶん進める（`MOSS_EVERY`、`MOSS_R`）。画面なしでは見たマスの更新を200刻みごと（lib/engine.ts。見たマスは生き物の判断に使わない）
 - 描画だけ：攻撃の技の演出（`fxAttacks`、`creatureView.drawAttacks`）、気づいた印、のけぞり、飛び散る粒。見本は `dist/index.html#fxdemo`。画面の部品を隠すのは `#clean`。
 
 ## 変更するときの注意
 
 - 生き物の行動を変えたら、`npm test` と `npm run check` に加えて、`npm run ab -- --preset quick` で兆候と帳簿を確かめる。テストは1日半しか回さないので、長く回して初めて出る不具合がある（例：ドワーフがあきらめて去るとき食料が帳簿から消えていた）。
+- ウィスプの処理を足すときは、判断する回が4回に1回であることに気をつける（間引いた回は代謝だけ。`px` は動いた回の前の位置のまま残し、描画の補間に使う）。苔とキノコの刻みに確率や増減を足すときは、`MOSS_R` 倍にする。
 - 新しい「消える」「現れる」経路を足したら、帳簿（imported / exported / born / washed / goldIn / goldOut / 岩）と、`stats`（deaths / births / exits）の両方に記録する。
 - 描画だけの状態（血の跡、土ぼこりなど）は保存しない。シミュレーションの判断に使わないこと。
 - 帳簿のずれは、`tools/analysis/manacheck.ts` と `goldcheck.ts`（ずれた刻みと、その刻みに変わった生き物・宝の山を表示する）で突き止めるのが早い。

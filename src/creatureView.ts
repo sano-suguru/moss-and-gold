@@ -584,8 +584,9 @@ export class CreatureView {
     this.order.length = 0;
     for (const c of eco.list) {
       if (c.dead === 2 || c.away) continue;
-      const x = c.px + (c.x - c.px) * alpha;
-      const y = c.py + (c.y - c.py) * alpha;
+      const a = eco.moveAlpha(c, alpha);
+      const x = c.px + (c.x - c.px) * a;
+      const y = c.py + (c.y - c.py) * a;
       if (!inView(x, y, 40)) continue;
       this.order.push({ y, c, x, yy: y });
     }

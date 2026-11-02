@@ -19,6 +19,13 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
 
   for (const c of this.list) {
     if (c.dead === 2) continue;
+    // ウィスプ（光の精を除く）は WISP_EVERY 回に1回だけ判断して動く（Ecology.WISP_EVERY）。ほかの回は腹が減るだけ。
+    // px は動いた回の前の位置のまま残す（描画が WISP_EVERY 回ぶんの時間をかけて補間する）
+    if (c.dead === 0 && c.k === Kind.Wisp && c.elite !== 7 && !c.caught && this.wispIdle(c)) {
+      c.actT++;
+      this.metabolism(c);
+      continue;
+    }
     c.px = c.x;
     c.py = c.y;
     c.actT++;

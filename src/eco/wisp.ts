@@ -66,18 +66,36 @@ export function wisp(this: Ecology, c: Cr, day: number): void {
     c.vx = (c.vx / sp) * max;
     c.vy = (c.vy / sp) * max;
   }
-  this.tryMove(c, c.vx, c.vy);
+  // 間引いたぶん（Ecology.WISP_EVERY 回ぶん）動いて食べる
+  const K = Ecology.WISP_EVERY > 1 ? Ecology.WISP_EVERY : 1;
+  this.tryMove(c, c.vx * K, c.vy * K);
   if (!(c.act === 2 && c.actT < 4)) c.act = sp > 0.15 ? 1 : 0;
-  if (ih(c.id, this.step, 2) % 2 === 0 && c.food < SPEC[Kind.Wisp].cap && this.eatMoss(c, 1)) {
+  if (ih(c.id, this.step, 2) % 2 === 0 && c.food < SPEC[Kind.Wisp].cap && this.eatMoss(c, K)) {
     c.act = 2;
     c.actT = 0;
   }
 }
 
+/** ウィスプがこの1歩では判断しない（間引かれる）か */
+export function wispIdle(this: Ecology, c: Cr): boolean {
+  const K = Ecology.WISP_EVERY;
+  return K > 1 && this.step % K !== c.id % K;
+}
+
+/** 描画の補間の割合：間引かれるウィスプは、動いた回から WISP_EVERY 回ぶんの時間をかけて px から x へ（ほかは alpha のまま） */
+export function moveAlpha(this: Ecology, c: Cr, alpha: number): number {
+  const K = Ecology.WISP_EVERY;
+  if (c.k !== Kind.Wisp || c.elite === 7 || c.caught || K <= 1) return alpha;
+  const since = (((this.step - c.id) % K) + K) % K;
+  return (since + alpha) / K;
+}
+
 declare module '../ecology' {
   interface Ecology {
     wisp: typeof wisp;
+    wispIdle: typeof wispIdle;
+    moveAlpha: typeof moveAlpha;
   }
 }
 
-Object.assign(Ecology.prototype, { wisp });
+Object.assign(Ecology.prototype, { wisp, wispIdle, moveAlpha });

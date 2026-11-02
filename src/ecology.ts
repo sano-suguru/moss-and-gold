@@ -6,6 +6,8 @@ import type { World } from './world';
 
 /** 生き物を動かす間隔（刻み） */
 export const CR_EVERY = 2;
+/** 苔とキノコの刻み（world.ts の MOSS_EVERY ＝ 40 刻みごと）で、一度に進める量の倍率（もとは20刻みごとに1倍。確率と増減を MOSS_R 倍） */
+export const MOSS_R = 2;
 
 export const enum Kind {
   Wisp = 0,
@@ -530,6 +532,11 @@ export class Ecology {
   goblinShun = 0;
   /** 同時にダンジョンの中にいる冒険者の一行の数の上限（切り替えられる。既定 1。段階13までは 2） */
   static ADV_MAX_PARTIES = 1;
+  /**
+   * ウィスプ（光の精を除く）が判断して動く間隔（生き物の1歩の何回に1回か）。数が多く（生き物の約6割）、漂うだけなので間引く。
+   * 動く回に、間引いたぶん（WISP_EVERY 倍）動いて食べる。ほかの回は腹が減るだけ。描画は px から x へ WISP_EVERY 回ぶんの時間をかけて補間する（wispAlpha）
+   */
+  static WISP_EVERY = 4;
   /** 弱い生き物の害（pester）をなす種 */
   static PESTERS = new Set<number>([Kind.Rat, Kind.Bat, Kind.Ant, Kind.Wisp, Kind.Myconid, Kind.Salamander]);
   /** 苔を食べたなどで苔の場が変わった */

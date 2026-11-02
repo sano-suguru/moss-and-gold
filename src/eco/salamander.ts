@@ -1,6 +1,6 @@
 /** Ecology のメソッド：サラマンダー（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+import { BLOOD, Burrow, CELL, CR_EVERY, MOSS_R, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
@@ -228,7 +228,7 @@ export function seed(this: Ecology): void {
 /** 苔からウィスプが生まれる（苔の刻みから呼ばれる） */
 export function maybeSpawnWisp(this: Ecology, k: number, step: number): void {
   if (this.counts[Kind.Wisp] >= MAX_WISPS) return;
-  if (this.w.moss[k] < 200 || ih(k, step, 99) % 45 !== 0 || this.w.mana[k] < 2) return;
+  if (this.w.moss[k] < 200 || ih(k, step, 99) % 45 >= MOSS_R || this.w.mana[k] < 2) return;
   this.w.moss[k] -= 4;
   this.counts[Kind.Wisp]++;
   const m = this.w.map;

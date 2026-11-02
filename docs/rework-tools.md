@@ -21,7 +21,7 @@
 
 ### 版と保存庫（runs/.cache）
 
-- **版（simHash）**：`tools/analysis/lib/engine.ts`（画面なしで進める入口。1刻みごとに `step` と、20刻みごとに `updateSeen`）からたどれるソース（src/ の world、ecology、eco/*、mapgen など）の**中身**のハッシュ。中身だけで決まるので、git のコミットでも作業中のファイルでも、同じ中身なら同じ版。
+- **版（simHash）**：`tools/analysis/lib/engine.ts`（画面なしで進める入口。1刻みごとに `step` と、200刻みごとに `updateSeen`。作り直したときは20刻みごとで、のちに docs/speed-experiments の D で200刻みごとにした）からたどれるソース（src/ の world、ecology、eco/*、mapgen など）の**中身**のハッシュ。中身だけで決まるので、git のコミットでも作業中のファイルでも、同じ中身なら同じ版。
 - **道具の版（binHash）**：組み立てた道具（記録の仕方＝sim.ts なども含む）の中身のハッシュ。
 - 道具はすべて `node tools/analysis/launch.mjs <道具>` で組み立てて `runs/.cache/bin/<道具>-<binHash>.js` に置く。書き換えないので、batch の最中にソースを直しても、回っているものに響かない（以前は build/sim.js を使っていて、batch の最中は作り直せなかった）。
 - git の参照（`--base HEAD~1`、`--ref` など）は、その版の **src/ だけ**を `runs/.cache/src/<コミット>/` に取り出し、**いまの記録の仕方**と組み合わせて組み立てる。前の版といまの版を同じ記録の仕方で比べられる（作り直す前のコミットも、そのまま比べられる）。
@@ -77,7 +77,7 @@
 | `probe look` | ある刻み・場所（または個体）のまわりの地形と生き物の字の地図と一覧、住みついた群れ。`--expr` で式の値 |
 | `probe stuck` | 動こうとして進めない場所の地図（以前の stuckmap） |
 
-以前の autopsy と stuckmap は、0日目から `w.step()` だけで進めていて、sim（20刻みごとに `updateSeen` も呼ぶ）と展開が違っていた。いまはどれも lib/engine.ts の同じ進め方なので、batch で見た死と同じ死を調べられる。
+以前の autopsy と stuckmap は、0日目から `w.step()` だけで進めていて、sim（`updateSeen` も呼ぶ）と展開が違っていた。いまはどれも lib/engine.ts の同じ進め方なので、batch で見た死と同じ死を調べられる。
 
 ### 回し直さずに値を計算する（npm run metric）
 

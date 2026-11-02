@@ -1,4 +1,4 @@
-import { CR_EVERY, Ecology } from './eco/index';
+import { CR_EVERY, Ecology, MOSS_R } from './eco/index';
 import { MapData, TILE, generate, lineOfSight } from './mapgen';
 
 export const TICKS_PER_SEC = 10;
@@ -7,7 +7,7 @@ export const DAY_TICKS = 24 * 60 * TICKS_PER_SEC;
 /** 水を流す間隔（刻み） */
 export const WATER_EVERY = 5;
 /** 苔を育てる間隔（刻み） */
-export const MOSS_EVERY = 20;
+export const MOSS_EVERY = 40;
 
 /** 高さ1あたりの水の量（水面の高さ = 高さ×HS + 水量） */
 const HS = 2;
@@ -1158,7 +1158,7 @@ export class World {
     if (day > 0.3) {
       this.dewAt(0);
       for (const k of this.dewTiles) {
-        if (m.solid[k] || mo[k] || m.lava[k] || this.lightBase[k] * day < 250 || moist[k] < MOIST_GROW || Nu[k] < 2 || ih(k, step + 29) % 60 !== 0) continue;
+        if (m.solid[k] || mo[k] || m.lava[k] || this.lightBase[k] * day < 250 || moist[k] < MOIST_GROW || Nu[k] < 2 || ih(k, step + 29) % 60 >= MOSS_R) continue;
         Nu[k] -= 2;
         mo[k] = 2;
         changed = true;
@@ -1171,14 +1171,14 @@ export class World {
       const h = this.heat[k];
       // 乾き、または熱で枯れる
       if (moist[k] < MOIST_DRY || h > 100) {
-        const dec = Math.min(v, 2 + (h >> 5));
+        const dec = Math.min(v, (2 + (h >> 5)) * MOSS_R);
         mo[k] = v - dec;
         Nu[k] += dec;
         changed = true;
         continue;
       }
       // 古い群落の一部が枯れて、養分が土へ戻る（入れ替わり）
-      if (v > 200 && ih(k, step) % 50 === 0) {
+      if (v > 200 && ih(k, step) % 50 < MOSS_R) {
         mo[k] = v - 20;
         Nu[k] += 20;
         changed = true;
@@ -1187,7 +1187,7 @@ export class World {
       // 育つ：光の筋の下では速く、暗がりではゆっくり
       if (moist[k] >= MOIST_GROW && h < 60 && v < 255) {
         const L = this.lightBase[k] * day;
-        const want = L > 50 ? 1 + Math.floor(L / 300) : (ih(k, step + 7) & 3) === 0 ? 1 : 0;
+        const want = (L > 50 ? 1 + Math.floor(L / 300) : (ih(k, step + 7) & 3) < MOSS_R ? 1 : 0) * (L > 50 ? MOSS_R : 1);
         const g = this.take(i, k, Math.min(want, 255 - v));
         if (g > 0) {
           mo[k] = v + g;
@@ -1195,7 +1195,7 @@ export class World {
         }
       }
       // 隣へじわじわ広がる
-      if (mo[k] >= 100 && moist[k] >= MOIST_GROW && ih(k, step + 13) % 16 === 0) {
+      if (mo[k] >= 100 && moist[k] >= MOIST_GROW && ih(k, step + 13) % 16 < MOSS_R) {
         const n = nb[i * 4 + (ih(k, step + 17) & 3)];
         if (n >= 0 && !m.lava[n] && mo[n] === 0 && moist[n] >= MOIST_GROW && Nu[n] >= 2) {
           Nu[n] -= 2;
@@ -1206,7 +1206,7 @@ export class World {
       // 外から風で運ばれた胞子が、外の光の差す口のそばに芽吹く（苔のない所でも）
       // （この下の、苔のあるマスの処理とは別に、口のまわりだけを見る）
       // 水の流れに乗った胞子が下流に新しい群落を作る
-      if (mo[k] >= 160 && ih(k, step + 23) % 400 === 0) {
+      if (mo[k] >= 160 && ih(k, step + 23) % 400 < MOSS_R) {
         const n = this.downstream(k);
         if (n !== k && !m.lava[n] && mo[n] === 0 && moist[n] >= MOIST_GROW && Nu[n] >= 2) {
           Nu[n] -= 2;
@@ -1242,7 +1242,7 @@ export class World {
     const moist = this.moist;
     let changed = false;
     // 天井の裂け目から吹き込む風に乗った胞子が、まれに近くの暗がりに落ちる
-    if (m.shafts.length && ih(step, 3) % 30 === 0) {
+    if (m.shafts.length && ih(step, 3) % 30 < MOSS_R) {
       const sh = m.shafts[ih(step, 4) % m.shafts.length];
       for (let i = 0; i < 12; i++) {
         const h = ih(step, 5 + i);
@@ -1263,34 +1263,34 @@ export class World {
       if (v === 0) continue;
       const L = this.lightBase[k] * day + this.moss[k] * 2;
       if (m.lava[k] || L > 250 || this.heat[k] > 60) {
-        const dec = Math.min(v, 2);
+        const dec = Math.min(v, 2 * MOSS_R);
         fu[k] = v - dec;
         Nu[k] += dec;
         changed = true;
         continue;
       }
       if (moist[k] < 70) {
-        if (ih(k, step + 31) % 3 === 0) {
+        if (ih(k, step + 31) % 3 < MOSS_R) {
           fu[k] = v - 1;
           Nu[k] += 1;
           changed = true;
         }
         continue;
       }
-      if (v > 90 && ih(k, step + 33) % 15 === 0) {
+      if (v > 90 && ih(k, step + 33) % 15 < MOSS_R) {
         fu[k] = v - 20;
         Nu[k] += 20;
         changed = true;
         continue;
       }
-      if (v < 130 && moist[k] >= 90 && (ih(k, step + 35) & 3) === 0) {
+      if (v < 130 && moist[k] >= 90 && (ih(k, step + 35) & 3) < MOSS_R) {
         const g = this.take(i, k, 1);
         if (g > 0) {
           fu[k] = v + g;
           changed = true;
         }
       }
-      if (fu[k] >= 100 && this.totalFungus < 30000 && ih(k, step + 37) % 48 === 0) {
+      if (fu[k] >= 100 && this.totalFungus < 30000 && ih(k, step + 37) % 48 < MOSS_R) {
         const n = nb[i * 4 + (ih(k, step + 39) & 3)];
         if (n >= 0 && !m.lava[n] && fu[n] === 0 && moist[n] >= 90 && this.lightBase[n] * day < 150 && Nu[n] >= 30) {
           Nu[n] -= 2;
