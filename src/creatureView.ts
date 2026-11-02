@@ -698,6 +698,8 @@ export class CreatureView {
         const hx = c.elite === 4 ? (flip ? -5 : 5) : (flip ? -1 : 1);
         pushSprite(x + hx, yy + 0.05, lift + hy, flip, c.elite === 4 ? A.crown() : A.chiefHelm(), 0, 2);
       }
+      // 貢ぎ物の袋：取り立てたオークは、袋を肩に担いで縄張りへ帰る
+      if (!isCorpse && sp === Kind.Orc && c.units > 0 && !hidden) pushSprite(x + (flip ? 6 : -6), yy + 0.05, lift + 16, flip, A.sack(), 0, 2);
       // 傷を受けた瞬間は白く光る
       const flash = !isCorpse && eco.w.tick - c.hitAt < 2 ? 20 : 0;
       pushSprite(x, yy, lift, flip, frame, hidden ? 0 : glow, flash + (hidden ? 10 : 0), (c.id * 0.6180339) % 1);

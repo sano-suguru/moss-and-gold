@@ -1,4 +1,4 @@
-import { adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, fireSpirit, phantomKnight, crownS, chiefHelm, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat } from './sprites';
+import { adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -61,6 +61,7 @@ export interface Atlas {
   /** 大ネズミの王の冠、ゴブリンの頭の角兜 */
   crown: () => number;
   chiefHelm: () => number;
+  sack: () => number;
   /** 攻撃の演出の部品（'arc:大きさ:色:段'、'arrow:向き' など） */
   fx: (key: string) => number;
   /** 気づいた印（'!' か '?'） */
@@ -392,6 +393,8 @@ export function buildAtlas(): Atlas {
   raws.push(crownS() as RawFrame);
   const helmFrame = raws.length;
   raws.push(chiefHelm() as RawFrame);
+  const sackFrame = raws.length;
+  raws.push(tributeSack() as RawFrame);
   // ドラゴンの炎の柱（横向きと正面）
   const breathFrames: number[] = [];
   for (let f = 0; f < 4; f++) {
@@ -638,6 +641,7 @@ export function buildAtlas(): Atlas {
     eggShell: () => eggShellFrame,
     crown: () => crownFrame,
     chiefHelm: () => helmFrame,
+    sack: () => sackFrame,
     mark: (k) => markFrames[k] ?? markFrames['!'],
     slash: (f) => slashFrames[Math.min(2, Math.max(0, f))],
     halo: (z) => haloFrames[Math.min(2, Math.max(0, z))],

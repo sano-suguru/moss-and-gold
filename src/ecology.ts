@@ -207,6 +207,10 @@ export interface Camp {
   raids?: number;
   empty?: number;
   alone?: number;
+  /** 従っているオークの縄張り（寝床の座標。0,0 なら従っていない）と、次に貢ぎ物を取り立てに来る刻み */
+  lx?: number;
+  ly?: number;
+  tribT?: number;
 }
 
 /** 種ごとの強さ（戦いの勝ち負けの確率に使う） */
@@ -305,7 +309,8 @@ const SPEC: Spec[] = [
   { body: 4, cap: 12, meta: 40, starve: 3000, speed: 1.1, glowDecay: 1 },
   { body: 20, cap: 60, meta: 45, starve: 3000, speed: 0.8, glowDecay: 1 },
   { body: 12, cap: 30, meta: 60, starve: 1e9, speed: 0.7, glowDecay: 1 },
-  { body: 20, cap: 50, meta: 40, starve: 3000, speed: 0.9, glowDecay: 1 },
+  // ゴブリン：腹の減り方は五巡目から7割に（meta 40 → 57）
+  { body: 20, cap: 50, meta: 57, starve: 3000, speed: 0.9, glowDecay: 1 },
   { body: 60, cap: 120, meta: 45, starve: 5000, speed: 0.9, glowDecay: 1 },
   { body: 40, cap: 80, meta: 60, starve: 6000, speed: 0.85, glowDecay: 1 },
   { body: 120, cap: 200, meta: 50, starve: 6000, speed: 0.8, glowDecay: 1 },
@@ -414,6 +419,8 @@ export interface Burrow {
 /** 狩りの獲物の種（毎刻み配列を作らないように） */
 const HUNT0: Kind[] = [Kind.Rat, Kind.Ant];
 const HUNT1: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Adventurer, Kind.Dwarf];
+/** オークの獲物：ゴブリンは従える相手なので獲物にしない */
+const HUNT_ORC: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Kobold, Kind.Ant, Kind.Adventurer, Kind.Dwarf];
 const HUNT2: Kind[] = [Kind.Rat, Kind.Ant, Kind.Kobold];
 const HUNT3: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Orc, Kind.Lizardman, Kind.Spider, Kind.Slime, Kind.Zombie, Kind.Adventurer];
 const HUNT4: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Lizardman, Kind.Orc, Kind.Slime, Kind.Zombie, Kind.Myconid, Kind.Adventurer];
@@ -565,6 +572,19 @@ export class Ecology {
 
   /** マス単位の幅優先探索で道筋を作る（見つからなければ null） */
   private findPath(c: Cr, from: number, to: number): number[] | null {
+    // ゴブリンは、コボルトの縄張りをできるだけ横切らない（縄張りを通らない道筋を先に探し、なければふつうに探す）
+    if (c.k === Kind.Goblin && from >= 0 && to >= 0 && this.warrens.some((o) => o.id >= 0)) {
+      const m = this.w.map;
+      const land = (k: number) => this.inKoboldLand((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8);
+      if (!land(from) && !land(to)) {
+        const p = this.findPathAvoid(c, from, to, land);
+        if (p) return p;
+      }
+    }
+    return this.findPathAvoid(c, from, to, null);
+  }
+
+  private findPathAvoid(c: Cr, from: number, to: number, avoid: ((k: number) => boolean) | null): number[] | null {
     const m = this.w.map;
     if (from < 0 || to < 0 || !this.tilePassable(c, to)) return null;
     const g = ++this.bgen;
@@ -585,7 +605,7 @@ export class Ecology {
       const y = (cur / m.w) | 0;
       for (let d = 0; d < 4; d++) {
         const n = d === 0 ? (x + 1 < m.w ? cur + 1 : -1) : d === 1 ? (x > 0 ? cur - 1 : -1) : d === 2 ? (y + 1 < m.h ? cur + m.w : -1) : y > 0 ? cur - m.w : -1;
-        if (n < 0 || this.bmark[n] === g || !this.tilePassable(c, n)) continue;
+        if (n < 0 || this.bmark[n] === g || !this.tilePassable(c, n) || (avoid && avoid(n))) continue;
         this.bmark[n] = g;
         this.bprev[n] = cur;
         q[qt++] = n;
@@ -1333,6 +1353,8 @@ export class Ecology {
     if (this.step % 50 === 35) this.updateWarrens();
     if (this.step % 10 === 3) this.watchWarrens();
     if (this.step % 10 === 7) this.watchCamps();
+    if (this.step % 600 === 115) this.updateVassals();
+    if (this.step % 50 === 25) this.sendCollectors();
     if (this.step % 600 === 105) this.checkGoblinMouths();
     this.checkTraps();
     if (this.step % 200 === 100) this.spawnSalamanders();
@@ -2535,6 +2557,8 @@ export class Ecology {
       if (o.k === Kind.Bat && o.st !== 0) return;
       // 気づけない相手と、（火を怖がる者にとって）火のそばの獲物は狙わない
       if (!this.canSense(c, o)) return;
+      // ゴブリンはコボルトの縄張りの中の獲物を追わない
+      if (c.k === Kind.Goblin && this.inKoboldLand(o.x, o.y)) return;
       if (Ecology.FEARS_FIRE.has(c.k) && c.sinceMeal < SPEC[c.k].starve * 0.85 && this.fireNear(o.x, o.y)) return;
       // 知性ある者は勝てない相手を避け、狡猾な者は自分より強い相手には挑まない
       const ts = this.str(o) * (o.hp > 0 ? o.hp / this.maxHp(o) : 1);
@@ -2896,6 +2920,34 @@ export class Ecology {
     this.log(cp.x, cp.y, msg);
   }
 
+  /** コボルトの住処の縄張り（住処から12マス、コボルトが住処を守る範囲）の中か。ゴブリンは食べ物を探すとき、ここを目当てにしない */
+  inKoboldLand(x: number, y: number): boolean {
+    for (const wr of this.warrens) if (wr.id >= 0 && sq(wr.x - x) + sq(wr.y - y) < 12 * TILE * 12 * TILE) return true;
+    return false;
+  }
+
+  /** ゴブリンの死骸あさり：R マス以内の死骸（コボルトの縄張りの外）へ行き、その場で食べ、余りを持つ（eat の食べ残し units）。true なら今そうしている */
+  private goblinCarrion(c: Cr, R: number): boolean {
+    let best: Cr | null = null;
+    let bd = R * TILE * R * TILE;
+    for (const o of this.corpses) {
+      if (o.dead !== 1 || o.units <= 0 || o.k === Kind.Goblin) continue;
+      const d = sq(o.x - c.x) + sq(o.y - c.y);
+      if (d >= bd || this.inKoboldLand(o.x, o.y) || this.fireNear(o.x, o.y)) continue;
+      bd = d;
+      best = o;
+    }
+    if (!best) return false;
+    const o = best as Cr;
+    c.act = 1;
+    if (bd < 11 * 11) {
+      this.eat(c, o);
+      c.act = 2;
+      c.actT = 0;
+    } else this.goTo(c, o.x, o.y, SPEC[c.k].speed);
+    return true;
+  }
+
   /** 集落のまわり（R マス四方）で、ゴブリン c がいちばん行きやすい、食べられる苔かキノコ（20以上）のマス。なければ -1 */
   private goblinForage(c: Cr, cx: number, cy: number, R: number): number {
     const m = this.w.map;
@@ -2910,7 +2962,7 @@ export class Ecology {
         const k = y * m.w + x;
         if (m.solid[k] || m.lava[k] || m.sealed[k]) continue;
         const f = Math.max(this.w.moss[k], this.w.fungus[k]);
-        if (f < 20) continue;
+        if (f < 20 || this.inKoboldLand(x * TILE + 8, y * TILE + 8)) continue;
         const v = Math.min(30, f - 12) - (Math.abs(x - gx) + Math.abs(y - gy)) * 4;
         if (v > bv) {
           bv = v;
@@ -2974,10 +3026,11 @@ export class Ecology {
           return;
         }
       }
-      // 蓄えを運び込む：腹が満ちた者（狩った獲物、拾った死骸、盗んだ食料）は、余りを集落に置く
-      if (c.food > s.cap * 0.75 && d2 < 2 * TILE * 2 * TILE && (camp.store ?? 0) < this.campStoreGoal(camp)) {
-        const t = c.food - Math.floor(s.cap * 0.5);
-        c.food -= t;
+      // 蓄えを運び込む：腹が満ちた者（狩った獲物、拾った死骸、盗んだ食料）は、余りと持ち帰った食べ残しを集落に置く
+      if ((c.food > s.cap * 0.75 || c.units > 0) && d2 < 2 * TILE * 2 * TILE && (camp.store ?? 0) < this.campStoreGoal(camp)) {
+        const t = Math.max(0, c.food - Math.floor(s.cap * 0.5)) + c.units;
+        c.food -= t - c.units;
+        c.units = 0;
         camp.store = (camp.store ?? 0) + t;
         c.act = 2;
         c.actT = 0;
@@ -2985,8 +3038,8 @@ export class Ecology {
         return;
       }
       if (c.st === 4 && c.food >= s.cap * 0.85) c.st = 0;
-      // 腹いっぱいの者は、蓄えが足りなければ集落へ持ち帰る
-      if (c.food > s.cap * 0.75 && d2 < 30 * TILE * 30 * TILE && (camp.store ?? 0) < this.campStoreGoal(camp) && c.gold <= 0) {
+      // 腹いっぱいの者と、食べ残しを持っている者は、蓄えが足りなければ集落へ持ち帰る
+      if ((c.food > s.cap * 0.75 || c.units >= 6) && d2 < 30 * TILE * 30 * TILE && (camp.store ?? 0) < this.campStoreGoal(camp) && c.gold <= 0) {
         c.act = 1;
         this.goTo(c, camp.x, camp.y, s.speed);
         return;
@@ -3027,14 +3080,33 @@ export class Ecology {
       }
     }
     const cp = this.campOf(c);
-    // 縄張りを守る：コボルト、オーク、畑に来たアリ
-    if (cp && this.defend(c, cp.x, cp.y, [Kind.Kobold, Kind.Ant, Kind.Orc, Kind.Dwarf])) return;
+    // 縄張りを守る：コボルト、畑に来たアリ（オークは従う相手なので襲わない）
+    if (cp && this.defend(c, cp.x, cp.y, [Kind.Kobold, Kind.Ant, Kind.Dwarf])) return;
     if (c.st === 3 && c.food >= s.cap * 0.7) c.st = 0;
     if (c.hungry || c.st === 3 || c.st === 4) {
-      if (c.hungry && c.st !== 4) c.st = 3;
-      // 長く食べていなければ、遠くまで探す（集落のそばに食べ物がなくても、そこで飢えるのを待たない）
-      const R = c.sinceMeal > 1200 ? 20 : c.sinceMeal > 600 ? 14 : 8;
-      if (this.hunt(c, R + 1, HUNT0, s.speed * 1.15)) return;
+      // 狩りに出た者も、腹を空かせたら自分が食べるほうを先にする（苔とキノコも食べる）
+      if (c.hungry) c.st = 3;
+      // 主な食べ物は狩り（大ネズミなど小さな獲物）と死骸あさり。長く食べていなければ、遠くまで探す
+      const R = c.sinceMeal > 1200 ? 20 : c.sinceMeal > 600 ? 16 : 12;
+      if (this.hunt(c, R, HUNT0, s.speed * 1.15)) return;
+      if (this.goblinCarrion(c, R)) return;
+      // 狩りに出た者（st 4）は苔を食べない（蓄えにならない）：獲物を探して集落のまわりを歩く
+      if (c.st === 4) {
+        if (!cp || c.sinceMeal > 900) {
+          c.st = 0;
+        } else {
+          const h = ih(c.id, this.step >> 8, 236);
+          const tx = cp.x + (((h & 255) % 33) - 16) * TILE;
+          const ty = cp.y + ((((h >>> 8) & 255) % 33) - 16) * TILE;
+          c.act = 1;
+          if (!this.inKoboldLand(tx, ty) && this.passable(c, tx, ty)) this.goTo(c, tx, ty, s.speed);
+          else {
+            const j = DIR16[ih(c.id, this.step >> 4, 237) & 15];
+            this.tryMove(c, j[0] * s.speed * 0.5, j[1] * s.speed * 0.5);
+          }
+          return;
+        }
+      }
       // 目当ての苔は地上の約25秒（128刻み）ごとに選び直す（刻みごとに選び直すと、目当てが毎回変わって行ったり来たりし、食べられずに飢えていた）
       // まわりを残らず調べ、近くて食べられる苔かキノコを選ぶ（いくつかの点を選んで調べるやり方では、まばらな群落を見落として、食べ物があるのに飢えていた）
       const kk = cp ? this.goblinForage(c, cp.x, cp.y, R) : (() => {
@@ -3045,6 +3117,7 @@ export class Ecology {
         const m = this.w.map;
         c.act = 1;
         if (this.goTo(c, (kk % m.w) * TILE + 8, Math.floor(kk / m.w) * TILE + 8, s.speed) || this.tileOf(c.x, c.y) === kk) {
+          // 苔とキノコは足し程度：腹の4割まで食べたら、また狩りと死骸を探す
           let t = Math.min(4, this.w.fungus[kk] - 12, s.cap - c.food);
           if (t > 0) {
             this.w.fungus[kk] -= t;
@@ -3052,6 +3125,7 @@ export class Ecology {
             c.sinceMeal = 0;
             this.mossTouched = true;
           } else this.eatMoss(c, 4);
+          if (c.food >= s.cap * 0.4) c.st = 0;
         }
         return;
       }
@@ -3226,14 +3300,19 @@ export class Ecology {
   }
 
   private orc(c: Cr): void {
-    if (!c.hungry && c.act !== 2 && this.scavenge(c)) return;
+    if (!c.hungry && c.act !== 2 && c.st < 5 && this.scavenge(c)) return;
     const s = SPEC[Kind.Orc];
     if (this.leaveIfStarving(c)) return;
     if (c.act === 2 && c.actT < 4) return;
+    // 貢ぎ物の取り立て（st 5：従う集落へ向かう、st 6：袋を担いで縄張りへ帰る）
+    if (c.st === 5 || c.st === 6) {
+      this.collectTribute(c);
+      return;
+    }
     if (c.hungry) {
-      if (this.hunt(c, 10, HUNT1, s.speed * 1.2)) return;
-      // 近くの集落を襲いに行く
-      const targets = [...this.camps.filter((o) => o.kind === 0), ...this.warrens];
+      if (this.hunt(c, 10, HUNT_ORC, s.speed * 1.2)) return;
+      // 近くのコボルトの住処を襲いに行く（ゴブリンの集落は襲わない：従える相手）
+      const targets = [...this.warrens.filter((o) => o.id >= 0)];
       let best: { x: number; y: number } | null = null;
       let bd = 40 * TILE * 40 * TILE;
       for (const t of targets) {
@@ -3249,6 +3328,8 @@ export class Ecology {
         return;
       }
     }
+    // 用心棒：従う集落のそば（8マス）に来たコボルトを追い払う（縄張りから25マスまで）
+    if (this.guardVassals(c)) return;
     if (sq(c.hx - c.x) + sq(c.hy - c.y) > 5 * TILE * 5 * TILE) {
       c.act = 1;
       this.goTo(c, c.hx, c.hy, s.speed);
@@ -3258,6 +3339,125 @@ export class Ecology {
         const j = DIR16[ih(c.id, this.step >> 4, 97) & 15];
         this.tryMove(c, j[0] * s.speed * 0.4, j[1] * s.speed * 0.4);
       }
+    }
+  }
+
+  /** オーク c の縄張りに従う集落 */
+  private vassalsOf(c: Cr): Camp[] {
+    if (!c.hx && !c.hy) return [];
+    return this.camps.filter((o) => o.id >= 0 && o.kind === 0 && o.lx === c.hx && o.ly === c.hy);
+  }
+
+  /** 用心棒：従う集落のそばに来たコボルトを追い払う。true なら今はそのために動いている */
+  private guardVassals(c: Cr): boolean {
+    if (c.hungry || c.flee > 0) return false;
+    for (const cp of this.vassalsOf(c)) {
+      if (sq(cp.x - c.x) + sq(cp.y - c.y) > 25 * TILE * 25 * TILE) continue;
+      let foe: Cr | null = null;
+      let bd = 8 * TILE * 8 * TILE;
+      this.nearby(cp.x, cp.y, 8, (o) => {
+        if (o.dead || o.away || o.k !== Kind.Kobold) return;
+        const d = sq(o.x - cp.x) + sq(o.y - cp.y);
+        if (d < bd) {
+          bd = d;
+          foe = o;
+        }
+      });
+      if (!foe) continue;
+      const f = foe as Cr;
+      c.act = 1;
+      if (sq(f.x - c.x) + sq(f.y - c.y) < 11 * 11) this.fight(c, f);
+      else this.goTo(c, f.x, f.y, SPEC[c.k].speed * 1.2);
+      return true;
+    }
+    return false;
+  }
+
+  /** 貢ぎ物の取り立て：従う集落へ行き、蓄えの3割を袋に詰めて（units）縄張りへ持ち帰り、食べる */
+  private collectTribute(c: Cr): void {
+    const s = SPEC[Kind.Orc];
+    c.act = 1;
+    if (c.st === 5) {
+      const cp = this.camps.find((o) => o.id === c.ref && o.id >= 0);
+      if (!cp || cp.lx !== c.hx || cp.ly !== c.hy) {
+        c.st = 0;
+        c.ref = 0;
+        return;
+      }
+      if (sq(cp.x - c.x) + sq(cp.y - c.y) < 1.5 * TILE * 1.5 * TILE || this.goTo(c, cp.x, cp.y, s.speed)) {
+        const amt = Math.floor((cp.store ?? 0) * 0.3);
+        cp.store = (cp.store ?? 0) - amt;
+        c.units += amt;
+        c.st = 6;
+        c.ref = 0;
+        c.act = 2;
+        c.actT = 0;
+        this.record('settle', { t: this.w.tick, k: Kind.Orc, id: cp.id, ev: 'tribute', n: amt, x: Math.round(cp.x), y: Math.round(cp.y) } as never);
+        this.log(cp.x, cp.y, `{k:${Kind.Orc}}が{k:${Kind.Goblin}}の集落から貢ぎ物を取り立てた`);
+      }
+      return;
+    }
+    // 袋を担いで縄張りへ帰り、食べる（食べきれない分は縄張りの土へ）
+    if (sq(c.hx - c.x) + sq(c.hy - c.y) < 2 * TILE * 2 * TILE || this.goTo(c, c.hx, c.hy, s.speed)) {
+      const t = Math.min(c.units, s.cap - c.food);
+      c.food += t;
+      c.units -= t;
+      if (t > 0) c.sinceMeal = 0;
+      if (c.units > 0) this.deposit(c.x, c.y, c.units);
+      c.units = 0;
+      c.st = 0;
+      c.act = 2;
+      c.actT = 0;
+    }
+  }
+
+  /**
+   * 従う集落：オークの縄張り（寝床）から20マス以内のゴブリンの集落は、いちばん近い縄張りのオークに従う。
+   * 地上の約1日ごとに、そのオークのうち一匹が来て、蓄えの3割を取り立てる
+   */
+  private updateVassals(): void {
+    for (const cp of this.camps) {
+      if (cp.id < 0 || cp.kind !== 0) continue;
+      let lx = 0;
+      let ly = 0;
+      let bd = 20 * TILE * 20 * TILE;
+      for (const o of this.list) {
+        if (o.k !== Kind.Orc || o.dead || o.away || (!o.hx && !o.hy)) continue;
+        const d = sq(o.hx - cp.x) + sq(o.hy - cp.y);
+        if (d < bd || (d === bd && (o.hx < lx || (o.hx === lx && o.hy < ly)))) {
+          bd = d;
+          lx = o.hx;
+          ly = o.hy;
+        }
+      }
+      if (lx !== (cp.lx ?? 0) || ly !== (cp.ly ?? 0)) {
+        cp.lx = lx;
+        cp.ly = ly;
+        if (lx || ly) {
+          cp.tribT = this.w.tick + DAY_TICKS_ECO / 2 + (ih(cp.id, this.step, 234) % (DAY_TICKS_ECO / 2));
+          this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'vassal', x: Math.round(cp.x), y: Math.round(cp.y) } as never);
+          this.log(cp.x, cp.y, `{k:${Kind.Goblin}}の集落が、近くに縄張りを持つ{k:${Kind.Orc}}に従った`);
+        }
+      }
+    }
+  }
+
+  /** 取り立ての時が来た集落へ、縄張りのオークを一匹送る */
+  private sendCollectors(): void {
+    for (const cp of this.camps) {
+      if (cp.id < 0 || cp.kind !== 0 || !(cp.lx || cp.ly) || this.w.tick < (cp.tribT ?? 0)) continue;
+      if ((cp.store ?? 0) < 10) {
+        cp.tribT = this.w.tick + 600;
+        continue;
+      }
+      const o = this.list.find((x) => x.k === Kind.Orc && !x.dead && !x.away && x.hx === cp.lx && x.hy === cp.ly && x.st === 0 && !x.hungry && x.flee <= 0 && x.units === 0);
+      if (!o) {
+        cp.tribT = this.w.tick + 600;
+        continue;
+      }
+      o.st = 5;
+      o.ref = cp.id;
+      cp.tribT = this.w.tick + Math.floor(DAY_TICKS_ECO * 0.8) + (ih(cp.id, this.step, 235) % Math.floor(DAY_TICKS_ECO * 0.4));
     }
   }
 
@@ -7727,7 +7927,7 @@ export class Ecology {
       const founding = !this.camps.some((o) => o.id >= 0 && o.kind === 0);
       open = open.filter((i) => !this.dragonNearMouth(i) && (!founding || this.gobMouthOk[i] === 1));
     }
-    // 大ネズミは、まわり（道のり40マス）で養える数に余裕のある口か天井の裂け目からだけ来る（横穴が開いたあとも、裂け目からも入り込む）
+    // 大ネズミは、まわり（道のり RAT_DOOR_REACH マス）で養える数に余裕のある口か天井の裂け目からだけ来る（横穴が開いたあとも、裂け目からも入り込む）
     if (k === Kind.Rat) {
       const opts = [...open.filter((i) => this.ratMouthOk[i] === 1), ...(this.ratShaftOk.some((v) => v === 1) && this.crackSpot(Kind.Rat) ? [-2] : [])];
       return opts.length ? opts[ih(this.step, salt, 196) % opts.length] : -3;
@@ -7758,9 +7958,14 @@ export class Ecology {
   ratShaftOk: number[] = [];
   /** 大ネズミが入り込む裂け目を、その刻みだけ決めておく（来る群れが同じ裂け目から入るように。保存しない） */
   private forcedCrack: [number, number] | null = null;
-  /** 口のまわり（道のり40マス）で、大ネズミをあと2匹以上養えるか（食べられる苔を、一匹が地上の1日に食べる量で割った数と、いまいる数を比べる） */
+  /**
+   * 大ネズミが来るかどうかを決める範囲（道のり）。大ネズミが食べずに歩けるのは約20マスなので、それより内側にする
+   * （四巡目は40マスで、天井の裂け目から来た大ネズミが苔にたどり着く前に飢えていた）
+   */
+  static RAT_DOOR_REACH = 18;
+  /** 口のまわり（道のり RAT_DOOR_REACH マス）で、大ネズミをあと2匹以上養えるか（食べられる苔を、一匹が地上の1日に食べる量で割った数と、いまいる数を比べる） */
   private ratRoomAt(x: number, y: number): boolean {
-    const d = this.walkDist(this.tileOf(x, y), 40);
+    const d = this.walkDist(this.tileOf(x, y), Ecology.RAT_DOOR_REACH);
     let food = 0;
     for (let q = 0; q < d.length; q++) {
       if (d[q] < 0) continue;
@@ -7776,10 +7981,10 @@ export class Ecology {
     this.ratMouthOk = m.mouths.map((mo, i) => (mo.kind === 0 && this.mouthOpen(i) && this.ratRoomAt(...this.mouthSpot(i)) ? 1 : 0));
     this.ratShaftOk = m.shafts.map((q) => (!m.sealed[q.y * m.w + q.x] && !m.solid[q.y * m.w + q.x] && this.ratRoomAt(q.x * TILE + 8, q.y * TILE + 8) ? 1 : 0));
   }
-  /** 入ってきた所から道のり40マス以内の巣穴（空きのあるもの）か、その範囲の新しい巣穴 */
+  /** 入ってきた所から道のり RAT_DOOR_REACH マス以内の巣穴（空きのあるもの）か、その範囲の新しい巣穴 */
   private pickBurrowNear(spot: [number, number]): Burrow {
     const m = this.w.map;
-    const d = this.walkDist(this.tileOf(spot[0], spot[1]), 40);
+    const d = this.walkDist(this.tileOf(spot[0], spot[1]), Ecology.RAT_DOOR_REACH);
     for (const b of this.burrows) {
       const k = this.tileOf(b.x, b.y - 3);
       if (k < 0 || d[k] < 0) continue;
@@ -8344,6 +8549,8 @@ export class Ecology {
       if (walls < 2) continue;
       if (this.warrens.some((o) => Math.abs(o.x - x * TILE) + Math.abs(o.y - y * TILE) < 30 * TILE)) continue;
       if (avoid && Math.abs(avoid.x - x * TILE) + Math.abs(avoid.y - y * TILE) < 30 * TILE) continue;
+      // ゴブリンの集落からも15マス離す（ゴブリンの集落の場所選びと同じ間合い。片方だけでは、集落のすぐそばに住処ができて殺し合っていた）
+      if (this.camps.some((o) => o.id >= 0 && o.kind === 0 && Math.abs(o.x / TILE - x) + Math.abs(o.y / TILE - y) < 15)) continue;
       const px = x * TILE + 8;
       const py = y * TILE + 8;
       if (danger.some(([dx, dy, r]) => sq(dx - px) + sq(dy - py) < r * TILE * r * TILE)) continue;
@@ -9548,7 +9755,7 @@ export class Ecology {
     }
     const P: number[][] = [];
     for (const [id, p] of this.paths) if (this.byId.get(id)?.dead === 0) P.push([id, p.gx, p.gy, p.pi, p.stall, p.gk, p.at, ...p.path]);
-    return { V: 43, PV: 2, G: Array.from(this.deathMap), GV: Array.from(this.graveMap), AG: Array.from(this.advGrave), NM: [...this.names], LE: this.lastElite.map((v) => v ?? null), AC: this.colonies.map((o) => [o.id, o.x, o.y, o.store, o.queen, o.starve, o.hk ?? -1, o.len ?? 0]), KW: this.warrens.map((o) => [o.id, o.x, o.y, o.target, o.prog, o.len, o.stall ?? 0, o.lastProg ?? 0, o.door ?? -1, o.dir ?? -1, o.tun ?? 0, o.store ?? 0, o.hide ?? 0, o.raids ?? 0, o.empty ?? -1, o.alone ?? -1]), KT: this.traps.map((o) => [o.id, o.k, o.w]), KS: this.koboldShun, KM: this.kobMouthOk, RM: [this.ratMouthOk, this.ratShaftOk], GC: this.camps.map((o) => [o.id, o.kind, o.x, o.y, o.dry, o.fuel ?? 0, o.store ?? 0, o.hide ?? 0, o.raids ?? 0, o.empty ?? -1, o.alone ?? -1]), GS: this.goblinShun, GM: this.gobMouthOk, LA: this.lastArrival.map((v) => v ?? null), ST: this.statues.map((o) => [o.id, o.x, o.y, o.k, o.sp, o.dir, o.act, o.f, o.units, o.age, o.blocks ?? -1]), TP: this.piles.map((o) => [o.id, o.x, o.y, o.gold, o.age]), TR: [...this.trails].map(([id, t]) => [id, ...t]), PD: this.pendingDigs, BN: this.burning, PT2: this.parties, LO: this.lore, IT: this.gear.map((o) => [o.id, o.x, o.y, o.kind, o.fuel]), RU: [this.rumors.light, this.rumors.gold, this.rumors.undead, this.rumors.beast, this.rumors.dragon, this.rumors.beastKind, this.rumors.beastX, this.rumors.beastY], GL: [this.goldIn, this.goldOut, this.returned, this.fallen], EV: this.events.map((e) => [e.t, e.x, e.y, e.m]), HD2: this.hold, LP: this.lamps, EG: this.eggs, DSH: this.dragonShell, FX: [this.fxHits.filter((h) => this.w.tick - h.t < 10), this.fxMarks.filter((m) => this.w.tick - m.t < 20), this.fxAttacks.filter((m) => this.w.tick - m.t < 20)], IS: [...this.islandIds], WB: this.wallBroken, PS: this.pendingScraps, PRB: Array.from(this.presenceBase), PRT: Array.from(this.presenceTrace), AL: [...this.alarms.entries()], FG: this.forage, OM: [this.openMoss, this.openFungus, this.edibleMoss, this.wildFungus], DL: [this.dwarfLore, this.lastDwarves], LL: this.lastLogged.map((v) => v ?? null), NZ: this.noises, LD: this.lastDigCount, DS: Array.from(this.discovered), L, P, W: this.webs.map((w) => [w.id, w.x, w.y, w.r, w.owner, w.age]), B: this.burrows.map((b) => [b.x, b.y, b.hk ?? -1, b.len ?? 0, b.moved ?? -1e9, b.cap ?? -1]), n: this.nextId, i: this.imported, e: this.exported, s: this.step };
+    return { V: 43, PV: 2, G: Array.from(this.deathMap), GV: Array.from(this.graveMap), AG: Array.from(this.advGrave), NM: [...this.names], LE: this.lastElite.map((v) => v ?? null), AC: this.colonies.map((o) => [o.id, o.x, o.y, o.store, o.queen, o.starve, o.hk ?? -1, o.len ?? 0]), KW: this.warrens.map((o) => [o.id, o.x, o.y, o.target, o.prog, o.len, o.stall ?? 0, o.lastProg ?? 0, o.door ?? -1, o.dir ?? -1, o.tun ?? 0, o.store ?? 0, o.hide ?? 0, o.raids ?? 0, o.empty ?? -1, o.alone ?? -1]), KT: this.traps.map((o) => [o.id, o.k, o.w]), KS: this.koboldShun, KM: this.kobMouthOk, RM: [this.ratMouthOk, this.ratShaftOk], GC: this.camps.map((o) => [o.id, o.kind, o.x, o.y, o.dry, o.fuel ?? 0, o.store ?? 0, o.hide ?? 0, o.raids ?? 0, o.empty ?? -1, o.alone ?? -1, o.lx ?? 0, o.ly ?? 0, o.tribT ?? 0]), GS: this.goblinShun, GM: this.gobMouthOk, LA: this.lastArrival.map((v) => v ?? null), ST: this.statues.map((o) => [o.id, o.x, o.y, o.k, o.sp, o.dir, o.act, o.f, o.units, o.age, o.blocks ?? -1]), TP: this.piles.map((o) => [o.id, o.x, o.y, o.gold, o.age]), TR: [...this.trails].map(([id, t]) => [id, ...t]), PD: this.pendingDigs, BN: this.burning, PT2: this.parties, LO: this.lore, IT: this.gear.map((o) => [o.id, o.x, o.y, o.kind, o.fuel]), RU: [this.rumors.light, this.rumors.gold, this.rumors.undead, this.rumors.beast, this.rumors.dragon, this.rumors.beastKind, this.rumors.beastX, this.rumors.beastY], GL: [this.goldIn, this.goldOut, this.returned, this.fallen], EV: this.events.map((e) => [e.t, e.x, e.y, e.m]), HD2: this.hold, LP: this.lamps, EG: this.eggs, DSH: this.dragonShell, FX: [this.fxHits.filter((h) => this.w.tick - h.t < 10), this.fxMarks.filter((m) => this.w.tick - m.t < 20), this.fxAttacks.filter((m) => this.w.tick - m.t < 20)], IS: [...this.islandIds], WB: this.wallBroken, PS: this.pendingScraps, PRB: Array.from(this.presenceBase), PRT: Array.from(this.presenceTrace), AL: [...this.alarms.entries()], FG: this.forage, OM: [this.openMoss, this.openFungus, this.edibleMoss, this.wildFungus], DL: [this.dwarfLore, this.lastDwarves], LL: this.lastLogged.map((v) => v ?? null), NZ: this.noises, LD: this.lastDigCount, DS: Array.from(this.discovered), L, P, W: this.webs.map((w) => [w.id, w.x, w.y, w.r, w.owner, w.age]), B: this.burrows.map((b) => [b.x, b.y, b.hk ?? -1, b.len ?? 0, b.moved ?? -1e9, b.cap ?? -1]), n: this.nextId, i: this.imported, e: this.exported, s: this.step };
   }
 
   restore(o: any): void {
@@ -9567,7 +9774,7 @@ export class Ecology {
     this.koboldShun = o.KS ?? 0;
     this.kobMouthOk = o.KM ?? [];
     [this.ratMouthOk, this.ratShaftOk] = o.RM ?? [[], []];
-    this.camps = (o.GC || []).map((a: number[]) => ({ id: a[0], kind: a[1], x: a[2], y: a[3], dry: a[4], fuel: a[5] ?? 0, store: a[6] ?? 0, hide: a[7] ?? 0, raids: a[8] ?? 0, empty: a[9] ?? -1, alone: a[10] ?? -1 }));
+    this.camps = (o.GC || []).map((a: number[]) => ({ id: a[0], kind: a[1], x: a[2], y: a[3], dry: a[4], fuel: a[5] ?? 0, store: a[6] ?? 0, hide: a[7] ?? 0, raids: a[8] ?? 0, empty: a[9] ?? -1, alone: a[10] ?? -1, lx: a[11] ?? 0, ly: a[12] ?? 0, tribT: a[13] ?? 0 }));
     this.goblinShun = o.GS ?? 0;
     this.gobMouthOk = o.GM ?? [];
     this.lastArrival = (o.LA || []).map((v: number | null) => (v === null ? undefined : v)) as number[];
