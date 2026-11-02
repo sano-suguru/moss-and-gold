@@ -145,7 +145,7 @@ export function tendGroups(this: Ecology): void {
       c.hy = best.y;
     }
   }
-  // ゴブリンとリザードマン：集落を失った者は、近くの同じ種の集落に加わる。ゴブリンの集落が15を超えたら、5匹が新しい集落を作る
+  // ゴブリンとリザードマン：集落を失った者は、近くの同じ種の集落に加わる。ゴブリンの集落が15を超えたら、5匹が新しい集落を作る（食べ物の足りる場所があるときだけ。蓄えは人数の割合で分ける）
   for (const c of this.list) {
     if (c.dead || (c.k !== Kind.Goblin && c.k !== Kind.Lizardman) || c.st === 9 || c.st === 10) continue;
     const kind = c.k === Kind.Goblin ? 0 : 1;
@@ -159,8 +159,12 @@ export function tendGroups(this: Ecology): void {
     if (res.length <= 15) continue;
     const site = this.pickGoblinCamp(cp, [cp.x, cp.y], Ecology.GOBLIN_MIN_FOOD);
     if (site < 0) continue;
-    const nc = this.newCamp(site, 'split');
-    for (const c of res.slice(-5)) c.ref = nc.id;
+    const go = res.slice(-5);
+    // 分かれる者は、人数の割合に応じて蓄えを分けて持っていく（七巡目。六巡目までは蓄えなしで始まり、短く終わっていた）
+    const share = Math.floor(((cp.store ?? 0) * go.length) / res.length);
+    cp.store = (cp.store ?? 0) - share;
+    const nc = this.newCamp(site, 'split', share);
+    for (const c of go) c.ref = nc.id;
     this.log(nc.x, nc.y, `{k:${Kind.Goblin}}の群れが分かれ、新しい集落を作った`);
   }
   // コボルト：住処を失った者は、近くの住処に加わる

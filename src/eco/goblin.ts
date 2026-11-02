@@ -132,12 +132,12 @@ export function checkGoblinMouths(this: Ecology): void {
   this.gobMouthOk = m.mouths.map((mo, i) => (mo.kind === 0 && this.mouthOpen(i) && !this.dragonNearMouth(i) && this.pickGoblinCamp(undefined, this.mouthSpot(i), Ecology.GOBLIN_MIN_FOOD) >= 0 ? 1 : 0));
 }
 
-export function newCamp(this: Ecology, k: number, how: string): Camp {
+export function newCamp(this: Ecology, k: number, how: string, store = 0): Camp {
   const m = this.w.map;
   const x = (k % m.w) * TILE + 8;
   const y = Math.floor(k / m.w) * TILE + 8;
-  this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: this.nextId, ev: 'found', how, x, y } as never);
-  const cp: Camp = { id: this.nextId++, kind: 0, x, y, dry: 0, fuel: 0, store: 0, hide: 0, raids: 0, empty: -1, alone: -1 };
+  this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: this.nextId, ev: 'found', how, x, y, ...(store ? { store } : {}) } as never);
+  const cp: Camp = { id: this.nextId++, kind: 0, x, y, dry: 0, fuel: 0, store, hide: 0, raids: 0, empty: -1, alone: -1 };
   this.camps.push(cp);
   return cp;
 }

@@ -894,6 +894,8 @@ export class World {
     for (const k of this.staleWet) paint(k);
     this.dewAt(0);
     const dew = this.dewMap;
+    // 床でなくなったマス（埋まった所など）に前の値を残さない（読み込み直したときは0から作るので、残すと続きの展開が分かれていた）
+    this.moist.fill(0);
     for (const k of this.floors) {
       const v = m.humidity[k] + Math.min(150, w[k] * 3) - this.heat[k] + dew[k];
       this.moist[k] = v < 0 ? 0 : v > 255 ? 255 : v;
