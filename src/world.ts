@@ -158,7 +158,6 @@ export class World {
   private readonly dW: Int32Array;
   private readonly dN: Int32Array;
   private readonly wetNear: Int32Array;
-  private readonly tmp: Int32Array;
   private readonly lightList: Light[];
 
   constructor(seed: string, state?: Partial<WorldState>) {
@@ -177,7 +176,6 @@ export class World {
     this.dW = new Int32Array(N);
     this.dN = new Int32Array(N);
     this.wetNear = new Int32Array(N);
-    this.tmp = new Int32Array(N);
     this.lightList = lightShape(m);
     this.fungus = state?.fungus && state.fungus.length === N ? state.fungus : new Uint8Array(N);
     this.fungusGlow = new Float32Array(N);
@@ -225,6 +223,7 @@ export class World {
     const fl: number[] = [];
     for (let k = 0; k < m.w * m.h; k++) if (!m.solid[k]) fl.push(k);
     this.floors = Int32Array.from(fl);
+    this.wetValid = false;
     this.nb = new Int32Array(fl.length * 4).fill(-1);
     for (let i = 0; i < fl.length; i++) {
       const k = fl[i];
@@ -299,31 +298,31 @@ export class World {
     T.fill(0);
     const W = m.w;
     const H = m.h;
+    const S = m.solid;
+    // 隣への流れ（差が小さくても少しずつは流れる。岩は差が4以上のときだけ）。配列を作らずに四方を順に見る
+    const flow = (k: number, n: number, v: number, sk: number) => {
+      const d = v - M[n];
+      if (sk || S[n]) {
+        if (d >= 4) {
+          const f = d >= 32 ? (d / 16) | 0 : 1;
+          T[k] -= f;
+          T[n] += f;
+        }
+      } else if (d >= 2) {
+        const f = d >= 12 ? (d / 6) | 0 : 1;
+        T[k] -= f;
+        T[n] += f;
+      }
+    };
     for (let y = 1; y < H - 1; y++)
-      for (let x = 1; x < W - 1; x++) {
-        const k = y * W + x;
+      for (let x = 1, k = y * W + 1; x < W - 1; x++, k++) {
         const v = M[k];
         if (v < 2) continue;
-        for (const n of [k + 1, k + W]) {
-          const d = v - M[n];
-          const rock = m.solid[k] || m.solid[n];
-          // 差が小さくても少しずつは流れる（岩は差が4以上のときだけ）
-          if (d >= (rock ? 4 : 2)) {
-            const f = Math.max(1, (d / (rock ? 16 : 6)) | 0);
-            T[k] -= f;
-            T[n] += f;
-          }
-        }
-        for (const n of [k - 1, k - W]) {
-          const d = v - M[n];
-          const rock = m.solid[k] || m.solid[n];
-          // 差が小さくても少しずつは流れる（岩は差が4以上のときだけ）
-          if (d >= (rock ? 4 : 2)) {
-            const f = Math.max(1, (d / (rock ? 16 : 6)) | 0);
-            T[k] -= f;
-            T[n] += f;
-          }
-        }
+        const sk = S[k];
+        flow(k, k + 1, v, sk);
+        flow(k, k + W, v, sk);
+        flow(k, k - 1, v, sk);
+        flow(k, k - W, v, sk);
       }
     for (let k = 0; k < M.length; k++) if (T[k]) M[k] += T[k];
     // 外へ逃げる：正面の入口と、開いた地表の横穴
@@ -801,6 +800,30 @@ export class World {
     for (let k = 0; k < acc.length; k++) this.lightBase[k] = Math.min(1000, Math.round(acc[k] * 1000));
   }
 
+  /**
+   * 見通しの控え（マスごとに、まわり7×7への見通し。0 未計算 / 1 見える / 2 見えない）。
+   * 見通しは岩だけで決まるので、地形の変化の記録（digs.length）が増えたときだけ捨てる
+   */
+  private losMemo = new Uint8Array(0);
+  private losDigs = -1;
+  private losNear(k: number, dx: number, dy: number, cx: number, cy: number, nx: number, ny: number): boolean {
+    const N = this.map.w * this.map.h;
+    if (this.losMemo.length !== N * 49) {
+      this.losMemo = new Uint8Array(N * 49);
+      this.losDigs = this.digs.length;
+    } else if (this.losDigs !== this.digs.length) {
+      this.losMemo.fill(0);
+      this.losDigs = this.digs.length;
+    }
+    const q = k * 49 + (dy + 3) * 7 + (dx + 3);
+    let v = this.losMemo[q];
+    if (v === 0) {
+      v = lineOfSight(this.map, cx, cy, nx * TILE + 8, ny * TILE + 8) ? 1 : 2;
+      this.losMemo[q] = v;
+    }
+    return v === 1;
+  }
+
   private spreadGlow(out: Float32Array, k: number, v: number, R: number): void {
     const m = this.map;
     const x = k % m.w;
@@ -815,7 +838,7 @@ export class World {
         const d = Math.sqrt(dx * dx + dy * dy);
         if (d > R + 0.2) continue;
         const f = 1 - d / (R + 0.4);
-        if (d > 1.1 && !lineOfSight(m, cx, cy, nx * TILE + 8, ny * TILE + 8)) continue;
+        if (d > 1.1 && !(R <= 3 ? this.losNear(k, dx, dy, cx, cy, nx, ny) : lineOfSight(m, cx, cy, nx * TILE + 8, ny * TILE + 8))) continue;
         out[ny * m.w + nx] += v * f * f;
       }
   }
@@ -844,35 +867,31 @@ export class World {
   private computeMoist(): void {
     const m = this.map;
     const W = m.w;
-    const t = this.tmp;
     const w = this.wetNear;
-    // 5×5 の最大の水量（横、縦の順に）
-    for (let y = 0; y < m.h; y++)
-      for (let x = 0; x < W; x++) {
-        let mx = 0;
-        for (let d = -2; d <= 2; d++) {
-          const xx = x + d;
-          if (xx >= 0 && xx < W) {
-            const v = this.water[y * W + xx];
-            if (v > mx) mx = v;
-          }
-        }
-        t[y * W + x] = mx;
-      }
-    for (let y = 0; y < m.h; y++)
-      for (let x = 0; x < W; x++) {
-        let mx = 0;
-        for (let d = -2; d <= 2; d++) {
-          const yy = y + d;
-          if (yy >= 0 && yy < m.h) {
-            const v = t[yy * W + x];
-            if (v > mx) mx = v;
-          }
-        }
-        w[y * W + x] = mx;
-      }
+    // 5×5 の最大の水量（地図の端で切れる）。水のあるマスは少ないので、水のあるマスから周りへ書き込む（全マスを見るのと同じ結果）
+    w.fill(0);
+    this.ensureWet();
+    const H = m.h;
+    const fl = this.floors;
+    const Wt = this.water;
+    const paint = (k: number) => {
+      const v = Wt[k];
+      if (v <= 0) return;
+      const x = k % W;
+      const y = (k / W) | 0;
+      const x0 = x < 2 ? 0 : x - 2;
+      const x1 = x + 2 >= W ? W - 1 : x + 2;
+      const y0 = y < 2 ? 0 : y - 2;
+      const y1 = y + 2 >= H ? H - 1 : y + 2;
+      for (let yy = y0; yy <= y1; yy++)
+        for (let q = yy * W + x0, e = yy * W + x1; q <= e; q++) if (w[q] < v) w[q] = v;
+    };
+    for (let j = 0; j < this.wetN; j++) paint(fl[this.wetIdx[j]]);
+    for (const k of this.staleWet) paint(k);
+    this.dewAt(0);
+    const dew = this.dewMap;
     for (const k of this.floors) {
-      const v = m.humidity[k] + Math.min(150, w[k] * 3) - this.heat[k] + this.dewAt(k);
+      const v = m.humidity[k] + Math.min(150, w[k] * 3) - this.heat[k] + dew[k];
       this.moist[k] = v < 0 ? 0 : v > 255 ? 255 : v;
     }
   }
@@ -958,6 +977,41 @@ export class World {
     return Math.round(SPRING_BASE * (0.35 + 0.65 * tri));
   }
 
+  /** 水のある床マス（floors の並びの番号）。水の刻みは水のあるマスとその隣だけを見る（並びによらない計算なので、全マスを見るのと同じ結果） */
+  private wetIdx = new Int32Array(0);
+  private wetN = 0;
+  private wetValid = false;
+  /** 床でなくなったのに水が残っているマス（水の刻みでは変わらないが、湿り気には効く） */
+  private staleWet: number[] = [];
+  /** 地図のマス → floors の番号（床でなければ -1） */
+  private kToI = new Int32Array(0);
+  private touchMark = new Int32Array(0);
+  private touchStamp = 0;
+  private touched = new Int32Array(0);
+
+  private ensureWet(): void {
+    if (this.wetValid) return;
+    const N = this.map.w * this.map.h;
+    const fl = this.floors;
+    if (this.kToI.length !== N) {
+      this.kToI = new Int32Array(N);
+      this.touchMark = new Int32Array(N);
+    }
+    this.kToI.fill(-1);
+    for (let i = 0; i < fl.length; i++) this.kToI[fl[i]] = i;
+    this.wetIdx = new Int32Array(fl.length);
+    this.touched = new Int32Array(fl.length);
+    this.wetN = 0;
+    this.staleWet = [];
+    for (let k = 0; k < N; k++) {
+      if (this.water[k] <= 0) continue;
+      const i = this.kToI[k];
+      if (i >= 0) this.wetIdx[this.wetN++] = i;
+      else this.staleWet.push(k);
+    }
+    this.wetValid = true;
+  }
+
   private waterStep(): void {
     const m = this.map;
     const Wt = this.water;
@@ -968,13 +1022,32 @@ export class World {
     const fl = this.floors;
     const nb = this.nb;
     const step = (this.tick / WATER_EVERY) | 0;
+    this.ensureWet();
+    const mark = this.touchMark;
+    const stamp = ++this.touchStamp;
+    const tl = this.touched;
+    const kToI = this.kToI;
+    let tn = 0;
+    // 前の刻みで水のあったマスと、湧き水のマスが出発点
+    for (let j = 0; j < this.wetN; j++) {
+      const i = this.wetIdx[j];
+      mark[fl[i]] = stamp;
+      tl[tn++] = i;
+    }
+    for (const s of m.springs) {
+      const k = s.y * m.w + s.x;
+      Wt[k] += this.springRate(s.phase);
+      const i = kToI[k];
+      if (i >= 0 && mark[k] !== stamp) {
+        mark[k] = stamp;
+        tl[tn++] = i;
+      } else if (i < 0 && !this.staleWet.includes(k)) this.staleWet.push(k);
+    }
+    const n0 = tn;
 
-    for (const s of m.springs) Wt[s.y * m.w + s.x] += this.springRate(s.phase);
-
-    dW.fill(0);
-    dN.fill(0);
     const outs = [0, 0, 0, 0];
-    for (let i = 0; i < fl.length; i++) {
+    for (let j = 0; j < n0; j++) {
+      const i = tl[j];
       const k = fl[i];
       const wk = Wt[k];
       // ごく薄い水は表面張力で留まる（細い流れと水たまりを保つ）
@@ -1000,6 +1073,10 @@ export class World {
         const n = nb[i * 4 + d];
         dW[k] -= o;
         dW[n] += o;
+        if (mark[n] !== stamp) {
+          mark[n] = stamp;
+          tl[tn++] = kToI[n];
+        }
         const nm = Math.floor((Nu[k] * o) / (wk * 4));
         if (nm > 0) {
           dN[k] -= nm;
@@ -1007,10 +1084,12 @@ export class World {
         }
       }
     }
-    for (let i = 0; i < fl.length; i++) {
-      const k = fl[i];
+    for (let j = 0; j < tn; j++) {
+      const k = fl[tl[j]];
       Wt[k] += dW[k];
       Nu[k] += dN[k];
+      dW[k] = 0;
+      dN[k] = 0;
     }
     for (const s of m.sinks) {
       const k = s.y * m.w + s.x;
@@ -1025,7 +1104,10 @@ export class World {
         }
       }
     }
-    for (let i = 0; i < fl.length; i++) {
+    let wn = 0;
+    const wet = this.wetIdx;
+    for (let j = 0; j < tn; j++) {
+      const i = tl[j];
       const k = fl[i];
       if (Wt[k] <= 0) continue;
       if (m.lava[k]) {
@@ -1034,7 +1116,9 @@ export class World {
       }
       const loss = (Wt[k] < 8 || (ih(k, step) & 3) === 0 ? 1 : 0) + (this.heat[k] >> 5);
       Wt[k] = Math.max(0, Wt[k] - loss);
+      if (Wt[k] > 0) wet[wn++] = i;
     }
+    this.wetN = wn;
     this.fieldsDirty = true;
   }
 

@@ -1036,8 +1036,23 @@ export class Ecology {
 
   // ---------- 生き物の格子（近くの相手を探す） ----------
 
+  /** 地図の横8マスごとの区切りに、いま何匹いるか（nearby で空の区切りを飛ばす。見る順番は変わらない） */
+  private blk = new Int32Array(0);
+  private usedTiles: number[] = [];
+
   private rebuildGrid(): void {
-    this.head.fill(-1);
+    const m = this.w.map;
+    const BW = (m.w + 7) >> 3;
+    if (this.blk.length !== BW * m.h) {
+      this.blk = new Int32Array(BW * m.h);
+      this.head.fill(-1);
+      this.usedTiles.length = 0;
+    }
+    for (const k of this.usedTiles) {
+      this.head[k] = -1;
+      this.blk[((k / m.w) | 0) * BW + ((k % m.w) >> 3)] = 0;
+    }
+    this.usedTiles.length = 0;
     this.items = this.list;
     if (this.next.length < this.list.length) this.next = new Int32Array(this.list.length * 2);
     for (let i = 0; i < this.list.length; i++) {
@@ -1045,20 +1060,37 @@ export class Ecology {
       if (c.dead || c.away) continue;
       const k = this.tileOf(c.x, c.y);
       if (k < 0) continue;
+      if (this.head[k] < 0) this.usedTiles.push(k);
       this.next[i] = this.head[k];
       this.head[k] = i;
+      this.blk[((k / m.w) | 0) * BW + ((k % m.w) >> 3)]++;
     }
   }
 
   private nearby(x: number, y: number, R: number, fn: (c: Cr) => void): void {
     const m = this.w.map;
+    const W = m.w;
+    const BW = (W + 7) >> 3;
     const tx = Math.floor(x / TILE);
     const ty = Math.floor(y / TILE);
-    for (let yy = ty - R; yy <= ty + R; yy++)
-      for (let xx = tx - R; xx <= tx + R; xx++) {
-        if (xx < 0 || yy < 0 || xx >= m.w || yy >= m.h) continue;
-        for (let i = this.head[yy * m.w + xx]; i >= 0; i = this.next[i]) fn(this.items[i]);
+    const y0 = Math.max(0, ty - R);
+    const y1 = Math.min(m.h - 1, ty + R);
+    const x0 = Math.max(0, tx - R);
+    const x1 = Math.min(W - 1, tx + R);
+    const head = this.head;
+    const blk = this.blk;
+    for (let yy = y0; yy <= y1; yy++) {
+      const row = yy * W;
+      const brow = yy * BW;
+      for (let xx = x0; xx <= x1; ) {
+        if (blk[brow + (xx >> 3)] === 0) {
+          xx = (xx | 7) + 1;
+          continue;
+        }
+        for (let i = head[row + xx]; i >= 0; i = this.next[i]) fn(this.items[i]);
+        xx++;
       }
+    }
   }
 
   // ---------- 1歩 ----------
