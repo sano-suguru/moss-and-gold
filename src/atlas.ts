@@ -34,6 +34,12 @@ export interface Atlas {
   web: number;
   burrow: number;
   anthill: number;
+  /** コボルトの住処：罠（鉄の歯の板）、入口の骨の飾り柱、奥の寝床（わら）、キノコの畑（0 芽、1 育った）、暗がりで光る目（コマ 0〜3、3 はまばたき） */
+  trap: number;
+  totem: number;
+  nest: number;
+  furrow: (grown: number) => number;
+  eyes: (f: number) => number;
   /** 宝の山（大きさ 0..2、きらめきのコマ） */
   treasure: (size: number, f: number) => number;
   wormSeg: (kind: number) => number;
@@ -137,6 +143,69 @@ function makeBurrow(): RawFrame {
     }
   return { W, H, px, mat, ax: 7, ay: 6 };
 }
+
+/**
+ * 文字の並びから小さな絵を作る（pal：文字 → [r,g,b, 光るなら1]）。ax, ay は足もと
+ */
+function pattern(rows: string[], pal: Record<string, number[]>, ax: number, ay: number): RawFrame {
+  const H = rows.length;
+  const W = rows[0].length;
+  const px = new Uint8ClampedArray(W * H * 4);
+  const mat: (string | null)[] = new Array(W * H).fill(null);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const c = pal[rows[y][x]];
+      if (!c) continue;
+      const p = y * W + x;
+      px[p * 4] = c[0];
+      px[p * 4 + 1] = c[1];
+      px[p * 4 + 2] = c[2];
+      px[p * 4 + 3] = 255;
+      mat[p] = c[3] ? 'wisp' : 'ol';
+    }
+  return { W, H, px, mat, ax, ay };
+}
+
+// コボルトの罠：錆びた鉄の板に、光をはじく歯が並ぶ（暗い床でも歯のきらめきで見える）
+const TRAP = pattern(
+  ['.S...S...S...S.', 'sSs.sSs.sSs.sSs', 'kRRRRRRRRRRRRRk', 'kRrRrRrRrRrRrRk', 'kRRRRRRRRRRRRRk', '.kkkkkkkkkkkkk.', '..c....c....c..'],
+  { S: [240, 236, 214, 1], s: [176, 172, 160], k: [26, 20, 22], R: [176, 96, 44], r: [112, 58, 30], c: [96, 96, 104] },
+  7,
+  5,
+);
+// 住処の入口の飾り柱：骨のしゃれこうべと赤い布を下げた木の杭
+const TOTEM = pattern(
+  ['..bbbbb..', '.bbbbbbb.', '.bEbbbEb.', '.bbbbbbb.', '..bkbkb..', '...bbb...', '..rrwrr..', '.rr.w.rr.', '.r..w..r.', '....w....', '...gwg...', '....w....', '....w....', '....w....', '....w....', '...www...', '..wwwww..'],
+  { b: [228, 220, 198], E: [255, 120, 60, 1], k: [24, 18, 20], r: [184, 44, 38], w: [128, 86, 52], g: [104, 150, 86] },
+  4,
+  16,
+);
+// 奥の寝床：わらと毛皮を敷いた浅いくぼみ
+const NEST = pattern(
+  ['....yYyYyYyY....', '..yYfffffffYyY..', '.YyffFffFffFfyY.', 'yYyfffffffffyYyY', '.yYyYyYyYyYyYyY.', '...yyyyyyyyyy...'],
+  { y: [214, 178, 92], Y: [246, 216, 128], f: [140, 102, 68], F: [182, 140, 96] },
+  8,
+  4,
+);
+// キノコの畑：耕した畝に、植えたキノコが並ぶ（0 芽、1 育った傘。傘のふちがほのかに光る）
+const FURROW = [
+  pattern(
+    ['..............', '..p...p...p...', '..s...s...s...', 'LLLLLLLLLLLLLL', 'DDDDDDDDDDDDDD'],
+    { p: [214, 196, 236], s: [200, 186, 160], L: [150, 112, 74], D: [52, 34, 24] },
+    7,
+    4,
+  ),
+  pattern(
+    ['.cCc...cCc....', 'cCgCc.cCgCc.c.', '..s.....s..cCc', '..s.....s...s.', 'LLLLLLLLLLLLLL', 'DDDDDDDDDDDDDD'],
+    { c: [190, 170, 210], C: [236, 222, 248], g: [230, 200, 255, 1], s: [214, 200, 172], L: [150, 112, 74], D: [52, 34, 24] },
+    7,
+    5,
+  ),
+];
+// 暗がりで光る目（二つの点。3 コマ目はまばたき）
+const EYES = [0, 1, 2, 3].map((f) =>
+  pattern(f === 3 ? ['.....', '.k.k.', '.....'] : ['.....', '.E.E.', '.....'], { E: f === 1 ? [255, 236, 150, 1] : [255, 214, 110, 1], k: [70, 60, 40] }, 2, 1),
+);
 
 export function buildAtlas(): Atlas {
   const raws: RawFrame[] = [];
@@ -491,6 +560,20 @@ export function buildAtlas(): Atlas {
   raws.push(makeWeb());
   const burrow = raws.length;
   raws.push(makeBurrow());
+  const trapFrame = raws.length;
+  raws.push(TRAP);
+  const totemFrame = raws.length;
+  raws.push(TOTEM);
+  const nestFrame = raws.length;
+  raws.push(NEST);
+  const furrowFrames = FURROW.map((f) => {
+    raws.push(f);
+    return raws.length - 1;
+  });
+  const eyeFrames = EYES.map((e) => {
+    raws.push(e);
+    return raws.length - 1;
+  });
 
   // 棚詰め
   // 高さの順に棚へ詰める（コマの番号はそのまま）
@@ -537,6 +620,11 @@ export function buildAtlas(): Atlas {
     burrow,
     index: (s, d, a, f, b = 0) => keyIndex.get(`${s},${d},${a},${f & 3},${s === 0 ? b : 0}`) ?? 0,
     anthill: anthillFrame,
+    trap: trapFrame,
+    totem: totemFrame,
+    nest: nestFrame,
+    furrow: (g) => furrowFrames[g ? 1 : 0],
+    eyes: (f) => eyeFrames[f & 3],
     treasure: (size, f) => treasureFrames[size * 4 + (f & 3)],
     wormSeg: (kind) => segFrames[kind],
     breath: (down, f) => breathFrames[(down ? 4 : 0) + (f & 3)],

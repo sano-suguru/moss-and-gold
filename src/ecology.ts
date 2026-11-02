@@ -8172,12 +8172,13 @@ export class Ecology {
   }
 
   /** 住処のそばの暗く湿った床（決まった数マスの畑）で、土の養分をキノコに移して育てる */
-  private farmFungus(wr: Warren): void {
+  /** 住処の畑のマス（住処のそばの決まった数マス：暗く、湿っているか横穴の中。最大3マス）。描画でも使う */
+  farmTiles(wr: Warren): number[] {
     const m = this.w.map;
     const hx = Math.floor(wr.x / TILE);
     const hy = Math.floor(wr.y / TILE);
-    let n = 0;
-    for (let i = 0; i < 24 && n < 3; i++) {
+    const out: number[] = [];
+    for (let i = 0; i < 24 && out.length < 3; i++) {
       const h = ih(wr.id, i, 230);
       const x = hx + (h % 9) - 4;
       const y = hy + ((h >>> 8) % 9) - 4;
@@ -8186,7 +8187,15 @@ export class Ecology {
       if (m.solid[k] || m.lava[k] || m.sealed[k] || this.w.water[k] > 30 || this.w.lightBase[k] > 100) continue;
       // 掘った横穴の中と入口のまわりは、地中の湿り気がある扱い（湿り気の値は書き換えない）
       if (this.w.moist[k] < 40 && !this.underground(wr, k)) continue;
-      n++;
+      out.push(k);
+    }
+    return out;
+  }
+
+  /** 住処のそばの畑で、土の養分をキノコに移して育てる */
+  private farmFungus(wr: Warren): void {
+    const m = this.w.map;
+    for (const k of this.farmTiles(wr)) {
       if (this.w.fungus[k] >= 160) continue;
       let got = 0;
       for (const q of [k, k + 1, k - 1, k + m.w, k - m.w, k + 2, k - 2, k + 2 * m.w, k - 2 * m.w]) {
@@ -8242,7 +8251,7 @@ export class Ecology {
     return m.dug[k] === 1 && sq((k % m.w) * TILE + 8 - wr.x) + sq(Math.floor(k / m.w) * TILE + 8 - wr.y) < 6 * TILE * 6 * TILE;
   }
 
-  /** 住処の入口から2〜3マスの床に罠を仕掛ける */
+  /** 住処の入口から2〜3マスの、横穴の外の床に罠を仕掛ける */
   private placeTrap(wr: Warren): void {
     const m = this.w.map;
     const d = wr.door ?? -1;
@@ -8256,7 +8265,8 @@ export class Ecology {
       const r = Math.abs(x - dx0) + Math.abs(y - dy0);
       if (r < 2 || r > 3 || x < 1 || y < 1 || x >= m.w - 1 || y >= m.h - 1) continue;
       const k = y * m.w + x;
-      if (m.solid[k] || m.lava[k] || m.sealed[k] || this.w.water[k] > 20 || this.traps.some((t) => t.k === k)) continue;
+      // 横穴の中（掘ったマス）には置かず、入口の外の床に置く
+      if (m.solid[k] || m.lava[k] || m.sealed[k] || m.dug[k] || this.w.water[k] > 20 || this.traps.some((t) => t.k === k)) continue;
       this.traps.push({ id: this.nextId++, k, w: wr.id });
       return;
     }

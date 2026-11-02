@@ -309,11 +309,34 @@ export class CreatureView {
 
     // 地面のもの（巣穴、クモの巣）
     for (const b of eco.burrows) if (inView(b.x, b.y, 16)) pushSprite(b.x, b.y, 0, false, A.burrow, 0, 2);
-    // コボルトの罠：小さな印
-    for (const t of eco.traps) {
-      const tx = (t.k % eco.mapW) * 16 + 8;
-      const ty = Math.floor(t.k / eco.mapW) * 16 + 10;
-      if (inView(tx, ty, 16)) pushSprite(tx, ty, 0, false, A.speck(3, 3), 0, 2);
+    // コボルトの住処：畑の畝、奥の寝床、入口の飾り柱、罠
+    for (const wr of eco.warrens) {
+      if (wr.id < 0 || !inView(wr.x, wr.y, 96)) continue;
+      const mw = eco.mapW;
+      for (const k of eco.farmTiles(wr)) pushSprite((k % mw) * 16 + 8, Math.floor(k / mw) * 16 + 14, 0, false, A.furrow(eco.w.fungus[k] >= 80 ? 1 : 0), 0, 2);
+      pushSprite(wr.x, wr.y + 5, 0, false, A.nest, 0, 2);
+      const d = wr.door ?? -1;
+      // 横穴の入口の脇（横穴と反対の側の、床の上）に飾り柱を立てる
+      if (d >= 0) {
+        const dx0 = (d % mw) * 16 + 8;
+        const dy0 = Math.floor(d / mw) * 16 + 8;
+        const vx = wr.x - dx0;
+        const vy = wr.y - dy0;
+        const ox = vx > 8 ? -7 : vx < -8 ? 7 : Math.abs(vy) > 8 ? 7 : 7;
+        const oy = vy > 8 ? -3 : vy < -8 ? 3 : 0;
+        pushSprite(dx0 + ox, dy0 + 6 + oy, 0, false, A.totem, 0, 0);
+      }
+    }
+    for (const tr of eco.traps) {
+      const tx = (tr.k % eco.mapW) * 16 + 8;
+      const ty = Math.floor(tr.k / eco.mapW) * 16 + 11;
+      if (inView(tx, ty, 16)) pushSprite(tx, ty, 0, false, A.trap, 0, 2);
+    }
+    // 隠れているコボルト：姿は見せず、暗がりで目だけが光る（ときどきまばたき）
+    for (const c of eco.list) {
+      if (c.k !== Kind.Kobold || !eco.isHidden(c) || !inView(c.x, c.y, 16)) continue;
+      const ph = Math.floor(t * 2 + c.id * 0.37) % 7;
+      pushSprite(c.x, c.y - 7, 0, false, A.eyes(ph === 6 ? 3 : ph & 1), 0, 0);
     }
     for (const w of eco.webs) if (inView(w.x, w.y, 24)) pushSprite(w.x, w.y, 0, false, A.web, 0, 2);
     for (const c of eco.colonies) if (inView(c.x, c.y, 24)) pushSprite(c.x, c.y + 4, 0, false, A.anthill, 0, 2);
