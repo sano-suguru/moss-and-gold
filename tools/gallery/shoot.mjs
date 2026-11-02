@@ -6,8 +6,11 @@
 //   node tools/gallery/shoot.mjs --compare before   いまの画像と before を左右に並べた build/gallery/compare-before.png
 //   node tools/gallery/shoot.mjs --light            確認用の明かり（#lit：全体を明るく照らす）をつけて撮る（暗さと絵の出来を分けて見る）
 //   node tools/gallery/shoot.mjs --no-shoot         撮らずに一覧だけ作り直す
+//   node tools/gallery/shoot.mjs --fresh            場面をかならず作り直す（ふだんはシミュレーションのコードが同じなら前回の場面を使う）
+//   場面づくり（build/scenes.js）は、ここから呼ぶ（npm run gallery -- の後ろの指定がここに届くように）
 import { createRequire } from 'module';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { execFileSync } from 'child_process';
 import { join, resolve } from 'path';
 const { chromium } = createRequire(import.meta.url)('playwright');
 
@@ -15,6 +18,7 @@ const ROOT = resolve('.');
 const G = join(ROOT, 'build', 'gallery');
 const args = process.argv.slice(2);
 const opt = (k) => (args.includes(k) ? args[args.indexOf(k) + 1] : undefined);
+if (!args.includes('--no-shoot') && existsSync(join(ROOT, 'build', 'scenes.js'))) execFileSync('node', [join(ROOT, 'build', 'scenes.js'), ...(args.includes('--fresh') ? ['--fresh'] : [])], { stdio: 'inherit' });
 let scenes = JSON.parse(readFileSync(join(G, 'scenes.json'), 'utf8'));
 if (opt('--only')) {
   const keep = opt('--only').split(',');
@@ -25,21 +29,47 @@ const light = args.includes('--light');
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 
 if (!args.includes('--no-shoot')) {
-  for (const s of scenes) {
-    const phone = s.device === 'phone';
-    const ctx = await browser.newContext({ viewport: phone ? { width: 390, height: 844 } : { width: 1000, height: 640 }, deviceScaleFactor: phone ? 2 : 1 });
-    const data = readFileSync(join(ROOT, s.file), 'utf8');
-    await ctx.addInitScript((d) => localStorage.setItem('dungeon-aquarium-v2', d), data);
-    const page = await ctx.newPage();
+  // 同時に2つのページで撮る。ページは場面ごとに読み込み直さず、window.__openScene で場面だけを入れ替える
+  // （絵の部品と WebGL を作り直さないので、1枚あたり約1.5秒）。スマホの場面は画面の大きさが違うので別のページで撮る。
+  const hash = (phone) => [phone ? '' : 'clean', light ? 'lit' : ''].filter(Boolean).join(',');
+  const url = (phone) => 'file://' + join(ROOT, 'dist', 'index.html') + (hash(phone) ? '#' + hash(phone) : '');
+  // 20回描き終わるまで待ち、描くのを止める（止めると撮るのが速い）
+  const waitFrames = async (page) => {
+    await page.waitForFunction(() => (window.__frames ?? 0) >= 20, null, { timeout: 15000 });
+    await page.evaluate(() => { window.__hold = true; });
+  };
+  const lane = async (list) => {
+    let page = null;
+    let ctx = null;
     const errs = [];
-    page.on('pageerror', (e) => errs.push(String(e)));
-    const hash = [phone ? '' : 'clean', light ? 'lit' : ''].filter(Boolean).join(',');
-    await page.goto('file://' + join(ROOT, 'dist', 'index.html') + (hash ? '#' + hash : ''));
-    await page.waitForTimeout(2500);
-    await page.screenshot({ path: join(G, s.name + '.png') });
-    console.log(s.name, errs.length ? errs : 'ok');
-    await ctx.close();
-  }
+    for (const s of list) {
+      const data = readFileSync(join(ROOT, s.file), 'utf8');
+      const phone = s.device === 'phone';
+      if (phone || !page) {
+        ctx = await browser.newContext({ viewport: phone ? { width: 390, height: 844 } : { width: 1000, height: 640 }, deviceScaleFactor: phone ? 2 : 1 });
+        await ctx.addInitScript((d) => { if (!sessionStorage.getItem('opened')) { localStorage.setItem('dungeon-aquarium-v2', d); sessionStorage.setItem('opened', '1'); } }, data);
+        const p = await ctx.newPage();
+        p.on('pageerror', (e) => errs.push(String(e)));
+        await p.goto(url(phone));
+        await waitFrames(p);
+        if (phone) {
+          await p.screenshot({ path: join(G, s.name + '.png') });
+          console.log(s.name, errs.length ? errs.splice(0) : 'ok');
+          await ctx.close();
+          continue;
+        }
+        page = p;
+      } else {
+        await page.evaluate((d) => window.__openScene(d), data);
+        await waitFrames(page);
+      }
+      await page.screenshot({ path: join(G, s.name + '.png') });
+      console.log(s.name, errs.length ? errs.splice(0) : 'ok');
+    }
+    if (page) await page.context().close();
+  };
+  const jobs = Math.max(1, +(process.env.SHOOT_JOBS || 2));
+  await Promise.all(Array.from({ length: jobs }, (_, j) => lane(scenes.filter((_, i) => i % jobs === j))));
 }
 
 if (opt('--label')) {

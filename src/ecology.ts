@@ -403,6 +403,16 @@ export interface Burrow {
   len?: number;
 }
 
+/** 狩りの獲物の種（毎刻み配列を作らないように） */
+const HUNT0: Kind[] = [Kind.Rat, Kind.Ant];
+const HUNT1: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Adventurer, Kind.Dwarf];
+const HUNT2: Kind[] = [Kind.Rat, Kind.Ant, Kind.Kobold];
+const HUNT3: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Orc, Kind.Lizardman, Kind.Spider, Kind.Slime, Kind.Zombie, Kind.Adventurer];
+const HUNT4: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Lizardman, Kind.Orc, Kind.Slime, Kind.Zombie, Kind.Myconid, Kind.Adventurer];
+const HUNT5: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Ant, Kind.Kobold, Kind.Goblin];
+const HUNT6: Kind[] = [Kind.Rat];
+/** 上下左右（毎刻み配列を作らないように） */
+const NB4: readonly (readonly [number, number])[] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 /** 16方向の単位ベクトル（三角関数を使わずに作る） */
 const DIR16: [number, number][] = [
   [16, 0], [15, 6], [11, 11], [6, 15], [0, 16], [-6, 15], [-11, 11], [-15, 6],
@@ -505,6 +515,8 @@ export class Ecology {
   koboldShun = 0;
   /** 同時にダンジョンの中にいる冒険者の一行の数の上限（切り替えられる。既定 1。段階13までは 2） */
   static ADV_MAX_PARTIES = 1;
+  /** 弱い生き物の害（pester）をなす種 */
+  static PESTERS = new Set<number>([Kind.Rat, Kind.Bat, Kind.Ant, Kind.Wisp, Kind.Myconid, Kind.Salamander]);
   /** 苔を食べたなどで苔の場が変わった */
   mossTouched = false;
   private lastPhase = 0;
@@ -672,7 +684,7 @@ export class Ecology {
     const m = this.w.map;
     let v = this.w.moss[k] / 255 + this.w.fungus[k] / 400 + Math.min(1, this.w.mana[k] / 40) * 0.6;
     v -= (this.w.lightBase[k] * day) / 600;
-    if (this.fireNear((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8)) v -= 1;
+    if (this.fireNearTile(k)) v -= 1;
     return v;
   }
 
@@ -1209,7 +1221,7 @@ export class Ecology {
           c.mana += t;
         }
       }
-      if ([Kind.Rat, Kind.Bat, Kind.Ant, Kind.Wisp, Kind.Myconid, Kind.Salamander].includes(c.k) && this.pester(c)) {
+      if (Ecology.PESTERS.has(c.k) && this.pester(c)) {
         this.metabolism(c);
         continue;
       }
@@ -1307,6 +1319,7 @@ export class Ecology {
           if (c.dead === 2) {
             this.byId.delete(c.id);
             this.paths.delete(c.id);
+            this.gkMemo.delete(c.id);
           }
         this.list = keep;
       }
@@ -1459,7 +1472,7 @@ export class Ecology {
     let by = 0;
     const tx = Math.floor(c.x / TILE);
     const ty = Math.floor(c.y / TILE);
-    const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const nb = NB4;
     for (const [dx, dy] of nb) {
       const xx = tx + dx;
       const yy = ty + dy;
@@ -2554,7 +2567,7 @@ export class Ecology {
     if (c.st === 3 && c.food >= s.cap * 0.7) c.st = 0;
     if (c.hungry || c.st === 3) {
       if (c.hungry) c.st = 3;
-      if (this.hunt(c, 9, [Kind.Rat, Kind.Ant], s.speed * 1.15)) return;
+      if (this.hunt(c, 9, HUNT0, s.speed * 1.15)) return;
       const k = this.findMoss(c, c.x, c.y, 8, 91);
       const kk = k >= 0 ? k : this.findFungus(c.x, c.y, 8, c.id);
       if (kk >= 0) {
@@ -2717,7 +2730,7 @@ export class Ecology {
     if (this.leaveIfStarving(c)) return;
     if (c.act === 2 && c.actT < 4) return;
     if (c.hungry) {
-      if (this.hunt(c, 10, [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Adventurer, Kind.Dwarf], s.speed * 1.2)) return;
+      if (this.hunt(c, 10, HUNT1, s.speed * 1.2)) return;
       // 近くの集落を襲いに行く
       const targets = [...this.camps.filter((o) => o.kind === 0), ...this.warrens];
       let best: { x: number; y: number } | null = null;
@@ -2787,7 +2800,7 @@ export class Ecology {
     }
     if (cp && this.defend(c, cp.x, cp.y, [Kind.Orc, Kind.Goblin])) return;
     if (c.hungry) {
-      if (this.hunt(c, 10, [Kind.Rat, Kind.Ant, Kind.Kobold], s.speed * 1.2)) return;
+      if (this.hunt(c, 10, HUNT2, s.speed * 1.2)) return;
     }
     if (!cp) {
       c.act = 1;
@@ -2826,7 +2839,7 @@ export class Ecology {
     const inMaze = k >= 0 && m.maze[k] === 1;
     // 迷路の中か、迷路のすぐ外で、何でも襲う
     const nearMaze = inMaze || sq(c.x - c.hx) + sq(c.y - c.hy) < 16 * TILE * 16 * TILE;
-    if (nearMaze && this.hunt(c, inMaze ? 5 : 3, [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Orc, Kind.Lizardman, Kind.Spider, Kind.Slime, Kind.Zombie, Kind.Adventurer], s.speed * 1.3)) return;
+    if (nearMaze && this.hunt(c, inMaze ? 5 : 3, HUNT3, s.speed * 1.3)) return;
     // 迷路の中を徘徊する
     c.act = 1;
     if (c.tx <= 0 || sq(c.tx - c.x) + sq(c.ty - c.y) < 10 * 10 || c.actT > 1200) {
@@ -2965,7 +2978,7 @@ export class Ecology {
     }
     // 夜は何でも食う
     if (c.food < s.cap * 0.8) {
-      if (this.hunt(c, 10, [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Lizardman, Kind.Orc, Kind.Slime, Kind.Zombie, Kind.Myconid, Kind.Adventurer], s.speed * 1.15)) return;
+      if (this.hunt(c, 10, HUNT4, s.speed * 1.15)) return;
       let best: Cr | null = null;
       let bd = 10 * TILE * 10 * TILE;
       for (const o of this.corpses) {
@@ -3021,7 +3034,7 @@ export class Ecology {
         return;
       }
     }
-    if (c.hungry && this.hunt(c, 8, [Kind.Rat, Kind.Lizard, Kind.Ant, Kind.Kobold, Kind.Goblin], s.speed * 1.2)) return;
+    if (c.hungry && this.hunt(c, 8, HUNT5, s.speed * 1.2)) return;
     // 入口から離れた暗がりを住みかにする
     const m = this.w.map;
     if (c.hx === c.x && c.hy === c.y) {
@@ -3706,16 +3719,25 @@ export class Ecology {
     if (hit !== undefined) return hit;
     return this.groupKeyRaw(c);
   }
+  /** 群れの身元の文字列の控え（種と二つの数が同じなら同じ文字列。作り直しを減らすだけで、値は同じ） */
+  private gkMemo = new Map<number, [string, number, number, string]>();
+  private memoKey(c: Cr, p: string, a: number, b: number): string {
+    const mm = this.gkMemo.get(c.id);
+    if (mm && mm[0] === p && mm[1] === a && mm[2] === b) return mm[3];
+    const key = `${p}${a},${b}`;
+    this.gkMemo.set(c.id, [p, a, b, key]);
+    return key;
+  }
   private groupKeyRaw(c: Cr): string | null {
     switch (c.k) {
       case Kind.Rat:
-        return c.hx || c.hy ? `r${c.hx},${c.hy}` : null;
+        return c.hx || c.hy ? this.memoKey(c, 'r', c.hx, c.hy) : null;
       case Kind.Bat:
-        return c.ref2 ? `v${c.ref2}` : c.tx || c.ty ? `b${c.tx},${c.ty}` : null;
+        return c.ref2 ? `v${c.ref2}` : c.tx || c.ty ? this.memoKey(c, 'b', c.tx, c.ty) : null;
       case Kind.Vampire:
         return `v${c.id}`;
       case Kind.Orc:
-        return c.hx || c.hy ? `o${c.hx},${c.hy}` : null;
+        return c.hx || c.hy ? this.memoKey(c, 'o', c.hx, c.hy) : null;
       case Kind.Ant:
       case Kind.Kobold:
       case Kind.Goblin:
@@ -4272,10 +4294,10 @@ export class Ecology {
     if (this.litMap.length !== m.w * m.h) this.litMap = new Uint8Array(m.w * m.h);
     else for (const k of this.litMarked) this.litMap[k] = 0;
     this.litMarked = [];
-    for (const l of this.lightSources()) {
-      const R = Math.floor((l.r * 0.7) / TILE);
-      const cx = Math.floor(l.x / TILE);
-      const cy = Math.floor(l.y / TILE);
+    this.eachLight((lx, ly, lr) => {
+      const R = Math.floor((lr * 0.7) / TILE);
+      const cx = Math.floor(lx / TILE);
+      const cy = Math.floor(ly / TILE);
       for (let dy = -R; dy <= R; dy++)
         for (let dx = -R; dx <= R; dx++) {
           if (dx * dx + dy * dy > R * R) continue;
@@ -4286,7 +4308,7 @@ export class Ecology {
             this.litMarked.push(y * m.w + x);
           }
         }
-    }
+    });
     this.litMapStep = this.step;
     this.litMapTick = this.w.tick;
   }
@@ -4348,6 +4370,28 @@ export class Ecology {
   private fireStep = -1;
 
   /** その場所の、いちばん近い火（怖さの届く中にあれば） */
+  /** マスの中心のそばに火があるか（同じ刻みのうちは、マスごとに一度だけ調べる。火の一覧は刻みごとに決まる） */
+  private fnStamp = new Int32Array(0);
+  private fnVal = new Uint8Array(0);
+  private fireNearTile(k: number): boolean {
+    const m = this.w.map;
+    if (this.fnStamp.length !== m.w * m.h) {
+      this.fnStamp = new Int32Array(m.w * m.h).fill(-1);
+      this.fnVal = new Uint8Array(m.w * m.h);
+    }
+    // fires() は刻みごとに作り直すので、刻みの番号で控えを見分ける（fires を先に呼んで、その刻みの一覧を確定させる）
+    const fl = this.fires();
+    if (this.fnStamp[k] !== this.step) {
+      const x = (k % m.w) * TILE + 8;
+      const y = Math.floor(k / m.w) * TILE + 8;
+      let hit = 0;
+      for (const f of fl) if (sq(f[0] - x) + sq(f[1] - y) < f[2] * f[2]) { hit = 1; break; }
+      this.fnVal[k] = hit;
+      this.fnStamp[k] = this.step;
+    }
+    return this.fnVal[k] === 1;
+  }
+
   private fireNear(x: number, y: number): [number, number, number] | null {
     for (const f of this.fires()) if (sq(f[0] - x) + sq(f[1] - y) < f[2] * f[2]) return f;
     return null;
@@ -6391,34 +6435,39 @@ export class Ecology {
   }
 
   /** 光源（松明、光の呪文、床で燃える松明）。描画と「見たマス」の記録に使う */
-  lightSources(): { x: number; y: number; r: number; i: number; c: [number, number, number] }[] {
-    const out: { x: number; y: number; r: number; i: number; c: [number, number, number] }[] = [];
+  /** 光源を順に（lightSources と同じ順・同じ値。配列や物を作らない） */
+  private eachLight(fn: (x: number, y: number, r: number, i: number, cr: number, cg: number, cb: number) => void): void {
     for (const c of this.list) {
       if (c.dead) continue;
-      if (c.k === Kind.Goblin && c.torch > 0) out.push({ x: c.x, y: c.y - 12, r: 80, i: 1.0, c: [1.0, 0.6, 0.28] });
-      if (c.k === Kind.Lich) out.push({ x: c.x, y: c.y - 16, r: 56, i: 0.6, c: [0.7, 0.45, 1.0] });
+      if (c.k === Kind.Goblin && c.torch > 0) fn(c.x, c.y - 12, 80, 1.0, 1.0, 0.6, 0.28);
+      if (c.k === Kind.Lich) fn(c.x, c.y - 16, 56, 0.6, 0.7, 0.45, 1.0);
       // もともと光る種：自分のまわり2〜3マスを、本当に照らす
-      if (c.elite === 1) out.push({ x: c.x, y: c.y - 12, r: 64, i: 0.8, c: [1.0, 0.55, 0.22] });
-      else if (c.elite === 2) out.push({ x: c.x, y: c.y - 14, r: 40, i: 0.4, c: [0.6, 0.8, 1.0] });
-      else if (c.elite === 6) out.push({ x: c.x, y: c.y - 10, r: 44, i: 0.4, c: [0.5, 0.8, 1.0] });
-      else if (c.elite === 7) out.push({ x: c.x, y: c.y - 12, r: 72, i: 0.7, c: [1.0, 0.95, 0.8] });
-      else if (c.elite === 9) out.push({ x: c.x, y: c.y - 14, r: 52, i: 0.45, c: [0.6, 1.0, 0.55] });
-      else if (c.k === Kind.Wisp) out.push({ x: c.x, y: c.y - 10, r: 40, i: 0.55, c: [0.55, 1.0, 0.8] });
-      else if (c.k === Kind.Myconid) out.push({ x: c.x, y: c.y - 8, r: 36, i: 0.45, c: [0.7, 1.0, 0.6] });
-      else if (c.k === Kind.Slime) out.push({ x: c.x, y: c.y - 4, r: 30, i: 0.4, c: [0.55, 1.0, 0.5] });
-      else if (c.k === Kind.Ghost) out.push({ x: c.x, y: c.y - 12, r: 44, i: 0.5, c: [0.7, 0.85, 1.0] });
-      if (c.k === Kind.Dwarf && c.sp === 0) out.push({ x: c.x, y: c.y - 10, r: 52, i: 0.75, c: [1.0, 0.82, 0.5] });
+      if (c.elite === 1) fn(c.x, c.y - 12, 64, 0.8, 1.0, 0.55, 0.22);
+      else if (c.elite === 2) fn(c.x, c.y - 14, 40, 0.4, 0.6, 0.8, 1.0);
+      else if (c.elite === 6) fn(c.x, c.y - 10, 44, 0.4, 0.5, 0.8, 1.0);
+      else if (c.elite === 7) fn(c.x, c.y - 12, 72, 0.7, 1.0, 0.95, 0.8);
+      else if (c.elite === 9) fn(c.x, c.y - 14, 52, 0.45, 0.6, 1.0, 0.55);
+      else if (c.k === Kind.Wisp) fn(c.x, c.y - 10, 40, 0.55, 0.55, 1.0, 0.8);
+      else if (c.k === Kind.Myconid) fn(c.x, c.y - 8, 36, 0.45, 0.7, 1.0, 0.6);
+      else if (c.k === Kind.Slime) fn(c.x, c.y - 4, 30, 0.4, 0.55, 1.0, 0.5);
+      else if (c.k === Kind.Ghost) fn(c.x, c.y - 12, 44, 0.5, 0.7, 0.85, 1.0);
+      if (c.k === Kind.Dwarf && c.sp === 0) fn(c.x, c.y - 10, 52, 0.75, 1.0, 0.82, 0.5);
       if (c.k !== Kind.Adventurer) continue;
-      if (c.torch > 0) out.push({ x: c.x, y: c.y - 14, r: 92, i: 1.1, c: [1.0, 0.62, 0.3] });
-      else if (c.sp === Job.Wizard) out.push({ x: c.x, y: c.y - 18, r: 80, i: 0.9, c: [0.72, 0.86, 1.0] });
+      if (c.torch > 0) fn(c.x, c.y - 14, 92, 1.1, 1.0, 0.62, 0.3);
+      else if (c.sp === Job.Wizard) fn(c.x, c.y - 18, 80, 0.9, 0.72, 0.86, 1.0);
     }
     // 鍛冶場の火と坑道のランプ、冒険者の焚き火
     const mw = this.w.map.w;
-    for (const cp of this.camps) if (cp.id >= 0 && (cp.fuel ?? 0) > 0) out.push({ x: cp.x, y: cp.y + 6, r: 140, i: 1.25, c: [1.0, 0.58, 0.26] });
-    for (const p of this.parties) if ((p.camp ?? -1) >= 0) out.push({ x: ((p.camp as number) % mw) * TILE + 8, y: Math.floor((p.camp as number) / mw) * TILE + 4, r: 120, i: 1.25, c: [1.0, 0.6, 0.28] });
-    if (this.hold && this.hold.forge >= 0) out.push({ x: (this.hold.forge % mw) * TILE + 8, y: Math.floor(this.hold.forge / mw) * TILE + 2, r: 130, i: 1.3, c: [1.0, 0.55, 0.22] });
-    for (const k of this.lamps) out.push({ x: (k % mw) * TILE + 8, y: Math.floor(k / mw) * TILE + 2, r: 64, i: 0.8, c: [1.0, 0.85, 0.55] });
-    for (const it of this.gear) if (it.kind === ItemKind.Torch) out.push({ x: it.x, y: it.y - 4, r: 52, i: 0.7, c: [1.0, 0.6, 0.28] });
+    for (const cp of this.camps) if (cp.id >= 0 && (cp.fuel ?? 0) > 0) fn(cp.x, cp.y + 6, 140, 1.25, 1.0, 0.58, 0.26);
+    for (const p of this.parties) if ((p.camp ?? -1) >= 0) fn(((p.camp as number) % mw) * TILE + 8, Math.floor((p.camp as number) / mw) * TILE + 4, 120, 1.25, 1.0, 0.6, 0.28);
+    if (this.hold && this.hold.forge >= 0) fn((this.hold.forge % mw) * TILE + 8, Math.floor(this.hold.forge / mw) * TILE + 2, 130, 1.3, 1.0, 0.55, 0.22);
+    for (const k of this.lamps) fn((k % mw) * TILE + 8, Math.floor(k / mw) * TILE + 2, 64, 0.8, 1.0, 0.85, 0.55);
+    for (const it of this.gear) if (it.kind === ItemKind.Torch) fn(it.x, it.y - 4, 52, 0.7, 1.0, 0.6, 0.28);
+  }
+
+  lightSources(): { x: number; y: number; r: number; i: number; c: [number, number, number] }[] {
+    const out: { x: number; y: number; r: number; i: number; c: [number, number, number] }[] = [];
+    this.eachLight((x, y, r, i, cr, cg, cb) => out.push({ x, y, r, i, c: [cr, cg, cb] }));
     return out;
   }
 
@@ -6937,7 +6986,7 @@ export class Ecology {
       return;
     }
     if (c.hungry) {
-      if (this.hunt(c, 7, [Kind.Rat], s.speed * 1.1)) return;
+      if (this.hunt(c, 7, HUNT6, s.speed * 1.1)) return;
       const k = this.findFungus(c.x, c.y, 10, c.id);
       if (k >= 0) {
         c.act = 1;
@@ -7693,21 +7742,26 @@ export class Ecology {
   }
 
   /** マス k からの歩いた道のり（溶岩、閉じた空洞、岩は通らない。max マスまで。届かなければ -1） */
+  /** walkDist の待ち行列（使い回す） */
+  private wdQ = new Int32Array(0);
   private walkDist(k: number, max: number, par?: Int32Array): Int32Array {
     const m = this.w.map;
     const N = m.w * m.h;
     const dist = new Int32Array(N).fill(-1);
     if (k < 0) return dist;
     if (par) par[k] = -1;
-    const q = new Int32Array(N);
+    if (this.wdQ.length !== N) this.wdQ = new Int32Array(N);
+    const q = this.wdQ;
     let h = 0;
     let t = 0;
     dist[k] = 0;
     q[t++] = k;
+    const W = m.w;
     while (h < t) {
       const c = q[h++];
       if (dist[c] >= max) continue;
-      for (const n of [c + 1, c - 1, c + m.w, c - m.w]) {
+      for (let d = 0; d < 4; d++) {
+        const n = d === 0 ? c + 1 : d === 1 ? c - 1 : d === 2 ? c + W : c - W;
         if (n < 0 || n >= N || dist[n] >= 0 || m.solid[n] || m.lava[n] || m.sealed[n]) continue;
         dist[n] = dist[c] + 1;
         if (par) par[n] = c;

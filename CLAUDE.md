@@ -22,9 +22,9 @@
 
 ```bash
 npm install                       # 初回
-npm test                          # 決定性・帳簿・保存からの再現など（約1分）
+npm test                          # 決定性・帳簿・保存からの再現など（四つの部分を別のプロセスで同時に回す。約26秒）
 npm run build                     # dist/index.html（外部依存なしの1ファイル）
-npm run sim -- --seed かしたれ --days 30 --out runs/kashitare     # 画面なしで全速（地上1日あたり約2.5秒）
+npm run sim -- --seed かしたれ --days 30 --out runs/kashitare     # 画面なしで全速（地上1日あたり約2.5〜3秒。生き物が増える終盤ほど遅い）
 npm run sim -- --resume runs/kashitare                              # 時間切れで止まった所から続ける
 npm run sim -- --seed abc --days 5 --out runs/t --trace 1234        # 生き物1234の一生を毎刻み記録
 npm run report -- --run runs/kashitare                              # report.md と deaths.png / births.png
@@ -52,12 +52,13 @@ npm run gallery                      # 決まった場面を作って撮り、bu
 npm run gallery -- --label before    # 撮った画像を build/gallery/before/ に残す（直す前に）
 npm run gallery -- --compare before  # いまの画像と before を左右に並べた build/gallery/compare-before.png
 node tools/gallery/shoot.mjs --only dragon,camp     # 場面を選んで撮り直す（場面の保存はそのまま。node build.mjs を先に）
+npm run gallery -- --fresh           # 場面をかならず作り直す（ふだんは、シミュレーションのコードと場面の定義が前回と同じなら作り直さない）
 node tools/gallery/shoot.mjs --light                # 確認用の明かり（#lit）をつけて撮る（暗さと絵の出来を分けて見る）
 npm run shot -- --seed かしたれ --find warren         # 見たいもの（warren / hide / kind:番号 / xy:x,y）が出るまで進めて撮る。
                                                     # build/shots/ に、そのまま・印つき（-marked）・真ん中を3倍に切り出し（-crop）
 ```
 
-撮るのは Node の Playwright（Python は要らない）。ゲームの URL の末尾に `#lit`（全体を明るく照らす）、`#albedo`（地形の色だけ）、`#clean`（画面の部品を隠す）を付けられ、`#clean,lit` のように並べてもよい。
+撮るのは Node の Playwright（Python は要らない）。速さの目安：gallery は描画だけ直したとき約30秒（場面を作り直すと約1分）。場面はシードごとに別のプロセスで同時に作り、撮るのはページを読み込み直さずに `window.__openScene(保存のJSON)` で場面を入れ替え、20回描き終わったら `window.__hold` で描くのを止めて撮る。ゲームの URL の末尾に `#lit`（全体を明るく照らす）、`#albedo`（地形の色だけ）、`#clean`（画面の部品を隠す）を付けられ、`#clean,lit` のように並べてもよい。
 
 場面は `tools/gallery/scenes.ts` の `SCENES`（シード、時刻、見たい場所を探す関数、拡大率、スマホかどうか）。見た目を変えたら、直す前に `--label` で残し、直したあと `--compare` で並べて確かめる。数値では測れないので、必ず画像を見て判断する（一箇所を直すと別の場面が崩れることがある）。
 

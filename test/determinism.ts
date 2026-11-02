@@ -1,4 +1,7 @@
 // 同じシードから同じダンジョンと同じ展開が得られることを確かめる
+// 互いに独立な四つの部分（地形の検査、1日半の通し二回、保存からの再現）を、別々の Node の子プロセスで同時に回す（CPU の数だけ速くなる）。
+// 子は `node build/test.js <部分>` で、親は結果を集めて、もとと同じ順に表示する。
+import { spawn } from 'child_process';
 import { generate, MAP_W, MAP_H } from '../src/mapgen';
 import { World, DAY_TICKS } from '../src/world';
 
@@ -9,6 +12,7 @@ function fnv(a: ArrayLike<number>): number {
 }
 function check(cond: boolean, msg: string) { if (!cond) { console.error('NG: ' + msg); process.exitCode = 1; } else console.log('OK: ' + msg); }
 
+function partMap() {
 for (const seed of ['かしたれ', 'abc', 'はじまりの洞窟']) {
   const a = generate(seed), b = generate(seed);
   check(fnv(a.solid) === fnv(b.solid) && fnv(a.moss) === fnv(b.moss), `${seed}: 地形と苔が一致`);
@@ -57,6 +61,8 @@ check(fnv(generate('かしたれ').solid) !== fnv(generate('abc').solid), '別�
   check(vs >= 28, `30個のシードのうち ${vs} 個に宝物庫がある`);
 }
 
+}
+
 let lastGold = { ok: false, g: 0 };
 let lastRock = { ok: false, dug: 0, rub: 0 };
 const run = () => {
@@ -80,13 +86,8 @@ const run = () => {
   const eco = JSON.stringify(w.eco.serialize());
   return { seen: fnv(w.seen), n: w.seen.reduce((s, v) => s + v, 0), water: fnv(new Uint8Array(w.water.buffer)), nutr: fnv(new Uint8Array(w.nutr.buffer)), moss: fnv(w.moss), eco: fnv(new TextEncoder().encode(eco)), alive: w.eco.list.filter(c => !c.dead).length, conserved: conserved && w.totalNutrients() - w.eco.imported + w.eco.exported - w.born + w.washed === total0, total: total0 };
 };
-const r1 = run(), r2 = run();
-check(r1.seen === r2.seen, `1日半進めた「見たマス」が一致（${r1.n} マス）`);
-check(r1.water === r2.water && r1.nutr === r2.nutr && r1.moss === r2.moss, '1日半進めた水・養分・苔が一致');
-check(r1.eco === r2.eco, `1日半進めた生き物の状態が一致（${r1.alive} 匹）`);
-check(r1.conserved, `養分の総量（土＋苔＋生き物）が、外との出入りと生まれた分・流れ出た分を除いて常に一定（${r1.total}）`);
-check(lastRock.ok, `岩の帳簿（岩＋瓦礫＋掘り出した土−崩落）が常にはじめの岩と一致（掘った ${lastRock.dug}、瓦礫と崩落 ${lastRock.rub}）`);
-check(lastGold.ok, `金貨の総量（山＋抱えている分）が、外との出入りを除いて常に一定（${lastGold.g}）`);
+
+function partSave() {
 // 保存して読み込み直しても、続きの展開が変わらない
 {
   const a = new World('かしたれ');
@@ -97,6 +98,9 @@ check(lastGold.ok, `金貨の総量（山＋抱えている分）が、外との
   check(JSON.stringify(a.eco.serialize()) === JSON.stringify(b.eco.serialize()) && fnv(a.moss) === fnv(b.moss) && fnv(a.fungus) === fnv(b.fungus) && a.digs.join() === b.digs.join() && fnv(a.ash) === fnv(b.ash), `保存から読み込み直しても続きの展開が一致（掘られた岩 ${digs0}→${a.digs.length} マス、キノコ ${a.totalFungus}）`);
 }
 
+}
+
+function partAscii() {
 // 縮小した地図を表示（# 岩、. 床、* 光の筋、E 入口）
 const m = generate('かしたれ');
 const lines: string[] = [];
@@ -111,3 +115,41 @@ for (let y = 0; y < MAP_H; y += 3) {
   lines.push(s);
 }
 console.log(lines.join('\n'));
+}
+
+const part = process.argv[2];
+if (part === 'map') partMap();
+else if (part === 'run') {
+  const r = run();
+  console.log('RESULT ' + JSON.stringify({ r, lastGold, lastRock }));
+} else if (part === 'save') partSave();
+else {
+  // 親：四つの部分を同時に回す
+  const child = (p: string) =>
+    new Promise<{ out: string; code: number }>((res) => {
+      const c = spawn(process.execPath, [process.argv[1], p], { stdio: ['ignore', 'pipe', 'inherit'] });
+      let out = '';
+      c.stdout.on('data', (d) => (out += d));
+      c.on('exit', (code) => res({ out, code: code ?? 1 }));
+    });
+  (async () => {
+    const [mp, a, b, sv] = await Promise.all([child('map'), child('run'), child('run'), child('save')]);
+    process.stdout.write(mp.out);
+    const res = (o: string) => JSON.parse(o.split('\n').find((l) => l.startsWith('RESULT '))!.slice(7));
+    const A = res(a.out);
+    const B = res(b.out);
+    const r1 = A.r;
+    const r2 = B.r;
+    lastGold = A.lastGold;
+    lastRock = A.lastRock;
+    check(r1.seen === r2.seen, `1日半進めた「見たマス」が一致（${r1.n} マス）`);
+    check(r1.water === r2.water && r1.nutr === r2.nutr && r1.moss === r2.moss, '1日半進めた水・養分・苔が一致');
+    check(r1.eco === r2.eco, `1日半進めた生き物の状態が一致（${r1.alive} 匹）`);
+    check(r1.conserved, `養分の総量（土＋苔＋生き物）が、外との出入りと生まれた分・流れ出た分を除いて常に一定（${r1.total}）`);
+    check(lastRock.ok, `岩の帳簿（岩＋瓦礫＋掘り出した土−崩落）が常にはじめの岩と一致（掘った ${lastRock.dug}、瓦礫と崩落 ${lastRock.rub}）`);
+    check(lastGold.ok, `金貨の総量（山＋抱えている分）が、外との出入りを除いて常に一定（${lastGold.g}）`);
+    process.stdout.write(sv.out);
+    partAscii();
+    if ([mp, a, b, sv].some((x) => x.code !== 0)) process.exitCode = 1;
+  })();
+}

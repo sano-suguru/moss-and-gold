@@ -18,7 +18,7 @@
     "stuckmap": "esbuild tools/analysis/stuckmap.ts --bundle --platform=node --outfile=build/stuckmap.js --log-level=warning && node build/stuckmap.js",
     "compare": "esbuild tools/analysis/compare.ts --bundle --platform=node --outfile=build/compare.js --log-level=warning && node build/compare.js",
     "shot": "node build.mjs && esbuild tools/gallery/shot.ts --bundle --platform=node --outfile=build/shot.js --log-level=warning && node build/shot.js",
-    "gallery": "node build.mjs && esbuild tools/gallery/scenes.ts --bundle --platform=node --outfile=build/scenes.js --log-level=warning && node build/scenes.js && node tools/gallery/shoot.mjs"
+    "gallery": "node build.mjs && esbuild tools/gallery/scenes.ts --bundle --platform=node --outfile=build/scenes.js --log-level=warning && node tools/gallery/shoot.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

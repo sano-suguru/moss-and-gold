@@ -14,7 +14,9 @@ const page = await ctx.newPage();
 const errs = [];
 page.on('pageerror', (e) => errs.push(String(e)));
 await page.goto('file://' + root + '/dist/index.html#clean' + (sc.lit ? ',lit' : ''));
-await page.waitForTimeout(3000);
+// 決まった時間ではなく、20回描き終わるまで待つ（ページの読み込みのあと0.3秒ほど）
+await page.waitForFunction(() => (window.__frames ?? 0) >= 20, null, { timeout: 15000 });
+await page.evaluate(() => { window.__hold = true; });
 const base = join(sc.out, sc.name);
 await page.screenshot({ path: base + '.png' });
 // 真ん中（見たいもののまわり）を切り出して、ドットのまま3倍

@@ -1,7 +1,7 @@
 import { MAP_H, MAP_W, TILE } from './mapgen';
 import { Camera, Input, deviceScale } from './input';
 import { MAX_LIGHTS, MAX_SHAFTS, Renderer, newLights, newShafts } from './renderer';
-import { load, packBits, packI32, packU8, save, unpackBits, unpackI32, unpackU8 } from './save';
+import { load, packBits, packI32, packU8, save, unpackBits, unpackI32, unpackU8, type SaveData } from './save';
 import { buildAtlas } from './atlas';
 import { CreatureView } from './creatureView';
 import { CR_EVERY } from './ecology';
@@ -52,7 +52,7 @@ function boot(): void {
   const atlas = buildAtlas();
   renderer.setAtlas(atlas);
   const view = new CreatureView(atlas);
-  const saved = load();
+  let saved = load();
   const cam: Camera = { x: 0, y: 0, zoom: 2 };
   let world: World;
   let speed = saved?.speed ?? 1;
@@ -459,6 +459,14 @@ function boot(): void {
 
   // 古い保存から引き継ぐのはシードだけ（tick が 0 のとき）。そのときは入口から眺め始める
   startWorld(saved?.seed ?? randomSeed(), !!saved && (saved.tick > 0 || !!saved.eco));
+  // 見た目の確認用（スクショの道具）：ページを読み込み直さずに、保存と同じ形の場面を開く（絵の部品と WebGL を作り直さないので速い）
+  (window as unknown as { __openScene: (json: string) => void }).__openScene = (json: string) => {
+    saved = JSON.parse(json) as SaveData;
+    speed = saved.speed ?? 0;
+    startWorld(saved.seed, true);
+    (window as unknown as { __frames: number; __hold?: boolean }).__frames = 0;
+    (window as unknown as { __hold?: boolean }).__hold = false;
+  };
 
   const lights = newLights();
   const halos = newLights();
@@ -477,7 +485,17 @@ function boot(): void {
     }
   };
 
+  // 描いた回数（スクショの道具が、描き終わるのを待つのに使う）
+  (window as unknown as { __frames: number }).__frames = 0;
   const frame = (now: number) => {
+    // スクショの道具が描き終わりを待ったあと、描くのを止めて撮る（__hold）。止めている間は前の絵のまま
+    const dbg = window as unknown as { __frames: number; __hold?: boolean };
+    if (dbg.__hold) {
+      last = now;
+      requestAnimationFrame(frame);
+      return;
+    }
+    dbg.__frames++;
     const raw = Math.max(0, (now - last) / 1000);
     last = now;
     input.update(Math.min(0.1, raw));
