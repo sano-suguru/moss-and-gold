@@ -30,7 +30,7 @@ npm run sim -- --seed abc --days 5 --out runs/t --trace 1234        # 生き物1
 npm run report -- --run runs/kashitare                              # report.md と deaths.png / births.png
 npm run batch -- --seeds "abc,かしたれ,seed4" --days 25 --out runs/batch-x  # CPU の数だけ sim を並べて回し、report と比較の表 summary.md を作る
 npm run batch -- --out runs/batch-x                                 # 途中で止まった batch を続ける（--summary で表だけ作り直す）
-npm run batch -- --seeds ... --days 25 --adv-max 1 --out runs/b-adv1 # 冒険者の一行の上限を切り替えて回す（既定 2＝今までの挙動）
+npm run batch -- --seeds ... --days 25 --adv-max 2 --out runs/b-adv2 # 冒険者の一行の上限を切り替えて回す（既定 1。段階13までは 2）
 npm run compare -- --runs runs/b1,runs/b2 --names "前,後" --out docs/x.md  # batch どうしをコボルトと大ネズミの目安で並べる
 ```
 
@@ -64,6 +64,7 @@ python3 tools/gallery/shoot.py --only dragon,camp   # 場面を選んで撮り�
 | samples.jsonl | 地上の1/4日ごと：種ごとの数（`counts` のキーは種の番号）、死骸、開いた床、瓦礫、使える養分、総量、帳簿のずれ（nutrientDrift / goldDrift / rockDrift）、噂、一行の数、外の世界の地図の区画数、ドワーフの住みかの段階 |
 | deaths.jsonl | `{t, k, cause, by, x, y}`。cause：eaten 食べられた / fight 打ち合い / starve 飢え / burned 焼けた / crushed 崩落 / petrified 石化 / killed 襲われた（ゾンビなど）/ dried 干からびた（スライム）/ faded ゴーストが消えた / planted マイコニドがキノコになった / crumbled スケルトンが崩れて消えた / other。by は手を下した種（なければ −1） |
 | births.jsonl | `{t, k, origin, x, y}`。origin：entrance 正面の入口 / mouth 地表の横穴 / fissure 地底の裂け目 / river 川の口 / shaft 天井の裂け目 / mana マナから / born 中で生まれた |
+| moves.jsonl | `{t, k, n, x, y, tx, ty}`。群れの引っ越し（大ネズミの巣穴）：何匹が、元の場所（x, y）から移った先（tx, ty）へ（画素） |
 | exits.jsonl | `{t, k, reason}`。starving 飢えて去った（住処のないコボルト、大物など） / returned 生還した冒険者 / home 満ちて巣へ帰った（ワイバーン） / abandoned 住処を捨てて群れで去った（コボルト） / dispersed 腹を空かせて群れで出ていった（大ネズミ） |
 | events.jsonl | ゲームの「記録」に出る出来事（`{k:番号}` は種の名前） |
 | checkpoint.json | ゲームの保存と同じ形。ブラウザの localStorage（キーは save.ts の KEY）に入れれば、その場面をゲームで開ける |
@@ -81,7 +82,8 @@ python3 tools/gallery/shoot.py --only dragon,camp   # 場面を選んで撮り�
 | src/creatureView.ts, renderer.ts, shaders.ts | 描画 |
 | src/main.ts | ループ、画面の部品（ミニマップ、記録、養分の表示）、保存 |
 | test/*.ts | テスト |
-| tools/analysis/ | 分析の道具（sim, report, batch：多くのシードを並べて回して比較の表, drift, ratdiag：飢え死にの調査, stuck：動かない個体, digmap：掘られたマスと岩の硬さの地図, planview：ドワーフの坑道の計画を文字で描く） |
+| tools/gallery/koboldshots.* | コボルトの住処のスクショ（場面を作る .ts と、Node の Playwright で撮る .mjs） |
+| tools/analysis/ | 分析の道具（sim, report, batch：多くのシードを並べて回して比較の表, compare：batch どうしの目安の比較, drift, ratdiag：飢え死にの調査, stuck：動かない個体, digmap：掘られたマスと岩の硬さの地図, planview：ドワーフの坑道の計画を文字で描く） |
 | README.md | 段階ごとの仕組みの詳しい説明（仕様書として読める） |
 
 ## いまの仕組みの要点（段階13まで）
@@ -90,8 +92,9 @@ python3 tools/gallery/shoot.py --only dragon,camp   # 場面を選んで撮り�
 - マナ（world.ts の `manaStep`、地上の5秒ごと）：深部、地底の裂け目、宝物庫、溶岩、岩盤から湧き、岩にも染みとおって広がり、入口と横穴から逃げ、少しずつ薄れる。生き物は食べるとマナを受け取り、死ぬと土に還す。
 - ドラゴンは `c.sp` が育ち具合（0 幼竜、1 若い竜、2 成竜）。`c.elite` は特別な個体（1 火の精、2 亡霊の騎士、4 大ネズミの王、5 ゴブリンの頭、6 水の精、7 光の精、8 骨の竜、9 キノコの主）。名前は `names`。
 - 気づき方（`canSense`：目、夜目、匂い、振動、反響、魔法）、火を怖がる獣（`fearFire`）、光に寄る狡猾な種（`lurk`）、人の気配（`presenceAt`、強い魔物ほど避ける）、やわらかい間合い（`personalSpace`）、食べる時間（`feeding`）、弱い生き物の害（`pester`）、冒険者の三段階の戦い。
-- コボルトの住処（四段目の前半）：人の気配が薄く、竜（30マス）・トロールとバジリスク（15マス）から離れ、食べ物の近い、歩いて行ける所を選び、岩壁に4マスの横穴を掘ってその奥（`Warren.x, y`）を住処にする（入口は `door`）。蓄え `store`（養分の帳簿に入る）、キノコの畑（土の養分をキノコへ移す）、入口のまわりの罠 `traps`。強い相手（冒険者の一行、若い竜、トロール、ミノタウロス）が近づくと奥に隠れる（`hide`。隠れている者は入口に踏み込まれない限り誰にも気づかれず、描かれない）。一匹ずつは去らず、蓄えが尽きて1日、襲われた回数 `raids` が4、数が2匹を切る、竜が近くに住みつく、のどれかで群れごと住処を捨てる（開いた横穴があれば去り、なければ中の別の場所へ移る）。襲われて捨てた直後は2日来ない（`koboldShun`）。竜の寝床のそばの口からは入ってこない。冒険者は逃げていく弱い者を追わない
-- 大ネズミ：食べられる苔（`edibleMoss`、`updateForage` で数えて保存）に合わせて来る数と殖える数を抑え、腹を空かせて近くに苔がなく、開いた横穴が30マス以内にあれば、巣穴の仲間と群れで出ていく（`st 8`）
+- コボルトの住処（四段目の前半）：人の気配が薄く、竜（30マス）・トロールとバジリスク（15マス）から離れ、食べ物の近い、歩いて行ける所を選び、岩壁に4マスの横穴を掘ってその奥（`Warren.x, y`）を住処にする（入口は `door`）。蓄え `store`（養分の帳簿に入る）、キノコの畑（土の養分をキノコへ移す）、入口のまわりの罠 `traps`。強い相手（冒険者の一行、若い竜、トロール、ミノタウロス）が近づくと奥に隠れる（`hide`。隠れている者は入口に踏み込まれない限り誰にも気づかれず、描かれない）。4〜6匹の群れで来て、住処へ向かう道中（`st 11`）は冒険者が8マス以内にいる間その場で身をひそめて待つ（`st 12`）。掘った横穴の中と入口のまわりは畑の判定で湿った扱い。一匹ずつは去らず、蓄えが尽きて1日、襲われた回数 `raids` が4、1匹になって1日（`alone`）、竜が近くに住みつく、のどれかで群れごと住処を捨てる（開いた横穴があれば去り、なければ中の別の場所へ移る）。襲われて捨てた直後は2日来ない（`koboldShun`）。竜の寝床のそばの口からは入ってこない。冒険者は逃げていく弱い者を追わない
+- 大ネズミ：食べられる苔（`edibleMoss`、`updateForage` で数えて保存）に合わせて来る数と殖える数を抑える。巣穴のまわりの苔が尽きてきたら、苔の豊かな所へ巣穴を移す（`relocateBurrow`、`Burrow.moved`、stats.moves）。移れず、腹を空かせて近くに苔がなく、飢える前に歩いて着ける開いた横穴があれば、巣穴の仲間と群れで出ていく（`st 8`）。深い水に取り残されたら泳いで抜け出せる
+- 冒険者の一行の上限 `Ecology.ADV_MAX_PARTIES` は既定1（段階13までは2）
 - 描画だけ：攻撃の技の演出（`fxAttacks`、`creatureView.drawAttacks`）、気づいた印、のけぞり、飛び散る粒。見本は `dist/index.html#fxdemo`。画面の部品を隠すのは `#clean`。
 
 ## 変更するときの注意
