@@ -189,6 +189,20 @@ export function ratMarch(this: Ecology, c: Cr): void {
     c.act = 0;
     return done();
   }
+  // 冒険者やドワーフが近く（3マス）にいれば、列のまま、まず離れる（以前は列のまま足もとを通って払われていた）
+  let man: Cr | null = null;
+  this.nearby(c.x, c.y, 3, (o) => {
+    if (!man && !o.dead && !o.away && (o.k === Kind.Adventurer || o.k === Kind.Dwarf) && sq(o.x - c.x) + sq(o.y - c.y) < 3 * TILE * 3 * TILE) man = o;
+  });
+  if (man) {
+    const mm = man as Cr;
+    const dx = c.x - mm.x;
+    const dy = c.y - mm.y;
+    const L = Math.sqrt(dx * dx + dy * dy) || 1;
+    c.act = 1;
+    this.tryMove(c, (dx / L) * s.speed * 1.3, (dy / L) * s.speed * 1.3);
+    return;
+  }
   // 前を行く仲間（列を離れた者、死んだ者は飛ばして、その前の者）
   let ahead = c.ref2 ? this.byId.get(c.ref2) : undefined;
   for (let i = 0; i < 12 && ahead && (ahead.dead || ahead.st !== 11); i++) ahead = ahead.ref2 ? this.byId.get(ahead.ref2) : undefined;
