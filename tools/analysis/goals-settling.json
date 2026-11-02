@@ -1,0 +1,38 @@
+[
+ {
+  "label": "豊かなシード（豊かさの上半分）の住処の日数の中央値",
+  "metric": "richWarrenMedian",
+  "op": ">=",
+  "value": 5
+ },
+ {
+  "label": "冒険者に倒されたコボルト（最初の1,071の半分）",
+  "metric": "advKob",
+  "op": "<=",
+  "value": 535
+ },
+ {
+  "label": "一匹ずつ飢えて去ったコボルト",
+  "metric": "kobStarveExit",
+  "op": "<=",
+  "value": 0
+ },
+ {
+  "label": "大ネズミの飢え死に（最初の1,749の3割）",
+  "metric": "ratStarve",
+  "op": "<=",
+  "value": 525
+ },
+ {
+  "label": "大ネズミが絶えたシード",
+  "metric": "ratGoneSeeds",
+  "op": "<=",
+  "value": 0
+ },
+ {
+  "label": "四つの帳簿のずれ",
+  "metric": "drift",
+  "op": "<=",
+  "value": 0
+ }
+]

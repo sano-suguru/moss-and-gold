@@ -286,7 +286,8 @@ export class CreatureView {
       {
         const mm = eco.w.map;
         const tk = Math.floor((y - 2) / 16) * mm.w + Math.floor(x / 16);
-        if (tk >= 0 && tk < mm.sealed.length && mm.sealed[tk]) kind += 10;
+        // （すでに暗く描くもの＝隠れている生き物には重ねない。kind の 20 は傷の光なので、足して 20 にならないように）
+        if (tk >= 0 && tk < mm.sealed.length && mm.sealed[tk] && kind % 20 < 9.5) kind += 10;
       }
       if (o.nSprites >= MAX_SPRITES) return;
       const fr = A.frames[frame];
@@ -309,6 +310,29 @@ export class CreatureView {
 
     // 地面のもの（巣穴、クモの巣）
     for (const b of eco.burrows) if (inView(b.x, b.y, 16)) pushSprite(b.x, b.y, 0, false, A.burrow, 0, 2);
+    // コボルトの住処：畑の畝、奥の寝床、入口の飾り柱、罠
+    for (const wr of eco.warrens) {
+      if (wr.id < 0 || !inView(wr.x, wr.y, 96)) continue;
+      const mw = eco.mapW;
+      for (const k of eco.farmTiles(wr)) pushSprite((k % mw) * 16 + 8, Math.floor(k / mw) * 16 + 14, 0, false, A.furrow(eco.w.fungus[k] >= 80 ? 1 : 0), 0, 2);
+      pushSprite(wr.x, wr.y + 5, 0, false, A.nest, 0, 2);
+      const d = wr.door ?? -1;
+      // 横穴の入口の脇（横穴と反対の側の、床の上）に飾り柱を立てる
+      if (d >= 0) {
+        const dx0 = (d % mw) * 16 + 8;
+        const dy0 = Math.floor(d / mw) * 16 + 8;
+        const vx = wr.x - dx0;
+        const vy = wr.y - dy0;
+        const ox = vx > 8 ? -7 : vx < -8 ? 7 : Math.abs(vy) > 8 ? 7 : 7;
+        const oy = vy > 8 ? -3 : vy < -8 ? 3 : 0;
+        pushSprite(dx0 + ox, dy0 + 6 + oy, 0, false, A.totem, 0, 0);
+      }
+    }
+    for (const tr of eco.traps) {
+      const tx = (tr.k % eco.mapW) * 16 + 8;
+      const ty = Math.floor(tr.k / eco.mapW) * 16 + 11;
+      if (inView(tx, ty, 16)) pushSprite(tx, ty, 0, false, A.trap, 0, 2);
+    }
     for (const w of eco.webs) if (inView(w.x, w.y, 24)) pushSprite(w.x, w.y, 0, false, A.web, 0, 2);
     for (const c of eco.colonies) if (inView(c.x, c.y, 24)) pushSprite(c.x, c.y + 4, 0, false, A.anthill, 0, 2);
     for (const c of eco.camps) if (inView(c.x, c.y, 32)) pushSprite(c.x, c.y + 6, 0, false, c.kind === 0 ? A.camp : A.hut, 0, 2);
@@ -572,7 +596,8 @@ export class CreatureView {
       let x = ord.x;
       let yy = ord.yy;
       const sp = c.k;
-      let dir = c.dir === 0 ? 0 : c.dir === 1 ? 1 : 2;
+      // 隠れている者は、こちら（暗がりの外）を向いて潜む（目が見えるように）
+      let dir = c.dir === 0 || eco.isHidden(c) ? 0 : c.dir === 1 ? 1 : 2;
       const flip = c.dir === 3;
       let act = c.act;
       let f = 0;
@@ -614,6 +639,8 @@ export class CreatureView {
         } else if (c.caught) lift = 6;
       }
       const bright = sp === Kind.Wisp && c.glow > 90 ? 1 : 0;
+      // 隠れている者（ほかの生き物には気づかれない）：眺める人には、暗く沈んだ影の姿と光る目で見せる
+      const hidden = eco.isHidden(c);
       const isCorpse = c.dead === 1 && c.actT >= 4 && sp !== Kind.Wisp && sp !== Kind.Slime && sp !== Kind.Ghost && sp !== Kind.Myconid;
       const eliteName = ['', 'firespirit', 'pknight', '', '', '', 'wspirit', 'lspirit', '', 'mlord'][c.elite] ?? '';
       let frame = !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : c.sp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Adventurer ? (c.sp >= 4 ? 8 + c.sp - 4 : c.sp * 2 + (c.torch > 0 && c.sp !== 1 ? 1 : 0)) : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][c.sp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? c.sp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
@@ -660,7 +687,7 @@ export class CreatureView {
       }
       // 光らない生き物のまわりの、見た目だけの淡い暈（光る種は自分で本当に光るので描かない）
       // （大きな体でも暈は中くらいまで。閉じた空洞の中の生き物には描かない）
-      if (!isCorpse && sp !== Kind.Wisp && sp !== Kind.Myconid && sp !== Kind.Slime && sp !== Kind.Ghost && c.sleep !== 2) {
+      if (!isCorpse && !hidden && sp !== Kind.Wisp && sp !== Kind.Myconid && sp !== Kind.Slime && sp !== Kind.Ghost && c.sleep !== 2) {
         const bs = Ecology.bodySize(sp);
         const tk = Math.floor(c.y / 16) * eco.w.map.w + Math.floor(c.x / 16);
         if (bs > 0 && !eco.w.map.sealed[tk]) pushSprite(x, yy - 0.05, lift * 0.5, false, A.halo(bs >= 11 ? 1 : 0), 0, 2);
@@ -671,9 +698,16 @@ export class CreatureView {
         const hx = c.elite === 4 ? (flip ? -5 : 5) : (flip ? -1 : 1);
         pushSprite(x + hx, yy + 0.05, lift + hy, flip, c.elite === 4 ? A.crown() : A.chiefHelm(), 0, 2);
       }
+      // 貢ぎ物の袋：取り立てたオークは、袋を肩に担いで縄張りへ帰る
+      if (!isCorpse && sp === Kind.Orc && c.units > 0 && !hidden) pushSprite(x + (flip ? 6 : -6), yy + 0.05, lift + 16, flip, A.sack(), 0, 2);
       // 傷を受けた瞬間は白く光る
       const flash = !isCorpse && eco.w.tick - c.hitAt < 2 ? 20 : 0;
-      pushSprite(x, yy, lift, flip, frame, glow, flash, (c.id * 0.6180339) % 1);
+      pushSprite(x, yy, lift, flip, frame, hidden ? 0 : glow, flash + (hidden ? 10 : 0), (c.id * 0.6180339) % 1);
+      // 隠れている者の目：影の姿の上で光る（ときどきまばたき）
+      if (hidden) {
+        const ph = Math.floor(t * 2 + c.id * 0.37) % 7;
+        pushSprite(x, yy + 0.05, lift + (sp === Kind.Goblin ? 14 : 7), false, A.eyes(ph === 6 ? 3 : ph & 1), 0, 0);
+      }
       // ウィスプの光の尾：通ったあとに、淡い光の粒が少しのあいだ残る（描画だけ）
       if (sp === Kind.Wisp && !isCorpse) {
         let tr = this.trails.get(c.id);

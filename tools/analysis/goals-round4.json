@@ -1,0 +1,8 @@
+[
+  { "label": "ゴブリン：豊かなシード（上半分）の集落の日数の中央値", "metric": "richCampMedian", "op": ">=", "value": 5 },
+  { "label": "ゴブリン：5日以上続いた集落の割合（％）", "metric": "campShare5", "op": ">", "value": 0 },
+  { "label": "ゴブリン：絶えたシード", "metric": "gobGoneSeeds", "op": "<=", "value": 3 },
+  { "label": "コボルト：豊かなシードの住処の日数の中央値", "metric": "richWarrenMedian", "op": ">=", "value": 5 },
+  { "label": "大ネズミが絶えたシード", "metric": "ratGoneSeeds", "op": "<=", "value": 0 },
+  { "label": "四つの帳簿のずれ", "metric": "drift", "op": "<=", "value": 0 }
+]

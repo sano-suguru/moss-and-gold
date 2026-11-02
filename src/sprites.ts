@@ -2583,6 +2583,14 @@ function crownS(){
  return {...fr,ax:4,ay:5};
 }
 /** 角兜（ゴブリンの頭の上に重ねる） */
+/** 貢ぎ物の袋：オークが肩に担いで縄張りへ持ち帰る、口を縛った麻袋 */
+function tributeSack(){
+ const fr=blank(9,9),L=[150,120,80],M=[124,96,60],K=[86,62,38],T=[60,44,28];
+ for(let y=2;y<9;y++){const w=y<3?2:y<8?4:3;for(let x=4-w;x<=4+w;x++)setPx(fr,x,y,x===4+w||y===8?K:x<=4-w+1?L:M,false)}
+ setPx(fr,3,1,T,false);setPx(fr,4,1,T,false);setPx(fr,5,1,T,false);setPx(fr,4,0,K,false);setPx(fr,2,5,T,false);setPx(fr,6,4,T,false);
+ return {...fr,ax:4,ay:8};
+}
+
 function chiefHelm(){
  const fr=blank(13,7),I=RAMP.iron,B=RAMP.bone;
  for(let x=3;x<10;x++){setPx(fr,x,5,I[1],false);setPx(fr,x,4,I[2],false);setPx(fr,x,3,x<6?I[3]:I[2],false)}
@@ -2634,4 +2642,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, fireSpirit, phantomKnight, crownS, chiefHelm, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

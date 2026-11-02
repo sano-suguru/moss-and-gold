@@ -6,8 +6,13 @@
  *   npm run gallery -- --compare before （いまの画像と before を左右に並べた比較画像を作る）
  *
  * 場面は SCENES に並べる。find は、その時刻の世界から見たい場所を探す関数。
+ *
+ * 速くするための工夫：シミュレーションのコード（src の world, ecology, mapgen, rng, names）とこのファイルが前回と同じなら、
+ * 場面は作り直さない（描画だけ直したときは、撮るだけになる。--fresh で必ず作り直す）。シードごとに別のプロセスで同時に作る。
  */
-import { mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { createHash } from 'crypto';
+import { spawn } from 'child_process';
 import { DAY_TICKS, World } from '../../src/world';
 
 type Cam = { x: number; y: number; zoom: number };
@@ -25,27 +30,33 @@ const SCENES: Scene[] = [
   { name: 'sealed', title: '閉じた空洞の縁', seed: 'かしたれ', day: 1, phase: 0.6, zoom: 2, find: (w) => { const m = w.map; for (let k = m.w * 10; k < m.solid.length - m.w * 10; k += 3) { if (!m.sealed[k] || m.solid[k]) continue; for (const d of [4, -4]) { const q = k + d; if (!m.solid[q] && !m.sealed[q] && !m.lava[q]) return { x: (k % m.w) * T + d * 8, y: Math.floor(k / m.w) * T, zoom: 2 }; } } return null; } },
   { name: 'strata', title: '岩の地層（夜）', seed: 'かしたれ', day: 2, phase: 0.95, zoom: 2, find: () => ({ x: 1500, y: 1150, zoom: 2 }) },
   { name: 'lava', title: '溶岩と微生物の膜', seed: 'かしたれ', day: 6, phase: 0.6, zoom: 3, find: (w) => { const m = w.map; let b = -1, bv = 0; for (let k = 0; k < m.solid.length; k++) { if (!m.lava[k] || m.sealed[k]) continue; let v = 0; for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) v += w.mat[k + dy * m.w + dx] ?? 0; if (v > bv) { bv = v; b = k; } } return b >= 0 ? { x: (b % m.w) * T + 8, y: Math.floor(b / m.w) * T + 8, zoom: 3 } : null; } },
-  { name: 'camp', title: '冒険者の焚き火', seed: 'かしたれ', day: 2, phase: 0.1, zoom: 4, search: 3, find: (w) => { const p = w.eco.parties.find((q) => (q.camp ?? -1) >= 0); return p ? { x: (p.camp! % w.map.w) * T + 8, y: Math.floor(p.camp! / w.map.w) * T + 8, zoom: 4 } : null; } },
+  { name: 'camp', title: '冒険者の焚き火', seed: 'かしたれ', day: 2, phase: 0.1, zoom: 4, search: 10, find: (w) => { const p = w.eco.parties.find((q) => (q.camp ?? -1) >= 0); return p ? { x: (p.camp! % w.map.w) * T + 8, y: Math.floor(p.camp! / w.map.w) * T + 8, zoom: 4 } : null; } },
   { name: 'dragon', title: '眠るドラゴン', seed: 'abc', day: 6, phase: 0.3, zoom: 3, find: (w) => { const d = first(w.eco.list, (c) => c.k === 24 && !c.dead && c.sleep === 2); return d ? { x: Math.round(d.x), y: Math.round(d.y), zoom: 3 } : null; } },
   { name: 'sleepers', title: '眠る生き物（群れで眠る）', seed: 'abc', day: 4, phase: 0.5, zoom: 4, search: 3, find: (w) => { let best: { x: number; y: number } | null = null; let bn = 2; for (const c of w.eco.list) { if (c.dead || c.sleep <= 0 || c.k === 1 || c.k === 24) continue; let n = 0; for (const o of w.eco.list) if (!o.dead && o.sleep > 0 && Math.abs(o.x - c.x) < 60 && Math.abs(o.y - c.y) < 40) n++; if (n > bn) { bn = n; best = c; } } return best ? { x: Math.round(best.x), y: Math.round(best.y), zoom: 4 } : null; } },
-  { name: 'bats', title: 'ねぐらで眠るコウモリ（昼）', seed: 'かしたれ', day: 3, phase: 0.45, zoom: 4, find: (w) => { const b = first(w.eco.list, (c) => c.k === 1 && !c.dead && c.sleep === 2 && !w.map.sealed[Math.floor(c.y / 16 + 1) * w.map.w + Math.floor(c.x / 16)]); return b ? { x: Math.round(b.x), y: Math.round(b.y) + 20, zoom: 4 } : null; } },
+  { name: 'bats', title: 'ねぐらで眠るコウモリ（昼）', seed: 'かしたれ', day: 3, phase: 0.45, zoom: 4, search: 4, find: (w) => { const b = first(w.eco.list, (c) => c.k === 1 && !c.dead && c.sleep === 2 && !w.map.sealed[Math.floor(c.y / 16 + 1) * w.map.w + Math.floor(c.x / 16)]); return b ? { x: Math.round(b.x), y: Math.round(b.y) + 20, zoom: 4 } : null; } },
   { name: 'dwarves', title: 'ドワーフの広間', seed: 'abc', day: 3.2, phase: 0.6, zoom: 3, find: (w) => { const h = w.eco.hold; return h ? { x: (h.hk % w.map.w) * T + 8, y: Math.floor(h.hk / w.map.w) * T + 8, zoom: 3 } : null; } },
-  { name: 'fissure', title: '地底の裂け目', seed: 'abc', day: 25, phase: 0.45, zoom: 3, find: (w) => { const mo = w.map.mouths.find((q) => q.kind === 1); return mo ? { x: mo.x * T + 8, y: mo.y * T + 8, zoom: 3 } : null; } },
-  { name: 'sidecave', title: '地表の横穴', seed: 'abc', day: 25, phase: 0.45, zoom: 3, find: (w) => { const i = w.map.mouths.findIndex((q, j) => q.kind === 0 && w.eco.mouthOpen(j)); if (i < 0) return null; const [x, y] = w.eco.mouthSpot(i); const mo = w.map.mouths[i]; return { x: x + (mo.y === 0 ? 0 : mo.x === 0 ? 60 : -60), y: y + (mo.y === 0 ? 40 : 0), zoom: 3 }; } },
-  { name: 'river', title: '地下の川の口', seed: 'abc', day: 25, phase: 0.45, zoom: 3, find: (w) => { const mo = w.map.mouths.find((q) => q.kind === 2); return mo ? { x: mo.x * T + 8, y: mo.y * T + 8, zoom: 3 } : null; } },
+  { name: 'fissure', title: '地底の裂け目', seed: 'abc', day: 12, phase: 0.45, zoom: 3, find: (w) => { const mo = w.map.mouths.find((q) => q.kind === 1); return mo ? { x: mo.x * T + 8, y: mo.y * T + 8, zoom: 3 } : null; } },
+  { name: 'sidecave', title: '地表の横穴', seed: 'abc', day: 12, phase: 0.45, zoom: 3, find: (w) => { const i = w.map.mouths.findIndex((q, j) => q.kind === 0 && w.eco.mouthOpen(j)); if (i < 0) return null; const [x, y] = w.eco.mouthSpot(i); const mo = w.map.mouths[i]; return { x: x + (mo.y === 0 ? 0 : mo.x === 0 ? 60 : -60), y: y + (mo.y === 0 ? 40 : 0), zoom: 3 }; } },
+  { name: 'river', title: '地下の川の口', seed: 'abc', day: 12, phase: 0.45, zoom: 3, find: (w) => { const mo = w.map.mouths.find((q) => q.kind === 2); return mo ? { x: mo.x * T + 8, y: mo.y * T + 8, zoom: 3 } : null; } },
+  { name: 'warren', title: 'コボルトの住処（横穴・罠・畑）', seed: 'かしたれ', day: 3.5, phase: 0.4, zoom: 4, search: 6, find: (w) => { const e = w.eco as any; const wr = e.warrens.find((o: any) => (o.tun ?? 0) >= 4 && e.traps.filter((t: any) => t.w === o.id).length >= 2); if (!wr) return null; const d = wr.door; return { x: Math.round(((d % w.map.w) * T + 8 + wr.x) / 2), y: Math.round((Math.floor(d / w.map.w) * T + 8 + wr.y) / 2), zoom: 4 }; } },
   { name: 'phone', title: 'スマホの画面全体', seed: 'かしたれ', day: 2, phase: 0.6, zoom: 2, device: 'phone', find: (w) => ({ x: w.map.entrance.x * T + 8, y: 30 * T, zoom: 2 }) },
 ];
 
 const b64 = (u: Uint8Array) => Buffer.from(u.buffer, u.byteOffset, u.byteLength).toString('base64');
 const bits = (a: Uint8Array) => { const b = new Uint8Array(Math.ceil(a.length / 8)); for (let i = 0; i < a.length; i++) if (a[i]) b[i >> 3] |= 1 << (i & 7); return b64(b); };
-const save = (w: World, cam: Cam) => ({ v: 3, seed: w.map.seed, tick: w.tick, cam, speed: 0, seen: bits(w.seen), water: b64(new Uint8Array(w.water.buffer)), nutr: b64(new Uint8Array(w.nutr.buffer)), moss: b64(w.moss), fungus: b64(w.fungus), burn: b64(w.burn), ash: b64(w.ash), mat: b64(w.mat), born: w.born, washed: w.washed, digs: w.digs.slice(), eco: w.eco.serialize() });
+// マナも保存に入れる（入れないと、読み込んだ場面のマナがすべて0になり、マナの見た目が出ない）
+const save = (w: World, cam: Cam) => ({ v: 3, seed: w.map.seed, tick: w.tick, cam, speed: 0, seen: bits(w.seen), water: b64(new Uint8Array(w.water.buffer)), nutr: b64(new Uint8Array(w.nutr.buffer)), moss: b64(w.moss), fungus: b64(w.fungus), burn: b64(w.burn), ash: b64(w.ash), mat: b64(w.mat), mana: b64(new Uint8Array(w.mana.buffer)), manaBorn: w.manaBorn, manaLeaked: w.manaLeaked, manaFaded: w.manaFaded, born: w.born, washed: w.washed, digs: w.digs.slice(), eco: w.eco.serialize() });
 
 mkdirSync('build/gallery/scenes', { recursive: true });
-const out: { name: string; title: string; device: string; file: string }[] = [];
+type Out = { name: string; title: string; device: string; file: string };
 // 同じシードの場面は、時刻の早い順に一つの世界を進めながら作る
 const bySeed = new Map<string, Scene[]>();
 for (const s of SCENES) bySeed.set(s.seed, [...(bySeed.get(s.seed) ?? []), s]);
-for (const [seed, list] of bySeed) {
+const seeds = [...bySeed.keys()];
+
+function makeSeed(seed: string): Out[] {
+  const out: Out[] = [];
+  const list = bySeed.get(seed) as Scene[];
   const w = new World(seed);
   for (const s of list.sort((a, b) => a.day + (a.phase ?? 0) - (b.day + (b.phase ?? 0)))) {
     const target = Math.floor((s.day + (s.phase ?? 0)) * DAY_TICKS);
@@ -63,5 +74,37 @@ for (const [seed, list] of bySeed) {
     out.push({ name: s.name, title: s.title, device: s.device ?? 'desktop', file });
     console.log(`場面：${s.title}（${(w.tick / DAY_TICKS).toFixed(2)}日）`);
   }
+  return out;
 }
-writeFileSync('build/gallery/scenes.json', JSON.stringify(out, null, 1));
+
+const argv = process.argv.slice(2);
+if (argv[0] === '--one-seed') {
+  // 子：一つのシードの場面だけを作る
+  const i = +argv[1];
+  writeFileSync(`build/gallery/scenes-part${i}.json`, JSON.stringify(makeSeed(seeds[i])));
+} else {
+  // 親：前回と同じなら作り直さない。違えばシードごとに同時に作る
+  const h = createHash('sha1');
+  for (const f of ['src/world.ts', 'src/ecology.ts', 'src/mapgen.ts', 'src/rng.ts', 'src/names.ts', 'tools/gallery/scenes.ts']) h.update(readFileSync(f));
+  const key = h.digest('hex');
+  const keyFile = 'build/gallery/scenes.key';
+  const prev = existsSync(keyFile) ? readFileSync(keyFile, 'utf8') : '';
+  const listed: Out[] = existsSync('build/gallery/scenes.json') ? JSON.parse(readFileSync('build/gallery/scenes.json', 'utf8')) : [];
+  if (!argv.includes('--fresh') && prev === key && listed.length && listed.every((o) => existsSync(o.file))) {
+    console.log('場面は前回のまま（シミュレーションのコードと場面の定義が同じ）。作り直すなら --fresh');
+  } else {
+    const runs = seeds.map(
+      (_, i) =>
+        new Promise<void>((res, rej) => {
+          const c = spawn(process.execPath, [process.argv[1], '--one-seed', String(i)], { stdio: 'inherit' });
+          c.on('exit', (code) => (code === 0 ? res() : rej(new Error(`場面づくりに失敗：${seeds[i]}`))));
+        }),
+    );
+    Promise.all(runs).then(() => {
+      const out: Out[] = [];
+      for (let i = 0; i < seeds.length; i++) out.push(...JSON.parse(readFileSync(`build/gallery/scenes-part${i}.json`, 'utf8')));
+      writeFileSync('build/gallery/scenes.json', JSON.stringify(out, null, 1));
+      writeFileSync(keyFile, key);
+    });
+  }
+}

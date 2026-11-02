@@ -5,7 +5,7 @@ import { NAMES } from '../../src/names';
 export const KIND_NAMES = NAMES;
 export const CAUSE_NAMES: Record<string, string> = {
   eaten: '食べられた', fight: '打ち合いで倒れた', starve: '飢えた', burned: '焼けた', crushed: '押しつぶされた',
-  petrified: '石になった', killed: '襲われた', dried: '干からびた', faded: '消えた', planted: 'キノコになった', other: 'その他',
+  petrified: '石になった', killed: '襲われた', dried: '干からびた', faded: '消えた', planted: 'キノコになった', crumbled: '崩れて消えた', other: 'その他',
 };
 export const ORIGIN_NAMES: Record<string, string> = { entrance: '正面の入口から来た', mouth: '地表の横穴から来た', fissure: '地底の裂け目から来た', river: '川の口から来た', shaft: '天井の裂け目から来た', born: '中で生まれた' };
 

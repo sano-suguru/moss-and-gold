@@ -532,9 +532,9 @@ void main() {
     {
       float ga = dot(alb, vec3(0.3, 0.5, 0.2));
       // 光の届かない所：一段明るく、色も少し残す（地形や生き物が読めるように）
-      vec3 dim = mix(vec3(ga), alb, 0.58) * vec3(0.34, 0.36, 0.50);
+      vec3 dim = mix(vec3(ga), alb, 0.72) * vec3(0.60, 0.62, 0.76);
       // 岩の上面は、上から見下ろした岩肌として、光がなくても地層の色と模様が読める明るさで描く
-      if (tkind == 2) dim = mix(vec3(ga), alb, 0.8) * vec3(0.54, 0.54, 0.62);
+      if (tkind == 2) dim = mix(vec3(ga), alb, 0.8) * vec3(0.74, 0.74, 0.82);
       dim = max(dim, alb * glint);
       col = max(col, dim);
     }
@@ -812,7 +812,7 @@ void main() {
   // 暗がりでも、姿は青く沈んだ色でいつも見える
   {
     float ga = dot(tx.rgb, vec3(0.3, 0.5, 0.2));
-    col = max(col, mix(vec3(ga), tx.rgb, 0.58) * vec3(0.44, 0.47, 0.64));
+    col = max(col, mix(vec3(ga), tx.rgb, 0.75) * vec3(0.72, 0.74, 0.86));
   }
   if (lum > 0.85) {
     float ww = (lum - 0.85) * 0.6;

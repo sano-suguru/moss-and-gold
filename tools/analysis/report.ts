@@ -95,7 +95,7 @@ for (const [k, mm] of [...byOrigin].sort((a, b) => a[0] - b[0])) L.push(`| ${nam
 const ent = births.filter((b) => b.origin === 'entrance').length;
 L.push('', `口が開いた日：${w.map.mouths.map((mo, i) => `${['地表の横穴', '地底の裂け目', '川の口'][mo.kind]}（${mo.x}, ${mo.y}）${w.eco.mouthOpen(i) ? '開いている' : '閉じたまま'}`).join('、')}`, '');
 L.push('', `正面の入口から来た割合：${((ent / Math.max(1, births.length)) * 100).toFixed(1)}％（ウィスプを除くと ${((ent / Math.max(1, births.filter((b) => b.k !== 0).length)) * 100).toFixed(1)}％）`, '');
-L.push(`外へ出ていった：${exits.length}件（${[...new Set(exits.map((e) => e.reason))].map((r) => `${r === 'returned' ? '生還した冒険者' : '飢えて去った'} ${exits.filter((e) => e.reason === r).length}`).join('、')}）`, '');
+L.push(`外へ出ていった：${exits.length}件（${[...new Set(exits.map((e) => e.reason))].map((r) => `${r === 'returned' ? '生還した冒険者' : r === 'home' ? '満ちて巣へ帰った' : '飢えて去った'} ${exits.filter((e) => e.reason === r).length}`).join('、')}）`, '');
 
 // ---- 死に場所の偏り ----
 const CELL = 8;
