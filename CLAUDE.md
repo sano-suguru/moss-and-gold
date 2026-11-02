@@ -93,6 +93,8 @@ npm run shot -- --seed かしたれ --find warren         # 見たいもの（wa
 
 設定はすべてリポジトリの中：`wrangler.jsonc`（`dist/` をそのまま公開。Worker のコードは無い）と `.github/workflows/deploy.yml`。push するたびに GitHub Actions が `npm run typecheck` と `npm test` を通し、`npm run build` してから公開する。main は本番（`npx wrangler deploy`）、ほかのブランチ（`claude/…` など）はブランチ名のプレビューの URL（`wrangler versions upload --preview-alias`。マージの前に遊んで確かめられる）。Node の版は `.node-version`、wrangler は devDependencies。リポジトリの Secrets に `CLOUDFLARE_API_TOKEN` と `CLOUDFLARE_ACCOUNT_ID` が無ければ、公開だけ飛ばす。
 
+Cloudflare のスキルと MCP サーバー（プラグイン `cloudflare@cloudflare`、マーケットプレイスは `cloudflare/skills`）は `.claude/settings.json` で有効にしてあり、クラウドのセッションでも毎回入る。MCP は初めて使うときに OAuth で許可を求める。
+
 ```bash
 npm run build && npx wrangler deploy --dry-run     # 設定の確かめ（アカウントは要らない）
 ```
