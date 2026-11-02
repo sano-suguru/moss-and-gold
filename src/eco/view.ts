@@ -41,6 +41,9 @@ export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]):
   else if (c.sleep === 3) state = '半分だけ眠っている（片目を開けたまま）';
   else if (c.flee > 0) state = '逃げている';
   else if (c.act === 2 && this.w.tick - c.hitAt < 120) state = '戦っている';
+  else if (c.k === Kind.Rat && c.st === 11) state = c.ref2 ? '仲間のあとについて、新しい巣穴へ引っ越している' : '群れの先頭に立って、新しい巣穴へ引っ越している';
+  else if (c.k === Kind.Goblin && c.st === 15) state = c.gait > 0 ? '光の縁に身をひそめて、焚き火をうかがっている' : c.gait < 0 ? '眠っている冒険者に忍び寄っている' : '暗がりを選んで、焚き火へ忍び寄っている';
+  else if (c.k === Kind.Goblin && c.st === 16) state = c.units > 0 ? '盗んだ荷物を抱えて、集落へ逃げ帰っている' : '手ぶらで集落へ逃げ帰っている';
   else if (c.k === Kind.Golem) state = '宝物庫の入口を見張っている';
   else if (c.k === Kind.Dragon) state = c.st === 2 ? '飛んでいる' : c.foe ? '宝を盗った者を追っている' : '目を覚まして獲物を探している';
   else if (party && (party.camp ?? -1) >= 0) state = party.members[0] === c.id ? '焚き火のそばで見張りをしている' : '焚き火で休んでいる';

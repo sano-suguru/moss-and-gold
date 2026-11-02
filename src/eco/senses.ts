@@ -219,6 +219,8 @@ export function fearFire(this: Ecology, c: Cr): boolean {
  */
 export function lurk(this: Ecology, c: Cr): boolean {
   if (c.k !== Kind.Goblin && c.k !== Kind.Orc && c.k !== Kind.Kobold) return false;
+  // 夜の盗みに出たゴブリン（src/eco/raid.ts）
+  if (c.k === Kind.Goblin && (c.st === 15 || c.st === 16)) return this.goblinRaid(c);
   // 住処を持つコボルトの群れは、冒険者の灯りに自分から寄っていかない
   if (c.k === Kind.Kobold && (this.warrenOf(c) || c.st === 10)) {
     c.lure = 0;
@@ -300,28 +302,10 @@ export function lurk(this: Ecology, c: Cr): boolean {
       });
       if (c.k === Kind.Goblin && !ambush && !(camp && alone && (allies >= 2 || bold))) {
         // ゴブリンは襲わずに、食料と松明を盗んで逃げる（頭のいる集落は多めに盗る）
-        const take = Math.min(bold ? 30 : 20, Math.max(0, t.food - 5), SPEC[Kind.Goblin].cap - c.food);
-        t.food -= take;
-        c.food += take;
-        if (t.torch > 0 && c.torch <= 0) {
-          c.torch = t.torch;
-          t.torch = 0;
-        }
+        this.goblinSteal(c, t, camp, false);
         c.flee = 120;
         c.foe = t.id;
         c.lure = 0;
-        // 盗まれた一行は覚えておく（生きて帰れば、ゴブリンの盗みの噂になる）
-        const tp = this.parties.find((q) => q.id === t.party);
-        if (tp && take > 0) {
-          tp.robbed = (tp.robbed ?? 0) + 1;
-          tp.robX = Math.round(t.x);
-          tp.robY = Math.round(t.y);
-          this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: camp?.id ?? -1, ev: 'rob', n: take, x: Math.round(t.x), y: Math.round(t.y) } as never);
-        }
-        if (this.step - (this.lastLogged[997] ?? -99999) > 3000) {
-          this.lastLogged[997] = this.step;
-          this.log(c.x, c.y, `{k:${Kind.Goblin}}が冒険者の荷物を盗んで逃げた`);
-        }
       } else this.fight(c, t);
     } else this.goTo(c, t.x, t.y, SPEC[c.k].speed * 1.2);
     return true;

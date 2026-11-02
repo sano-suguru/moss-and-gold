@@ -28,13 +28,18 @@ export function tilePassable(this: Ecology, c: Cr, k: number): boolean {
 /** マス単位の幅優先探索で道筋を作る（見つからなければ null） */
 export function findPath(this: Ecology, c: Cr, from: number, to: number): number[] | null {
   // ゴブリンは、コボルトの縄張りをできるだけ横切らない（縄張りを通らない道筋を先に探し、なければふつうに探す）
-  if (c.k === Kind.Goblin && from >= 0 && to >= 0 && this.warrens.some((o) => o.id >= 0)) {
+  if (c.k === Kind.Goblin && c.st < 15 && from >= 0 && to >= 0 && this.warrens.some((o) => o.id >= 0)) {
     const m = this.w.map;
     const land = (k: number) => this.inKoboldLand((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8);
     if (!land(from) && !land(to)) {
       const p = this.findPathAvoid(c, from, to, land);
       if (p) return p;
     }
+  }
+  // 盗みに出たゴブリンは、明るい所をできるだけ避けて、暗がりを進む
+  if (c.k === Kind.Goblin && (c.st === 16 || (c.st === 15 && c.gait >= 0)) && from >= 0 && to >= 0) {
+    const p = this.darkPath(c, from, to);
+    if (p) return p;
   }
   // 冒険者は、目標でない住処・集落・縄張りのまわりをできるだけ避ける（避けては行けないときだけ通る）
   if (c.k === Kind.Adventurer && from >= 0 && to >= 0) {
@@ -57,7 +62,7 @@ export function findPathAvoid(this: Ecology, c: Cr, from: number, to: number, av
   // 探す広さに上限をつける（届かない目的地のために地図じゅうを探さない）
   // 冒険者は入口から深部まで歩くので、地図全体を探せるようにする
   // 冒険者とドラゴンとドワーフ、外へ去ろうとしている者は、地図全体を探す
-  const limit = c.k === Kind.Adventurer || c.k === Kind.Dragon || c.k === Kind.Dwarf || c.st === 9 || (c.k === Kind.Kobold && c.st === 10) || (c.k === Kind.Rat && c.st === 8) ? 40000 : c.k === Kind.Rat || c.k === Kind.Kobold ? 15000 : 6000;
+  const limit = c.k === Kind.Adventurer || c.k === Kind.Dragon || c.k === Kind.Dwarf || c.st === 9 || (c.k === Kind.Kobold && c.st === 10) || (c.k === Kind.Rat && c.st === 8) || (c.k === Kind.Goblin && c.st >= 15) ? 40000 : c.k === Kind.Rat || c.k === Kind.Kobold ? 15000 : 6000;
   while (qh < qt && qh < limit) {
     const cur = q[qh++];
     if (cur === to) break;
@@ -184,6 +189,8 @@ export function lit(this: Ecology, k: number, day: number): number {
 
 export function spawn(this: Ecology, k: Kind, x: number, y: number, body: number, food: number): Cr {
   this.record('births', { t: this.w ? this.w.tick : 0, k, origin: this.originNext || 'born', x: Math.round(x), y: Math.round(y) } as never);
+  // マナから生まれた者は、描画で出現の演出をする（描画だけの印）
+  const fromMana = this.originNext === 'mana';
   this.originNext = '';
   const c: Cr = {
     id: this.nextId++, k, x, y, px: x, py: y, vx: 0, vy: 0, dir: 0, act: 0, actT: 0,
@@ -192,6 +199,10 @@ export function spawn(this: Ecology, k: Kind, x: number, y: number, body: number
   };
   this.list.push(c);
   this.byId.set(c.id, c);
+  if (fromMana && this.w) {
+    this.fxManaBorn = this.fxManaBorn.filter((e) => this.w.tick - e.t < 200);
+    this.fxManaBorn.push({ id: c.id, t: this.w.tick, k, x, y });
+  }
   return c;
 }
 
@@ -505,7 +516,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr): void {
   prey.mana = 0;
   const quick = prey.dead !== 0 || [Kind.Wisp, Kind.Slime, Kind.Ghost, Kind.Myconid].includes(prey.k) || pred.k === Kind.Goblin || pred.k === Kind.Worm || pred.k === Kind.Mimic || total <= 4;
   if (!quick) {
-    this.record('deaths', { t: this.w.tick, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y) } as never);
+    this.record('deaths', { t: this.w.tick, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}) } as never);
     this.raiseAlarm(prey, pred);
     this.paths.delete(prey.id);
     if (prey.k === Kind.Dwarf && this.hold && pred.k === Kind.Golem && this.list.some((o) => o.k === Kind.Dwarf && !o.dead && o !== prey)) this.hold.golem = 1;
@@ -531,7 +542,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr): void {
   }
   prey.units = 0;
   if (!prey.dead) {
-    this.record('deaths', { t: this.w.tick, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y) } as never);
+    this.record('deaths', { t: this.w.tick, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}) } as never);
     // 仲間が食べられたら、群れに警戒が伝わる
     this.raiseAlarm(prey, pred);
   }
@@ -575,7 +586,7 @@ export function die(this: Ecology, c: Cr, cause = '', by = -1): void {
       near = -1;
       for (let q = 0; q < d.length; q++) if (d[q] >= 0 && Math.max(this.w.moss[q], this.w.fungus[q]) >= 20 && (near < 0 || d[q] < near)) near = d[q];
     }
-    this.record('deaths', { t: this.w.tick, k: c.k, cause, by, x: Math.round(c.x), y: Math.round(c.y), ...(near !== undefined ? { near } : {}) } as never);
+    this.record('deaths', { t: this.w.tick, k: c.k, cause, by, x: Math.round(c.x), y: Math.round(c.y), ...(near !== undefined ? { near } : {}), ...(c.k === Kind.Rat && c.st === 11 ? { march: 1 } : {}) } as never);
     // 住処の仲間が襲われて倒れたら、群れは覚えている（何度も続けば住処を捨てる）
     if (c.k === Kind.Kobold && by >= 0 && by !== Kind.Kobold && cause !== 'starve') {
       const wr = this.warrenOf(c);

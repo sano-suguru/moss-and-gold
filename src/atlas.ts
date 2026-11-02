@@ -1,4 +1,4 @@
-import { adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat } from './sprites';
+import { adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -62,6 +62,9 @@ export interface Atlas {
   halo: (z: number) => number;
   /** 幼竜が生まれた場所に残る卵の殻 */
   eggShell: () => number;
+  /** マナの粒（0 小〜3 大）と、竜の卵（0 静か、1 筋が光る、2 ひび、3 割れかけ）。マナから生まれる者の出現の演出 */
+  manaMote: (size: number) => number;
+  dragonEgg: (v: number) => number;
   /** 大ネズミの王の冠、ゴブリンの頭の角兜 */
   crown: () => number;
   chiefHelm: () => number;
@@ -422,6 +425,14 @@ export function buildAtlas(): Atlas {
     }
   const eggShellFrame = raws.length;
   raws.push(eggShell(0) as RawFrame);
+  const manaMoteFrames: number[] = [];
+  const dragonEggFrames: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    manaMoteFrames.push(raws.length);
+    raws.push(manaMote(i) as RawFrame);
+    dragonEggFrames.push(raws.length);
+    raws.push(dragonEgg(i) as RawFrame);
+  }
   // 特別な個体：火の精と亡霊の騎士（どの向きも同じ絵。左向きは反転）、冠と角兜
   for (const [nm, gen] of [['firespirit', fireSpirit], ['pknight', phantomKnight], ['wspirit', waterSpirit], ['lspirit', (_a: string, f: number) => lightSpirit(f)], ['mlord', mushroomLord]] as [string, (a: string, f: number) => unknown][])
     for (let f = 0; f < 4; f++) {
@@ -693,6 +704,8 @@ export function buildAtlas(): Atlas {
     hoard: (tier, owner, f) => hoardFrames[`${owner}:${Math.min(4, Math.max(0, tier))}:${f & 1}`],
     fx: (key) => fxFrames.get(key) ?? 0,
     eggShell: () => eggShellFrame,
+    manaMote: (z) => manaMoteFrames[Math.min(3, Math.max(0, z))],
+    dragonEgg: (v) => dragonEggFrames[Math.min(3, Math.max(0, v))],
     crown: () => crownFrame,
     chiefHelm: () => helmFrame,
     sack: () => sackFrame,

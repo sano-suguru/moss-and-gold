@@ -2528,6 +2528,35 @@ function eggShell(v){
 }
 
 
+// ===== マナから生まれる者の出現（描画だけ） =====
+/** マナの粒：紫に光る点（size 0 小 〜 3 大） */
+function manaMote(size){
+ const C=[[180,130,255],[200,160,255],[222,196,255],[246,236,255]][size];
+ const W=size>=2?5:3,fr=blank(W,W),c=Math.floor(W/2);
+ setPx(fr,c,c,C,true);
+ const d=C.map(v=>Math.round(v*0.62));
+ if(size>=1){setPx(fr,c-1,c,d,true);setPx(fr,c+1,c,d,true);setPx(fr,c,c-1,d,true);setPx(fr,c,c+1,d,true)}
+ if(size>=3){const e=C.map(v=>Math.round(v*0.4));setPx(fr,c-2,c,e,true);setPx(fr,c+2,c,e,true);setPx(fr,c,c-2,e,true);setPx(fr,c,c+2,e,true)}
+ return {...fr,ax:c,ay:c};
+}
+/** 竜の卵：0 まだ静か、1 マナを吸って筋が紫に光る、2 ひびが走る、3 ひびが広がり上が欠ける */
+function dragonEgg(v){
+ const W=14,H=18,fr=blank(W,H);
+ const S=[[92,74,60],[118,96,74],[150,124,92],[64,50,44]];
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+  const dx=(x-6.5)/6.2,dy=(y-10.5)/(y<10.5?9.6:7.2);const d=dx*dx+dy*dy;if(d>1)continue;
+  if(v===3&&y<4)continue;
+  const lit=(-dx*0.6-dy*0.7);
+  let c=d>0.8?S[3]:lit>0.35?S[2]:lit>-0.1?S[1]:S[0];
+  if(((x*7+y*3)%9===0)&&d<0.75)c=S[0];
+  setPx(fr,x,y,c,false);
+ }
+ const vein=[[6,4],[7,5],[7,6],[6,7],[6,8],[7,9],[8,10],[8,11],[7,12],[4,8],[5,9],[4,10],[9,7],[10,8]];
+ if(v>=1)vein.forEach(([x,y],i)=>{if(v===3&&y<4)return;setPx(fr,x,y,i%3===0?[246,230,255]:[196,150,255],true)});
+ if(v>=2){const crack=[[3,6],[4,6],[5,5],[6,5],[8,5],[9,6],[10,6],[11,7]];crack.forEach(([x,y])=>setPx(fr,x,y,[30,22,26],false));if(v===3){setPx(fr,6,3,[246,230,255],true);setPx(fr,7,3,[246,230,255],true)}}
+ return {...fr,ax:7,ay:16};
+}
+
 // ===== 特別な個体の姿 =====
 /** 火の精：炎の体。芯は白く、外へ橙、赤、縁は暗い赤。腕の炎が揺らめく。act attack は両腕を前へ */
 function fireSpirit(act,f){
@@ -2642,4 +2671,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

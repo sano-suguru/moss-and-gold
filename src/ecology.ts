@@ -138,6 +138,8 @@ export interface Party {
   name?: string;
   /** ゴブリンに荷物を盗まれた回数と、最後に盗まれた場所（生きて帰れば噂になる） */
   robbed?: number;
+  /** ゴブリン退治：目指す集落のゴブリンを最後に見た歩（着いてから誰も見えないまま長く探せば引き返す） */
+  gobSeen?: number;
   robX?: number;
   robY?: number;
   /** 身構えて止まっている刻みの終わり、向く先、種類（1 目標に着いて構える、2 住処のそばで身構える） */
@@ -150,6 +152,12 @@ export interface Party {
   /** 見かけた竜の場所（生きて帰れば噂になる） */
   dgx?: number;
   dgy?: number;
+  /** 竜（ドラゴン）を見通しの利く所から見た：その者の番号と、見た者の立っていた所（歩いて行ける所。生きて帰れば、竜の寝床への道として町に知られる） */
+  dgId?: number;
+  dgvx?: number;
+  dgvy?: number;
+  /** 竜退治：知られた道をたどっている（見えるまでは、道の先＝見た所へ向かう） */
+  aimWay?: number;
 }
 
 /** 外の世界の地図：生還者が持ち帰った、探した範囲、宝のあった区画、危ない区画 [区画, 強さ, 刻み] */
@@ -159,6 +167,8 @@ export interface Lore {
   danger: number[][];
   /** 生還者が見つけた、地表へ通じる別の横穴（mouths の番号） */
   mouths?: number[];
+  /** 竜の寝床への道：[見た者の立っていた所 x, y（画素）, 竜の番号, 持ち帰った刻み]。前の一行が見つけて持ち帰ったときだけ、竜殺しは竜退治を目標にする */
+  dragonWay?: number[];
 }
 /** 地図の区画の大きさ（マス） */
 export const CELL = 8;
@@ -252,6 +262,8 @@ export interface Camp {
   lx?: number;
   ly?: number;
   tribT?: number;
+  /** 次に盗みに出られる刻み（夜の盗み：src/eco/raid.ts） */
+  raidT?: number;
 }
 
 /** 種ごとの強さ（戦いの勝ち負けの確率に使う） */
@@ -779,6 +791,8 @@ export class Ecology {
   fxHits: { t: number; x: number; y: number; ax: number; ay: number; id: number }[] = [];
   /** 気づいた印：「！」（敵や獲物）か「？」（害のない相手） */
   fxMarks: { t: number; id: number; m: string }[] = [];
+  /** マナから生まれた者（描画だけ：生まれる場所にマナが集まって姿が現れる演出。保存しない。判断に使わない） */
+  fxManaBorn: { id: number; t: number; k: number; x: number; y: number }[] = [];
   noticed = new Map<number, number>();
 
   /** デモの組：攻める側と受ける側 */

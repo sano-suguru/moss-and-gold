@@ -154,8 +154,9 @@ export function updateParties(this: Ecology): void {
         this.log(alive[0].x, alive[0].y, `冒険者の一行が深手を負って引き返した`);
         continue;
       }
+      // 地上が夜なら、早めに休む（夜は焚き火を囲む）
       // 休むのは、探索中で食料に余裕があるときだけ（帰り道では休まずに出口を目指す。目標に着いて果たすまでの間も休まない）
-      if (p.goal === 0 && foodAvg >= 0.5 && (p.camp ?? -1) < 0 && !(p.aimAt && !p.aimEnd) && this.step - (p.lastCamp ?? 0) > 2500 && ((p.fatigue ?? 0) > 3600 || worst < 0.5)) this.startCamp(p, alive[0]);
+      if (p.goal === 0 && foodAvg >= 0.5 && (p.camp ?? -1) < 0 && !(p.aimAt && !p.aimEnd) && this.step - (p.lastCamp ?? 0) > 2500 && ((p.fatigue ?? 0) > 3600 || worst < 0.5 || (this.isNight() && (p.fatigue ?? 0) > 2000))) this.startCamp(p, alive[0]);
       if ((p.camp ?? -1) >= 0 && (p.goal !== 0 || foodAvg < 0.3)) this.endCamp(p);
       if ((p.camp ?? -1) >= 0 && this.step >= (p.campUntil ?? 0)) this.endCamp(p);
       if (held >= cap * 0.7 || hungry || tooLong || fewer || dark || ((p.saw & 8) !== 0 && !slayer)) {
@@ -385,6 +386,12 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
         p.saw |= 8;
         p.dgx = Math.round(o.x);
         p.dgy = Math.round(o.y);
+        // 寝床のドラゴンを、見通しの利く所から見た：そこまでの道が分かった（生きて帰れば町に知られる）
+        if (o.k === Kind.Dragon && !p.dgId && lineOfSight(m, c.x, c.y, o.x, o.y)) {
+          p.dgId = o.id;
+          p.dgvx = Math.round(c.x);
+          p.dgvy = Math.round(c.y);
+        }
       }
     });
   }
@@ -708,6 +715,12 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
       r.dragonX = p.dgx ?? 0;
       r.dragonY = p.dgy ?? 0;
     }
+  }
+  // 竜の寝床への道（見通しの利く所から寝床のドラゴンを見た一行が持ち帰る）
+  if (p.dgId && !(lo.dragonWay && lo.dragonWay[2] === p.dgId)) {
+    lo.dragonWay = [p.dgvx ?? 0, p.dgvy ?? 0, p.dgId, this.w.tick];
+    this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'way', n: p.dgId, x: p.dgvx ?? 0, y: p.dgvy ?? 0 } as never);
+    this.log(c.x, c.y, `生きて帰った冒険者が、深部の{k:${Kind.Dragon}}の寝床への道を町に伝えた`);
   }
   // ゴブリンに荷物を盗まれた話（溜まると、ゴブリン退治の一行が来る）
   if (p.robbed) {

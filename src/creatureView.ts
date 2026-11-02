@@ -552,7 +552,7 @@ export class CreatureView {
       }
     }
     // 幼竜が生まれた場所の卵の殻
-    if (eco.dragonShell && eco.w.tick - eco.dragonShell.t < 14400 * 3 && inView(eco.dragonShell.x, eco.dragonShell.y, 20)) pushSprite(eco.dragonShell.x, eco.dragonShell.y, 0, false, A.eggShell(), 0, 2);
+    if (eco.dragonShell && eco.w.tick - eco.dragonShell.t >= 52 && eco.w.tick - eco.dragonShell.t < 14400 * 3 && inView(eco.dragonShell.x, eco.dragonShell.y, 20)) pushSprite(eco.dragonShell.x, eco.dragonShell.y, 0, false, A.eggShell(), 0, 2);
     // 血の跡（地面に描く）
     for (const b of eco.blood) if (inView(b.x, b.y, 8)) pushSprite(b.x, b.y, 0, false, A.blood(b.c, b.v), 0, 2);
     // 技の残した床の跡（ひび、溶け跡、霜。地上の時間で数分かけて消える）
@@ -611,6 +611,9 @@ export class CreatureView {
     }
     this.order.sort((a, b) => a.y - b.y || a.c.id - b.c.id);
 
+    // マナから生まれた者（描画だけの出現の演出）
+    const manaBorn = new Map<number, { t: number; x: number; y: number }>();
+    for (const e of eco.fxManaBorn) if (eco.w.tick - e.t < 100) manaBorn.set(e.id, e);
     // 身構えている一行（描画だけ：武器を構えた姿で止める。目標に着いたときは振りかぶり、そばを通るときは構えるだけ）
     const braced = new Map<number, number>();
     for (const p of eco.parties) if ((p.braceT ?? 0) > eco.step) for (const id of p.members) braced.set(id, p.braceK ?? 2);
@@ -664,6 +667,46 @@ export class CreatureView {
           }
         } else if (c.caught) lift = 6;
       }
+      // マナから生まれた者の出現（描画だけ）：生まれる場所にマナの粒が渦を巻いて集まり、影の姿から白く光って形が固まる。
+      // ドラゴンの幼子は、マナが卵に集まり、卵が揺れてひびが走り、割れて殻から出てくる
+      let veil = 0;
+      {
+        const mb = manaBorn.get(c.id);
+        if (mb && !c.dead) {
+          const age = eco.w.tick - mb.t + alpha;
+          const egg = sp === Kind.Dragon;
+          const G = 30;
+          const HATCH = egg ? G + 22 : G;
+          const F = 14;
+          if (age < HATCH + F + 6) {
+            const cx = egg ? mb.x : x;
+            const cy = egg ? mb.y + 4 : yy;
+            const bh = egg ? 8 : Ecology.bodySize(sp) * 0.9 + 6;
+            // 集まる粒
+            const n = age < G ? 18 : 8;
+            const p = Math.min(1, age / G);
+            for (let i = 0; i < n; i++) {
+              const ang = i * 2.399 + age * (0.1 + (i % 3) * 0.03) * (i % 2 ? 1 : -1);
+              const r = age < G ? 3 + Math.pow(1 - p, 1.4) * (30 + (i % 4) * 6) : Math.max(0, 6 - (age - G) * 0.3);
+              const fade = age < G ? Math.min(3, Math.floor(p * 4 + (i % 2))) : Math.max(0, 2 - Math.floor((age - G) / 8));
+              if (age >= G && r <= 0) continue;
+              pushSprite(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r * 0.55, bh + Math.sin(i * 1.7 + age * 0.25) * 4 * (1 - p * 0.5), false, A.manaMote(fade), 0, 2);
+            }
+            if (age < G * 1.2 && age > G * 0.4) pushSprite(cx, cy - 0.05, bh * 0.5, false, A.halo(age > G * 0.8 ? 1 : 0), 0, 2);
+            if (egg && age < HATCH) {
+              // 卵：マナを吸って筋が光り、揺れてひびが走る
+              const shake = age > G ? (Math.floor(age) % 4 < 2 ? 1 : -1) * (age > HATCH - 8 ? 1.5 : 0.8) : 0;
+              const v = age < G * 0.5 ? 0 : age < G ? 1 : age < HATCH - 7 ? 2 : 3;
+              pushSprite(cx + shake, cy, 0, false, A.dragonEgg(v), 0, 2);
+            }
+            // 姿：集まるあいだは見せず、影の姿から白い光で形が固まる
+            if (age < HATCH) veil = 1;
+            else if (age < HATCH + F * 0.5) veil = egg ? 3 : 2;
+            else if (age < HATCH + F * 0.5 + 3) veil = 3;
+          }
+        }
+      }
+      if (veil === 1) continue;
       const bright = sp === Kind.Wisp && c.glow > 90 ? 1 : 0;
       // 隠れている者（ほかの生き物には気づかれない）：眺める人には、暗く沈んだ影の姿と光る目で見せる
       const hidden = eco.isHidden(c);
@@ -726,9 +769,11 @@ export class CreatureView {
       }
       // 貢ぎ物の袋：取り立てたオークは、袋を肩に担いで縄張りへ帰る
       if (!isCorpse && sp === Kind.Orc && c.units > 0 && !hidden) pushSprite(x + (flip ? 6 : -6), yy + 0.05, lift + 16, flip, A.sack(), 0, 2);
+      // ゴブリンの袋：摘んだキノコや苔、冒険者から盗んだ食べ物を背負って集落へ持ち帰る
+      if (!isCorpse && sp === Kind.Goblin && c.units >= 6 && !hidden && !c.dead) pushSprite(x + (flip ? 5 : -5), yy + 0.05, lift + 10, flip, A.sack(), 0, 2);
       // 傷を受けた瞬間は白く光る
       const flash = !isCorpse && eco.w.tick - c.hitAt < 2 ? 20 : 0;
-      pushSprite(x, yy, lift, flip, frame, hidden ? 0 : glow, flash + (hidden ? 10 : 0), (c.id * 0.6180339) % 1);
+      pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0), (c.id * 0.6180339) % 1);
       // 隠れている者の目：影の姿の上で光る（ときどきまばたき）。暗がりで灯りを狙って潜む者（待ち伏せのゴブリンなど）も、暗ければ目だけ光る
       if (hidden || (!isCorpse && c.lure && !c.dead && c.act === 0 && !eco.isLit(c))) {
         const ph = Math.floor(t * 2 + c.id * 0.37) % 7;

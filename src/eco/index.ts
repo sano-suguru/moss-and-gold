@@ -33,6 +33,7 @@ import './fire';
 import './dragon';
 import './adventurer';
 import './aim';
+import './raid';
 import './dwarf';
 import './arrivals';
 import './myconid';
