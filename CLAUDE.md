@@ -84,6 +84,7 @@ npm run bench -- --repeat 3                                         # 速さ：s
 
 途中の状態の保存庫は、コードの版ごとに分かれる（版が変われば使わない）。コードを直した直後は、いまの版の状態はまだないので、調べ物は前の版（HEAD）の状態から、いまの版で続けて回す（何日目から分かれたかを表示する）。
 `runs/.cache` は大きくなったら消してよい（次に回したときに作り直す）。
+main の版の保存庫（16シード×25日の結果と1日ごとの状態、約26MB）は、main へのマージごとに GitHub Actions（.github/workflows/simcache.yml）が作って Release「sim-cache」に置き、クラウドのセッションは始まりのフック（.claude/hooks/session-start.sh）で裏で取ってくる（`node tools/analysis/simcache.mjs fetch --ref origin/main`。様子は runs/.cache/fetched/log.txt）。マージの直後で Actions がまだ終わっていなければ取れないので、いまどおり手元で回す。git には入れない（版が変わるとすぐ使われなくなり、履歴が重くなる）。
 
 `sim` を直接回すときは `--budget 秒`（既定270）を超えそうになると途中の状態を書き出して止まる（`--resume` で続ける。分けても結果は同じ）。batch・ab・check は時間で止めない。
 

@@ -1,0 +1,68 @@
+# main の版の保存庫（16シード×25日の結果と1日ごとの状態、runs/.cache の一部）を作って、Release「sim-cache」に置く。
+# 新しいセッションは、始まりのフック（.claude/hooks/session-start.sh）でここから取ってくるので、main の版を回し直さずに済む。
+# 置くファイルの名前は、シミュレーションの版と道具の版のハッシュ（tools/analysis/simcache.mjs key）。同じ名前がもうあれば回さない。
+# 古いものは新しい順に KEEP 個だけ残す。鍵は Actions に最初からある GITHUB_TOKEN だけ（contents: write）。
+name: simcache
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tools/analysis/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/simcache.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: simcache
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: sim-cache
+  KEEP: 4
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - name: 置くファイルの名前と、もう置いてあるか
+        id: key
+        run: |
+          name=$(node tools/analysis/simcache.mjs key)
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          if gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx "$name"; then
+            echo "have=1" >> "$GITHUB_OUTPUT"
+            echo "::notice::$name はもう置いてある（回さない）"
+          fi
+      - name: 16シード×25日を回す
+        if: steps.key.outputs.have != '1'
+        run: npm run batch -- --seeds 16 --days 25 --out runs/b16
+      - name: 固めて Release に置く
+        if: steps.key.outputs.have != '1'
+        run: |
+          name='${{ steps.key.outputs.name }}'
+          node tools/analysis/simcache.mjs pack "$name"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --prerelease --title "検証の保存庫（sim-cache）" \
+              --notes "main の版ごとの、16シード×25日の結果と1日ごとの状態（runs/.cache の一部）。tools/analysis/simcache.mjs fetch が取ってくる。Actions の simcache.yml が作り、新しい順に ${KEEP} 個だけ残す。"
+          fi
+          gh release upload "$TAG" "$name" --clobber
+      - name: 古いものを消す
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.assets | sort_by(.created_at) | reverse | .[]?.name' | tail -n +$((KEEP + 1)) | while read -r old; do
+            echo "消す：$old"
+            gh release delete-asset "$TAG" "$old" -y
+          done

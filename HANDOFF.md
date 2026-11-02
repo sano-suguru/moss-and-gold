@@ -9,7 +9,7 @@
 
 1. `npm ci`、`npm test`（21項目すべて OK、約12秒）、`npm run check`（早めの確かめ5件、約1分。保存庫が空なら前の版の10日目までも回すので数分）。
 2. CLAUDE.md の「よく使うコマンド」「分析の流れ」を読む。道具のしくみは docs/rework-tools.md。
-3. 保存庫 `runs/.cache` は git に入っていない。新しい環境では空なので、最初に `npm run ab -- --preset final`（または `npm run batch -- --seeds 16 --days 25`）でいまの版の16シード×25日を一度回しておくと、そのあとの比較（`ab --preset quick`）・調べ物（`probe`）・確かめ（`check`）が速い。
+3. 保存庫 `runs/.cache` は git に入っていない。クラウドのセッションでは、始まりのフックが main の版の16シード×25日を Release「sim-cache」から裏で取ってくる（Actions の simcache.yml が main へのマージごとに作る。runs/.cache/fetched/log.txt）。取れなかったとき（マージの直後など）は、最初に `npm run ab -- --preset final`（または `npm run batch -- --seeds 16 --days 25`）でいまの版を一度回しておくと、そのあとの比較・調べ物・確かめが速い。
 
 ## いまの状態
 
