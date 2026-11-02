@@ -201,6 +201,12 @@ export interface Camp {
   dry: number;
   /** かがり火の燃料（枯れたキノコの軸）。0 なら火は消えている */
   fuel?: number;
+  /** ゴブリンの集落（住みつける仕組み）：蓄え（養分の帳簿に入る）、1 なら暗がりに散って潜んでいる、近ごろ襲われた回数、蓄えが尽きた刻み、1匹になった刻み */
+  store?: number;
+  hide?: number;
+  raids?: number;
+  empty?: number;
+  alone?: number;
 }
 
 /** 種ごとの強さ（戦いの勝ち負けの確率に使う） */
@@ -515,6 +521,8 @@ export class Ecology {
   }
   /** この刻みまでコボルトは来ない（住処が襲われて捨てられたという外の噂） */
   koboldShun = 0;
+  /** この刻みまでゴブリンは来ない（集落が襲われて捨てられたという外の噂） */
+  goblinShun = 0;
   /** 同時にダンジョンの中にいる冒険者の一行の数の上限（切り替えられる。既定 1。段階13までは 2） */
   static ADV_MAX_PARTIES = 1;
   /** 弱い生き物の害（pester）をなす種 */
@@ -886,17 +894,17 @@ export class Ecology {
   }
 
   /** 近くで苔の多いマスを探す（何か所か試して一番よい所） */
-  private findMoss(c: Cr, cx: number, cy: number, R: number, salt: number): number {
+  private findMoss(c: Cr, cx: number, cy: number, R: number, salt: number, seedStep = this.step): number {
     const m = this.w.map;
     const tx0 = Math.floor(cx / TILE);
     const ty0 = Math.floor(cy / TILE);
     let best = -1;
-    // 腹を空かせた大ネズミとコボルトは、えり好みしない（薄い群落でも、近ければ食べに行く）
-    const needy = (c.k === Kind.Rat || c.k === Kind.Kobold) && c.hungry > 0;
+    // 腹を空かせた大ネズミとコボルトとゴブリンは、えり好みしない（薄い群落でも、近ければ食べに行く。キノコも探す）
+    const needy = (c.k === Kind.Rat || c.k === Kind.Kobold || c.k === Kind.Goblin) && c.hungry > 0;
     let bv = needy ? 0 : 24;
     const per = 4;
     for (let i = 0; i < (needy ? 40 : 28); i++) {
-      const h = ih(c.id, this.step, salt + i);
+      const h = ih(c.id, seedStep, salt + i);
       const dx = ((h & 255) % (2 * R + 1)) - R;
       const dy = (((h >>> 8) & 255) % (2 * R + 1)) - R;
       const x = tx0 + dx;
@@ -905,7 +913,7 @@ export class Ecology {
       const k = y * m.w + x;
       if (m.solid[k] || m.lava[k] || m.sealed[k]) continue;
       if (c.k === Kind.Rat && this.w.water[k] > 40) continue;
-      const food = c.k === Kind.Rat || c.k === Kind.Kobold ? Math.max(this.w.moss[k], this.w.fungus[k]) : this.w.moss[k];
+      const food = c.k === Kind.Rat || c.k === Kind.Kobold || (c.k === Kind.Goblin && needy) ? Math.max(this.w.moss[k], this.w.fungus[k]) : this.w.moss[k];
       if (needy && food < 20) continue;
       // 腹を空かせた者は、豊かさより近さ（豊かさは30で頭打ち）
       const v = (needy ? Math.min(30, food - 12) : food - 12) - (Math.abs(dx) + Math.abs(dy)) * per;
@@ -929,8 +937,6 @@ export class Ecology {
   edibleMoss = 0;
   /** 開いた場所のキノコのうち、コボルトの畑の外にあるもの（ゴブリンが来る条件に使う。土地勘と同じ時機に数える） */
   wildFungus = 0;
-  /** 分析の切り替え：true なら、ゴブリンが来る条件に畑のキノコも数える（二巡目までの挙動） */
-  static GOBLIN_FARM_FUNGUS = false;
   private updateForage(): void {
     const m = this.w.map;
     const out: number[] = [];
@@ -1101,6 +1107,10 @@ export class Ecology {
       if (c.k === Kind.Kobold && by >= 0 && by !== Kind.Kobold && cause !== 'starve') {
         const wr = this.warrenOf(c);
         if (wr) wr.raids = (wr.raids ?? 0) + 1;
+      }
+      if (c.k === Kind.Goblin && by >= 0 && by !== Kind.Goblin && cause !== 'starve') {
+        const cp = this.campOf(c);
+        if (cp && cp.kind === 0) cp.raids = (cp.raids ?? 0) + 1;
       }
     }
     if (c.k === Kind.Dwarf && this.hold && this.list.some((o) => o.k === Kind.Golem && !o.dead && sq(o.x - c.x) + sq(o.y - c.y) < 40 * 40)) {
@@ -1322,6 +1332,8 @@ export class Ecology {
     if (this.step % 600 === 95) this.checkRatDoors();
     if (this.step % 50 === 35) this.updateWarrens();
     if (this.step % 10 === 3) this.watchWarrens();
+    if (this.step % 10 === 7) this.watchCamps();
+    if (this.step % 600 === 105) this.checkGoblinMouths();
     this.checkTraps();
     if (this.step % 200 === 100) this.spawnSalamanders();
     if (this.step % 50 === 15) this.updateCamps();
@@ -2564,30 +2576,347 @@ export class Ecology {
   }
 
   // ---------- ゴブリン ----------
-  private pickCampSite(): number {
+  /**
+   * ゴブリンの集落の場所：暗く、人の気配が薄く、冒険者の通り道（気配の濃いマス）から歩いて15マス以上（40マスまでが望ましい：
+   * 灯りを見張って盗みや待ち伏せに出られる近さ）。竜の寝床から30、トロールとバジリスクから15、コボルトの住処から10、
+   * ほかの集落から30マス離れ、まわりにネズミとキノコ（食べ物）があり、出発点から歩いて行ける所。
+   * minFood を指定すれば、まわり8マスの食べ物（warrenFood）がそれに満たない所は選ばない
+   */
+  static GOBLIN_MIN_FOOD = 1800;
+  /**
+   * 集落の候補のまわりの食べ物。ゴブリンは狩りと死骸あさりで広く動くので、コボルト（8マス）より広く数える：
+   * 14マス以内の食べられる苔とキノコ（20以上の群落の、根元12を除いた分）の半分、16マス以内のネズミ1匹あたり100、死骸の残り
+   */
+  private campFood(k: number): number {
+    const m = this.w.map;
+    const x0 = k % m.w;
+    const y0 = Math.floor(k / m.w);
+    let f = 0;
+    for (let y = Math.max(1, y0 - 14); y <= Math.min(m.h - 2, y0 + 14); y++)
+      for (let x = Math.max(1, x0 - 14); x <= Math.min(m.w - 2, x0 + 14); x++) {
+        const q = y * m.w + x;
+        if (m.solid[q] || m.sealed[q]) continue;
+        const v = Math.max(this.w.moss[q], this.w.fungus[q]);
+        if (v >= 20) f += (v - 12) >> 1;
+      }
+    this.nearby(x0 * TILE + 8, y0 * TILE + 8, 16, (o) => {
+      if (o.k === Kind.Rat && !o.dead) f += 100;
+      else if (o.dead === 1 && o.units > 0) f += o.units;
+    });
+    return f;
+  }
+  private pickGoblinCamp(avoid?: Camp, from?: [number, number], minFood = 0): number {
     const m = this.w.map;
     let best = -1;
     let bv = -1e9;
-    for (let i = 0; i < 200; i++) {
-      const k = ih(this.step, i, 90) % (m.w * m.h);
-      if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 10 || this.w.lightBase[k] > 80 || m.maze[k]) continue;
+    const par = from ? new Int32Array(m.w * m.h) : null;
+    const dist = from ? this.walkDist(this.tileOf(from[0], from[1]), 100, par as Int32Array) : null;
+    const reach: number[] = [];
+    if (dist) for (let q = 0; q < dist.length; q++) if (dist[q] >= 0) reach.push(q);
+    if (dist && !reach.length) return -1;
+    const route = this.routeDist(45);
+    const danger: [number, number, number][] = [];
+    for (const o of this.list) {
+      if (o.dead || o.away) continue;
+      if (o.k === Kind.Dragon) danger.push([o.hx || o.x, o.hy || o.y, 30]);
+      else if (o.k === Kind.Troll || o.k === Kind.Basilisk) danger.push([o.hx || o.x, o.hy || o.y, 15]);
+    }
+    if (this.dragonShell) danger.push([this.dragonShell.x, this.dragonShell.y, 30]);
+    // 安く調べられる条件で先に絞り、残った候補から選ぶ（条件を満たす所が少なくても取りこぼさないように）
+    const cand: number[] = [];
+    const pool = dist ? reach.length : 2000;
+    for (let i = 0; i < pool; i++) {
+      const k = dist ? reach[i] : ih(this.step, i, 90) % (m.w * m.h);
+      if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 10 || this.w.lightBase[k] > 60 || m.maze[k]) continue;
       const x = k % m.w;
       const y = Math.floor(k / m.w);
       if (Math.abs(x - m.entrance.x) + y < 15) continue;
-      if (this.warrens.some((o) => Math.abs(o.x / TILE - x) + Math.abs(o.y / TILE - y) < 25)) continue;
-      if (this.camps.some((o) => Math.abs(o.x / TILE - x) + Math.abs(o.y / TILE - y) < 30)) continue;
+      // 通り道から15マスより近い所には住まない（40マスより遠い所は点を下げる）
+      if (route[k] >= 0 && route[k] < 15) continue;
+      // コボルトの住処から15マス（コボルトが住処を守る範囲12マスの外に集落の真ん中を置く。10マスでは集落ごと縄張りの中に入り、群れで食べられていた）
+      if (this.warrens.some((o) => o.id >= 0 && Math.abs(o.x / TILE - x) + Math.abs(o.y / TILE - y) < 15)) continue;
+      if (this.camps.some((o) => o.id >= 0 && o !== avoid && Math.abs(o.x / TILE - x) + Math.abs(o.y / TILE - y) < 30)) continue;
+      if (avoid && Math.abs(avoid.x / TILE - x) + Math.abs(avoid.y / TILE - y) < 20) continue;
+      const px = x * TILE + 8;
+      const py = y * TILE + 8;
+      if (danger.some(([dx, dy, r]) => sq(dx - px) + sq(dy - py) < r * TILE * r * TILE)) continue;
+      if (this.presenceAt(px, py) > 0.5) continue;
+      cand.push(k);
+    }
+    if (!cand.length) return -1;
+    for (let i = 0; i < Math.min(160, cand.length); i++) {
+      const k = cand.length <= 160 ? cand[i] : cand[ih(this.step, i, 91) % cand.length];
+      const x = k % m.w;
+      const y = Math.floor(k / m.w);
+      const px = x * TILE + 8;
+      const py = y * TILE + 8;
+      const rd = route[k];
+      if (minFood > 0 && this.campFood(k) < minFood) continue;
+      const pres = this.presenceAt(px, py);
+      // 出発点からの道筋の人の気配（コボルトと同じ）
+      let busy = 0;
+      if (par) for (let q = k, n = 0; q >= 0 && n < 200; q = par[q], n++) if (this.presenceAt((q % m.w) * TILE + 8, Math.floor(q / m.w) * TILE + 8) > 0.5) busy++;
       let f = 0;
       for (let dy = -8; dy <= 8; dy += 2) for (let dx = -8; dx <= 8; dx += 2) {
         const xx = x + dx;
         const yy = y + dy;
-        if (xx >= 0 && yy >= 0 && xx < m.w && yy < m.h) f += this.w.fungus[yy * m.w + xx];
+        if (xx >= 0 && yy >= 0 && xx < m.w && yy < m.h) f += this.w.fungus[yy * m.w + xx] + (this.w.moss[yy * m.w + xx] >> 2);
       }
-      const v = f + (ih(k, 2, 90) % 100);
+      let rats = 0;
+      this.nearby(px, py, 10, (o) => {
+        if (!o.dead && o.k === Kind.Rat) rats++;
+      });
+      const v = f + rats * 80 - pres * 1500 - busy * 60 - (rd < 0 || rd > 40 ? 400 : 0) - this.w.lightBase[k] * 4 + (ih(k, 2, 90) % 200);
       if (v > bv) {
         bv = v;
         best = k;
       }
     }
+    return best;
+  }
+
+  /** 冒険者の通り道（人の気配が0.5より濃い区画の床）から歩いた道のり（max マスまで。届かなければ -1） */
+  private routeDist(max: number): Int32Array {
+    const m = this.w.map;
+    const N = m.w * m.h;
+    const dist = new Int32Array(N).fill(-1);
+    if (this.wdQ.length !== N) this.wdQ = new Int32Array(N);
+    const q = this.wdQ;
+    let h = 0;
+    let t = 0;
+    for (let k = 0; k < N; k++) {
+      if (m.solid[k] || m.lava[k] || m.sealed[k]) continue;
+      if (this.presenceAt((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8) > 0.5) {
+        dist[k] = 0;
+        q[t++] = k;
+      }
+    }
+    while (h < t) {
+      const c = q[h++];
+      if (dist[c] >= max) continue;
+      for (let d = 0; d < 4; d++) {
+        const n = d === 0 ? c + 1 : d === 1 ? c - 1 : d === 2 ? c + m.w : c - m.w;
+        if (n < 0 || n >= N || dist[n] >= 0 || m.solid[n] || m.lava[n] || m.sealed[n]) continue;
+        dist[n] = dist[c] + 1;
+        q[t++] = n;
+      }
+    }
+    return dist;
+  }
+
+  /** 口ごとに、そこからゴブリンが来られるか（コボルトの kobMouthOk と同じ。地上の約2時間ごとに調べ直し、保存する） */
+  gobMouthOk: number[] = [];
+  private checkGoblinMouths(): void {
+    const m = this.w.map;
+    this.gobMouthOk = m.mouths.map((mo, i) => (mo.kind === 0 && this.mouthOpen(i) && !this.dragonNearMouth(i) && this.pickGoblinCamp(undefined, this.mouthSpot(i), Ecology.GOBLIN_MIN_FOOD) >= 0 ? 1 : 0));
+  }
+
+  private newCamp(k: number, how: string): Camp {
+    const m = this.w.map;
+    const x = (k % m.w) * TILE + 8;
+    const y = Math.floor(k / m.w) * TILE + 8;
+    this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: this.nextId, ev: 'found', how, x, y } as never);
+    const cp: Camp = { id: this.nextId++, kind: 0, x, y, dry: 0, fuel: 0, store: 0, hide: 0, raids: 0, empty: -1, alone: -1 };
+    this.camps.push(cp);
+    return cp;
+  }
+
+  /** 集落の仲間（去っていく途中の者は除く） */
+  private campMembers(cp: Camp): Cr[] {
+    return this.list.filter((c) => c.k === Kind.Goblin && !c.dead && c.ref === cp.id && c.st !== 9 && c.st !== 10);
+  }
+
+  /** 集落にゴブリンの頭がいるか */
+  private campChief(cp: Camp): boolean {
+    return this.list.some((c) => c.k === Kind.Goblin && c.elite === 5 && !c.dead && c.ref === cp.id);
+  }
+
+  /** 蓄えの目安（群れの数に応じて） */
+  private campStoreGoal(cp: Camp): number {
+    return Math.min(300, 30 * Math.max(2, this.campMembers(cp).length));
+  }
+
+  /** 散って隠れているゴブリン（集落のまわりの暗がりで身をひそめている。灯りに照らされず、すぐそばまで来られない限り、誰にも気づかれない） */
+  private goblinHidden(o: Cr): boolean {
+    if (o.dead || o.st !== 7) return false;
+    const cp = this.campOf(o);
+    if (!cp || cp.kind !== 0 || cp.hide !== 1) return false;
+    if (sq(o.x - cp.x) + sq(o.y - cp.y) > 9 * TILE * 9 * TILE) return false;
+    return !this.isLit(o);
+  }
+
+  /** 隠れ場所：集落から4〜7マスの、暗い床（ひとりずつ違う所。見つからなければ集落の真ん中） */
+  private hideSpot(cp: Camp, c: Cr): [number, number] {
+    const m = this.w.map;
+    for (let i = 0; i < 8; i++) {
+      const a = ((c.id * 2.399 + i * 0.785) % 6.283);
+      const r = 4 + ((c.id + i) % 4);
+      const x = Math.floor(cp.x / TILE + Math.cos(a) * r);
+      const y = Math.floor(cp.y / TILE + Math.sin(a) * r);
+      if (x < 1 || y < 1 || x >= m.w - 1 || y >= m.h - 1) continue;
+      const k = y * m.w + x;
+      if (m.solid[k] || m.lava[k] || m.sealed[k] || this.w.water[k] > 20 || this.w.lightBase[k] > 40) continue;
+      return [x * TILE + 8, y * TILE + 8];
+    }
+    return [cp.x, cp.y];
+  }
+
+  /**
+   * 集落を捨てる（群れの出来事）。開いた地表の横穴があれば群れごと外へ去り、なければ中の別の場所へ移る。
+   * reason：0 蓄えが尽きた、1 何度も襲われた、2 数が減った、3 竜が近くに住みついた
+   */
+  private abandonCamp(cp: Camp, reason: number): boolean {
+    const m = this.w.map;
+    const members = this.campMembers(cp);
+    const why = ['蓄えが尽きて', '何度も襲われて', '1匹になって', '竜を恐れて'][reason];
+    const open = m.mouths.some((mo, i) => mo.kind === 0 && this.mouthOpen(i));
+    const rec = (to: string) => this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'abandon', reason: ['food', 'raids', 'alone', 'dragon'][reason], to, n: members.length, x: Math.round(cp.x), y: Math.round(cp.y) } as never);
+    if (reason === 1 || reason === 3) this.goblinShun = Math.max(this.goblinShun, this.w.tick + DAY_TICKS_ECO * 2);
+    if (!open) {
+      const site = this.pickGoblinCamp(cp, [cp.x, cp.y], Ecology.GOBLIN_MIN_FOOD);
+      if (site < 0) return false;
+      rec('move');
+      const nc = this.newCamp(site, 'move');
+      nc.store = cp.store ?? 0;
+      cp.store = 0;
+      for (const c of members) {
+        c.ref = nc.id;
+        c.st = 0;
+      }
+      this.log(nc.x, nc.y, `{k:${Kind.Goblin}}の一団が${why}集落を捨て、別の場所へ移った`);
+    } else {
+      let st = cp.store ?? 0;
+      for (const c of members) {
+        const t = Math.min(st, SPEC[Kind.Goblin].cap - c.food);
+        c.food += t;
+        st -= t;
+        c.st = 10;
+        c.ref = 0;
+        c.flee = 0;
+        c.lure = 0;
+      }
+      this.deposit(cp.x, cp.y, st);
+      cp.store = 0;
+      rec('leave');
+      this.log(cp.x, cp.y, `{k:${Kind.Goblin}}の一団が${why}集落を捨てて去った`);
+    }
+    if ((cp.fuel ?? 0) > 0) this.deposit(cp.x, cp.y + 10, cp.fuel as number);
+    cp.fuel = 0;
+    cp.id = -1;
+    return true;
+  }
+
+  /**
+   * 集落の見張り（10刻みごと）：冒険者の一行、若い竜と成竜、トロール、ミノタウロスが近づくと、
+   * 群れより明らかに強ければ暗がりに散って隠れ（hide 1）、一行が弱ければ暗がりで待ち伏せる（hide 2）。
+   * 隠れているのを見つかったり、待ち伏せで負けそうになったら、皆で深い方へ逃げ散る（一行が去れば戻る）
+   */
+  private watchCamps(): void {
+    for (const cp of this.camps) {
+      if (cp.id < 0 || cp.kind !== 0) continue;
+      let near: Cr | null = null;
+      let nd = 1e18;
+      let threat = 0;
+      let party = false;
+      for (const p of this.parties)
+        for (const id of p.members) {
+          const a = this.byId.get(id);
+          if (!a || a.dead || a.away) continue;
+          const d = sq(a.x - cp.x) + sq(a.y - cp.y);
+          if (d < nd) {
+            nd = d;
+            near = a;
+            threat = this.partyStr(p);
+            party = true;
+          }
+        }
+      this.nearby(cp.x, cp.y, 14, (o) => {
+        if (o.dead || o.away || !((o.k === Kind.Dragon && o.sp >= 1) || o.k === Kind.Troll || o.k === Kind.Minotaur)) return;
+        const d = sq(o.x - cp.x) + sq(o.y - cp.y);
+        if (d < nd) {
+          nd = d;
+          near = o;
+          threat = this.str(o);
+          party = false;
+        }
+      });
+      if (!near || nd > 18 * TILE * 18 * TILE) {
+        cp.hide = 0;
+        continue;
+      }
+      const a = near as Cr;
+      const members = this.campMembers(cp);
+      const mine = members.reduce((s, c) => s + (c.flee > 0 ? 0 : this.str(c)), 0);
+      const bold = this.campChief(cp);
+      // 待ち伏せのさなかに負けそうになったら、皆で逃げ散る
+      if (cp.hide === 2 && threat > mine * (bold ? 2 : 1.5)) {
+        this.scatterCamp(cp, members, a, `待ち伏せていた{k:${Kind.Goblin}}たちが劣勢になり、奥へ逃げ散った`);
+        continue;
+      }
+      if (cp.hide === 1) {
+        const found = members.some((c) => c.st === 7 && this.goblinHidden(c) === false && sq(c.x - cp.x) + sq(c.y - cp.y) < 9 * TILE * 9 * TILE && sq(c.x - a.x) + sq(c.y - a.y) < 3 * TILE * 3 * TILE) || members.some((c) => c.st === 7 && this.goblinHidden(c) && this.atDoorOf(a, c));
+        if (found) this.scatterCamp(cp, members, a, `隠れていた{k:${Kind.Goblin}}たちが見つかり、奥へ逃げ散った`);
+        continue;
+      }
+      if (nd > 13 * TILE * 13 * TILE) continue;
+      if (threat > mine * (bold ? 2 : 1.5)) {
+        cp.hide = 1;
+        if (this.step - (this.lastLogged[994] ?? -99999) > 3000) {
+          this.lastLogged[994] = this.step;
+          this.log(cp.x, cp.y, a.k === Kind.Adventurer ? `{k:${Kind.Goblin}}たちが冒険者の気配に、集落のまわりの暗がりへ散って隠れた` : `{k:${Kind.Goblin}}たちが{k:${a.k}}の気配に、暗がりへ散って隠れた`);
+        }
+      } else if (party && cp.hide !== 2 && threat <= mine * (bold ? 1.3 : 1)) {
+        // 一行が弱ければ、灯りのまわりの暗がりに潜んで、集落に踏み込むのを待つ
+        cp.hide = 2;
+        for (const c of members) {
+          if (c.flee > 0 || c.sleep > 0 || c.st === 7) continue;
+          c.lure = a.id;
+          c.lureAt = this.step;
+        }
+        if (this.step - (this.lastLogged[993] ?? -99999) > 3000) {
+          this.lastLogged[993] = this.step;
+          this.log(cp.x, cp.y, `{k:${Kind.Goblin}}たちが、近づく冒険者を暗がりで待ち伏せている`);
+        }
+      }
+    }
+  }
+
+  /** 集落の皆が、相手から離れる方（深い方）へ逃げ散る。近ごろ襲われた回数に数える */
+  private scatterCamp(cp: Camp, members: Cr[], a: Cr, msg: string): void {
+    cp.hide = 0;
+    cp.raids = (cp.raids ?? 0) + 1;
+    for (const c of members) {
+      c.st = 0;
+      c.lure = 0;
+      c.flee = 150 + (ih(c.id, this.step, 233) % 60);
+      c.foe = a.id;
+      c.hx = 0;
+      c.hy = 0;
+    }
+    this.log(cp.x, cp.y, msg);
+  }
+
+  /** 集落のまわり（R マス四方）で、ゴブリン c がいちばん行きやすい、食べられる苔かキノコ（20以上）のマス。なければ -1 */
+  private goblinForage(c: Cr, cx: number, cy: number, R: number): number {
+    const m = this.w.map;
+    const x0 = Math.floor(cx / TILE);
+    const y0 = Math.floor(cy / TILE);
+    const gx = c.x / TILE;
+    const gy = c.y / TILE;
+    let best = -1;
+    let bv = -1e9;
+    for (let y = Math.max(1, y0 - R); y <= Math.min(m.h - 2, y0 + R); y++)
+      for (let x = Math.max(1, x0 - R); x <= Math.min(m.w - 2, x0 + R); x++) {
+        const k = y * m.w + x;
+        if (m.solid[k] || m.lava[k] || m.sealed[k]) continue;
+        const f = Math.max(this.w.moss[k], this.w.fungus[k]);
+        if (f < 20) continue;
+        const v = Math.min(30, f - 12) - (Math.abs(x - gx) + Math.abs(y - gy)) * 4;
+        if (v > bv) {
+          bv = v;
+          best = k;
+        }
+      }
     return best;
   }
 
@@ -2597,12 +2926,77 @@ export class Ecology {
 
   private goblin(c: Cr): void {
     const s = SPEC[Kind.Goblin];
-    if (this.leaveIfStarving(c)) return;
-    if (c.act === 2 && c.actT < 4) return;
-    if (!c.hungry && this.scavenge(c)) return;
-    // 見つけた金貨を集落へ持ち帰って山にする
+    if (c.st === 10) {
+      this.leaveWithGroup(c);
+      return;
+    }
     const camp = this.campOf(c);
-    if (camp && !c.hungry) {
+    // 集落のある者は一匹で見切りをつけない（集落ごと捨てるのは群れの出来事：updateCamps）。集落のない者だけが飢えて去る
+    if (!camp && this.leaveIfStarving(c)) return;
+    if (c.act === 2 && c.actT < 4) return;
+    if (camp) {
+      // 散って隠れる：集落のまわりの暗がりで身をひそめる（蓄えから食べる。蓄えが尽きて飢えれば、こっそり食べ物を探しに出る）
+      const d2 = sq(camp.x - c.x) + sq(camp.y - c.y);
+      if (camp.hide === 1 && c.hungry && (camp.store ?? 0) > 0 && d2 < 10 * TILE * 10 * TILE) {
+        const t = Math.min(camp.store ?? 0, Math.floor(s.cap * 0.7) - c.food);
+        camp.store = (camp.store ?? 0) - t;
+        c.food += t;
+        c.hungry = 0;
+        c.sinceMeal = 0;
+      }
+      if (camp.hide === 1 && !(c.hungry > 300 && (camp.store ?? 0) <= 0) && (c.st === 7 || d2 < 10 * TILE * 10 * TILE)) {
+        c.st = 7;
+        const [hx, hy] = this.hideSpot(camp, c);
+        if (sq(hx - c.x) + sq(hy - c.y) > 0.6 * TILE * 0.6 * TILE) {
+          c.act = 1;
+          this.goTo(c, hx, hy, s.speed * 1.2);
+        } else c.act = 0;
+        return;
+      }
+      if (c.st === 7) c.st = 0;
+      // 腹を空かせた者は、集落の蓄えから食べる
+      if ((camp.store ?? 0) > 0 && (c.hungry || c.food < s.cap * 0.15)) {
+        if (d2 < 2 * TILE * 2 * TILE) {
+          const t = Math.min(camp.store ?? 0, Math.floor(s.cap * 0.7) - c.food);
+          if (t > 0) {
+            camp.store = (camp.store ?? 0) - t;
+            c.food += t;
+            c.hungry = 0;
+            c.sinceMeal = 0;
+            c.act = 2;
+            c.actT = 0;
+            c.st = 0;
+            return;
+          }
+        } else if (d2 < 30 * TILE * 30 * TILE) {
+          c.act = 1;
+          this.goTo(c, camp.x, camp.y, s.speed);
+          return;
+        }
+      }
+      // 蓄えを運び込む：腹が満ちた者（狩った獲物、拾った死骸、盗んだ食料）は、余りを集落に置く
+      if (c.food > s.cap * 0.75 && d2 < 2 * TILE * 2 * TILE && (camp.store ?? 0) < this.campStoreGoal(camp)) {
+        const t = c.food - Math.floor(s.cap * 0.5);
+        c.food -= t;
+        camp.store = (camp.store ?? 0) + t;
+        c.act = 2;
+        c.actT = 0;
+        if (c.st === 4) c.st = 0;
+        return;
+      }
+      if (c.st === 4 && c.food >= s.cap * 0.85) c.st = 0;
+      // 腹いっぱいの者は、蓄えが足りなければ集落へ持ち帰る
+      if (c.food > s.cap * 0.75 && d2 < 30 * TILE * 30 * TILE && (camp.store ?? 0) < this.campStoreGoal(camp) && c.gold <= 0) {
+        c.act = 1;
+        this.goTo(c, camp.x, camp.y, s.speed);
+        return;
+      }
+      // 食べ物を集めに出る：蓄えが足りなければ、何匹かが交代で狩りと死骸あさりに出て、腹いっぱいにして帰る
+      if (c.st === 0 && !c.hungry && (camp.store ?? 0) < this.campStoreGoal(camp) && c.food < s.cap * 0.85 && ih(c.id, this.step >> 7, 77) % 3 === 0) c.st = 4;
+    }
+    if ((!c.hungry || c.st === 4) && this.scavenge(c)) return;
+    // 見つけた金貨を集落へ持ち帰って山にする
+    if (camp && !c.hungry && c.st !== 4) {
       if (c.gold > 0) {
         c.act = 1;
         if (sq(camp.x - c.x) + sq(camp.y - c.y) < 18 * 18 || this.goTo(c, camp.x + 12, camp.y + 8, s.speed)) {
@@ -2636,11 +3030,17 @@ export class Ecology {
     // 縄張りを守る：コボルト、オーク、畑に来たアリ
     if (cp && this.defend(c, cp.x, cp.y, [Kind.Kobold, Kind.Ant, Kind.Orc, Kind.Dwarf])) return;
     if (c.st === 3 && c.food >= s.cap * 0.7) c.st = 0;
-    if (c.hungry || c.st === 3) {
-      if (c.hungry) c.st = 3;
-      if (this.hunt(c, 9, HUNT0, s.speed * 1.15)) return;
-      const k = this.findMoss(c, c.x, c.y, 8, 91);
-      const kk = k >= 0 ? k : this.findFungus(c.x, c.y, 8, c.id);
+    if (c.hungry || c.st === 3 || c.st === 4) {
+      if (c.hungry && c.st !== 4) c.st = 3;
+      // 長く食べていなければ、遠くまで探す（集落のそばに食べ物がなくても、そこで飢えるのを待たない）
+      const R = c.sinceMeal > 1200 ? 20 : c.sinceMeal > 600 ? 14 : 8;
+      if (this.hunt(c, R + 1, HUNT0, s.speed * 1.15)) return;
+      // 目当ての苔は地上の約25秒（128刻み）ごとに選び直す（刻みごとに選び直すと、目当てが毎回変わって行ったり来たりし、食べられずに飢えていた）
+      // まわりを残らず調べ、近くて食べられる苔かキノコを選ぶ（いくつかの点を選んで調べるやり方では、まばらな群落を見落として、食べ物があるのに飢えていた）
+      const kk = cp ? this.goblinForage(c, cp.x, cp.y, R) : (() => {
+        const k = this.findMoss(c, c.x, c.y, R, 91, this.step >> 7);
+        return k >= 0 ? k : this.findFungus(c.x, c.y, R, c.id);
+      })();
       if (kk >= 0) {
         const m = this.w.map;
         c.act = 1;
@@ -2655,9 +3055,11 @@ export class Ecology {
         }
         return;
       }
+      if (c.st === 4) c.st = 0;
       if (!c.hungry) c.st = 0;
     }
-    if (!cp) {
+    // 集落のない者と、近くに食べ物の見つからない腹ぺこの者は、あてもなく歩いて探す
+    if (!cp || c.hungry > 0) {
       c.act = 1;
       const j = DIR16[ih(c.id, this.step >> 4, 92) & 15];
       this.tryMove(c, j[0] * s.speed * 0.5, j[1] * s.speed * 0.5);
@@ -2707,14 +3109,36 @@ export class Ecology {
   /** 集落：ゴブリンは数を増やし、リザードマンの村は水が涸れると移る。誰もいない所は消える */
   private updateCamps(): void {
     for (const cp of this.camps) {
+      if (cp.id < 0) continue;
       const kind = cp.kind === 0 ? Kind.Goblin : Kind.Lizardman;
-      const members = this.list.filter((c) => c.k === kind && !c.dead && c.ref === cp.id && c.st !== 9);
+      const members = cp.kind === 0 ? this.campMembers(cp) : this.list.filter((c) => c.k === kind && !c.dead && c.ref === cp.id && c.st !== 9);
       if (!members.length) {
         // 誰もいなくなった集落の火は消え、燃え残りは灰になる
         if ((cp.fuel ?? 0) > 0) this.deposit(cp.x, cp.y + 10, cp.fuel as number);
         cp.fuel = 0;
+        if (cp.kind === 0) {
+          this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'empty', x: Math.round(cp.x), y: Math.round(cp.y) } as never);
+          this.deposit(cp.x, cp.y, cp.store ?? 0);
+          cp.store = 0;
+        }
         cp.id = -1;
         continue;
+      }
+      if (cp.kind === 0) {
+        // 襲われた記憶は少しずつ薄れる
+        if (this.step % 600 === 45 && (cp.raids ?? 0) > 0) cp.raids = (cp.raids ?? 0) - 1;
+        if ((cp.store ?? 0) > 0) cp.empty = -1;
+        else if ((cp.empty ?? -1) < 0) cp.empty = this.w.tick;
+        if (members.length >= 2) cp.alone = -1;
+        else if ((cp.alone ?? -1) < 0) cp.alone = this.w.tick;
+        let dragonNear = false;
+        for (const o of this.list) if (o.k === Kind.Dragon && !o.dead && o.sp >= 1 && sq((o.hx || o.x) - cp.x) + sq((o.hy || o.y) - cp.y) < 30 * TILE * 30 * TILE) dragonNear = true;
+        const lonely = members.length < 2 && this.w.tick - (cp.alone as number) > DAY_TICKS_ECO;
+        // 蓄えが残っているうちは、食べ物のことでは捨てない。尽きて地上の1/3日たち、皆が腹を空かせているか、飢え死にしかけている者がいるとき
+        // （ゴブリンは腹を空かせてから地上の約0.4日で飢え死にするので、コボルトのように1日は待てない）
+        const starving = members.every((c) => c.hungry > 0 || c.food < 10) || members.some((c) => c.hungry > SPEC[Kind.Goblin].starve * 0.5);
+        const reason = (cp.raids ?? 0) >= 4 ? 1 : dragonNear ? 3 : lonely ? 2 : (cp.empty ?? -1) >= 0 && this.w.tick - (cp.empty as number) > DAY_TICKS_ECO / 3 && starving ? 0 : -1;
+        if (reason >= 0 && cp.hide !== 1 && this.abandonCamp(cp, reason)) continue;
       }
       // かがり火：まわりの枯れかけたキノコの軸を集めて燃やし続ける。燃えた分は灰になって土に返る（地上の時間で20秒ごと）
       if (this.step % 100 === 65) {
@@ -2749,8 +3173,14 @@ export class Ecology {
           if (cp.fuel === 0) this.log(cp.x, cp.y, `{k:${kind}}の集落のかがり火が消えた`);
         }
       }
-      if (this.step % 600 === 15 && members.length >= 2) {
-        const cap = cp.kind === 0 ? 20 : 8;
+      // ゴブリンは、集落の蓄えが目安の3割以上あるときだけ子を産む（蓄えから産む）
+      if (cp.kind === 0 && this.step % 600 === 15 && members.length >= 2 && this.counts[kind] < 20 && (cp.store ?? 0) >= Math.max(20, this.campStoreGoal(cp) * 0.3)) {
+        const b = SPEC[kind].body;
+        cp.store = (cp.store ?? 0) - b;
+        this.spawn(kind, members[0].x, members[0].y, b, 0).ref = cp.id;
+      }
+      if (cp.kind === 1 && this.step % 600 === 15 && members.length >= 2) {
+        const cap = 8;
         const p = members.find((c) => c.food >= SPEC[kind].cap * 0.6);
         if (p && this.counts[kind] < cap) {
           const b = SPEC[kind].body;
@@ -3927,7 +4357,7 @@ export class Ecology {
     }
     // ゴブリンとリザードマン：集落を失った者は、近くの同じ種の集落に加わる。ゴブリンの集落が15を超えたら、5匹が新しい集落を作る
     for (const c of this.list) {
-      if (c.dead || (c.k !== Kind.Goblin && c.k !== Kind.Lizardman) || c.st === 9) continue;
+      if (c.dead || (c.k !== Kind.Goblin && c.k !== Kind.Lizardman) || c.st === 9 || c.st === 10) continue;
       const kind = c.k === Kind.Goblin ? 0 : 1;
       if (this.camps.some((o) => o.id === c.ref && o.id >= 0)) continue;
       const cp = this.camps.filter((o) => o.id >= 0 && o.kind === kind).sort((p, q) => sq(p.x - c.x) + sq(p.y - c.y) - (sq(q.x - c.x) + sq(q.y - c.y)))[0];
@@ -3935,12 +4365,11 @@ export class Ecology {
     }
     for (const cp of this.camps.slice()) {
       if (cp.id < 0 || cp.kind !== 0 || this.camps.filter((o) => o.id >= 0 && o.kind === 0).length >= 3) continue;
-      const res = this.list.filter((c) => c.k === Kind.Goblin && !c.dead && c.ref === cp.id);
+      const res = this.campMembers(cp);
       if (res.length <= 15) continue;
-      const site = this.pickCampSite();
+      const site = this.pickGoblinCamp(cp, [cp.x, cp.y], Ecology.GOBLIN_MIN_FOOD);
       if (site < 0) continue;
-      const nc = { id: this.nextId++, kind: 0, x: (site % m.w) * TILE + 8, y: Math.floor(site / m.w) * TILE + 8, dry: 0, fuel: 0 };
-      this.camps.push(nc);
+      const nc = this.newCamp(site, 'split');
       for (const c of res.slice(-5)) c.ref = nc.id;
       this.log(nc.x, nc.y, `{k:${Kind.Goblin}}の群れが分かれ、新しい集落を作った`);
     }
@@ -4516,6 +4945,16 @@ export class Ecology {
       c.lure = 0;
       return false;
     }
+    // 集落のゴブリン：散って隠れているあいだと、群れで去る道中は潜まない
+    const gcp = c.k === Kind.Goblin ? this.campOf(c) : undefined;
+    const camp = gcp && gcp.kind === 0 ? gcp : undefined;
+    if (camp && (camp.hide === 1 || c.st === 7)) {
+      c.lure = 0;
+      return false;
+    }
+    if (c.st === 10) return false;
+    // 頭（ゴブリンの頭）のいる集落は大胆になる
+    const bold = !!camp && this.campChief(camp);
     const m = this.w.map;
     // 狙いを探す
     if (!c.lure) {
@@ -4538,7 +4977,7 @@ export class Ecology {
           this.tryMove(c, bx * SPEC[c.k].speed, by * SPEC[c.k].speed);
         }
       }
-      if (this.step % 30 !== c.id % 30 || (!c.hungry && ih(c.id, this.step, 210) % 3 !== 0)) return false;
+      if (this.step % 30 !== c.id % 30 || (!c.hungry && !bold && ih(c.id, this.step, 210) % 3 !== 0)) return false;
       let best: Cr | null = null;
       let bd = 20 * TILE * 20 * TILE;
       for (const o of this.list) {
@@ -4566,12 +5005,19 @@ export class Ecology {
     }
     // 隙：まわりに仲間がいない（はぐれた）か、眠っている
     const alone = !this.list.some((o) => o !== t && !o.dead && o.k === Kind.Adventurer && o.party === t.party && sq(o.x - t.x) + sq(o.y - t.y) < 4 * TILE * 4 * TILE);
-    if (alone || t.sleep > 0) {
+    // 集落の待ち伏せ：弱い一行が集落のそば（9マス）に踏み込んだら、暗がりから群れで襲いかかる
+    const ambush = !!camp && camp.hide === 2 && sq(t.x - camp.x) + sq(t.y - camp.y) < 9 * TILE * 9 * TILE;
+    if (alone || t.sleep > 0 || ambush) {
       c.act = 1;
       if (sq(t.x - c.x) + sq(t.y - c.y) < 14 * 14) {
-        if (c.k === Kind.Goblin) {
-          // ゴブリンは襲わずに、食料と松明を盗んで逃げる
-          const take = Math.min(20, Math.max(0, t.food - 5), SPEC[Kind.Goblin].cap - c.food);
+        // はぐれた者には、仲間が2匹以上そばにいるか頭がいれば、盗むのではなく襲いかかる（集落の者だけ）
+        let allies = 0;
+        if (camp && !ambush) this.nearby(c.x, c.y, 5, (o) => {
+          if (o !== c && !o.dead && o.k === Kind.Goblin && o.ref === camp.id && o.flee <= 0) allies++;
+        });
+        if (c.k === Kind.Goblin && !ambush && !(camp && alone && (allies >= 2 || bold))) {
+          // ゴブリンは襲わずに、食料と松明を盗んで逃げる（頭のいる集落は多めに盗る）
+          const take = Math.min(bold ? 30 : 20, Math.max(0, t.food - 5), SPEC[Kind.Goblin].cap - c.food);
           t.food -= take;
           c.food += take;
           if (t.torch > 0 && c.torch <= 0) {
@@ -7276,13 +7722,18 @@ export class Ecology {
       const quiet = open.filter((i) => this.presenceAt(...this.mouthSpot(i)) < 0.5);
       if (quiet.length) open = quiet;
     }
+    // ゴブリンも、集落がまだないときは、歩いて行ける範囲に集落の条件を満たし食べ物の足りる場所のある口からだけ来る
+    if (k === Kind.Goblin) {
+      const founding = !this.camps.some((o) => o.id >= 0 && o.kind === 0);
+      open = open.filter((i) => !this.dragonNearMouth(i) && (!founding || this.gobMouthOk[i] === 1));
+    }
     // 大ネズミは、まわり（道のり40マス）で養える数に余裕のある口か天井の裂け目からだけ来る（横穴が開いたあとも、裂け目からも入り込む）
     if (k === Kind.Rat) {
       const opts = [...open.filter((i) => this.ratMouthOk[i] === 1), ...(this.ratShaftOk.some((v) => v === 1) && this.crackSpot(Kind.Rat) ? [-2] : [])];
       return opts.length ? opts[ih(this.step, salt, 196) % opts.length] : -3;
     }
     if (open.length) return open[ih(this.step, salt, 196) % open.length];
-    if (k === Kind.Kobold) return -3;
+    if (k === Kind.Kobold || k === Kind.Goblin) return -3;
     const small = k === Kind.Lizard || k === Kind.Spider || k === Kind.Ant;
     return small && want === 0 ? -2 : -3;
   }
@@ -7442,18 +7893,34 @@ export class Ecology {
         }
       }
     }
-    // ゴブリン：ネズミとキノコが十分になると、群れで集落を作りに来る
-    const gcamps = this.camps.filter((o) => o.kind === 0);
+    // ゴブリン：口ごとに、歩いて行ける範囲に集落の条件を満たし食べ物（苔・キノコとネズミ）の足りる場所があれば、群れで集落を作りに来る。
+    // 集落がすでにあれば、新しく来た者はいちばん小さな集落に加わる。集落が襲われて捨てられた直後は、外の噂でしばらく来ない
+    const gcamps = this.camps.filter((o) => o.kind === 0 && o.id >= 0);
     const cool = (k: Kind) => this.step - (this.lastArrival[k] ?? -1e9) > 3600;
-    // キノコはコボルトの畑の外のものだけを数える（GOBLIN_FARM_FUNGUS で二巡目までの数え方に戻せる）
-    if (this.canEnter(Kind.Goblin) && n[Kind.Rat] >= 8 && (Ecology.GOBLIN_FARM_FUNGUS ? this.openFungus : this.wildFungus) > 3000 && gcamps.length < 2 && n[Kind.Goblin] < 15 && cool(Kind.Goblin) && ih(this.step, 6, 71) % 14 === 0) {
-      next();
-      this.lastArrival[Kind.Goblin] = this.step;
-      const site = this.pickCampSite();
-      if (site >= 0) {
-        const cp: Camp = { id: this.nextId++, kind: 0, x: (site % m.w) * TILE + 8, y: Math.floor(site / m.w) * TILE + 8, dry: 0 };
-        this.camps.push(cp);
-        for (let i = 0; i < 5; i++) enter(Kind.Goblin, 20, 45).ref = cp.id;
+    if (this.canEnter(Kind.Goblin) && this.w.tick >= this.goblinShun && n[Kind.Goblin] < 15 && cool(Kind.Goblin) && ih(this.step, 6, 71) % 14 === 0) {
+      if (!gcamps.length) {
+        next();
+        door = this.pickDoor(Kind.Goblin, Kind.Goblin);
+        const site = door >= 0 ? this.pickGoblinCamp(undefined, this.mouthSpot(door), Ecology.GOBLIN_MIN_FOOD) : -1;
+        if (site >= 0) {
+          this.lastArrival[Kind.Goblin] = this.step;
+          const cp = this.newCamp(site, 'arrive');
+          for (let i = 0; i < 5; i++) {
+            const g = enter(Kind.Goblin, 20, 45);
+            g.ref = cp.id;
+            // 持ってきた食べ物の一部を、集落の蓄えにする
+            g.food -= 15;
+            cp.store = (cp.store ?? 0) + 15;
+          }
+        }
+      } else if (ih(this.step, 6, 72) % 3 === 0) {
+        const sizes = gcamps.map((o) => [o, this.campMembers(o).length] as [Camp, number]).sort((a, b) => a[1] - b[1] || a[0].id - b[0].id);
+        const [cp, sz] = sizes[0];
+        if (sz < 10) {
+          next();
+          this.lastArrival[Kind.Goblin] = this.step;
+          for (let i = 0; i < 2; i++) enter(Kind.Goblin, 20, 45).ref = cp.id;
+        }
       }
     }
     // オーク：ゴブリンかコボルトの集落があると、縄張りを持ちに来る
@@ -8008,6 +8475,7 @@ export class Ecology {
 
   /** 隠れているコボルト（住処の奥に身をひそめている。入口に踏み込まれない限り、誰にも気づかれない） */
   isHidden(o: Cr): boolean {
+    if (o.k === Kind.Goblin) return this.goblinHidden(o);
     if (o.k !== Kind.Kobold || o.dead) return false;
     // 住処へ向かう道中で、冒険者をやり過ごすために身をひそめている
     if (o.st === 12) return true;
@@ -8018,7 +8486,7 @@ export class Ecology {
 
   /** 見る者 c が、隠れている o の住処の入口に踏み込んでいるか（すぐそばまで来ているか） */
   private atDoorOf(c: Cr, o: Cr): boolean {
-    if (o.st === 12) return sq(o.x - c.x) + sq(o.y - c.y) < 1.2 * TILE * 1.2 * TILE;
+    if (o.st === 12 || o.k === Kind.Goblin) return sq(o.x - c.x) + sq(o.y - c.y) < 1.2 * TILE * 1.2 * TILE;
     const wr = this.warrenOf(o);
     if (!wr) return true;
     const m = this.w.map;
@@ -9066,7 +9534,7 @@ export class Ecology {
     for (const o of this.warrens) if (o.id >= 0 && ok(o.x, o.y)) s += o.store ?? 0;
     for (const o of this.statues) if (ok(o.x, o.y)) s += o.units;
     if (this.hold) s += this.hold.store;
-    for (const cp of this.camps) if (cp.id >= 0 && ok(cp.x, cp.y)) s += cp.fuel ?? 0;
+    for (const cp of this.camps) if (cp.id >= 0 && ok(cp.x, cp.y)) s += (cp.fuel ?? 0) + (cp.store ?? 0);
     for (const e of this.eggs) if (ok(e.x, e.y)) s += e.units;
     return s;
   }
@@ -9080,7 +9548,7 @@ export class Ecology {
     }
     const P: number[][] = [];
     for (const [id, p] of this.paths) if (this.byId.get(id)?.dead === 0) P.push([id, p.gx, p.gy, p.pi, p.stall, p.gk, p.at, ...p.path]);
-    return { V: 43, PV: 2, G: Array.from(this.deathMap), GV: Array.from(this.graveMap), AG: Array.from(this.advGrave), NM: [...this.names], LE: this.lastElite.map((v) => v ?? null), AC: this.colonies.map((o) => [o.id, o.x, o.y, o.store, o.queen, o.starve, o.hk ?? -1, o.len ?? 0]), KW: this.warrens.map((o) => [o.id, o.x, o.y, o.target, o.prog, o.len, o.stall ?? 0, o.lastProg ?? 0, o.door ?? -1, o.dir ?? -1, o.tun ?? 0, o.store ?? 0, o.hide ?? 0, o.raids ?? 0, o.empty ?? -1, o.alone ?? -1]), KT: this.traps.map((o) => [o.id, o.k, o.w]), KS: this.koboldShun, KM: this.kobMouthOk, RM: [this.ratMouthOk, this.ratShaftOk], GC: this.camps.map((o) => [o.id, o.kind, o.x, o.y, o.dry, o.fuel ?? 0]), LA: this.lastArrival.map((v) => v ?? null), ST: this.statues.map((o) => [o.id, o.x, o.y, o.k, o.sp, o.dir, o.act, o.f, o.units, o.age, o.blocks ?? -1]), TP: this.piles.map((o) => [o.id, o.x, o.y, o.gold, o.age]), TR: [...this.trails].map(([id, t]) => [id, ...t]), PD: this.pendingDigs, BN: this.burning, PT2: this.parties, LO: this.lore, IT: this.gear.map((o) => [o.id, o.x, o.y, o.kind, o.fuel]), RU: [this.rumors.light, this.rumors.gold, this.rumors.undead, this.rumors.beast, this.rumors.dragon, this.rumors.beastKind, this.rumors.beastX, this.rumors.beastY], GL: [this.goldIn, this.goldOut, this.returned, this.fallen], EV: this.events.map((e) => [e.t, e.x, e.y, e.m]), HD2: this.hold, LP: this.lamps, EG: this.eggs, DSH: this.dragonShell, FX: [this.fxHits.filter((h) => this.w.tick - h.t < 10), this.fxMarks.filter((m) => this.w.tick - m.t < 20), this.fxAttacks.filter((m) => this.w.tick - m.t < 20)], IS: [...this.islandIds], WB: this.wallBroken, PS: this.pendingScraps, PRB: Array.from(this.presenceBase), PRT: Array.from(this.presenceTrace), AL: [...this.alarms.entries()], FG: this.forage, OM: [this.openMoss, this.openFungus, this.edibleMoss, this.wildFungus], DL: [this.dwarfLore, this.lastDwarves], LL: this.lastLogged.map((v) => v ?? null), NZ: this.noises, LD: this.lastDigCount, DS: Array.from(this.discovered), L, P, W: this.webs.map((w) => [w.id, w.x, w.y, w.r, w.owner, w.age]), B: this.burrows.map((b) => [b.x, b.y, b.hk ?? -1, b.len ?? 0, b.moved ?? -1e9, b.cap ?? -1]), n: this.nextId, i: this.imported, e: this.exported, s: this.step };
+    return { V: 43, PV: 2, G: Array.from(this.deathMap), GV: Array.from(this.graveMap), AG: Array.from(this.advGrave), NM: [...this.names], LE: this.lastElite.map((v) => v ?? null), AC: this.colonies.map((o) => [o.id, o.x, o.y, o.store, o.queen, o.starve, o.hk ?? -1, o.len ?? 0]), KW: this.warrens.map((o) => [o.id, o.x, o.y, o.target, o.prog, o.len, o.stall ?? 0, o.lastProg ?? 0, o.door ?? -1, o.dir ?? -1, o.tun ?? 0, o.store ?? 0, o.hide ?? 0, o.raids ?? 0, o.empty ?? -1, o.alone ?? -1]), KT: this.traps.map((o) => [o.id, o.k, o.w]), KS: this.koboldShun, KM: this.kobMouthOk, RM: [this.ratMouthOk, this.ratShaftOk], GC: this.camps.map((o) => [o.id, o.kind, o.x, o.y, o.dry, o.fuel ?? 0, o.store ?? 0, o.hide ?? 0, o.raids ?? 0, o.empty ?? -1, o.alone ?? -1]), GS: this.goblinShun, GM: this.gobMouthOk, LA: this.lastArrival.map((v) => v ?? null), ST: this.statues.map((o) => [o.id, o.x, o.y, o.k, o.sp, o.dir, o.act, o.f, o.units, o.age, o.blocks ?? -1]), TP: this.piles.map((o) => [o.id, o.x, o.y, o.gold, o.age]), TR: [...this.trails].map(([id, t]) => [id, ...t]), PD: this.pendingDigs, BN: this.burning, PT2: this.parties, LO: this.lore, IT: this.gear.map((o) => [o.id, o.x, o.y, o.kind, o.fuel]), RU: [this.rumors.light, this.rumors.gold, this.rumors.undead, this.rumors.beast, this.rumors.dragon, this.rumors.beastKind, this.rumors.beastX, this.rumors.beastY], GL: [this.goldIn, this.goldOut, this.returned, this.fallen], EV: this.events.map((e) => [e.t, e.x, e.y, e.m]), HD2: this.hold, LP: this.lamps, EG: this.eggs, DSH: this.dragonShell, FX: [this.fxHits.filter((h) => this.w.tick - h.t < 10), this.fxMarks.filter((m) => this.w.tick - m.t < 20), this.fxAttacks.filter((m) => this.w.tick - m.t < 20)], IS: [...this.islandIds], WB: this.wallBroken, PS: this.pendingScraps, PRB: Array.from(this.presenceBase), PRT: Array.from(this.presenceTrace), AL: [...this.alarms.entries()], FG: this.forage, OM: [this.openMoss, this.openFungus, this.edibleMoss, this.wildFungus], DL: [this.dwarfLore, this.lastDwarves], LL: this.lastLogged.map((v) => v ?? null), NZ: this.noises, LD: this.lastDigCount, DS: Array.from(this.discovered), L, P, W: this.webs.map((w) => [w.id, w.x, w.y, w.r, w.owner, w.age]), B: this.burrows.map((b) => [b.x, b.y, b.hk ?? -1, b.len ?? 0, b.moved ?? -1e9, b.cap ?? -1]), n: this.nextId, i: this.imported, e: this.exported, s: this.step };
   }
 
   restore(o: any): void {
@@ -9099,7 +9567,9 @@ export class Ecology {
     this.koboldShun = o.KS ?? 0;
     this.kobMouthOk = o.KM ?? [];
     [this.ratMouthOk, this.ratShaftOk] = o.RM ?? [[], []];
-    this.camps = (o.GC || []).map((a: number[]) => ({ id: a[0], kind: a[1], x: a[2], y: a[3], dry: a[4], fuel: a[5] ?? 0 }));
+    this.camps = (o.GC || []).map((a: number[]) => ({ id: a[0], kind: a[1], x: a[2], y: a[3], dry: a[4], fuel: a[5] ?? 0, store: a[6] ?? 0, hide: a[7] ?? 0, raids: a[8] ?? 0, empty: a[9] ?? -1, alone: a[10] ?? -1 }));
+    this.goblinShun = o.GS ?? 0;
+    this.gobMouthOk = o.GM ?? [];
     this.lastArrival = (o.LA || []).map((v: number | null) => (v === null ? undefined : v)) as number[];
     this.statues = (o.ST || []).map((a: number[]) => ({ id: a[0], x: a[1], y: a[2], k: a[3], sp: a[4], dir: a[5], act: a[6], f: a[7], units: a[8], age: a[9], blocks: a[10] === undefined || a[10] < 0 ? undefined : a[10] }));
     this.rebuildStatueIndex();

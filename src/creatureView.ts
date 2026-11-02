@@ -332,9 +332,9 @@ export class CreatureView {
       const ty = Math.floor(tr.k / eco.mapW) * 16 + 11;
       if (inView(tx, ty, 16)) pushSprite(tx, ty, 0, false, A.trap, 0, 2);
     }
-    // 隠れているコボルト：姿は見せず、暗がりで目だけが光る（ときどきまばたき）
+    // 隠れているコボルトとゴブリン：姿は見せず、暗がりで目だけが光る（ときどきまばたき）
     for (const c of eco.list) {
-      if (c.k !== Kind.Kobold || !eco.isHidden(c) || !inView(c.x, c.y, 16)) continue;
+      if ((c.k !== Kind.Kobold && c.k !== Kind.Goblin) || !eco.isHidden(c) || !inView(c.x, c.y, 16)) continue;
       const ph = Math.floor(t * 2 + c.id * 0.37) % 7;
       pushSprite(c.x, c.y - 7, 0, false, A.eyes(ph === 6 ? 3 : ph & 1), 0, 0);
     }
