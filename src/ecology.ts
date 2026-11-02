@@ -398,6 +398,8 @@ export interface Burrow {
   y: number;
   /** 最後に引っ越しを試みた刻み */
   moved?: number;
+  /** まわり（10マス）の食べられる苔で養える数（土地勘と同じ時機に数え直す。保存する） */
+  cap?: number;
   /** 掘り進めている巣穴の先と長さ */
   hk?: number;
   len?: number;
@@ -815,14 +817,27 @@ export class Ecology {
         const hy = my / L;
         const gap = Ecology.bodySize(c.k) * 0.9;
         let slow = 1;
+        // 前で止まっている仲間（休む、食べる、眠る）は、列ではなく障害物：ゆるめずに脇へよけて追い越す
+        // （以前は止まっている仲間の後ろでも歩みをゆるめ続け、やわらかい間合いで押し返されて、広い床でも先へ進めなかった）
+        let sidestep = 0;
         this.nearby(c.x, c.y, 1, (o) => {
-          if (o === c || o.dead || slow < 1 || this.groupKey(o) !== key) return;
+          if (o === c || o.dead || slow < 1 || sidestep || this.groupKey(o) !== key) return;
           const dx = o.x - c.x;
           const dy = o.y - c.y;
           const ahead = dx * hx + dy * hy;
-          const side = Math.abs(dx * hy - dy * hx);
-          if (ahead > 0 && ahead < gap && side < gap * 0.6) slow = ahead < gap * 0.5 ? 0.15 : 0.5;
+          const cross = dx * hy - dy * hx;
+          const side = Math.abs(cross);
+          if (!(ahead > 0 && ahead < gap && side < gap * 0.6)) return;
+          if (o.act === 1 && o.sleep <= 0) slow = ahead < gap * 0.5 ? 0.15 : 0.5;
+          else sidestep = cross > 0 ? -1 : cross < 0 ? 1 : c.id % 2 ? 1 : -1;
         });
+        if (sidestep) {
+          // 進む向きに対して横（仲間のいない側）へ半分、前へ半分
+          const px = hy * sidestep;
+          const py = -hx * sidestep;
+          mx = (hx * 0.6 + px * 0.8) * L;
+          my = (hy * 0.6 + py * 0.8) * L;
+        }
         mx *= slow;
         my *= slow;
       }
@@ -912,6 +927,10 @@ export class Ecology {
   openFungus = 0;
   /** 開いた床の、食べられる苔（20以上の群落の、根元12を除いた分）。土地勘と同じ時機に数える */
   edibleMoss = 0;
+  /** 開いた場所のキノコのうち、コボルトの畑の外にあるもの（ゴブリンが来る条件に使う。土地勘と同じ時機に数える） */
+  wildFungus = 0;
+  /** 分析の切り替え：true なら、ゴブリンが来る条件に畑のキノコも数える（二巡目までの挙動） */
+  static GOBLIN_FARM_FUNGUS = false;
   private updateForage(): void {
     const m = this.w.map;
     const out: number[] = [];
@@ -927,6 +946,16 @@ export class Ecology {
     this.openMoss = mo;
     this.openFungus = fu;
     this.edibleMoss = ed;
+    // 巣穴ごとの養える数も、同じ時機に数え直す（読み込み直しても同じ値になるように、決まった刻みで）
+    for (const b of this.burrows) b.cap = this.burrowCap(b);
+    // 畑の外のキノコ（ゴブリンは、コボルトの畑に引き寄せられては来ない）
+    let farm = 0;
+    const counted = new Set<number>();
+    for (const wr of this.warrens) if (wr.id >= 0) for (const k of this.farmTiles(wr)) if (!counted.has(k) && !m.sealed[k]) {
+      counted.add(k);
+      farm += this.w.fungus[k];
+    }
+    this.wildFungus = fu - farm;
     for (let y = 2; y < m.h - 2; y += 3)
       for (let x = 2; x < m.w - 2; x += 3) {
         let best = -1;
@@ -1060,7 +1089,14 @@ export class Ecology {
     this.releaseMana(c);
     if (!c.dead) {
       if (!cause) cause = c.hungry > SPEC[c.k].starve ? 'starve' : 'other';
-      this.record('deaths', { t: this.w.tick, k: c.k, cause, by, x: Math.round(c.x), y: Math.round(c.y) } as never);
+      // 分析用：飢え死にした大ネズミは、食べられる苔・キノコ（20以上）までの歩いた道のり（60マスまで。なければ -1）も残す
+      let near: number | undefined;
+      if (c.k === Kind.Rat && cause === 'starve') {
+        const d = this.walkDist(this.tileOf(c.x, c.y), 60);
+        near = -1;
+        for (let q = 0; q < d.length; q++) if (d[q] >= 0 && Math.max(this.w.moss[q], this.w.fungus[q]) >= 20 && (near < 0 || d[q] < near)) near = d[q];
+      }
+      this.record('deaths', { t: this.w.tick, k: c.k, cause, by, x: Math.round(c.x), y: Math.round(c.y), ...(near !== undefined ? { near } : {}) } as never);
       // 住処の仲間が襲われて倒れたら、群れは覚えている（何度も続けば住処を捨てる）
       if (c.k === Kind.Kobold && by >= 0 && by !== Kind.Kobold && cause !== 'starve') {
         const wr = this.warrenOf(c);
@@ -1282,6 +1318,7 @@ export class Ecology {
     if (this.step % 50 === 25) this.spawnGhosts(day);
     if (this.step % 40 === 20) this.spawnSlimes();
     if (this.step % 10 === 5) this.updateColonies();
+    if (this.step % 600 === 85) this.checkKoboldMouths();
     if (this.step % 50 === 35) this.updateWarrens();
     if (this.step % 10 === 3) this.watchWarrens();
     this.checkTraps();
@@ -1643,14 +1680,24 @@ export class Ecology {
     // 腹を空かせて食べ物が見つからなければ、行き詰まる前に去る
     if (c.hungry > 150 && this.step % 20 === c.id % 20 && this.ratDisperse(c)) return;
     if (c.st === 0) {
+      // 巣穴への道筋が見つからない（遠すぎる、ふさがった）なら、はぐれ者になって食べ物を探す。
+      // 近くの巣穴には、群れの見直し（tendGroups）で加わる（以前は、届かない巣穴へまっすぐ歩いては壁に当たり続けていた）
       // 巣穴へ帰る・休む（巣穴のまわりに散らばって）
       const ox = ((c.id % 5) - 2) * 6;
       const oy = (((c.id >> 3) % 3) - 1) * 5;
       const hx = this.passable(c, c.hx + ox, c.hy + oy) ? c.hx + ox : c.hx;
       const hy = this.passable(c, c.hx + ox, c.hy + oy) ? c.hy + oy : c.hy;
+      const hp0 = this.paths.get(c.id);
+      if (!(c.hx || c.hy) || (hp0 && hp0.path.length === 0 && hp0.gk === this.tileOf(hx, hy) && sq(hx - c.x) + sq(hy - c.y) > 3 * TILE * 3 * TILE)) {
+        c.hx = 0;
+        c.hy = 0;
+        c.st = 1;
+        return;
+      }
       if (this.goTo(c, hx, hy, s.speed)) {
         c.act = 0;
-        if (c.food >= 24 && this.counts[Kind.Rat] < Math.min(this.ratCap(), this.ratFoodCap()) && ih(c.id, this.step, 11) % 45 === 0) {
+        // 殖えるかどうかは、巣穴のまわりで養える数で決める（全体の目安も超えない）
+        if (c.food >= 24 && this.counts[Kind.Rat] < Math.min(this.ratCap(), this.ratFoodCap()) && ih(c.id, this.step, 11) % 45 === 0 && this.burrowResidents(c) < this.burrowCapOf(c)) {
           c.food -= 12;
           const pup = this.spawn(Kind.Rat, c.x, c.y, 12, 0);
           pup.hx = c.hx;
@@ -1738,7 +1785,7 @@ export class Ecology {
    * 巣穴の引っ越し：まわりの苔が尽きてきた巣穴は、歩いて行ける（道のり120マスまで）苔の豊かな所へ群れごと移る。
    * 地上の1/4日に一度まで試す。移った先が見つかれば true
    */
-  private relocateBurrow(b: Burrow): boolean {
+  private relocateBurrow(b: Burrow, fromFire = false): boolean {
     if (this.w.tick - (b.moved ?? -1e9) < DAY_TICKS_ECO / 4) return false;
     b.moved = this.w.tick;
     const m = this.w.map;
@@ -1750,7 +1797,8 @@ export class Ecology {
     for (let q = 0; q < dist.length; q++) if (dist[q] >= 8) reach.push(q);
     if (!reach.length) return false;
     let best = -1;
-    let bv = Math.max(here * 2, res.length * 300, 600);
+    // 火のそばから逃げるときは、まわりに食べ物が足りれば十分（今より豊かでなくてもよい）
+    let bv = fromFire ? Math.max(res.length * 150, 300) : Math.max(here * 2, res.length * 300, 600);
     for (let i = 0; i < 80; i++) {
       const k = reach[ih(this.step, i, 233) % reach.length];
       if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 0) continue;
@@ -1760,6 +1808,8 @@ export class Ecology {
       const x = (k % m.w) * TILE + 8;
       const y = Math.floor(k / m.w) * TILE + 11;
       if (this.burrows.some((o) => o !== b && Math.abs(o.x - x) < 6 * TILE && Math.abs(o.y - y) < 6 * TILE)) continue;
+      // 火のそば（怖くて近寄れない所）には巣穴を作らない
+      if (this.fireNear(x, y)) continue;
       const v = this.burrowFood(x, y) - dist[k] * 4;
       if (v > bv) {
         bv = v;
@@ -1779,11 +1829,31 @@ export class Ecology {
     b.y = ny;
     b.hk = -1;
     b.len = 0;
+    b.cap = this.burrowCap(b);
     if (this.step - (this.lastLogged[993] ?? -99999) > 1500) {
       this.lastLogged[993] = this.step;
       this.log(nx, ny, `{k:${Kind.Rat}}の群れ（${res.length}匹）が、苔の尽きた巣穴を捨てて、苔の豊かな所へ巣穴を移した`);
     }
     return true;
+  }
+
+  /**
+   * 巣穴のまわり（10マス）の食べられる苔で養える数：いまある量を、一匹が地上の1日に食べる量（約600）で割る。
+   * 苔はそのあいだにも育つので、いまある量だけで2日分（全体の目安と同じ割り方）とすると少なすぎた（巣穴ごとに2〜5匹、ダンジョン全体で数匹になった）
+   */
+  private burrowCap(b: Burrow): number {
+    return Math.floor(this.burrowFood(b.x, b.y) / 600);
+  }
+
+  private burrowCapOf(c: Cr): number {
+    const b = this.burrows.find((o) => o.x === c.hx && o.y === c.hy);
+    return b ? b.cap ?? this.burrowCap(b) : 0;
+  }
+
+  private burrowResidents(c: Cr): number {
+    let n = 0;
+    for (const o of this.list) if (o.k === Kind.Rat && !o.dead && o.hx === c.hx && o.hy === c.hy) n++;
+    return n;
   }
 
   private hungryRats(): number {
@@ -3453,7 +3523,8 @@ export class Ecology {
         // 一つの巣穴が子を産むのは、地上の約4時間に1回まで（食べ物が豊かでも、一気には増えない）
         if (ih(b.x, b.y * 7 + Math.floor(this.step / 300), 304) % 4 !== 0) continue;
         const res = this.list.filter((c) => c.k === Kind.Rat && !c.dead && c.hx === b.x && c.hy === b.y);
-        if (res.length < 2 || res.length >= 8) continue;
+        // 巣穴のまわりで養える数を超えるなら産まない（移った先で殖えすぎてまた飢えないように）
+        if (res.length < 2 || res.length >= 8 || res.length + 2 > (b.cap ?? 0)) continue;
         const mom = res.find((c) => c.food >= 30 && this.w.tick - c.bornAt > DAY_TICKS_ECO / 2);
         if (!mom) continue;
         for (let i = 0; i < 2; i++) {
@@ -4411,6 +4482,20 @@ export class Ecology {
     const L = Math.sqrt(dx * dx + dy * dy) || 1;
     c.act = 1;
     this.tryMove(c, (dx / L) * SPEC[c.k].speed * 1.2, (dy / L) * SPEC[c.k].speed * 1.2);
+    // 大ネズミ：火のそばにある目当ての苔はあきらめ（避ける印をつけて選び直す）、巣穴そのものが火のそばなら群れで移る
+    // （以前は、目当てや巣穴へ向かっては火に追い返され、その間を行ったり来たりして先へ進めなかった）
+    if (c.k === Kind.Rat) {
+      const r2 = f[2] * f[2];
+      const t = c.ref - 1;
+      if (t >= 0 && sq((t % this.w.map.w) * TILE + 8 - f[0]) + sq(Math.floor(t / this.w.map.w) * TILE + 8 - f[1]) < r2) {
+        c.gait = c.ref;
+        c.ref = 0;
+      }
+      if ((c.hx || c.hy) && sq(c.hx - f[0]) + sq(c.hy - f[1]) < r2) {
+        const b = this.burrows.find((o) => o.x === c.hx && o.y === c.hy);
+        if (b) this.relocateBurrow(b, true);
+      }
+    }
     return true;
   }
 
@@ -7182,7 +7267,10 @@ export class Ecology {
     let open = m.mouths.map((mo, i) => (mo.kind === want && this.mouthOpen(i) ? i : -1)).filter((i) => i >= 0);
     // 狡猾なコボルトは、竜の寝床のそば（20マス以内）の口からは入ってこない
     if (k === Kind.Kobold) {
-      open = open.filter((i) => !this.dragonNearMouth(i));
+      // 竜の寝床のそばの口、まわりに住めて食べ物の足りる場所のない口からは来ない
+      // （住処がまだないとき。すでにあれば、来る者はその住処に加わるので、口のまわりに新しい場所は要らない）
+      const founding = !this.warrens.some((o) => o.id >= 0);
+      open = open.filter((i) => !this.dragonNearMouth(i) && (!founding || this.kobMouthOk[i] === 1));
       // 人の気配の薄い口があれば、そちらを選ぶ
       const quiet = open.filter((i) => this.presenceAt(...this.mouthSpot(i)) < 0.5);
       if (quiet.length) open = quiet;
@@ -7282,7 +7370,8 @@ export class Ecology {
     // ゴブリン：ネズミとキノコが十分になると、群れで集落を作りに来る
     const gcamps = this.camps.filter((o) => o.kind === 0);
     const cool = (k: Kind) => this.step - (this.lastArrival[k] ?? -1e9) > 3600;
-    if (this.canEnter(Kind.Goblin) && n[Kind.Rat] >= 8 && this.openFungus > 3000 && gcamps.length < 2 && n[Kind.Goblin] < 15 && cool(Kind.Goblin) && ih(this.step, 6, 71) % 14 === 0) {
+    // キノコはコボルトの畑の外のものだけを数える（GOBLIN_FARM_FUNGUS で二巡目までの数え方に戻せる）
+    if (this.canEnter(Kind.Goblin) && n[Kind.Rat] >= 8 && (Ecology.GOBLIN_FARM_FUNGUS ? this.openFungus : this.wildFungus) > 3000 && gcamps.length < 2 && n[Kind.Goblin] < 15 && cool(Kind.Goblin) && ih(this.step, 6, 71) % 14 === 0) {
       next();
       this.lastArrival[Kind.Goblin] = this.step;
       const site = this.pickCampSite();
@@ -7385,7 +7474,7 @@ export class Ecology {
       if (!live.length) {
         next();
         door = this.pickDoor(Kind.Kobold, Kind.Kobold);
-        const home = door >= 0 ? this.pickWarren(undefined, this.mouthSpot(door)) : -1;
+        const home = door >= 0 ? this.pickWarren(undefined, this.mouthSpot(door), Ecology.KOBOLD_MIN_FOOD) : -1;
         if (home >= 0) {
           const wr = this.newWarren(home);
           // 4〜6匹の群れで来る。住処に着くまでは「道中」（冒険者が近ければ隠れて待つ）
@@ -7685,7 +7774,7 @@ export class Ecology {
    * トロールとバジリスクの住みかから15マス離れ、食べ物（キノコ、苔、ネズミ）が近い所。岩壁に面していれば横穴を掘り込める所を好む。
    * avoid の住処からも離れる（住処を捨てて移るとき）
    */
-  private pickWarren(avoid?: Warren, from?: [number, number]): number {
+  private pickWarren(avoid?: Warren, from?: [number, number], minFood = 0): number {
     const m = this.w.map;
     let best = -1;
     let bv = -1e9;
@@ -7716,6 +7805,8 @@ export class Ecology {
       const px = x * TILE + 8;
       const py = y * TILE + 8;
       if (danger.some(([dx, dy, r]) => sq(dx - px) + sq(dy - py) < r * TILE * r * TILE)) continue;
+      // 食べ物が足りない所には住まない（minFood を指定したとき）
+      if (minFood > 0 && this.warrenFood(k) < minFood) continue;
       const pres = this.presenceAt(px, py);
       if (pres > 0.6) continue;
       // 出発点からの道筋の人の気配：気配の濃いマス（0.5より上）が多い候補ほど避ける（道中で冒険者に出会わないように）。
@@ -7769,6 +7860,39 @@ export class Ecology {
       }
     }
     return dist;
+  }
+
+  /**
+   * 住処の候補のまわりの食べ物：8マス以内の食べられる苔とキノコ（20以上の群落の、根元12を除いた分）と、10マス以内のネズミ1匹あたり100。
+   * 来たばかりの群れ（4〜6匹）が地上の2日ほど食べていける目安が KOBOLD_MIN_FOOD
+   */
+  static KOBOLD_MIN_FOOD = 1500;
+  private warrenFood(k: number): number {
+    const m = this.w.map;
+    const x0 = k % m.w;
+    const y0 = Math.floor(k / m.w);
+    let f = 0;
+    for (let y = Math.max(1, y0 - 8); y <= Math.min(m.h - 2, y0 + 8); y++)
+      for (let x = Math.max(1, x0 - 8); x <= Math.min(m.w - 2, x0 + 8); x++) {
+        const q = y * m.w + x;
+        if (m.solid[q] || m.sealed[q]) continue;
+        const v = Math.max(this.w.moss[q], this.w.fungus[q]);
+        if (v >= 20) f += v - 12;
+      }
+    this.nearby(x0 * TILE + 8, y0 * TILE + 8, 10, (o) => {
+      if (!o.dead && o.k === Kind.Rat) f += 100;
+    });
+    return f;
+  }
+
+  /**
+   * 口ごとに、そこからコボルトが来られるか（歩いて行ける範囲に、住処の条件を満たし食べ物も足りる場所があるか）。
+   * 地上の約2時間（600刻み）ごとに決まった刻みで調べ直し、保存する
+   */
+  kobMouthOk: number[] = [];
+  private checkKoboldMouths(): void {
+    const m = this.w.map;
+    this.kobMouthOk = m.mouths.map((mo, i) => (mo.kind === 0 && this.mouthOpen(i) && !this.dragonNearMouth(i) && this.pickWarren(undefined, this.mouthSpot(i), Ecology.KOBOLD_MIN_FOOD) >= 0 ? 1 : 0));
   }
 
   /** 床のマス k から、岩壁へまっすぐ4マス掘り込める向き（なければ -1） */
@@ -8093,7 +8217,7 @@ export class Ecology {
     const rec = (to: string) => this.record('settle', { t: this.w.tick, k: Kind.Kobold, id: wr.id, ev: 'abandon', reason: ['food', 'raids', 'alone', 'dragon'][reason], to, n: members.length, x: Math.round(wr.x), y: Math.round(wr.y) } as never);
     if (reason === 1 || reason === 3) this.koboldShun = Math.max(this.koboldShun, this.w.tick + DAY_TICKS_ECO * 2);
     if (!open) {
-      const site = this.pickWarren(wr, [wr.x, wr.y]);
+      const site = this.pickWarren(wr, [wr.x, wr.y], Ecology.KOBOLD_MIN_FOOD);
       if (site < 0) return false;
       rec('move');
       const nw = this.newWarren(site, 'move');
@@ -8218,7 +8342,7 @@ export class Ecology {
       }
       // 増えすぎたら、若い者が分かれて中の別の場所に新しい住処を作る
       if (this.step % 600 === 335 && members.length >= 12 && (wr.store ?? 0) >= 40 && this.warrens.filter((o) => o.id >= 0).length < 3) {
-        const site = this.pickWarren(undefined, [wr.x, wr.y]);
+        const site = this.pickWarren(undefined, [wr.x, wr.y], Ecology.KOBOLD_MIN_FOOD);
         if (site >= 0) {
           const nw = this.newWarren(site, 'split');
           const young = members.slice().sort((p, q) => q.id - p.id).slice(0, 4);
@@ -8520,6 +8644,8 @@ export class Ecology {
       let walls = 0;
       for (const nn of [k + 1, k - 1, k - m.w]) walls += m.solid[nn];
       if (!walls) continue;
+      // 火のそば（入口のかがり火など）には巣穴を作らない
+      if (this.fireNear(x * TILE + 8, y * TILE + 11)) continue;
       let moss = 0;
       for (let dy = -4; dy <= 4; dy++)
         for (let dx = -4; dx <= 4; dx++) {
@@ -8536,7 +8662,8 @@ export class Ecology {
       }
     }
     if (best < 0) best = this.nearestFloor(m.entrance.x * TILE + 16, 40);
-    const b = { x: (best % m.w) * TILE + 8, y: Math.floor(best / m.w) * TILE + 11 };
+    const b: Burrow = { x: (best % m.w) * TILE + 8, y: Math.floor(best / m.w) * TILE + 11 };
+    b.cap = this.burrowCap(b);
     this.burrows.push(b);
     return b;
   }
@@ -8878,7 +9005,7 @@ export class Ecology {
     }
     const P: number[][] = [];
     for (const [id, p] of this.paths) if (this.byId.get(id)?.dead === 0) P.push([id, p.gx, p.gy, p.pi, p.stall, p.gk, p.at, ...p.path]);
-    return { V: 43, PV: 2, G: Array.from(this.deathMap), GV: Array.from(this.graveMap), AG: Array.from(this.advGrave), NM: [...this.names], LE: this.lastElite.map((v) => v ?? null), AC: this.colonies.map((o) => [o.id, o.x, o.y, o.store, o.queen, o.starve, o.hk ?? -1, o.len ?? 0]), KW: this.warrens.map((o) => [o.id, o.x, o.y, o.target, o.prog, o.len, o.stall ?? 0, o.lastProg ?? 0, o.door ?? -1, o.dir ?? -1, o.tun ?? 0, o.store ?? 0, o.hide ?? 0, o.raids ?? 0, o.empty ?? -1, o.alone ?? -1]), KT: this.traps.map((o) => [o.id, o.k, o.w]), KS: this.koboldShun, GC: this.camps.map((o) => [o.id, o.kind, o.x, o.y, o.dry, o.fuel ?? 0]), LA: this.lastArrival.map((v) => v ?? null), ST: this.statues.map((o) => [o.id, o.x, o.y, o.k, o.sp, o.dir, o.act, o.f, o.units, o.age, o.blocks ?? -1]), TP: this.piles.map((o) => [o.id, o.x, o.y, o.gold, o.age]), TR: [...this.trails].map(([id, t]) => [id, ...t]), PD: this.pendingDigs, BN: this.burning, PT2: this.parties, LO: this.lore, IT: this.gear.map((o) => [o.id, o.x, o.y, o.kind, o.fuel]), RU: [this.rumors.light, this.rumors.gold, this.rumors.undead, this.rumors.beast, this.rumors.dragon, this.rumors.beastKind, this.rumors.beastX, this.rumors.beastY], GL: [this.goldIn, this.goldOut, this.returned, this.fallen], EV: this.events.map((e) => [e.t, e.x, e.y, e.m]), HD2: this.hold, LP: this.lamps, EG: this.eggs, DSH: this.dragonShell, FX: [this.fxHits.filter((h) => this.w.tick - h.t < 10), this.fxMarks.filter((m) => this.w.tick - m.t < 20), this.fxAttacks.filter((m) => this.w.tick - m.t < 20)], IS: [...this.islandIds], WB: this.wallBroken, PS: this.pendingScraps, PRB: Array.from(this.presenceBase), PRT: Array.from(this.presenceTrace), AL: [...this.alarms.entries()], FG: this.forage, OM: [this.openMoss, this.openFungus, this.edibleMoss], DL: [this.dwarfLore, this.lastDwarves], LL: this.lastLogged.map((v) => v ?? null), NZ: this.noises, LD: this.lastDigCount, DS: Array.from(this.discovered), L, P, W: this.webs.map((w) => [w.id, w.x, w.y, w.r, w.owner, w.age]), B: this.burrows.map((b) => [b.x, b.y, b.hk ?? -1, b.len ?? 0, b.moved ?? -1e9]), n: this.nextId, i: this.imported, e: this.exported, s: this.step };
+    return { V: 43, PV: 2, G: Array.from(this.deathMap), GV: Array.from(this.graveMap), AG: Array.from(this.advGrave), NM: [...this.names], LE: this.lastElite.map((v) => v ?? null), AC: this.colonies.map((o) => [o.id, o.x, o.y, o.store, o.queen, o.starve, o.hk ?? -1, o.len ?? 0]), KW: this.warrens.map((o) => [o.id, o.x, o.y, o.target, o.prog, o.len, o.stall ?? 0, o.lastProg ?? 0, o.door ?? -1, o.dir ?? -1, o.tun ?? 0, o.store ?? 0, o.hide ?? 0, o.raids ?? 0, o.empty ?? -1, o.alone ?? -1]), KT: this.traps.map((o) => [o.id, o.k, o.w]), KS: this.koboldShun, KM: this.kobMouthOk, GC: this.camps.map((o) => [o.id, o.kind, o.x, o.y, o.dry, o.fuel ?? 0]), LA: this.lastArrival.map((v) => v ?? null), ST: this.statues.map((o) => [o.id, o.x, o.y, o.k, o.sp, o.dir, o.act, o.f, o.units, o.age, o.blocks ?? -1]), TP: this.piles.map((o) => [o.id, o.x, o.y, o.gold, o.age]), TR: [...this.trails].map(([id, t]) => [id, ...t]), PD: this.pendingDigs, BN: this.burning, PT2: this.parties, LO: this.lore, IT: this.gear.map((o) => [o.id, o.x, o.y, o.kind, o.fuel]), RU: [this.rumors.light, this.rumors.gold, this.rumors.undead, this.rumors.beast, this.rumors.dragon, this.rumors.beastKind, this.rumors.beastX, this.rumors.beastY], GL: [this.goldIn, this.goldOut, this.returned, this.fallen], EV: this.events.map((e) => [e.t, e.x, e.y, e.m]), HD2: this.hold, LP: this.lamps, EG: this.eggs, DSH: this.dragonShell, FX: [this.fxHits.filter((h) => this.w.tick - h.t < 10), this.fxMarks.filter((m) => this.w.tick - m.t < 20), this.fxAttacks.filter((m) => this.w.tick - m.t < 20)], IS: [...this.islandIds], WB: this.wallBroken, PS: this.pendingScraps, PRB: Array.from(this.presenceBase), PRT: Array.from(this.presenceTrace), AL: [...this.alarms.entries()], FG: this.forage, OM: [this.openMoss, this.openFungus, this.edibleMoss, this.wildFungus], DL: [this.dwarfLore, this.lastDwarves], LL: this.lastLogged.map((v) => v ?? null), NZ: this.noises, LD: this.lastDigCount, DS: Array.from(this.discovered), L, P, W: this.webs.map((w) => [w.id, w.x, w.y, w.r, w.owner, w.age]), B: this.burrows.map((b) => [b.x, b.y, b.hk ?? -1, b.len ?? 0, b.moved ?? -1e9, b.cap ?? -1]), n: this.nextId, i: this.imported, e: this.exported, s: this.step };
   }
 
   restore(o: any): void {
@@ -8895,6 +9022,7 @@ export class Ecology {
     this.warrens = (o.KW || []).map((a: number[]) => ({ id: a[0], x: a[1], y: a[2], target: a[3], prog: a[4], len: a[5], stall: a[6] ?? 0, lastProg: a[7] ?? 0, door: a[8] ?? -1, dir: a[9] ?? -1, tun: a[10] ?? 0, store: a[11] ?? 0, hide: a[12] ?? 0, raids: a[13] ?? 0, empty: a[14] ?? -1, alone: a[15] ?? -1 }));
     this.traps = (o.KT || []).map((a: number[]) => ({ id: a[0], k: a[1], w: a[2] }));
     this.koboldShun = o.KS ?? 0;
+    this.kobMouthOk = o.KM ?? [];
     this.camps = (o.GC || []).map((a: number[]) => ({ id: a[0], kind: a[1], x: a[2], y: a[3], dry: a[4], fuel: a[5] ?? 0 }));
     this.lastArrival = (o.LA || []).map((v: number | null) => (v === null ? undefined : v)) as number[];
     this.statues = (o.ST || []).map((a: number[]) => ({ id: a[0], x: a[1], y: a[2], k: a[3], sp: a[4], dir: a[5], act: a[6], f: a[7], units: a[8], age: a[9], blocks: a[10] === undefined || a[10] < 0 ? undefined : a[10] }));
@@ -8930,6 +9058,7 @@ export class Ecology {
     this.forage = o.FG ? o.FG.slice() : [];
     [this.openMoss, this.openFungus] = o.OM ?? [0, 0];
     this.edibleMoss = o.OM?.[2] ?? 0;
+    this.wildFungus = o.OM?.[3] ?? this.openFungus;
     this.lastLogged = (o.LL || []).map((v: number | null) => (v === null ? undefined : v)) as number[];
     this.noises = o.NZ ? JSON.parse(JSON.stringify(o.NZ)) : [];
     this.lastDigCount = o.LD ?? -1;
@@ -8957,7 +9086,7 @@ export class Ecology {
       else this.paths.set(a[0], { gx: a[1], gy: a[2], pi: a[3], stall: a[4], gk: this.tileOf(a[1], a[2]), at: 0, path: a.slice(5) });
     }
     this.webs = (o.W || []).map((a: number[]) => ({ id: a[0], x: a[1], y: a[2], r: a[3], owner: a[4], age: a[5] }));
-    this.burrows = (o.B || []).map((a: number[]) => ({ x: a[0], y: a[1], hk: a[2] ?? -1, len: a[3] ?? 0, moved: a[4] ?? -1e9 }));
+    this.burrows = (o.B || []).map((a: number[]) => ({ x: a[0], y: a[1], hk: a[2] ?? -1, len: a[3] ?? 0, moved: a[4] ?? -1e9, cap: a[5] ?? -1 }));
     this.nextId = o.n || 1;
     this.imported = o.i || 0;
     this.exported = o.e || 0;

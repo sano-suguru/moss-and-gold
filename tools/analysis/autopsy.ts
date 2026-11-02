@@ -59,9 +59,17 @@ const rows: { key: string; ex: string }[] = [];
 const hist = new Map<string, number>();
 const orig = e.die.bind(e);
 e.die = (c: any, cs = '', by = -1) => {
-  if (!c.dead && (kind < 0 || c.k === kind)) {
-    // die() は死因が空なら、腹を空かせていれば飢え、そうでなければ other とする（同じ扱い）
-    const cz = cs || (c.hungry > 0 ? 'starve' : 'other');
+  if (c.dead || !(kind < 0 || c.k === kind)) return orig(c, cs, by);
+  // 死ぬ前の様子を先に控え、死因は die() が記録したもの（stats.deaths の最後）を使う
+  const x0 = c.x;
+  const y0 = c.y;
+  const st0 = { st: c.st, flee: c.flee, sleep: c.sleep, caught: c.caught, hx: c.hx, hy: c.hy, k: c.k, id: c.id };
+  const nd = e.stats.deaths.length;
+  const r = orig(c, cs, by);
+  const rec = e.stats.deaths.length > nd ? e.stats.deaths[e.stats.deaths.length - 1] : null;
+  if (rec) {
+    const cz = rec.cause;
+    c = { ...c, ...st0, x: x0, y: y0 };
     if ((!cause || cause === cz) && (byK === undefined || byK === by)) {
       const tx = Math.floor(c.x / T);
       const ty = Math.floor(c.y / T);
@@ -100,7 +108,7 @@ e.die = (c: any, cs = '', by = -1) => {
       }
     }
   }
-  return orig(c, cs, by);
+  return r;
 };
 
 while (w.tick < days * DAY_TICKS) {

@@ -1,7 +1,7 @@
 [
  {
-  "label": "コボルトの住処の日数の中央値",
-  "metric": "warrenMedian",
+  "label": "豊かなシード（豊かさの上半分）の住処の日数の中央値",
+  "metric": "richWarrenMedian",
   "op": ">=",
   "value": 5
  },

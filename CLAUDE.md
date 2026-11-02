@@ -30,7 +30,7 @@ npm run sim -- --seed abc --days 5 --out runs/t --trace 1234        # 生き物1
 npm run report -- --run runs/kashitare                              # report.md と deaths.png / births.png
 npm run batch -- --seeds "abc,かしたれ,seed4" --days 25 --out runs/batch-x  # CPU の数だけ sim を並べて回し、report と比較の表 summary.md を作る
 npm run batch -- --out runs/batch-x                                 # 途中で止まった batch を続ける（--summary で表だけ作り直す）
-npm run batch -- --seeds ... --days 25 --adv-max 2 --out runs/b-adv2 # 冒険者の一行の上限を切り替えて回す（既定 1。段階13までは 2）
+npm run batch -- --seeds ... --days 25 --adv-max 2 --out runs/b-adv2 # 冒険者の一行の上限を切り替えて回す（既定 1。段階13までは 2）。--goblin-farm 1 で、ゴブリンの来る条件に畑のキノコも数える（比べる用）
 npm run compare -- --runs runs/b1,runs/b2 --names "前,後" --out docs/x.md  # batch どうしをコボルトと大ネズミの目安で並べる
 npm run compare -- --runs ... --goals tools/analysis/goals-settling.json   # 目安に届いたか（✅/❌）の表をつける
 npm run autopsy -- --seed seed7 --days 25 --kind 2 --cause starve   # 死んだときの様子の内訳と、死ぬ直前の様子の例（runs/autopsy-*.md）
@@ -76,8 +76,8 @@ npm run shot -- --seed かしたれ --find warren         # 見たいもの（wa
 | ファイル | 中身 |
 |---|---|
 | settle.jsonl | `{t, k, id, ev, how, reason, to, n, x, y}`。住みつく群れの出来事（いまはコボルトの住処）：ev は found（how：arrive / move / split）、abandon（reason：food / raids / alone / dragon、to：leave / move）、empty |
-| samples.jsonl | 地上の1/4日ごと：種ごとの数（`counts` のキーは種の番号）、死骸、開いた床、瓦礫、使える養分、総量、帳簿のずれ（nutrientDrift / goldDrift / rockDrift）、噂、一行の数、外の世界の地図の区画数、ドワーフの住みかの段階 |
-| deaths.jsonl | `{t, k, cause, by, x, y}`。cause：eaten 食べられた / fight 打ち合い / starve 飢え / burned 焼けた / crushed 崩落 / petrified 石化 / killed 襲われた（ゾンビなど）/ dried 干からびた（スライム）/ faded ゴーストが消えた / planted マイコニドがキノコになった / crumbled スケルトンが崩れて消えた / other。by は手を下した種（なければ −1） |
+| samples.jsonl | 地上の1/4日ごと：シードの豊かさ（rich：開いた地表の横穴から道のり100マスで行ける床1マスあたりの、食べられる苔とキノコ）、種ごとの数（`counts` のキーは種の番号）、死骸、開いた床、瓦礫、使える養分、総量、帳簿のずれ（nutrientDrift / goldDrift / rockDrift）、噂、一行の数、外の世界の地図の区画数、ドワーフの住みかの段階 |
+| deaths.jsonl | `{t, k, cause, by, x, y, near?}`（near：飢え死にした大ネズミの、食べられる苔・キノコまでの歩いた道のり。60マスまで、なければ -1）。cause：eaten 食べられた / fight 打ち合い / starve 飢え / burned 焼けた / crushed 崩落 / petrified 石化 / killed 襲われた（ゾンビなど）/ dried 干からびた（スライム）/ faded ゴーストが消えた / planted マイコニドがキノコになった / crumbled スケルトンが崩れて消えた / other。by は手を下した種（なければ −1） |
 | births.jsonl | `{t, k, origin, x, y}`。origin：entrance 正面の入口 / mouth 地表の横穴 / fissure 地底の裂け目 / river 川の口 / shaft 天井の裂け目 / mana マナから / born 中で生まれた |
 | moves.jsonl | `{t, k, n, x, y, tx, ty}`。群れの引っ越し（大ネズミの巣穴）：何匹が、元の場所（x, y）から移った先（tx, ty）へ（画素） |
 | exits.jsonl | `{t, k, reason}`。starving 飢えて去った（住処のないコボルト、大物など） / returned 生還した冒険者 / home 満ちて巣へ帰った（ワイバーン） / abandoned 住処を捨てて群れで去った（コボルト） / dispersed 腹を空かせて群れで出ていった（大ネズミ） |
@@ -110,6 +110,10 @@ npm run shot -- --seed かしたれ --find warren         # 見たいもの（wa
 - コボルトの住処（四段目の前半）：人の気配が薄く、竜（30マス）・トロールとバジリスク（15マス）から離れ、食べ物の近い、歩いて行ける所を選び、岩壁に4マスの横穴を掘ってその奥（`Warren.x, y`）を住処にする（入口は `door`）。蓄え `store`（養分の帳簿に入る）、キノコの畑（土の養分をキノコへ移す）、入口のまわりの罠 `traps`。強い相手（冒険者の一行、若い竜、トロール、ミノタウロス）が近づくと奥に隠れる（`hide`。隠れている者は入口に踏み込まれない限り誰にも気づかれず、目だけが光って描かれる）。描画：罠（歯の並ぶ鉄の板）、入口の飾り柱、奥の寝床、畑の畝とキノコ（`farmTiles`）。4〜6匹の群れで来て、住処へ向かう道中（`st 11`）は冒険者が8マス以内にいる間その場で身をひそめて待つ（`st 12`）。掘った横穴の中と入口のまわりは畑の判定で湿った扱い。一匹ずつは去らず、蓄えが尽きて1日、襲われた回数 `raids` が4、1匹になって1日（`alone`）、竜が近くに住みつく、のどれかで群れごと住処を捨てる（開いた横穴があれば去り、なければ中の別の場所へ移る）。襲われて捨てた直後は2日来ない（`koboldShun`）。竜の寝床のそばの口からは入ってこない。冒険者は逃げていく弱い者を追わない
 - 大ネズミ：食べられる苔（`edibleMoss`、`updateForage` で数えて保存）に合わせて来る数と殖える数を抑える。巣穴のまわりの苔が尽きてきたら、苔の豊かな所へ巣穴を移す（`relocateBurrow`、`Burrow.moved`、stats.moves）。移れず、腹を空かせて近くに苔がなく、飢える前に歩いて着ける開いた横穴があれば、巣穴の仲間と群れで出ていく（`st 8`）。深い水に取り残されたら泳いで抜け出せる
 - 冒険者の一行の上限 `Ecology.ADV_MAX_PARTIES` は既定1（段階13までは2）
+- 三巡目：大ネズミの殖える数は巣穴のまわりで決める（`Burrow.cap`、土地勘と同じ時機に数え直して保存）。巣穴は火のそばに作らない。届かない巣穴へは帰らず、はぐれ者になる。
+  列の間合いは、前の仲間が動いているときだけ（止まっている仲間は脇へよけて追い越す）。
+  コボルトは、口から歩いて行ける範囲に住めて食べ物の足りる場所（`warrenFood` が `KOBOLD_MIN_FOOD` 以上）がある口からだけ来る（`kobMouthOk`、600刻みごと、保存）。
+  ゴブリンが来る条件のキノコは、コボルトの畑の外のもの（`wildFungus`。`--goblin-farm 1` で二巡目までの数え方）
 - 描画だけ：攻撃の技の演出（`fxAttacks`、`creatureView.drawAttacks`）、気づいた印、のけぞり、飛び散る粒。見本は `dist/index.html#fxdemo`。画面の部品を隠すのは `#clean`。
 
 ## 変更するときの注意

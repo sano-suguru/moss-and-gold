@@ -22,7 +22,7 @@ const median = (a: number[]) => {
 };
 const f1 = (v: number) => (isFinite(v) ? v.toFixed(1) : '—');
 
-interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number }
+interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number }
 function measure(dir: string): M {
   const S = rd(dir, 'samples.jsonl');
   const D = rd(dir, 'deaths.jsonl');
@@ -55,6 +55,11 @@ function measure(dir: string): M {
     ratStarve: cnt(D, 2, (d) => d.cause === 'starve'), ratArr: cnt(B, 2, (b) => b.origin !== 'born'), ratBorn: cnt(B, 2, (b) => b.origin === 'born'), ratDisp: cnt(X, 2, (x) => x.reason === 'dispersed'),
     ratLast: rs[rs.length - 1] ?? 0, ratMax: Math.max(0, ...rs), ratGone: (rs[rs.length - 1] ?? 0) === 0 && (rs[rs.length - 2] ?? 0) === 0, drift,
     ratMoves: MV.filter((x) => x.k === 2).length,
+    // シードの豊かさ：5日目以降の記録の平均（口が開いていない記録は除く）
+    rich: (() => { const v = S.filter((x) => x.day >= 5 && typeof x.rich === 'number').map((x) => x.rich as number); return v.length ? v.reduce((p, q) => p + q, 0) / v.length : NaN; })(),
+    // 飢え死にした大ネズミのうち、道のり10マス以内に食べられる苔があった数（記録に near があるものだけ）
+    ratNear: D.filter((d) => d.k === 2 && d.cause === 'starve' && typeof d.near === 'number' && d.near >= 0 && d.near < 10).length,
+    ratNearKnown: D.filter((d) => d.k === 2 && d.cause === 'starve' && typeof d.near === 'number').length,
     // 住処の終わり方：settle.jsonl（構造化した記録）があればそれを、なければ記録の文章から数える（古い回のため）
     ...(existsSync(join(dir, 'settle.jsonl'))
       ? (() => {
@@ -82,6 +87,10 @@ const sum = (ms: M[], f: (m: M) => number) => ms.reduce((a, m) => a + f(m), 0);
  * 目安（--goals goals.json）：[{ "label": "住処の日数の中央値", "metric": "warrenMedian", "op": ">=", "value": 5 }, ...]
  * metric は下の METRICS の名前（8シードまとめた値）。届いたかどうかを表にする
  */
+const halves = (ms: M[]): [M[], M[]] => {
+  const o = [...ms].sort((a, b) => (isFinite(b.rich) ? b.rich : -1) - (isFinite(a.rich) ? a.rich : -1));
+  return [o.slice(0, Math.ceil(o.length / 2)), o.slice(Math.ceil(o.length / 2))];
+};
 const METRICS: Record<string, (ms: M[]) => number> = {
   warrenMedian: (ms) => median(ms.flatMap((m) => m.dur)),
   warrenSeedMedian: (ms) => median(ms.filter((m) => m.dur.length).map((m) => median(m.dur))),
@@ -102,10 +111,15 @@ const METRICS: Record<string, (ms: M[]) => number> = {
   ratBorn: (ms) => sum(ms, (m) => m.ratBorn),
   ratDisp: (ms) => sum(ms, (m) => m.ratDisp),
   ratMoves: (ms) => sum(ms, (m) => m.ratMoves),
+  ratNearShare: (ms) => (100 * sum(ms, (m) => m.ratNear)) / Math.max(1, sum(ms, (m) => m.ratNearKnown)),
   ratGoneSeeds: (ms) => ms.filter((m) => m.ratGone).length,
   gobArr: (ms) => sum(ms, (m) => m.gobArr),
   orcArr: (ms) => sum(ms, (m) => m.orcArr),
   drift: (ms) => Math.max(0, ...ms.map((m) => m.drift)),
+  // 豊かさで上半分（豊かなシード）と下半分（乏しいシード）に分けた目安
+  richWarrenMedian: (ms) => median(halves(ms)[0].flatMap((m) => m.dur)),
+  poorKobArr: (ms) => sum(halves(ms)[1], (m) => m.kobArr),
+  poorEndFood: (ms) => sum(halves(ms)[1], (m) => m.endFood),
 };
 if (args.goals) {
   const goals: { label: string; metric: string; op: string; value: number }[] = JSON.parse(readFileSync(args.goals, 'utf8'));
@@ -118,6 +132,15 @@ if (args.goals) {
   }
   L.push('');
 }
+// シードの豊かさの順（最後に並べた回）
+{
+  const last = all[all.length - 1];
+  if (last.some((m) => isFinite(m.rich))) {
+    L.push(`## シードの豊かさの順（${names[names.length - 1]}）`, '', '豊かさ＝開いた地表の横穴から歩いて行ける範囲（道のり100マス）の床1マスあたりの、食べられる苔とキノコ（20以上の群落の、根元12を除いた分）。5日目以降の地上の1/4日ごとの記録の平均。', '', '| シード | 豊かさ | 住処の日数の中央値 / 最長 / できた数 | 来たコボルト / 中で生まれた | 終わり方：蓄え / 1匹 / 襲われた / 竜 |', '|---|---:|---:|---:|---:|');
+    for (const m of [...last].sort((a, b) => (isFinite(b.rich) ? b.rich : -1) - (isFinite(a.rich) ? a.rich : -1))) L.push(`| ${m.seed} | ${f1(m.rich)} | ${f1(median(m.dur))} / ${f1(Math.max(0, ...m.dur))} / ${m.warrens} | ${m.kobArr} / ${m.kobBorn} | ${m.endFood} / ${m.endAlone} / ${m.endRaid} / ${m.endDragon} |`);
+    L.push('');
+  }
+}
 L.push('## コボルト', '');
 tbl('住処が続いた日数（中央値 / 最長 / できた数）', (m) => `${f1(median(m.dur))} / ${f1(Math.max(0, ...m.dur))} / ${m.warrens}`, (ms) => `中央値 ${f1(median(ms.flatMap((m) => m.dur)))}（シードごとの中央値の中央値 ${f1(median(ms.filter((m) => m.dur.length).map((m) => median(m.dur))))}）`);
 tbl('5日以上続いた住処 / 終わった住処の日数の中央値', (m) => `${m.dur.filter((d) => d >= 5).length}/${m.warrens} / ${f1(median(m.ended))}`, (ms) => `${ms.reduce((a, m) => a + m.dur.filter((d) => d >= 5).length, 0)}/${ms.reduce((a, m) => a + m.warrens, 0)}（${f1((100 * ms.reduce((a, m) => a + m.dur.filter((d) => d >= 5).length, 0)) / Math.max(1, ms.reduce((a, m) => a + m.warrens, 0)))}％） / ${f1(median(ms.flatMap((m) => m.ended)))}`);
@@ -129,6 +152,7 @@ tbl('飢え死にしたコボルト', (m) => m.kobStarveDeath, (ms) => sum(ms, (
 tbl('来た / 中で生まれた / 数の中央値 / 最後の数', (m) => `${m.kobArr} / ${m.kobBorn} / ${m.kobMed} / ${m.kobLast}`, (ms) => `${sum(ms, (m) => m.kobArr)} / ${sum(ms, (m) => m.kobBorn)}`);
 L.push('## 大ネズミ', '');
 tbl('飢え死に', (m) => m.ratStarve, (ms) => sum(ms, (m) => m.ratStarve));
+tbl('飢え死にのうち、道のり10マス以内に食べられる苔があった割合', (m) => (m.ratNearKnown ? `${Math.round((100 * m.ratNear) / m.ratNearKnown)}％（${m.ratNear}/${m.ratNearKnown}）` : '—'), (ms) => { const k = sum(ms, (m) => m.ratNearKnown); return k ? `${Math.round((100 * sum(ms, (m) => m.ratNear)) / k)}％` : '—'; });
 tbl('来た / 中で生まれた / 群れで出ていった（dispersed）', (m) => `${m.ratArr} / ${m.ratBorn} / ${m.ratDisp}`, (ms) => `${sum(ms, (m) => m.ratArr)} / ${sum(ms, (m) => m.ratBorn)} / ${sum(ms, (m) => m.ratDisp)}`);
 tbl('巣穴の引っ越し', (m) => m.ratMoves, (ms) => sum(ms, (m) => m.ratMoves));
 tbl('最多 / 最後の数（✝ は最後の2回の記録で0）', (m) => `${m.ratMax} / ${m.ratLast}${m.ratGone ? ' ✝' : ''}`, (ms) => `絶えた ${ms.filter((m) => m.ratGone).length} シード`);

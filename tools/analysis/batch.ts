@@ -23,10 +23,11 @@ const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').sl
 const out = args.out || `runs/batch-${stamp}`;
 mkdirSync(out, { recursive: true });
 const cfgPath = join(out, 'batch.json');
-let cfg: { seeds: string[]; days: number; advMax?: number };
+let cfg: { seeds: string[]; days: number; advMax?: number; goblinFarm?: boolean };
 if (args.seeds) {
   cfg = { seeds: args.seeds.split(',').map((s) => s.trim()).filter(Boolean), days: +(args.days || 25) };
   if (args['adv-max'] !== undefined) cfg.advMax = +args['adv-max'];
+  if (args['goblin-farm']) cfg.goblinFarm = true;
   writeFileSync(cfgPath, JSON.stringify(cfg, null, 1));
 } else if (existsSync(cfgPath)) {
   cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
@@ -49,7 +50,7 @@ function done(dir: string): boolean {
 function runOne(i: number): Promise<void> {
   const dir = dirOf(i);
   const resume = existsSync(join(dir, 'checkpoint.json'));
-  const a = resume ? ['build/sim.js', '--resume', dir, '--days', String(cfg.days), '--budget', budget] : ['build/sim.js', '--seed', cfg.seeds[i], '--days', String(cfg.days), '--out', dir, '--budget', budget, ...(cfg.advMax !== undefined ? ['--adv-max', String(cfg.advMax)] : [])];
+  const a = resume ? ['build/sim.js', '--resume', dir, '--days', String(cfg.days), '--budget', budget] : ['build/sim.js', '--seed', cfg.seeds[i], '--days', String(cfg.days), '--out', dir, '--budget', budget, ...(cfg.advMax !== undefined ? ['--adv-max', String(cfg.advMax)] : []), ...(cfg.goblinFarm ? ['--goblin-farm', '1'] : [])];
   const t0 = Date.now();
   return new Promise((res, rej) => {
     const p = spawn('node', a, { stdio: ['ignore', 'ignore', 'inherit'] });

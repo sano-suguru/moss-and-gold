@@ -48,12 +48,13 @@ const unbits = (s: string, n: number) => {
 };
 
 let w: World;
-let meta: { seed: string; days: number; tick: number; total0: number; gold0: number; trace: number; advMax?: number };
+let meta: { seed: string; days: number; tick: number; total0: number; gold0: number; trace: number; advMax?: number; goblinFarm?: boolean };
 if (args.resume && existsSync(join(out, 'checkpoint.json'))) {
   meta = JSON.parse(readFileSync(join(out, 'meta.json'), 'utf8'));
   if (args.days) meta.days = +args.days;
   // 冒険者の一行の数の上限（分析の切り替え）は、続きから回すときも同じにする
   if (meta.advMax !== undefined) Ecology.ADV_MAX_PARTIES = meta.advMax;
+  if (meta.goblinFarm) Ecology.GOBLIN_FARM_FUNGUS = true;
   const s = JSON.parse(readFileSync(join(out, 'checkpoint.json'), 'utf8'));
   const N = s.n;
   w = new World(s.seed, {
@@ -64,8 +65,9 @@ if (args.resume && existsSync(join(out, 'checkpoint.json'))) {
 } else {
   const seed = args.seed || 'かしたれ';
   if (args['adv-max'] !== undefined) Ecology.ADV_MAX_PARTIES = +args['adv-max'];
+  if (args['goblin-farm']) Ecology.GOBLIN_FARM_FUNGUS = true;
   w = new World(seed);
-  meta = { seed, days: +(args.days || 10), tick: 0, total0: 0, gold0: 0, trace: +(args.trace || 0), advMax: Ecology.ADV_MAX_PARTIES };
+  meta = { seed, days: +(args.days || 10), tick: 0, total0: 0, gold0: 0, trace: +(args.trace || 0), advMax: Ecology.ADV_MAX_PARTIES, goblinFarm: Ecology.GOBLIN_FARM_FUNGUS };
   meta.total0 = w.totalNutrients();
   meta.gold0 = w.eco.totalGold();
   for (const f of ['samples', 'deaths', 'births', 'exits', 'moves', 'settle', 'events', 'trace']) writeFileSync(join(out, `${f}.jsonl`), '');
@@ -83,6 +85,34 @@ let lastEventT = -1;
     const lines = readFileSync(join(out, 'events.jsonl'), 'utf8').trim().split('\n').filter(Boolean);
     if (lines.length) lastEventT = JSON.parse(lines[lines.length - 1]).t;
   }
+}
+
+/**
+ * シードの豊かさ：開いた地表の横穴から歩いて行ける範囲（道のり100マス）の床1マスあたりの、食べられる苔とキノコ
+ * （20以上の群落の、根元12を除いた分）。口が開いていなければ null
+ */
+function richness(): number | null {
+  const e = w.eco as any;
+  const m = w.map;
+  const seen = new Uint8Array(m.w * m.h);
+  let any = false;
+  for (let i = 0; i < m.mouths.length; i++) {
+    if (m.mouths[i].kind !== 0 || !e.mouthOpen(i)) continue;
+    const [x, y] = e.mouthSpot(i);
+    const d: Int32Array = e.walkDist(e.tileOf(x, y), 100);
+    for (let k = 0; k < d.length; k++) if (d[k] >= 0) seen[k] = 1;
+    any = true;
+  }
+  if (!any) return null;
+  let n = 0;
+  let f = 0;
+  for (let k = 0; k < seen.length; k++) {
+    if (!seen[k]) continue;
+    n++;
+    const v = Math.max(w.moss[k], w.fungus[k]);
+    if (v >= 20) f += v - 12;
+  }
+  return n ? +(f / n).toFixed(2) : null;
 }
 
 function sample() {
@@ -133,6 +163,7 @@ function sample() {
     },
     dragons: e.list.filter((c) => c.k === 24 && !c.dead).map((c) => c.sp),
     elites: e.list.filter((c) => c.elite && !c.dead).map((c) => [c.id, c.elite]),
+    rich: richness(),
   };
 }
 
