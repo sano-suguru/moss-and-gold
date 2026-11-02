@@ -128,6 +128,7 @@ export function onDayEvents(this: Ecology, prevPhase: number, phase: number): vo
     r.undead *= 0.8;
     r.beast *= 0.8;
     r.dragon *= 0.85;
+    r.goblin *= 0.8;
     let glow = 0;
     for (let y = 0; y < Math.min(m.h, 30); y++)
       for (let x = Math.max(0, m.entrance.x - 30); x < Math.min(m.w, m.entrance.x + 30); x++) {

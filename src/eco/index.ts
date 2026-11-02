@@ -32,6 +32,7 @@ import './log';
 import './fire';
 import './dragon';
 import './adventurer';
+import './aim';
 import './dwarf';
 import './arrivals';
 import './myconid';

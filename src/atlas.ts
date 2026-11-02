@@ -38,6 +38,10 @@ export interface Atlas {
   trap: number;
   totem: number;
   nest: number;
+  /** オークに従う集落の旗 */
+  banner: number;
+  /** 蓄えの山（kind 0 コボルト、1 ゴブリン。tier 0〜2） */
+  larder: (kind: number, tier: number) => number;
   furrow: (grown: number) => number;
   eyes: (f: number) => number;
   /** 宝の山（大きさ 0..2、きらめきのコマ） */
@@ -203,6 +207,46 @@ const FURROW = [
     5,
   ),
 ];
+// 蓄えの山（描画だけ。蓄えの目安に対する割合で三段階）：コボルトはキノコの傘を積んだ山、ゴブリンは肉の塊と骨とキノコ。縁を暗くして床から浮かせる
+const LARDER_COL: Record<string, number[]> = { c: [150, 120, 186], C: [222, 204, 244], s: [214, 198, 166], m: [150, 44, 38], M: [214, 92, 74], b: [236, 228, 204], k: [30, 22, 22], d: [60, 42, 32] };
+function heap(W: number, H: number, kind: number): RawFrame {
+  const inside = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= W || y >= H - 1) return false;
+    const u = (x + 0.5 - W / 2) / (W / 2);
+    const v = (H - 1.5 - y) / (H - 1);
+    return u * u + v * v * 1.15 <= 1;
+  };
+  const rows: string[] = [];
+  for (let y = 0; y < H; y++) {
+    let r = '';
+    for (let x = 0; x < W; x++) {
+      if (y === H - 1) {
+        r += x > 0 && x < W - 1 ? 'd' : '.';
+        continue;
+      }
+      if (!inside(x, y)) {
+        r += '.';
+        continue;
+      }
+      if (!inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1)) {
+        r += 'k';
+        continue;
+      }
+      const h = (x * 7 + y * 13 + ((x * y) % 5)) % 11;
+      r += kind === 0 ? (h < 4 ? 'C' : h < 9 ? 'c' : 's') : h < 3 ? 'M' : h < 6 ? 'm' : h < 8 ? 'b' : h < 10 ? 'c' : 'C';
+    }
+    rows.push(r);
+  }
+  return pattern(rows, LARDER_COL, Math.floor(W / 2), H - 1);
+}
+const LARDER = [0, 1].map((kind) => [heap(10, 6, kind), heap(15, 8, kind), heap(21, 10, kind)]);
+// オークに従う集落の印：竿に下げた赤い布と、白い牙の印（描画だけ。集落の小屋の後ろから突き出す）
+const BANNER = pattern(
+  ['.w.......', 'wwwwwwww.', '.wRRRRRRk', '.wRbRRbRk', '.wRbRRbRk', '.wRRbbRRk', '.wRRRRRRk', '.wRR.RR.k', '.wR...R..', '.w.......', '.w.......', '.w.......', '.w.......', '.w.......', '.w.......', '.w.......', '.w.......', '.w.......', 'www......'],
+  { w: [118, 82, 50], R: [176, 40, 34], b: [240, 232, 206], k: [70, 20, 18] },
+  1,
+  18,
+);
 // 暗がりで光る目（二つの点。3 コマ目はまばたき）
 const EYES = [0, 1, 2, 3].map((f) =>
   pattern(f === 3 ? ['.....', '.k.k.', '.....'] : ['.....', '.E.E.', '.....'], { E: f === 1 ? [255, 236, 150, 1] : [255, 214, 110, 1], k: [70, 60, 40] }, 2, 1),
@@ -573,6 +617,14 @@ export function buildAtlas(): Atlas {
     raws.push(f);
     return raws.length - 1;
   });
+  const bannerFrame = raws.length;
+  raws.push(BANNER);
+  const larderFrames = LARDER.map((set) =>
+    set.map((f) => {
+      raws.push(f);
+      return raws.length - 1;
+    }),
+  );
   const eyeFrames = EYES.map((e) => {
     raws.push(e);
     return raws.length - 1;
@@ -626,6 +678,8 @@ export function buildAtlas(): Atlas {
     trap: trapFrame,
     totem: totemFrame,
     nest: nestFrame,
+    banner: bannerFrame,
+    larder: (kind, tier) => larderFrames[kind][Math.max(0, Math.min(2, tier))],
     furrow: (g) => furrowFrames[g ? 1 : 0],
     eyes: (f) => eyeFrames[f & 3],
     treasure: (size, f) => treasureFrames[size * 4 + (f & 3)],

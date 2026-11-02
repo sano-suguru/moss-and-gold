@@ -22,7 +22,8 @@
     "probe": "node tools/analysis/launch.mjs probe",
     "check": "node tools/analysis/launch.mjs check",
     "metric": "node tools/analysis/launch.mjs metric",
-    "bench": "node tools/analysis/launch.mjs bench"
+    "bench": "node tools/analysis/launch.mjs bench",
+    "film": "node build.mjs && node tools/analysis/launch.mjs film"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

@@ -44,6 +44,7 @@ export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]):
   else if (c.k === Kind.Golem) state = '宝物庫の入口を見張っている';
   else if (c.k === Kind.Dragon) state = c.st === 2 ? '飛んでいる' : c.foe ? '宝を盗った者を追っている' : '目を覚まして獲物を探している';
   else if (party && (party.camp ?? -1) >= 0) state = party.members[0] === c.id ? '焚き火のそばで見張りをしている' : '焚き火で休んでいる';
+  else if (party && (party.braceT ?? 0) > this.step) state = party.braceK === 1 ? '目標に着いて、武器を構えている' : '住みかの気配に身構えている';
   else if (party && party.goal === 1) state = '引き返している';
   else if (key && this.isSentry(c, key) && this.groups.get(key)!.members.some((o) => o.sleep > 0)) state = '群れの見張りをしている';
   else if (c.act === 2) state = '何かをしている';
@@ -61,11 +62,12 @@ export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]):
   if (key) {
     const g = this.groups.get(key);
     const n = g ? g.members.length : 1;
-    if (c.k === Kind.Adventurer) lines.push(`冒険者の一行（${n}人）`);
+    if (c.k === Kind.Adventurer) lines.push(party?.name ? `${this.partyTitle(party)}の一行（${n}人）` : `冒険者の一行（${n}人）`);
     else if (c.k === Kind.Dwarf) lines.push(`ドワーフの一団（${n}人）`);
     else if (n > 1) lines.push(`${known ? names[c.k] : '見知らぬ影'}の群れ（${n}匹）`);
     else lines.push('群れからはぐれている');
   } else if (Ecology.TERRITORY[c.k]) lines.push('一匹で縄張りを持って暮らしている');
+  if (party) lines.push(this.aimLine(party));
   return { title, lines };
 }
 

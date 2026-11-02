@@ -19,8 +19,10 @@ export function maybeParty(this: Ecology): void {
   const r = this.rumors;
   const size = Math.min(5, 2 + (ih(this.step, 202, 7) % 3) + (rep > 3 ? 1 : 0));
   const tier = rep < 2 ? 0 : rep < 6 ? 1 : 2;
+  // ゴブリンの盗みの噂が溜まっていれば、ゴブリン退治の一行（戦士が多い）
+  const gobHunt = this.goblinHuntReady();
   // 噂の中身で顔ぶれが変わる：金貨なら盗賊、アンデッドなら僧侶、大物や竜なら戦士
-  const wts = [3 + 3 * (r.beast + r.dragon), 2, 1 + 3 * r.gold, 2 + 3 * r.undead, 1, r.beastKind ? 3 * r.beast : 0, 0];
+  const wts = [3 + 3 * (r.beast + r.dragon) + (gobHunt ? 6 : 0), 2, 1 + 3 * r.gold, 2 + 3 * r.undead, 1, r.beastKind ? 3 * r.beast : 0, 0];
   const jobs: number[] = [];
   for (let i = 0; i < size; i++) {
     const tot = wts.reduce((a, b) => a + b, 0);
@@ -30,7 +32,8 @@ export function maybeParty(this: Ecology): void {
     jobs.push(j);
   }
   // 竜の噂があれば、竜殺しが一行を率いる
-  if (r.dragon > 0.3) jobs[0] = Job.Slayer;
+  if (r.dragon > 0.3 && !gobHunt) jobs[0] = Job.Slayer;
+  if (gobHunt) jobs[0] = Job.Warrior;
   // 光がなければ進めない：魔法使いも僧侶もいなければ、戦士が一人松明を持つ。戦士もいなければ一人を戦士に
   if (!jobs.includes(Job.Wizard) && !jobs.includes(Job.Priest) && !jobs.includes(Job.Warrior)) jobs[jobs.length - 1] = Job.Warrior;
   const pid = this.nextId++;
@@ -67,11 +70,16 @@ export function maybeParty(this: Ecology): void {
     this.counts[Kind.Adventurer]++;
   }
   this.parties.push(party);
+  // 目標を一つ決める（噂と職業の役目から）
+  this.chooseAim(party, jobs, gobHunt);
   const names = jobs.map((j) => JOB_NAMES[j]).join('・');
+  const aim = this.aimPhrase(party);
+  const who = `${JOB_NAMES[jobs[0]]}${party.name}の一行（${names}）が、${aim ? aim + '、' : ''}`;
+  this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: pid, ev: 'enter', how: party.aim ?? 0, n: party.aimId ?? 0, to: party.aimKnown ?? 0, x: 0, y: 0 } as never);
   // 入口で身支度をして、食べ残しを少し落としていく
   if (door < 0) this.pendingScraps.push(pid);
-  if (door < 0) this.log(m.entrance.x * TILE + 8, TILE + 8, `冒険者の一行（${names}）が入口から入ってきた`);
-  else this.log(this.mouthSpot(door)[0], this.mouthSpot(door)[1], `冒険者の一行（${names}）が地表の横穴から入ってきた`);
+  if (door < 0) this.log(m.entrance.x * TILE + 8, TILE + 8, `${who}入口から入ってきた`);
+  else this.log(this.mouthSpot(door)[0], this.mouthSpot(door)[1], `${who}地表の横穴から入ってきた`);
 }
 
 /** 冒険者の一行の光（松明と光の呪文） */
@@ -86,7 +94,7 @@ export function partyLights(this: Ecology, p: Party): Cr[] {
 
 /** その者から見えるか：一行の光の中か、日の光や光る苔に照らされているか。盗賊は夜目が利く */
 export function seenBy(this: Ecology, c: Cr, lights: Cr[], o: Cr): boolean {
-  if ((o.st === 7 || o.st === 12) && this.isHidden(o) && !this.atDoorOf(c, o)) return false;
+  if ((o.st === 7 || o.st === 12) && this.isHidden(o) && !this.atDoorOf(c, o) && !this.searchesCamp(c, o)) return false;
   if (c.sp === Job.Thief && sq(o.x - c.x) + sq(o.y - c.y) < 3 * TILE * 3 * TILE) return true;
   for (const l of lights) if (sq(o.x - l.x) + sq(o.y - l.y) < 5.5 * TILE * 5.5 * TILE) return true;
   return this.isLit(o);
@@ -98,10 +106,13 @@ export function updateParties(this: Ecology): void {
     const alive = p.members.map((id) => this.byId.get(id)).filter((c): c is Cr => !!c && !c.dead);
     if (!alive.length && p.members.length) {
       const last = this.byId.get(p.members[p.members.length - 1]);
-      if (!(p.saw & 16)) this.log(last?.x ?? 0, last?.y ?? 0, `冒険者の一行が全滅した`);
+      if (!(p.saw & 16)) this.log(last?.x ?? 0, last?.y ?? 0, `${p.name ? p.name + 'の' : ''}冒険者の一行が全滅した`);
+      // 一行の終わり：目標、着いたか、果たしたか、生きて帰ったか
+      this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'end', how: p.aim ?? 0, reason: p.saw & 16 ? 'returned' : 'wiped', to: p.aimEnd ?? 0, n: p.aimId ?? 0, arrived: p.aimAt ? 1 : 0, x: Math.round(last?.x ?? 0), y: Math.round(last?.y ?? 0) } as never);
     }
     p.members = alive.map((c) => c.id);
     if (!alive.length) continue;
+    this.aimStep(p, alive);
     if (p.goal !== 0 && (p.camp ?? -1) >= 0) this.endCamp(p);
     if (p.goal === 0) {
       const lights = this.partyLights(p);
@@ -143,8 +154,8 @@ export function updateParties(this: Ecology): void {
         this.log(alive[0].x, alive[0].y, `冒険者の一行が深手を負って引き返した`);
         continue;
       }
-      // 休むのは、探索中で食料に余裕があるときだけ（帰り道では休まずに出口を目指す）
-      if (p.goal === 0 && foodAvg >= 0.5 && (p.camp ?? -1) < 0 && this.step - (p.lastCamp ?? 0) > 2500 && ((p.fatigue ?? 0) > 3600 || worst < 0.5)) this.startCamp(p, alive[0]);
+      // 休むのは、探索中で食料に余裕があるときだけ（帰り道では休まずに出口を目指す。目標に着いて果たすまでの間も休まない）
+      if (p.goal === 0 && foodAvg >= 0.5 && (p.camp ?? -1) < 0 && !(p.aimAt && !p.aimEnd) && this.step - (p.lastCamp ?? 0) > 2500 && ((p.fatigue ?? 0) > 3600 || worst < 0.5)) this.startCamp(p, alive[0]);
       if ((p.camp ?? -1) >= 0 && (p.goal !== 0 || foodAvg < 0.3)) this.endCamp(p);
       if ((p.camp ?? -1) >= 0 && this.step >= (p.campUntil ?? 0)) this.endCamp(p);
       if (held >= cap * 0.7 || hungry || tooLong || fewer || dark || ((p.saw & 8) !== 0 && !slayer)) {
@@ -205,7 +216,9 @@ export function partyStr(this: Ecology, p: Party): number {
  * 3. どれもなければ、入口から離れる向きのでたらめな所
  */
 export function pickTarget(this: Ecology, p: Party, from: Cr): void {
-  if (this.pickQuarry(p)) return;
+  if (this.aimTarget(p, from)) return;
+  // 場所を知らない目標（竜・アンデッド・集落など）は、知っている宝に寄り道せず、奥（深部）へ寄せて探す
+  const deep = this.aimDeep(p);
   const m = this.w.map;
   const cw = Math.ceil(m.w / CELL);
   const ch = Math.ceil(m.h / CELL);
@@ -220,6 +233,7 @@ export function pickTarget(this: Ecology, p: Party, from: Cr): void {
     // 知っている宝
     let gbest = -1;
     let gd = 1e9;
+    if (deep && p.aim !== 1) gd = -1;
     for (const g of p.goldCells ?? []) {
       if ((p.goneGold ?? []).includes(g) || risky(g)) continue;
       const d = Math.abs((g % cw) - hx) + Math.abs(Math.floor(g / cw) - hy);
@@ -248,7 +262,7 @@ export function pickTarget(this: Ecology, p: Party, from: Cr): void {
         let edge = false;
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (ex.has((cy + dy) * cw + cx + dx) && cx + dx >= 0 && cx + dx < cw) edge = true;
         if (!edge && ex.size) continue;
-        const v = -(Math.abs(cx - hx) + Math.abs(cy - hy)) * 3 + cy * 0.5 + (ih(p.id, cell, 230) % 4);
+        const v = -(Math.abs(cx - hx) + Math.abs(cy - hy)) * 3 + (deep ? -(Math.abs(cx * CELL - m.deep.x) + Math.abs(cy * CELL - m.deep.y)) / CELL * 2 : cy * 0.5) + (ih(p.id, cell, 230) % 4);
         if (v <= bv) continue;
         if (this.cellFloor(cell) < 0) continue;
         bv = v;
@@ -265,46 +279,8 @@ export function pickTarget(this: Ecology, p: Party, from: Cr): void {
   this.pickTargetRandom(p, from);
 }
 
-/** 竜殺しの一行は竜へ、狩人の一行は噂の大物を見かけた場所へ */
-export function pickQuarry(this: Ecology, p: Party): boolean {
-  const jobs = p.members.map((id) => this.byId.get(id)).filter((c): c is Cr => !!c && !c.dead).map((c) => c.sp);
-  if (jobs.includes(Job.Slayer)) {
-    const d = this.list.find((o) => !o.dead && !o.away && (o.k === Kind.Dragon || o.k === Kind.Wyvern || o.k === Kind.Worm));
-    if (d) {
-      p.tx = d.x;
-      p.ty = d.y + 20;
-      p.targetAt = this.step;
-      return true;
-    }
-  }
-  if (jobs.includes(Job.Hunter) && this.rumors.beastKind && this.step - p.since < 3000) {
-    p.tx = this.rumors.beastX;
-    p.ty = this.rumors.beastY;
-    p.targetAt = this.step;
-    return true;
-  }
-  return false;
-}
-
 export function pickTargetRandom(this: Ecology, p: Party, from: Cr): void {
   const m = this.w.map;
-  const jobs = p.members.map((id) => this.byId.get(id)).filter((c): c is Cr => !!c && !c.dead).map((c) => c.sp);
-  // 竜殺しの一行は竜へ、狩人の一行は噂の大物を見かけた場所へ
-  if (jobs.includes(Job.Slayer)) {
-    const d = this.list.find((o) => !o.dead && !o.away && (o.k === Kind.Dragon || o.k === Kind.Wyvern || o.k === Kind.Worm));
-    if (d) {
-      p.tx = d.x;
-      p.ty = d.y + 20;
-      p.targetAt = this.step;
-      return;
-    }
-  }
-  if (jobs.includes(Job.Hunter) && this.rumors.beastKind && this.step - p.since < 3000) {
-    p.tx = this.rumors.beastX;
-    p.ty = this.rumors.beastY;
-    p.targetAt = this.step;
-    return;
-  }
   for (let i = 0; i < 40; i++) {
     const a = (ih(p.id, this.step, 220 + i) % 628) / 100;
     const r = (14 + (ih(p.id, this.step, 240 + i) % 22)) * TILE;
@@ -405,7 +381,11 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
           }
         }
       }
-      if (o.k === Kind.Dragon || o.k === Kind.Wyvern || o.k === Kind.Worm) p.saw |= 8;
+      if (o.k === Kind.Dragon || o.k === Kind.Wyvern || o.k === Kind.Worm) {
+        p.saw |= 8;
+        p.dgx = Math.round(o.x);
+        p.dgy = Math.round(o.y);
+      }
     });
   }
   // 僧侶は足もとの死骸を清める（アンデッドとして起き上がらない）
@@ -416,6 +396,14 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   //  雑魚（大ネズミ、コウモリ、アリ、ウィスプ、マイコニド、サラマンダー、トカゲ、クモ、スライム）は、近く（2マス）に来たか、自分に害をなしたときに、通りがかりの一人が払う。
   //  手強い敵は、気づいた者が一行に知らせ、一行が皆で向かう。かなわない相手は避ける（引き返す）。
   //  盗賊はミミックを見破る以外は自分から戦わず、吟遊詩人は戦わない（どちらも襲われれば打ち返す）
+  // 身構えて止まる（目標に着いたとき、目標でない住みかのそばを通るとき）。襲われている者は構えずに打ち返す
+  if ((p.braceT ?? 0) > this.step && (p.camp ?? -1) < 0 && !(c.foe && this.w.tick - c.hitAt < 150)) {
+    c.act = 0;
+    const bx = p.braceX ?? c.x;
+    const by = p.braceY ?? c.y;
+    c.dir = Math.abs(bx - c.x) > Math.abs(by - c.y) ? (bx > c.x ? 2 : 3) : by > c.y ? 0 : 1;
+    return;
+  }
   const ENEMY = [Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Lizardman, Kind.Minotaur, Kind.Troll, Kind.Vampire, Kind.Zombie, Kind.Basilisk, Kind.Skeleton, Kind.Lich];
   // ウィスプは剣では払えない光なので、雑魚に含めない（誘われても追いかけて迷うだけ。魔法使いは瓶に捕まえる）
   const MINOR = [Kind.Rat, Kind.Bat, Kind.Ant, Kind.Myconid, Kind.Salamander, Kind.Lizard, Kind.Spider, Kind.Slime];
@@ -433,7 +421,8 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     this.nearby(c.x, c.y, 6, (o) => {
       if (o.dead || o.away) return;
       const attacked = o.id === c.foe && this.w.tick - c.hitAt < 150;
-      const enemy = ENEMY.includes(o.k) || (o.k === Kind.Gargoyle && o.act !== 0) || (o.k === Kind.Mimic && c.sp === Job.Thief) || (c.sp === Job.Hunter && o.k === this.rumors.beastKind);
+      // 目標でない住民（住処・集落・村・縄張りの者）には、自分たちから戦いを始めない
+      const enemy = (ENEMY.includes(o.k) && !this.spareResident(p, c, o)) || (o.k === Kind.Gargoyle && o.act !== 0) || (o.k === Kind.Mimic && c.sp === Job.Thief) || (c.sp === Job.Hunter && o.k === this.rumors.beastKind);
       const minor = MINOR.includes(o.k) && (o.k !== Kind.Bat || o.st === 0 || o.foe === c.id);
       if (!enemy && !minor && !attacked) return;
       if (!attacked && (c.sp === Job.Bard || (c.sp === Job.Thief && o.k !== Kind.Mimic))) return;
@@ -713,7 +702,19 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
       r.beastY = p.by;
     }
   }
-  if (p.saw & 8) r.dragon += 0.25 * mul;
+  if (p.saw & 8) {
+    r.dragon += 0.25 * mul;
+    if (p.dgx || p.dgy) {
+      r.dragonX = p.dgx ?? 0;
+      r.dragonY = p.dgy ?? 0;
+    }
+  }
+  // ゴブリンに荷物を盗まれた話（溜まると、ゴブリン退治の一行が来る）
+  if (p.robbed) {
+    r.goblin += 0.12 * Math.min(3, p.robbed) * mul;
+    r.goblinX = p.robX ?? 0;
+    r.goblinY = p.robY ?? 0;
+  }
   c.body = 0;
   c.food = 0;
   c.gold = 0;
@@ -817,7 +818,6 @@ declare module '../ecology' {
     cellFloor: typeof cellFloor;
     partyStr: typeof partyStr;
     pickTarget: typeof pickTarget;
-    pickQuarry: typeof pickQuarry;
     pickTargetRandom: typeof pickTargetRandom;
     adventurer: typeof adventurer;
     setExit: typeof setExit;
@@ -834,4 +834,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { reputation, maybeParty, partyLights, seenBy, updateParties, cellOf, cellFloor, partyStr, pickTarget, pickQuarry, pickTargetRandom, adventurer, setExit, startCamp, endCamp, dropScraps, leaveDungeon, dropBelongings, dropJobItems, dropItem, updateItems, eachLight, lightSources });
+Object.assign(Ecology.prototype, { reputation, maybeParty, partyLights, seenBy, updateParties, cellOf, cellFloor, partyStr, pickTarget, pickTargetRandom, adventurer, setExit, startCamp, endCamp, dropScraps, leaveDungeon, dropBelongings, dropJobItems, dropItem, updateItems, eachLight, lightSources });

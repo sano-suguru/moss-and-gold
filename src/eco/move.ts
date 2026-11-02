@@ -36,6 +36,11 @@ export function findPath(this: Ecology, c: Cr, from: number, to: number): number
       if (p) return p;
     }
   }
+  // 冒険者は、目標でない住処・集落・縄張りのまわりをできるだけ避ける（避けては行けないときだけ通る）
+  if (c.k === Kind.Adventurer && from >= 0 && to >= 0) {
+    const p = this.advPath(c, from, to);
+    if (p) return p;
+  }
   return this.findPathAvoid(c, from, to, null);
 }
 

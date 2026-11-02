@@ -12,3 +12,11 @@ export const UNKNOWN = '見知らぬ影';
 export function renderEvent(msg: string, discovered: ArrayLike<number>): string {
   return msg.replace(/\{k:(\d+)\}/g, (_, n) => (discovered[+n] ? NAMES[+n] : UNKNOWN));
 }
+
+/** 冒険者の一行を率いる者の名前（入ってくるときに決まる） */
+export const ADV_NAMES = [
+  'アルド', 'ベリス', 'カイル', 'ダナ', 'エルク', 'フィン', 'ガロ', 'ヘルガ', 'イオ', 'ジェス', 'ケルン', 'リオ', 'マルタ', 'ノア', 'オルド', 'ペトラ',
+  'ラス', 'セラ', 'トマ', 'ウルスラ', 'ヴィク', 'ヨハン', 'ザラ', 'ブラン', 'シグ', 'ミラ', 'ロウ', 'テッサ', 'グレン', 'ハル', 'イルマ', 'コリン',
+];
+/** 一行の目標（Party.aim）の呼び方：札に出す短い言葉 */
+export const AIM_NAMES = ['探索', '宝探し', '竜退治', '大物狩り', 'アンデッド祓い', 'ゴブリン退治'];
