@@ -23,7 +23,8 @@
     "check": "node tools/analysis/launch.mjs check",
     "metric": "node tools/analysis/launch.mjs metric",
     "bench": "node tools/analysis/launch.mjs bench",
-    "film": "node build.mjs && node tools/analysis/launch.mjs film"
+    "film": "node build.mjs && node tools/analysis/launch.mjs film",
+    "advreport": "node tools/analysis/launch.mjs advreport"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

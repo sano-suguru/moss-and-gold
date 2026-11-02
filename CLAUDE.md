@@ -18,6 +18,7 @@
 # 動きを数こまの連続に撮る（途中の状態の保存庫から始める。こまの下に日と先頭の札）→ docs/img/<name>.png
 npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 --name adv-enter
 npm run film -- --seed abc --tick 180000 --frames 6 --every 30 --xy 1200,640 --zoom 3 --name camp
+npm run film -- --run runs/.cache/run/<道具の版>/a1/seed5-xxxx/0 --seed seed5 --tick 310600 --ticks 310640,310700 --xy 735,680 --name x   # その回の状態から
 ```
 
 ## 最初に知っておくこと
@@ -75,6 +76,7 @@ npm run batch -- --seeds ... --days 25 --adv-max 2 --out runs/b-adv2 # 冒険者
 npm run compare -- --runs runs/b1,runs/b2 --names "前,後" --out docs/x.md   # batch どうしをコボルトと大ネズミの目安で並べる
 npm run compare -- --runs ... --paired --since 10                            # 同じシードどうしの差の分布と「はっきり / ばらつきの内」の目安（ab が付ける）
 npm run compare -- --runs ... --goals tools/analysis/goals-settling.json     # 目安に届いたか（✅/❌）の表をつける
+npm run advreport -- --runs runs/ab-x/base,runs/ab-x/new --out x.md      # 冒険者の目標（着いた・果たした）、ゴブリンの盗みと退治、竜退治、大ネズミの引っ越しの列を対にして数える
 npm run autopsy -- --seed seed7 --days 25 --kind 2 --cause starve   # probe deaths の別名（0〜25日目すべて）
 npm run stuckmap -- --seed seed7 --days 12 --kind 2                 # probe stuck の別名
 npm run bench -- --repeat 3                                         # 速さ：seed4・かしたれ・seed7 を10日目の状態から1日ずつ（同時に回さない）。手直しの前後は続けて測る（揺れが1割ほどある）

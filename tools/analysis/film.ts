@@ -8,7 +8,7 @@
  * --at 始める日（小数可）か --tick 刻み、--frames こまの数（既定 6）、--every こまの間（刻み、既定 40）、
  * --follow party:<一行の id>（先頭にカメラを合わせ続ける）か id:<生き物の id>、--xy 画素x,画素y（カメラを止める）、--zoom 拡大率（既定 3）、
  * --ticks 刻み,刻み,...（こまの刻みを並べて指定。--tick/--at はその最初の刻み以下にする）、
- * --name 書き出す名前、--title 見出し、--out 書き出す先（既定 docs/img）、--lit 確認用の明かり、--cols 一行のこま数（既定 3）
+ * --run <回したフォルダ>（その回の1日ごとの状態から始める）、--name 書き出す名前、--title 見出し、--out 書き出す先（既定 docs/img）、--lit 確認用の明かり、--cols 一行のこま数（既定 3）
  */
 import { mkdirSync, writeFileSync } from 'fs';
 import { execFileSync } from 'child_process';
@@ -33,7 +33,7 @@ mkdirSync('build/film', { recursive: true });
 mkdirSync(out, { recursive: true });
 
 async function main(): Promise<void> {
-const { w, from } = await openAt(seed, t0);
+const { w, from } = await openAt(seed, t0, opt('run') ? { run: opt('run') } : {});
 const e = w.eco as any;
 const all = new Uint8Array(w.seen.length).fill(1);
 let cam = { x: 0, y: 0, zoom };
