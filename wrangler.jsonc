@@ -1,0 +1,10 @@
+// Cloudflare Workers の静的アセットとして dist/ を公開する（Worker のコードは無い）。
+// Workers Builds：ビルドの命令 `npm run build`、公開の命令 `npx wrangler deploy`。
+// main への push で本番、ほかのブランチではプレビューの URL ができる。
+{
+  "name": "moss-and-gold",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist"
+  }
+}

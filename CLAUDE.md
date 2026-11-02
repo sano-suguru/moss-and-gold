@@ -89,6 +89,14 @@ npm run shot -- --seed かしたれ --find warren         # 見たいもの（wa
 
 場面は `tools/gallery/scenes.ts` の `SCENES`（シード、時刻、見たい場所を探す関数、拡大率、スマホかどうか）。見た目を変えたら、直す前に `--label` で残し、直したあと `--compare` で並べて確かめる。数値では測れないので、必ず画像を見て判断する（一箇所を直すと別の場面が崩れることがある）。
 
+## 公開（Cloudflare Workers の静的アセット）
+
+`wrangler.jsonc` で `dist/` をそのまま公開する（Worker のコードは無い）。Cloudflare の Workers Builds がこのリポジトリにつながっていて、ビルドの命令は `npm run build`、公開の命令は `npx wrangler deploy`。main への push で本番が更新され、ほかのブランチ（`claude/…` など）に push するとブランチごとのプレビューの URL ができる（マージの前に遊んで確かめられる）。Node の版は `.node-version`。
+
+```bash
+npx wrangler deploy --dry-run     # 設定の確かめ（npm run build の後。アカウントは要らない）
+```
+
 ## 分析の流れ（推奨）
 
 1. 手直しをしたら `npm test`、そして `npm run check`（新しい流れが実際に起きるかを、決まった途中の状態から1〜2分で）。届かない確かめがあれば、大きな比較の前に `probe` で原因を追う。新しい流れを足したら、その確かめを `tools/analysis/checks.ts` に足す（起きることがわかっているシードと日を、前の batch の settle.jsonl などから選ぶ）。
