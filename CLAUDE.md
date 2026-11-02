@@ -91,10 +91,10 @@ npm run shot -- --seed かしたれ --find warren         # 見たいもの（wa
 
 ## 公開（Cloudflare Workers の静的アセット）
 
-`wrangler.jsonc` で `dist/` をそのまま公開する（Worker のコードは無い）。Cloudflare の Workers Builds がこのリポジトリにつながっていて、ビルドの命令は `npm run build`、公開の命令は `npx wrangler deploy`。main への push で本番が更新され、ほかのブランチ（`claude/…` など）に push するとブランチごとのプレビューの URL ができる（マージの前に遊んで確かめられる）。Node の版は `.node-version`。
+設定はすべてリポジトリの中：`wrangler.jsonc`（`dist/` をそのまま公開。Worker のコードは無い）と `.github/workflows/deploy.yml`。push するたびに GitHub Actions が `npm run typecheck` と `npm test` を通し、`npm run build` してから公開する。main は本番（`npx wrangler deploy`）、ほかのブランチ（`claude/…` など）はブランチ名のプレビューの URL（`wrangler versions upload --preview-alias`。マージの前に遊んで確かめられる）。Node の版は `.node-version`、wrangler は devDependencies。リポジトリの Secrets に `CLOUDFLARE_API_TOKEN` と `CLOUDFLARE_ACCOUNT_ID` が無ければ、公開だけ飛ばす。
 
 ```bash
-npx wrangler deploy --dry-run     # 設定の確かめ（npm run build の後。アカウントは要らない）
+npm run build && npx wrangler deploy --dry-run     # 設定の確かめ（アカウントは要らない）
 ```
 
 ## 分析の流れ（推奨）
