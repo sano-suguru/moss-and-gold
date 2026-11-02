@@ -114,7 +114,9 @@ export function collectTribute(this: Ecology, c: Cr): void {
     }
     if (sq(cp.x - c.x) + sq(cp.y - c.y) < 1.5 * TILE * 1.5 * TILE || this.goTo(c, cp.x, cp.y, s.speed)) {
       // 取り立てる量：そのオークが腹を満たすのに要る分を目安に、蓄えの半分まで（七巡目。六巡目は蓄えの3割で、1回あたり約50だった）
-      const amt = Math.max(0, Math.min(s.cap - c.food, Math.floor((cp.store ?? 0) / 2)));
+      // ただし集落の取り分（蓄えの目安の半分＝1匹あたり15）は残す
+      const keep = Math.floor(this.campStoreGoal(cp) / 2);
+      const amt = Math.max(0, Math.min(s.cap - c.food, Math.floor((cp.store ?? 0) / 2), (cp.store ?? 0) - keep));
       if (amt <= 0) {
         // 着いたら蓄えが空だった（またはもう腹が満ちていた）：取り立てずに戻る
         c.st = 0;
@@ -187,7 +189,7 @@ export function goCollect(this: Ecology, c: Cr): boolean {
   let best: Camp | null = null;
   let bd = 1e18;
   for (const cp of this.vassalsOf(c)) {
-    if (this.w.tick < (cp.tribT ?? 0) || (cp.store ?? 0) < 10) continue;
+    if (this.w.tick < (cp.tribT ?? 0) || (cp.store ?? 0) < 10 + Math.floor(this.campStoreGoal(cp) / 2)) continue;
     const d = sq(cp.x - c.x) + sq(cp.y - c.y);
     if (d < bd) {
       bd = d;
