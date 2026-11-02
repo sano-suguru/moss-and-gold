@@ -316,6 +316,12 @@ export class CreatureView {
       const mw = eco.mapW;
       for (const k of eco.farmTiles(wr)) pushSprite((k % mw) * 16 + 8, Math.floor(k / mw) * 16 + 14, 0, false, A.furrow(eco.w.fungus[k] >= 80 ? 1 : 0), 0, 2);
       pushSprite(wr.x, wr.y + 5, 0, false, A.nest, 0, 2);
+      // 蓄え：寝床の脇に積んだキノコの山（蓄えの目安に対する割合で三段階。尽きれば消える）
+      const ws = wr.store ?? 0;
+      if (ws > 0) {
+        const fr = ws / Math.max(1, eco.storeGoal(wr));
+        pushSprite(wr.x + 11, wr.y + 7, 0, false, A.larder(0, fr >= 0.67 ? 2 : fr >= 0.34 ? 1 : 0), 0, 2);
+      }
       const d = wr.door ?? -1;
       // 横穴の入口の脇（横穴と反対の側の、床の上）に飾り柱を立てる
       if (d >= 0) {
@@ -335,7 +341,19 @@ export class CreatureView {
     }
     for (const w of eco.webs) if (inView(w.x, w.y, 24)) pushSprite(w.x, w.y, 0, false, A.web, 0, 2);
     for (const c of eco.colonies) if (inView(c.x, c.y, 24)) pushSprite(c.x, c.y + 4, 0, false, A.anthill, 0, 2);
-    for (const c of eco.camps) if (inView(c.x, c.y, 32)) pushSprite(c.x, c.y + 6, 0, false, c.kind === 0 ? A.camp : A.hut, 0, 2);
+    for (const c of eco.camps) {
+      if (!inView(c.x, c.y, 32)) continue;
+      pushSprite(c.x, c.y + 6, 0, false, c.kind === 0 ? A.camp : A.hut, 0, 2);
+      if (c.id < 0 || c.kind !== 0) continue;
+      // ゴブリンの集落の蓄え：小屋の脇に積んだ肉と骨とキノコの山（三段階）
+      const cs = c.store ?? 0;
+      if (cs > 0) {
+        const fr = cs / Math.max(1, eco.campStoreGoal(c));
+        pushSprite(c.x - 20, c.y + 14, 0, false, A.larder(1, fr >= 0.67 ? 2 : fr >= 0.34 ? 1 : 0), 0, 2);
+      }
+      // オークに従う集落：小屋の後ろから、牙の印の赤い旗が突き出す（縄張りの印）
+      if (c.lx || c.ly) pushSprite(c.x + 8, c.y + 1, 0, false, A.banner, 0, 0);
+    }
     // ドワーフの鍛冶場と坑道のランプ
     {
       const mw = eco.w.map.w;
@@ -426,7 +444,8 @@ export class CreatureView {
         }
       };
       for (const p of eco.parties) if ((p.camp ?? -1) >= 0) embers((p.camp! % mm.w) * 16 + 8, Math.floor(p.camp! / mm.w) * 16 + 12, 5, p.id, 26);
-      for (const cp of eco.camps) if (cp.id >= 0 && (cp.fuel ?? 0) > 0 && inView(cp.x, cp.y, 40)) embers(cp.x, cp.y + 14, 6, cp.id, 30);
+      // かがり火の火の粉は、燃料（集めた枯れキノコの軸）の多さで数と高さが変わる（尽きかけると細る）
+      for (const cp of eco.camps) if (cp.id >= 0 && (cp.fuel ?? 0) > 0 && inView(cp.x, cp.y, 40)) embers(cp.x, cp.y + 14, Math.min(8, 1 + ((cp.fuel as number) >> 1)), cp.id, 14 + Math.min(12, cp.fuel as number) * 2);
       {
         const gx = mm.entrance.x * 16 + 16;
         if (inView(gx, 24, 60)) {
@@ -592,6 +611,9 @@ export class CreatureView {
     }
     this.order.sort((a, b) => a.y - b.y || a.c.id - b.c.id);
 
+    // 身構えている一行（描画だけ：武器を構えた姿で止める。目標に着いたときは振りかぶり、そばを通るときは構えるだけ）
+    const braced = new Map<number, number>();
+    for (const p of eco.parties) if ((p.braceT ?? 0) > eco.step) for (const id of p.members) braced.set(id, p.braceK ?? 2);
     for (const ord of this.order) {
       const c = ord.c;
       let x = ord.x;
@@ -611,6 +633,9 @@ export class CreatureView {
       } else if (c.caught) {
         act = 1;
         f = Math.floor(t * 10 + seed) & 1;
+      } else if (sp === Kind.Adventurer && braced.has(c.id) && act === 0) {
+        act = 2;
+        f = braced.get(c.id) === 1 ? 1 : 0;
       } else if (act === 2) {
         f = Math.min(3, c.actT);
       } else if (act === 1) {
@@ -704,8 +729,8 @@ export class CreatureView {
       // 傷を受けた瞬間は白く光る
       const flash = !isCorpse && eco.w.tick - c.hitAt < 2 ? 20 : 0;
       pushSprite(x, yy, lift, flip, frame, hidden ? 0 : glow, flash + (hidden ? 10 : 0), (c.id * 0.6180339) % 1);
-      // 隠れている者の目：影の姿の上で光る（ときどきまばたき）
-      if (hidden) {
+      // 隠れている者の目：影の姿の上で光る（ときどきまばたき）。暗がりで灯りを狙って潜む者（待ち伏せのゴブリンなど）も、暗ければ目だけ光る
+      if (hidden || (!isCorpse && c.lure && !c.dead && c.act === 0 && !eco.isLit(c))) {
         const ph = Math.floor(t * 2 + c.id * 0.37) % 7;
         pushSprite(x, yy + 0.05, lift + (sp === Kind.Goblin ? 14 : 7), false, A.eyes(ph === 6 ? 3 : ph & 1), 0, 0);
       }

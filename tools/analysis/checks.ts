@@ -34,6 +34,24 @@ const RUN_A = { seeds: ['かしたれ', 'seed8', 'abc', 'seed7'], from: 10, to: 
 
 export const CHECKS: Check[] = [
   {
+    // 冒険者の作り直しの一歩目：一行は目標を持って入り、目標に着くと構える（seed8・seed7 では10〜18日に何度も着く）
+    name: '冒険者の一行が目標に着く（4シードで3回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'arrive').length);
+      return { ok: sum(n) >= 3, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // 目標でない住処・集落のそばを通るときは身構えて通り過ぎる（seed7 で10〜18日に数回）
+    name: '冒険者の一行が住処のそばで身構えて通り過ぎる（4シードで1回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'pass').length);
+      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
     name: 'オークが貢ぎ物を取り立てる（4シードで1回以上）',
     ...RUN_A,
     test: (rs) => {

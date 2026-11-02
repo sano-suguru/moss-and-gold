@@ -310,6 +310,14 @@ export function lurk(this: Ecology, c: Cr): boolean {
         c.flee = 120;
         c.foe = t.id;
         c.lure = 0;
+        // 盗まれた一行は覚えておく（生きて帰れば、ゴブリンの盗みの噂になる）
+        const tp = this.parties.find((q) => q.id === t.party);
+        if (tp && take > 0) {
+          tp.robbed = (tp.robbed ?? 0) + 1;
+          tp.robX = Math.round(t.x);
+          tp.robY = Math.round(t.y);
+          this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: camp?.id ?? -1, ev: 'rob', n: take, x: Math.round(t.x), y: Math.round(t.y) } as never);
+        }
         if (this.step - (this.lastLogged[997] ?? -99999) > 3000) {
           this.lastLogged[997] = this.step;
           this.log(c.x, c.y, `{k:${Kind.Goblin}}が冒険者の荷物を盗んで逃げた`);

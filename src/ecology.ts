@@ -118,6 +118,38 @@ export interface Party {
   camp?: number;
   campUntil?: number;
   lastCamp?: number;
+  /**
+   * 一行の目標（冒険者の作り直しの一歩目）：0 なし（探索）、1 宝、2 竜、3 大物、4 アンデッド、5 ゴブリン退治。
+   * aimId は目指す相手（竜・大物の生き物、ゴブリンの集落の id。宝なら区画、アンデッドは 0）、aimX/aimY は目指す場所（画素）、
+   * aimKnown は場所を知っているか（0 なら噂の方角＝奥へ向かい、見つけたら 1）、aimAt は着いた刻み（0 まだ）、aimEnd は終わり方（0 まだ、1 果たした、2 あきらめた）
+   */
+  aim?: number;
+  aimId?: number;
+  aimX?: number;
+  aimY?: number;
+  aimKnown?: number;
+  aimAt?: number;
+  aimEnd?: number;
+  /** 場所を知らない目標の、当て推量の行き先（1：噂の場所か深部へ向かっている途中。着いたら 0 にして、まわりの奥を探す） */
+  aimGuess?: number;
+  aimGuessX?: number;
+  aimGuessY?: number;
+  /** 率いる者の名前 */
+  name?: string;
+  /** ゴブリンに荷物を盗まれた回数と、最後に盗まれた場所（生きて帰れば噂になる） */
+  robbed?: number;
+  robX?: number;
+  robY?: number;
+  /** 身構えて止まっている刻みの終わり、向く先、種類（1 目標に着いて構える、2 住処のそばで身構える） */
+  braceT?: number;
+  braceX?: number;
+  braceY?: number;
+  braceK?: number;
+  /** そばを通って身構えた、目標でない住処・集落・縄張り（同じ所では一度だけ） */
+  passed?: number[];
+  /** 見かけた竜の場所（生きて帰れば噂になる） */
+  dgx?: number;
+  dgy?: number;
 }
 
 /** 外の世界の地図：生還者が持ち帰った、探した範囲、宝のあった区画、危ない区画 [区画, 強さ, 刻み] */
@@ -164,6 +196,13 @@ export interface Rumors {
   beastKind: number;
   beastX: number;
   beastY: number;
+  /** ゴブリンの盗み（生還者が持ち帰る。溜まるとゴブリン退治の一行が来る）と、最後に盗まれた場所 */
+  goblin: number;
+  goblinX: number;
+  goblinY: number;
+  /** 竜を見かけた場所（竜殺しの一行が目指す噂の方角。0,0 なら知らない） */
+  dragonX: number;
+  dragonY: number;
 }
 
 /** 金貨と宝石の山（量は整数で保存される） */
@@ -503,7 +542,7 @@ export class Ecology {
   /** 一度でも光に照らされた種 */
   discovered = new Uint8Array(32);
   gear: Item[] = [];
-  rumors: Rumors = { light: 0, gold: 0, undead: 0, beast: 0, dragon: 0, beastKind: 0, beastX: 0, beastY: 0 };
+  rumors: Rumors = { light: 0, gold: 0, undead: 0, beast: 0, dragon: 0, beastKind: 0, beastX: 0, beastY: 0, goblin: 0, goblinX: 0, goblinY: 0, dragonX: 0, dragonY: 0 };
   /** 外との金貨の出入り */
   goldIn = 0;
   goldOut = 0;
