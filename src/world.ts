@@ -1,4 +1,4 @@
-import { CR_EVERY, Ecology } from './ecology';
+import { CR_EVERY, Ecology } from './eco/index';
 import { MapData, TILE, generate, lineOfSight } from './mapgen';
 
 export const TICKS_PER_SEC = 10;
@@ -1357,19 +1357,35 @@ export class World {
   }
 
   /** 光の届いたマスを「見た」として記録する。変化があれば true */
+  private unseen: Int32Array | null = null;
+  private unseenN = 0;
   updateSeen(): boolean {
     const d = dayIntensity(this.tick);
     let changed = false;
-    for (let k = 0; k < this.seen.length; k++) {
-      if (this.seen[k]) continue;
-      if (this.lightBase[k] * d > 60 || this.mossGlow[k] > 0.08 || this.lavaGlow[k] > 0.08 || this.fungusGlow[k] > 0.06) {
-        this.seen[k] = 1;
-        changed = true;
+    // まだ見ていないマスだけを順に見る（見たマスは見ていない側へ戻らないので、一覧は縮むだけ。控えは保存しない）
+    if (!this.unseen) {
+      const u: number[] = [];
+      for (let k = 0; k < this.seen.length; k++) if (!this.seen[k]) u.push(k);
+      this.unseen = Int32Array.from(u);
+      this.unseenN = u.length;
+    }
+    {
+      const U = this.unseen;
+      let n = 0;
+      for (let i = 0; i < this.unseenN; i++) {
+        const k = U[i];
+        if (this.seen[k]) continue;
+        if (this.lightBase[k] * d > 60 || this.mossGlow[k] > 0.08 || this.lavaGlow[k] > 0.08 || this.fungusGlow[k] > 0.06) {
+          this.seen[k] = 1;
+          changed = true;
+        } else U[n++] = k;
       }
+      this.unseenN = n;
     }
     const m = this.map;
     // 松明や光の呪文に照らされた所も記憶に残る
-    for (const l of this.eco.lightSources()) {
+    const srcs = this.eco.lightSources();
+    for (const l of srcs) {
       const tx = Math.floor(l.x / TILE);
       const ty = Math.floor(l.y / TILE);
       const R = Math.floor(l.r / TILE) - 1;
@@ -1384,8 +1400,7 @@ export class World {
           changed = true;
         }
     }
-    // 種の発見：光の中にいる（または自ら光を放つ）生き物の種は、名前と記録がわかる
-    const srcs = this.eco.lightSources();
+    // 種の発見：光の中にいる（または自ら光を放つ）生き物の種は、名前と記録がわかる（光源は上と同じ）
     for (const c of this.eco.list) {
       if (c.dead || c.away || this.eco.discovered[c.k]) continue;
       const k = Math.floor(c.y / TILE) * m.w + Math.floor(c.x / TILE);
