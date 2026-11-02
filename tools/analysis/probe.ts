@@ -1,9 +1,10 @@
 /**
  * 調べ物の道具（使い捨てのスクリプトの代わり）。途中の状態の保存庫（lib/open.ts）から始めるので、0日目から回し直さない。
  *
- *   npm run probe -- deaths --seed seed7 --kind 2 --cause starve --day 20
- *       20日目（刻みで 20×DAY_TICKS から 21×DAY_TICKS の手前まで）に飢え死にした大ネズミの、死ぬ直前の履歴（既定で1000刻みぶん）と、
- *       死んだときの様子の組み合わせの内訳。--from 19.5 --to 21 で範囲、--by 手を下した種、--examples 例の数、--keep 履歴の刻み数
+ *   npm run probe -- deaths --seed seed7 --kind 2 --cause starve --day 19
+ *       19.0〜20.0日（20日目。刻みで 19×DAY_TICKS から 20×DAY_TICKS の手前まで）に飢え死にした大ネズミの、死ぬ直前の履歴（既定で1000刻みぶん）と、
+ *       死んだときの様子の組み合わせの内訳。--from 19.5 --to 21 で範囲、--by 手を下した種、--examples 例の数、--keep 履歴の刻み数、
+ *       --warm 範囲の始めより keep 刻み前から回す（範囲の始めのすぐ後に死んだものにも履歴が付く。1日ぶん余計にかかる）
  *   npm run probe -- life --seed abc --id 1234 [--from 5 --to 8]
  *       ある個体の一生（生まれた日を1日ごとの状態の番号から探す）。状態（st、逃げる・眠る・死ぬ。--act なら act も）が変わるたびに1行と、20刻みごとの細かい記録
  *   npm run probe -- calls --seed abc --method sendCollectors,collectTribute --from 10 --to 12 [--by-kind]
@@ -69,7 +70,8 @@ async function deaths(seed: string, a: Record<string, string>, o: OpenOpts) {
   const to = a.to !== undefined ? +a.to : a.day !== undefined ? +a.day + 1 : from + 1;
   const keep = +(a.keep ?? 1000);
   const every = +(a.every ?? 20);
-  const startT = Math.max(0, Math.round(from * DAY_TICKS) - keep);
+  // 始まりは from の刻み（その日の状態から）。範囲の始めの keep 刻みの間に死んだものは履歴が短い（--warm で keep 刻み前から始める）
+  const startT = Math.max(0, Math.round(from * DAY_TICKS) - (a.warm ? keep : 0));
   const { w } = await openAt(seed, startT, o);
   const e = w.eco as any;
   const m = w.map;
@@ -138,7 +140,7 @@ async function deaths(seed: string, a: Record<string, string>, o: OpenOpts) {
     hist.set(key, (hist.get(key) ?? 0) + 1);
     if (rows.filter((q) => q.key === key).length < 2) {
       const lines = ring.get(cc.id) ?? [];
-      rows.push({ key, ex: [`#### ${name(cc.k)} ${cc.id}（${dayOf(w.tick)}日目、マス ${tx},${ty}）`, '', key, '', '近くにいた：' + ([...near].join('、') || 'なし'), '', '```', ...lines, '```', ''].join('\n') });
+      rows.push({ key, ex: [`#### ${name(cc.k)} ${cc.id}（${dayOf(w.tick)}日目、マス ${tx},${ty}）${w.tick - startT < keep ? `　※履歴は始まりからの ${w.tick - startT} 刻みだけ（--warm で前から）` : ''}`, '', key, '', '近くにいた：' + ([...near].join('、') || 'なし'), '', '```', ...lines, '```', ''].join('\n') });
     }
     return r;
   };

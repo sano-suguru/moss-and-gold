@@ -37,7 +37,7 @@ npm run ab -- --base HEAD~1 --seeds abc,seed5 --days 10               # 1バイ�
 npm run ab -- --resume-check 7 --seeds かしたれ --days 10              # 7日目で分けて回しても、状態も記録も通しと一致するか
 
 # 調べ物（途中の状態の保存庫から始める。どの版の何日目から始めたかを最初に表示する）
-npm run probe -- deaths --seed seed7 --kind 2 --cause starve --day 20    # 20日目に飢え死にした大ネズミの、死ぬ前1000刻みの履歴と、様子の組み合わせの内訳
+npm run probe -- deaths --seed seed7 --kind 2 --cause starve --day 19    # 19.0〜20.0日（20日目）に飢え死にした大ネズミの、死ぬ前1000刻みの履歴と様子の内訳（--warm で範囲の前から）
 npm run probe -- life --seed abc --id 1234                               # ある個体の一生（生まれた日は自動で探す）
 npm run probe -- calls --seed abc --method sendCollectors,vassalsOf --from 10 --to 12   # メソッドの呼び出しの回数と戻り値の内訳（日ごと）
 npm run probe -- look --seed abc --at 18.5 --id 1234 --expr "e.camps.map(c => c.store)" # その刻みのまわりの地形と生き物、式の値

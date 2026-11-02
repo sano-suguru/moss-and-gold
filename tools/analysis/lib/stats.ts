@@ -3,7 +3,7 @@
  *
  * 目安の考え方：展開は少しの違いで大きく分かれるので、シードごとの差は大きく揺れる。そこで
  *   - 差の平均の 90％ 区間（シードを選び直すブートストラップ、乱数は決まった種で毎回同じ）
- *   - 増えたシードと減ったシードの数（符号検定の両側 p 値）
+ *   - 増えたシードと減ったシードの数（符号検定の両側 p 値が 0.1 未満。たとえば 5対0、6対0、7対1 は届き、4対0、6対1 は届かない）
  *   - いちばん差の大きい1シードを除いても、差の合計の向きが変わらないか（1シードの出来事に引っ張られていないか）
  * を並べ、三つともそろったときだけ「はっきり」とする。どれかが欠けたら「ばらつきの内」。
  */
@@ -83,7 +83,7 @@ export function paired(a: number[], b: number[], seeds: string[]): Paired {
   const robust = Math.sign(rest) === Math.sign(total) && total !== 0;
   let verdict: Paired['verdict'] = 'ばらつきの内';
   if (!n || d.every((x) => x === 0)) verdict = '差なし';
-  else if ((lo > 0 || hi < 0) && p < 0.2 && robust) verdict = lo > 0 ? 'はっきり増' : 'はっきり減';
+  else if ((lo > 0 || hi < 0) && p < 0.1 && robust) verdict = lo > 0 ? 'はっきり増' : 'はっきり減';
   return {
     n, sumA: idx.reduce((s, i) => s + a[i], 0), sumB: idx.reduce((s, i) => s + b[i], 0), diffs: d, mean, median: med(d), up, down, lo, hi, p, top, topSeed: ti >= 0 ? seeds[idx[ti]] : '', robust, verdict,
   };
@@ -109,4 +109,4 @@ export const PAIRED_HEAD = ['| 指標 | 前の合計 | 後の合計 | 差の平�
 export function pairedRow(label: string, p: Paired): string {
   return `| ${label} | ${f(p.sumA)} | ${f(p.sumB)} | ${f(p.mean, 2)}（${f(p.lo, 2)}〜${f(p.hi, 2)}） | ${f(p.median)} | ${p.up} / ${p.down} | ${p.top ? `${Math.round(p.top * 100)}％ ${p.topSeed}${p.robust ? '' : '（除くと向きが変わる）'}` : '—'} | ${strip(p.diffs)} | ${p.verdict === 'はっきり増' ? '**↑ はっきり**' : p.verdict === 'はっきり減' ? '**↓ はっきり**' : p.verdict} |`;
 }
-export const PAIRED_NOTE = '「目安」：差の平均の90％区間（シードを選び直すブートストラップ）が0をまたがず、増えたシードと減ったシードの数の偏り（符号検定の両側 p）が 0.2 未満で、いちばん差の大きい1シードを除いても差の合計の向きが変わらないときだけ「はっきり」。どれかが欠けたら「ばらつきの内」（その差は、展開の分かれ方で説明できる大きさ）。';
+export const PAIRED_NOTE = '「目安」：差の平均の90％区間（シードを選び直すブートストラップ）が0をまたがず、増えたシードと減ったシードの数の偏り（符号検定の両側 p）が 0.1 未満で、いちばん差の大きい1シードを除いても差の合計の向きが変わらないときだけ「はっきり」。どれかが欠けたら「ばらつきの内」（その差は、展開の分かれ方で説明できる大きさ）。';

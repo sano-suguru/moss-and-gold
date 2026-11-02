@@ -59,11 +59,12 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: '大ネズミが絶えない（最後の記録で、4シードとも1匹以上）',
+    // 大ネズミは天井の裂け目や横穴から少しずつ来ては去るので、ある刻みに0匹でも絶えたとは限らない（前の版でも abc は0匹と数匹を行き来する）。来つづけるかで見る
+    name: '大ネズミが来つづける（4シードの合計で10匹以上来た）',
     ...RUN_A,
     test: (rs) => {
-      const n = rs.map((r) => (r.samples.length ? r.samples[r.samples.length - 1].counts['2'] ?? 0 : 0));
-      return { ok: n.every((x) => x > 0), value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+      const n = rs.map((r) => r.births.filter((b) => b.k === 2 && b.origin !== 'born').length);
+      return { ok: sum(n) >= 10, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },
   {
