@@ -115,6 +115,18 @@ function sample() {
     parties: e.parties.length,
     lore: e.lore.explored.length,
     hold: e.hold ? e.hold.stage : -1,
+    // 比較の表（batch）のため：口が開いているか、住みついた群れ、生きている竜の育ち、特別な個体（読むだけ。展開は変えない）
+    mouths: m.mouths.map((_, i) => (e.mouthOpen(i) ? 1 : 0)),
+    settle: {
+      burrow: e.burrows.map((b) => `${b.x},${b.y}`),
+      warren: e.warrens.map((v) => v.id),
+      colony: e.colonies.map((v) => v.id),
+      camp: e.camps.filter((v) => v.kind === 0).map((v) => v.id),
+      village: e.camps.filter((v) => v.kind === 1).map((v) => v.id),
+      orc: [...new Set(e.list.filter((c) => c.k === 13 && !c.dead && (c.hx || c.hy)).map((c) => `${c.hx},${c.hy}`))],
+    },
+    dragons: e.list.filter((c) => c.k === 24 && !c.dead).map((c) => c.sp),
+    elites: e.list.filter((c) => c.elite && !c.dead).map((c) => [c.id, c.elite]),
   };
 }
 

@@ -12,6 +12,7 @@
     "export-sprites": "esbuild tools/export-sprites.ts --bundle --platform=node --outfile=build/export.js --log-level=warning && node build/export.js",
     "sim": "esbuild tools/analysis/sim.ts --bundle --platform=node --outfile=build/sim.js --log-level=warning && node build/sim.js",
     "report": "esbuild tools/analysis/report.ts --bundle --platform=node --outfile=build/report.js --log-level=warning && node build/report.js",
+    "batch": "esbuild tools/analysis/batch.ts --bundle --platform=node --outfile=build/batch.js --log-level=warning && node build/batch.js",
     "gallery": "node build.mjs && esbuild tools/gallery/scenes.ts --bundle --platform=node --outfile=build/scenes.js --log-level=warning && node build/scenes.js && python3 tools/gallery/shoot.py"
   },
   "devDependencies": {

@@ -28,6 +28,8 @@ npm run sim -- --seed かしたれ --days 30 --out runs/kashitare     # 画面�
 npm run sim -- --resume runs/kashitare                              # 時間切れで止まった所から続ける
 npm run sim -- --seed abc --days 5 --out runs/t --trace 1234        # 生き物1234の一生を毎刻み記録
 npm run report -- --run runs/kashitare                              # report.md と deaths.png / births.png
+npm run batch -- --seeds "abc,かしたれ,seed4" --days 25 --out runs/batch-x  # CPU の数だけ sim を並べて回し、report と比較の表 summary.md を作る
+npm run batch -- --out runs/batch-x                                 # 途中で止まった batch を続ける（--summary で表だけ作り直す）
 ```
 
 `sim` は `--budget 秒`（既定270）を超えそうになると途中の状態（checkpoint.json）を書き出して止まる。
@@ -77,7 +79,7 @@ python3 tools/gallery/shoot.py --only dragon,camp   # 場面を選んで撮り�
 | src/creatureView.ts, renderer.ts, shaders.ts | 描画 |
 | src/main.ts | ループ、画面の部品（ミニマップ、記録、養分の表示）、保存 |
 | test/*.ts | テスト |
-| tools/analysis/ | 分析の道具（sim, report, drift, ratdiag：飢え死にの調査, stuck：動かない個体, digmap：掘られたマスと岩の硬さの地図, planview：ドワーフの坑道の計画を文字で描く） |
+| tools/analysis/ | 分析の道具（sim, report, batch：多くのシードを並べて回して比較の表, drift, ratdiag：飢え死にの調査, stuck：動かない個体, digmap：掘られたマスと岩の硬さの地図, planview：ドワーフの坑道の計画を文字で描く） |
 | README.md | 段階ごとの仕組みの詳しい説明（仕様書として読める） |
 
 ## いまの仕組みの要点（段階13まで）
