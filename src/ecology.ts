@@ -4963,6 +4963,7 @@ export class Ecology {
     if (c.st === 1 && (c.food >= s.cap * 0.8 || c.actT > 2400)) c.st = 9;
     if (c.st === 9) {
       if (this.goTo(c, c.hx, c.hy, s.speed) || sq(c.hx - c.x) + sq(c.hy - c.y) < 10 * 10) {
+        this.record('exits', { t: this.w.tick, k: c.k, reason: 'home', x: Math.round(c.x), y: Math.round(c.y) } as never);
         this.exported += c.body + c.food;
         c.body = 0;
         c.food = 0;

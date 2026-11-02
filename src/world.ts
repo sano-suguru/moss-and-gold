@@ -202,7 +202,11 @@ export class World {
     this.computeLightBase();
     this.computeLavaGlow();
     // 新しいダンジョンは、湧き水がすでに流れ出した状態から始める
-    if (!state?.water) for (let i = 0; i < WARMUP_WATER_STEPS; i++) this.waterStep();
+    if (!state?.water) {
+      for (let i = 0; i < WARMUP_WATER_STEPS; i++) this.waterStep();
+      // 始める前の水の流れで吸い込み穴へ流れた養分は、はじめの量の外とする（はじめの総量はこのあとで測るので、帳簿に数えるとずれる）
+      this.washed = 0;
+    }
     this.computeMoist();
     for (let k = 0; k < N; k++) {
       this.totalMoss += this.moss[k];

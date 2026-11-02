@@ -62,7 +62,7 @@ python3 tools/gallery/shoot.py --only dragon,camp   # 場面を選んで撮り�
 | samples.jsonl | 地上の1/4日ごと：種ごとの数（`counts` のキーは種の番号）、死骸、開いた床、瓦礫、使える養分、総量、帳簿のずれ（nutrientDrift / goldDrift / rockDrift）、噂、一行の数、外の世界の地図の区画数、ドワーフの住みかの段階 |
 | deaths.jsonl | `{t, k, cause, by, x, y}`。cause：eaten 食べられた / fight 打ち合い / starve 飢え / burned 焼けた / crushed 崩落 / petrified 石化 / killed 襲われた（ゾンビなど）/ dried 干からびた（スライム）/ faded ゴーストが消えた / planted マイコニドがキノコになった / other。by は手を下した種（なければ −1） |
 | births.jsonl | `{t, k, origin, x, y}`。origin：entrance 正面の入口 / mouth 地表の横穴 / fissure 地底の裂け目 / river 川の口 / shaft 天井の裂け目 / mana マナから / born 中で生まれた |
-| exits.jsonl | `{t, k, reason}`。starving 飢えて去った / returned 生還した冒険者 |
+| exits.jsonl | `{t, k, reason}`。starving 飢えて去った / returned 生還した冒険者 / home 満ちて巣へ帰った（ワイバーン） |
 | events.jsonl | ゲームの「記録」に出る出来事（`{k:番号}` は種の名前） |
 | checkpoint.json | ゲームの保存と同じ形。ブラウザの localStorage（キーは save.ts の KEY）に入れれば、その場面をゲームで開ける |
 

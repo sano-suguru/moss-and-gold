@@ -236,7 +236,7 @@ function writeSummary() {
     L.push(row('中で生まれた', (s) => s.born.get(k) ?? 0));
     L.push(row('去った：飢えて', (s) => ex(s, 'starving')));
     const otherReasons = [...new Set(sums.flatMap((s) => [...(s.exits.get(k)?.keys() ?? [])]))].filter((r) => r !== 'starving');
-    for (const r of otherReasons) L.push(row(`去った：${r === 'returned' ? '生還' : r}`, (s) => ex(s, r)));
+    for (const r of otherReasons) L.push(row(`去った：${r === 'returned' ? '生還' : r === 'home' ? '満ちて帰った' : r}`, (s) => ex(s, r)));
     L.push(row('死んだ：飢え', (s) => dc(s, 'starve')));
     L.push(row('死んだ：食べられた', (s) => dc(s, 'eaten')));
     L.push(row('死んだ：戦い', (s) => dc(s, 'fight')));
