@@ -91,6 +91,18 @@ export function rat(this: Ecology, c: Cr, day: number): void {
       if (noPath) c.gait = cur + 1;
       c.ref = 0;
     }
+    // 腹を空かせて目当てへ向かう途中でも、10歩に1回まわりを見直し、歩いて12マス以内に、目当てまでの残りの道のりより近い食べ物があれば替える
+    // （以前は目当てがまだ食べられる限り選び直さず、道のりの長い目当て（まっすぐなら近くても回り道）へ向かう途中で、
+    //  近くの苔やキノコの前を通っても気づかずに飢えていた。seed30 の19日目に飢え死にした19匹の多くは、死んだ所から道のり10マス以内に食べ物があった）
+    if (c.hungry > 0 && c.ref > 0 && this.step % 10 === c.id % 10) {
+      const goal = c.ref - 1;
+      const gp = this.paths.get(c.id);
+      const left = gp && gp.gk === goal && gp.path.length ? gp.path.length - gp.pi : Math.hypot(((goal % this.w.map.w) + 0.5) * TILE - c.x, (Math.floor(goal / this.w.map.w) + 0.5) * TILE - c.y) / TILE;
+      if (left > 4) {
+        const [t2, d2] = this.nearestEdibleD(c, 12);
+        if (t2 >= 0 && t2 !== goal && d2 + 2 < left) c.ref = t2 + 1;
+      }
+    }
     if (c.ref === 0 || (ih(c.id, this.step, 13) % 50 === 0 && !(c.hungry > 0 && cur >= 0 && Math.max(this.w.moss[cur], this.w.fungus[cur]) >= 20))) {
       // 腹を空かせていれば、歩いて12マス以内でいちばん近い食べられる苔かキノコを目当てにする
       // （いくつかの点を選んで調べるやり方では、まばらな苔を見落として、ずっと遠くの群落を目指して途中で飢えていた）
@@ -242,14 +254,26 @@ export function hungryRats(this: Ecology): number {
  */
 /** 歩いて max マス以内でいちばん近い、食べられる苔かキノコ（20以上）のマス（避けたい目当て gait は除く）。なければ -1 */
 export function nearestEdible(this: Ecology, c: Cr, max: number): number {
+  return this.nearestEdibleD(c, max)[0];
+}
+
+/** nearestEdible と同じマスと、そこまでの歩いた道のり（マス）。なければ [-1, -1] */
+export function nearestEdibleD(this: Ecology, c: Cr, max: number): [number, number] {
   const d = this.walkDist(this.tileOf(c.x, c.y), max);
+  const W = this.w.map.w;
+  // 避けたい目当て（おびえて逃げた目当て、道筋の見つからなかった目当て）は、まわり1マスも避ける
+  // （以前はそのマスだけを避けたので、ゴーストの居座る苔の群落で、隣のマスを目当てにしては近づいておびえる、を繰り返して飢えていた）
+  const ax = c.gait > 0 ? (c.gait - 1) % W : -9;
+  const ay = c.gait > 0 ? Math.floor((c.gait - 1) / W) : -9;
   let best = -1;
   for (let q = 0; q < d.length; q++) {
+    if (d[q] < 0 || Math.max(this.w.moss[q], this.w.fungus[q]) < 20) continue;
+    if (Math.abs((q % W) - ax) <= 1 && Math.abs(Math.floor(q / W) - ay) <= 1) continue;
     // 立てないマス（大ネズミにとっての深い水）の苔は選ばない
-    if (d[q] < 0 || q === c.gait - 1 || Math.max(this.w.moss[q], this.w.fungus[q]) < 20 || !this.tilePassable(c, q)) continue;
+    if (!this.tilePassable(c, q)) continue;
     if (best < 0 || d[q] < d[best]) best = q;
   }
-  return best;
+  return [best, best >= 0 ? d[best] : -1];
 }
 
 export function ratDisperse(this: Ecology, c: Cr): boolean {
@@ -318,8 +342,9 @@ declare module '../ecology' {
     burrowResidents: typeof burrowResidents;
     hungryRats: typeof hungryRats;
     nearestEdible: typeof nearestEdible;
+    nearestEdibleD: typeof nearestEdibleD;
     ratDisperse: typeof ratDisperse;
   }
 }
 
-Object.assign(Ecology.prototype, { rat, ratCap, ratFoodCap, burrowFood, relocateBurrow, burrowCap, burrowCapOf, burrowResidents, hungryRats, nearestEdible, ratDisperse });
+Object.assign(Ecology.prototype, { rat, ratCap, ratFoodCap, burrowFood, relocateBurrow, burrowCap, burrowCapOf, burrowResidents, hungryRats, nearestEdible, nearestEdibleD, ratDisperse });
