@@ -856,7 +856,11 @@ export class Ecology {
           const cross = dx * hy - dy * hx;
           const side = Math.abs(cross);
           if (!(ahead > 0 && ahead < gap && side < gap * 0.6)) return;
-          if (o.act === 1 && o.sleep <= 0) slow = ahead < gap * 0.5 ? 0.15 : 0.5;
+          // 前の仲間がこちらへ向かってくる（向きが逆）なら、列ではなくすれ違い：ゆるめずに脇へよける
+          // （以前は向かい合った二匹が互いにゆるめ合い、細い通路で押し戻し合って進めず、苔のそばで飢えていた）
+          const od = o.dir === 0 ? [0, 1] : o.dir === 1 ? [0, -1] : o.dir === 2 ? [1, 0] : [-1, 0];
+          const oncoming = od[0] * hx + od[1] * hy < -0.3;
+          if (o.act === 1 && o.sleep <= 0 && !oncoming) slow = ahead < gap * 0.5 ? 0.15 : 0.5;
           else sidestep = cross > 0 ? -1 : cross < 0 ? 1 : c.id % 2 ? 1 : -1;
         });
         if (sidestep) {
@@ -1007,9 +1011,11 @@ export class Ecology {
     const ty = Math.floor(y / TILE);
     let best = -1;
     let bd = R * R;
+    // 歩いてつながっていない洞窟の群落は選ばない（以前は、飢えた大ネズミが道筋の通らない遠くの群落を目指し続けて、そばの薄い苔に戻れなかった）
+    const r0 = this.regionOf(ty * m.w + tx);
     for (const k of this.forage) {
       const d = sq((k % m.w) - tx) + sq(Math.floor(k / m.w) - ty);
-      if (d < bd && k !== avoid && Math.max(this.w.moss[k], this.w.fungus[k]) > 40) {
+      if (d < bd && k !== avoid && Math.max(this.w.moss[k], this.w.fungus[k]) > 40 && (r0 < 0 || this.regionOf(k) === r0)) {
         bd = d;
         best = k;
       }
@@ -1698,6 +1704,12 @@ export class Ecology {
       this.tryMove(c, (dx / d) * s.speed * 1.4, (dy / d) * s.speed * 1.4);
       c.act = 1;
       c.st = 0;
+      // 目当ての苔へ向かう途中でおびえたら、その苔はあきらめて別の苔を探す
+      // （以前は、細い通路にいるゴーストやクモにおびえては同じ苔へ戻り、を繰り返して苔のそばで飢えていた）
+      if (c.ref > 0) {
+        c.gait = c.ref;
+        c.ref = 0;
+      }
       return;
     }
     // 群れで外へ出ていくところ
@@ -1751,13 +1763,19 @@ export class Ecology {
       }
       // 目指す苔が食べ尽くされていたら、すぐに選び直す。道筋が見つからなかった所は避ける
       const cur = c.ref - 1;
-      const noPath = this.paths.get(c.id)?.path.length === 0 && this.step - (this.paths.get(c.id)?.at ?? 0) < 4;
+      // 道筋の見つからなかった目当てはあきらめる（以前は、道筋を探した直後の4刻みしか見ておらず、その間ほかのことをしていると、
+      // 届かない目当てへまっすぐ歩いて壁に当たり続け、そばの苔に気づかずに飢えていた）
+      const pp = this.paths.get(c.id);
+      const noPath = !!pp && pp.path.length === 0 && cur >= 0 && pp.gk === cur;
       if (cur >= 0 && (Math.max(this.w.moss[cur], this.w.fungus[cur]) < 20 || noPath)) {
         if (noPath) c.gait = cur + 1;
         c.ref = 0;
       }
       if (c.ref === 0 || (ih(c.id, this.step, 13) % 50 === 0 && !(c.hungry > 0 && cur >= 0 && Math.max(this.w.moss[cur], this.w.fungus[cur]) >= 20))) {
-        let t = this.findMoss(c, c.x, c.y, 9, 200);
+        // 腹を空かせていれば、歩いて12マス以内でいちばん近い食べられる苔かキノコを目当てにする
+        // （いくつかの点を選んで調べるやり方では、まばらな苔を見落として、ずっと遠くの群落を目指して途中で飢えていた）
+        let t = c.hungry > 0 ? this.nearestEdible(c, 12) : -1;
+        if (t < 0) t = this.findMoss(c, c.x, c.y, 9, 200);
         if (t < 0) t = this.findMoss(c, c.hx, c.hy, 10, 230);
         // 近くになければ、土地勘から豊かな群落を目指す（腹が減るほど遠くまで）
         if (t < 0) t = this.nearestForage(c.x, c.y, 30 + Math.min(60, c.hungry / 10), c.gait - 1);
@@ -1902,9 +1920,29 @@ export class Ecology {
    * 開いた地表の横穴まで飢え死にする前に歩いて着ければ（道のり150マスまで）、巣穴の仲間のうち腹を空かせた者と連れ立って（数匹の群れで）外へ出ていく。
    * どちらもできなければ、今までどおり中で飢える
    */
+  /** 歩いて max マス以内でいちばん近い、食べられる苔かキノコ（20以上）のマス（避けたい目当て gait は除く）。なければ -1 */
+  private nearestEdible(c: Cr, max: number): number {
+    const d = this.walkDist(this.tileOf(c.x, c.y), max);
+    let best = -1;
+    for (let q = 0; q < d.length; q++) {
+      // 立てないマス（大ネズミにとっての深い水）の苔は選ばない
+      if (d[q] < 0 || q === c.gait - 1 || Math.max(this.w.moss[q], this.w.fungus[q]) < 20 || !this.tilePassable(c, q)) continue;
+      if (best < 0 || d[q] < d[best]) best = q;
+    }
+    return best;
+  }
+
   private ratDisperse(c: Cr): boolean {
     const m = this.w.map;
-    if (this.findMoss(c, c.x, c.y, 9, 201) >= 0 || this.findMoss(c, c.hx, c.hy, 10, 231) >= 0) return false;
+    // 出ていく途中で飢えが7割を越えたらあきらめる（st 8）ので、すでに越えている者は出ていこうとしない
+    // （以前は出ていこうとしては次の刻みにあきらめ、そのたびに目当ての苔を忘れて選び直し、苔のそばで行ったり来たりして飢えていた）
+    if (c.hungry > SPEC[Kind.Rat].starve * 0.7) return false;
+    // 歩いて10マス以内に食べられる苔かキノコがあれば出ていかない（いくつかの点を選んで調べるやり方では、まばらな苔を見落としていた）
+    {
+      const d = this.walkDist(this.tileOf(c.x, c.y), 10);
+      for (let q = 0; q < d.length; q++) if (d[q] >= 0 && Math.max(this.w.moss[q], this.w.fungus[q]) >= 20) return false;
+    }
+    if (this.findMoss(c, c.hx, c.hy, 10, 231) >= 0) return false;
     // まず中での引っ越しを試す（巣穴のまわりの苔が尽きていれば、苔の豊かな所へ群れごと移る）
     const b = this.burrows.find((o) => o.x === c.hx && o.y === c.hy);
     if (b && this.relocateBurrow(b)) {
@@ -1928,6 +1966,8 @@ export class Ecology {
         ey = my;
       }
     }
+    // 着ける口がなければ出ていかない（以前は口がなくても出ていく群れにして、目当てを忘れさせていた）
+    if (ex < 0) return false;
     const group: Cr[] = [c];
     this.nearby(c.x, c.y, 12, (o) => {
       if (group.length >= 5 || o === c || o.dead || o.away || o.k !== Kind.Rat || o.st === 8 || o.hx !== c.hx || o.hy !== c.hy) return;
@@ -2885,8 +2925,8 @@ export class Ecology {
       if (nd > 13 * TILE * 13 * TILE) continue;
       if (threat > mine * (bold ? 2 : 1.5)) {
         cp.hide = 1;
-        if (this.step - (this.lastLogged[994] ?? -99999) > 3000) {
-          this.lastLogged[994] = this.step;
+        if (this.step - (this.lastLogged[989] ?? -99999) > 3000) {
+          this.lastLogged[989] = this.step;
           this.log(cp.x, cp.y, a.k === Kind.Adventurer ? `{k:${Kind.Goblin}}たちが冒険者の気配に、集落のまわりの暗がりへ散って隠れた` : `{k:${Kind.Goblin}}たちが{k:${a.k}}の気配に、暗がりへ散って隠れた`);
         }
       } else if (party && cp.hide !== 2 && threat <= mine * (bold ? 1.3 : 1)) {
@@ -2897,8 +2937,8 @@ export class Ecology {
           c.lure = a.id;
           c.lureAt = this.step;
         }
-        if (this.step - (this.lastLogged[993] ?? -99999) > 3000) {
-          this.lastLogged[993] = this.step;
+        if (this.step - (this.lastLogged[988] ?? -99999) > 3000) {
+          this.lastLogged[988] = this.step;
           this.log(cp.x, cp.y, `{k:${Kind.Goblin}}たちが、近づく冒険者を暗がりで待ち伏せている`);
         }
       }
@@ -3037,15 +3077,14 @@ export class Ecology {
         if (c.st === 4) c.st = 0;
         return;
       }
-      if (c.st === 4 && c.food >= s.cap * 0.85) c.st = 0;
       // 腹いっぱいの者と、食べ残しを持っている者は、蓄えが足りなければ集落へ持ち帰る
-      if ((c.food > s.cap * 0.75 || c.units >= 6) && d2 < 30 * TILE * 30 * TILE && (camp.store ?? 0) < this.campStoreGoal(camp) && c.gold <= 0) {
+      if ((c.food > s.cap * 0.75 || (c.units >= 6 && c.st !== 4) || c.units >= 20) && d2 < 30 * TILE * 30 * TILE && (camp.store ?? 0) < this.campStoreGoal(camp) && c.gold <= 0) {
         c.act = 1;
         this.goTo(c, camp.x, camp.y, s.speed);
         return;
       }
       // 食べ物を集めに出る：蓄えが足りなければ、何匹かが交代で狩りと死骸あさりに出て、腹いっぱいにして帰る
-      if (c.st === 0 && !c.hungry && (camp.store ?? 0) < this.campStoreGoal(camp) && c.food < s.cap * 0.85 && ih(c.id, this.step >> 7, 77) % 3 === 0) c.st = 4;
+      if (c.st === 0 && !c.hungry && c.units === 0 && (camp.store ?? 0) < this.campStoreGoal(camp) && ih(c.id, this.step >> 7, 77) % 3 === 0) c.st = 4;
     }
     if ((!c.hungry || c.st === 4) && this.scavenge(c)) return;
     // 見つけた金貨を集落へ持ち帰って山にする
@@ -3086,29 +3125,39 @@ export class Ecology {
     if (c.hungry || c.st === 3 || c.st === 4) {
       // 狩りに出た者も、腹を空かせたら自分が食べるほうを先にする（苔とキノコも食べる）
       if (c.hungry) c.st = 3;
-      // 主な食べ物は狩り（大ネズミなど小さな獲物）と死骸あさり。長く食べていなければ、遠くまで探す
+      // 食べ物の主は、集落のまわりのキノコと苔（集めに出た者 st 4 が持ち帰って蓄えにする）。
+      // 近くに獲物がいれば狩り、死骸があれば拾う（足し）。長く食べていなければ、遠くまで探す
       const R = c.sinceMeal > 1200 ? 20 : c.sinceMeal > 600 ? 16 : 12;
-      if (this.hunt(c, R, HUNT0, s.speed * 1.15)) return;
-      if (this.goblinCarrion(c, R)) return;
-      // 狩りに出た者（st 4）は苔を食べない（蓄えにならない）：獲物を探して集落のまわりを歩く
+      if (this.hunt(c, c.st === 4 ? 8 : R, HUNT0, s.speed * 1.15)) return;
+      if (this.goblinCarrion(c, c.st === 4 ? 8 : R)) return;
+      // 集めに出た者（st 4）：集落のまわり（14マス、コボルトの縄張りの外）のキノコと苔を摘んで袋（units、20まで）に入れる。いっぱいになったら持ち帰る
       if (c.st === 4) {
-        if (!cp || c.sinceMeal > 900) {
+        const k = cp && c.units < 20 ? this.goblinForage(c, cp.x, cp.y, 14) : -1;
+        if (k < 0) {
           c.st = 0;
         } else {
-          const h = ih(c.id, this.step >> 8, 236);
-          const tx = cp.x + (((h & 255) % 33) - 16) * TILE;
-          const ty = cp.y + ((((h >>> 8) & 255) % 33) - 16) * TILE;
+          const m = this.w.map;
           c.act = 1;
-          if (!this.inKoboldLand(tx, ty) && this.passable(c, tx, ty)) this.goTo(c, tx, ty, s.speed);
-          else {
-            const j = DIR16[ih(c.id, this.step >> 4, 237) & 15];
-            this.tryMove(c, j[0] * s.speed * 0.5, j[1] * s.speed * 0.5);
+          if (this.goTo(c, (k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8, s.speed) || this.tileOf(c.x, c.y) === k) {
+            const tf = Math.min(4, this.w.fungus[k] - 12, 20 - c.units);
+            if (tf > 0) {
+              this.w.fungus[k] -= tf;
+              c.units += tf;
+            } else {
+              const tm = Math.min(4, this.w.moss[k] - 12, 20 - c.units);
+              if (tm > 0) {
+                this.w.moss[k] -= tm;
+                c.units += tm;
+              }
+            }
+            this.mossTouched = true;
+            c.act = 2;
+            if (c.actT > 4) c.actT = 0;
           }
           return;
         }
       }
-      // 目当ての苔は地上の約25秒（128刻み）ごとに選び直す（刻みごとに選び直すと、目当てが毎回変わって行ったり来たりし、食べられずに飢えていた）
-      // まわりを残らず調べ、近くて食べられる苔かキノコを選ぶ（いくつかの点を選んで調べるやり方では、まばらな群落を見落として、食べ物があるのに飢えていた）
+      // 腹を空かせた者は、その場で苔かキノコを食べる
       const kk = cp ? this.goblinForage(c, cp.x, cp.y, R) : (() => {
         const k = this.findMoss(c, c.x, c.y, R, 91, this.step >> 7);
         return k >= 0 ? k : this.findFungus(c.x, c.y, R, c.id);
@@ -3117,7 +3166,6 @@ export class Ecology {
         const m = this.w.map;
         c.act = 1;
         if (this.goTo(c, (kk % m.w) * TILE + 8, Math.floor(kk / m.w) * TILE + 8, s.speed) || this.tileOf(c.x, c.y) === kk) {
-          // 苔とキノコは足し程度：腹の4割まで食べたら、また狩りと死骸を探す
           let t = Math.min(4, this.w.fungus[kk] - 12, s.cap - c.food);
           if (t > 0) {
             this.w.fungus[kk] -= t;
@@ -3125,7 +3173,6 @@ export class Ecology {
             c.sinceMeal = 0;
             this.mossTouched = true;
           } else this.eatMoss(c, 4);
-          if (c.food >= s.cap * 0.4) c.st = 0;
         }
         return;
       }
@@ -7927,9 +7974,10 @@ export class Ecology {
       const founding = !this.camps.some((o) => o.id >= 0 && o.kind === 0);
       open = open.filter((i) => !this.dragonNearMouth(i) && (!founding || this.gobMouthOk[i] === 1));
     }
-    // 大ネズミは、まわり（道のり RAT_DOOR_REACH マス）で養える数に余裕のある口か天井の裂け目からだけ来る（横穴が開いたあとも、裂け目からも入り込む）
+    // 大ネズミは、まわり（道のり RAT_DOOR_REACH マス）で養える数に余裕のある口か天井の裂け目からだけ来る（裂け目からは、地表の横穴が一つも開いていない間だけ）
     if (k === Kind.Rat) {
-      const opts = [...open.filter((i) => this.ratMouthOk[i] === 1), ...(this.ratShaftOk.some((v) => v === 1) && this.crackSpot(Kind.Rat) ? [-2] : [])];
+      // 天井の割れ目は、地表の横穴が開くまでの序盤の入口（六巡目に戻した。四・五巡目は横穴が開いたあとも割れ目から来て、割れ目のそばで飢えていた）
+      const opts = [...open.filter((i) => this.ratMouthOk[i] === 1), ...(!open.length && this.ratShaftOk.some((v) => v === 1) && this.crackSpot(Kind.Rat) ? [-2] : [])];
       return opts.length ? opts[ih(this.step, salt, 196) % opts.length] : -3;
     }
     if (open.length) return open[ih(this.step, salt, 196) % open.length];

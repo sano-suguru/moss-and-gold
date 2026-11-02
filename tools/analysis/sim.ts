@@ -156,6 +156,7 @@ function sample() {
       warren: e.warrens.map((v) => v.id),
       colony: e.colonies.map((v) => v.id),
       camp: e.camps.filter((v) => v.kind === 0).map((v) => v.id),
+      campStore: e.camps.filter((v) => v.kind === 0 && v.id >= 0).map((v) => v.store ?? 0),
       village: e.camps.filter((v) => v.kind === 1).map((v) => v.id),
       orc: [...new Set(e.list.filter((c) => c.k === 13 && !c.dead && (c.hx || c.hy)).map((c) => `${c.hx},${c.hy}`))],
     },
