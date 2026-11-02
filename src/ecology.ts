@@ -3349,13 +3349,14 @@ export class Ecology {
   private orc(c: Cr): void {
     if (!c.hungry && c.act !== 2 && c.st < 5 && this.scavenge(c)) return;
     const s = SPEC[Kind.Orc];
-    if (this.leaveIfStarving(c)) return;
-    if (c.act === 2 && c.actT < 4) return;
-    // 貢ぎ物の取り立て（st 5：従う集落へ向かう、st 6：袋を担いで縄張りへ帰る）
+    // 貢ぎ物の取り立て（st 5：従う集落へ向かう、st 6：袋を担いで縄張りへ帰る）。飢えて去るより先に
     if (c.st === 5 || c.st === 6) {
+      if (c.act === 2 && c.actT < 4) return;
       this.collectTribute(c);
       return;
     }
+    if (this.leaveIfStarving(c)) return;
+    if (c.act === 2 && c.actT < 4) return;
     if (c.hungry) {
       if (this.hunt(c, 10, HUNT_ORC, s.speed * 1.2)) return;
       // 近くのコボルトの住処を襲いに行く（ゴブリンの集落は襲わない：従える相手）
@@ -3498,7 +3499,8 @@ export class Ecology {
         continue;
       }
       // 腹を空かせたオークも行く（腹を空かせているからこそ取り立てる。五巡目は腹ぺこのオークを送らず、取り立ての時が来ても縄張りのオークが皆腹ぺこで、ほとんど取り立てられなかった）
-      const o = this.list.find((x) => x.k === Kind.Orc && !x.dead && !x.away && x.hx === cp.lx && x.hy === cp.ly && x.st === 0 && x.flee <= 0 && x.units === 0);
+      // 飢えて去ろうとしている（st 9）オークも行く：貢ぎ物で腹を満たせば、去らずにとどまる
+      const o = this.list.find((x) => x.k === Kind.Orc && !x.dead && !x.away && x.hx === cp.lx && x.hy === cp.ly && (x.st === 0 || x.st === 9) && x.flee <= 0 && x.units === 0);
       if (!o) {
         cp.tribT = this.w.tick + 600;
         continue;
