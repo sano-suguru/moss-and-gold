@@ -55,6 +55,11 @@ export function pickDoor(this: Ecology, k: Kind, salt: number): number {
     if (quiet.length) open = quiet;
   }
   // ゴブリンも、集落がまだないときは、歩いて行ける範囲に集落の条件を満たし食べ物の足りる場所のある口からだけ来る
+  // オークは、歩いて行ける範囲に従えられるゴブリンの集落か十分な獲物のある口からだけ来る（七巡目）
+  if (k === Kind.Orc) {
+    open = open.filter((i) => this.orcMouthOk[i] === 1);
+    return open.length ? open[ih(this.step, salt, 196) % open.length] : -3;
+  }
   if (k === Kind.Goblin) {
     const founding = !this.camps.some((o) => o.id >= 0 && o.kind === 0);
     open = open.filter((i) => !this.dragonNearMouth(i) && (!founding || this.gobMouthOk[i] === 1));
@@ -266,7 +271,9 @@ export function arrivals(this: Ecology, day: number): void {
   if (this.canEnter(Kind.Orc) && settlements > 0 && n[Kind.Goblin] + n[Kind.Kobold] >= 8 && n[Kind.Orc] < Math.min(6, settlements * 3) && cool(Kind.Orc) && ih(this.step, 7, 71) % 30 === 0) {
     next();
     this.lastArrival[Kind.Orc] = this.step;
-    const home = this.pickLair();
+    door = this.pickDoor(Kind.Orc, Kind.Orc);
+    const tgt = this.orcTargetFrom(door);
+    const home = tgt ? this.pickLair(tgt) : -1;
     if (home >= 0) {
       const k = 2 + (ih(this.step, 8, 71) & 1);
       for (let i = 0; i < k; i++) {

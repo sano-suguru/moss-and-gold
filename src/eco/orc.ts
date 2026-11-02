@@ -5,11 +5,11 @@ import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
 
-export function pickLair(this: Ecology): number {
+export function pickLair(this: Ecology, near?: { x: number; y: number }): number {
   const m = this.w.map;
   const targets = [...this.camps.filter((o) => o.kind === 0), ...this.warrens];
-  if (!targets.length) return -1;
-  const t = targets[ih(this.step, 1, 95) % targets.length];
+  if (!near && !targets.length) return -1;
+  const t = near ?? targets[ih(this.step, 1, 95) % targets.length];
   for (let i = 0; i < 80; i++) {
     const h = ih(this.step, i, 96);
     const x = Math.floor(t.x / TILE) + ((h & 63) % 41) - 20;
@@ -33,6 +33,8 @@ export function orc(this: Ecology, c: Cr): void {
     this.collectTribute(c);
     return;
   }
+  // 腹を空かせたら（腹の半分を切ったら）、従う集落へ取り立てに行く（七巡目：決まった間隔ではなく、腹に合わせて）。飢えて去る途中（st 9）でも行く
+  if ((c.st === 0 || c.st === 9) && this.step % 10 === c.id % 10 && this.goCollect(c)) return;
   if (this.leaveIfStarving(c)) return;
   if (c.act === 2 && c.actT < 4) return;
   if (c.hungry) {
@@ -99,7 +101,7 @@ export function guardVassals(this: Ecology, c: Cr): boolean {
   return false;
 }
 
-/** 貢ぎ物の取り立て：従う集落へ行き、蓄えの3割を袋に詰めて（units）縄張りへ持ち帰り、食べる */
+/** 貢ぎ物の取り立て：従う集落へ行き、要る分（蓄えの半分まで）を袋に詰めて（units）縄張りへ持ち帰り、食べる */
 export function collectTribute(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Orc];
   c.act = 1;
@@ -111,7 +113,14 @@ export function collectTribute(this: Ecology, c: Cr): void {
       return;
     }
     if (sq(cp.x - c.x) + sq(cp.y - c.y) < 1.5 * TILE * 1.5 * TILE || this.goTo(c, cp.x, cp.y, s.speed)) {
-      const amt = Math.floor((cp.store ?? 0) * 0.3);
+      // 取り立てる量：そのオークが腹を満たすのに要る分を目安に、蓄えの半分まで（七巡目。六巡目は蓄えの3割で、1回あたり約50だった）
+      const amt = Math.max(0, Math.min(s.cap - c.food, Math.floor((cp.store ?? 0) / 2)));
+      if (amt <= 0) {
+        // 着いたら蓄えが空だった（またはもう腹が満ちていた）：取り立てずに戻る
+        c.st = 0;
+        c.ref = 0;
+        return;
+      }
       cp.store = (cp.store ?? 0) - amt;
       c.units += amt;
       c.st = 6;
@@ -139,7 +148,7 @@ export function collectTribute(this: Ecology, c: Cr): void {
 
 /**
  * 従う集落：オークの縄張り（寝床）から20マス以内のゴブリンの集落は、いちばん近い縄張りのオークに従う。
- * 地上の約1日ごとに、そのオークのうち一匹が来て、蓄えの3割を取り立てる
+ * そのオークは、腹を空かせたら取り立てに来る（goCollect。同じ集落へは地上の1/3日あける）
  */
 export function updateVassals(this: Ecology): void {
   for (const cp of this.camps) {
@@ -160,7 +169,7 @@ export function updateVassals(this: Ecology): void {
       cp.lx = lx;
       cp.ly = ly;
       if (lx || ly) {
-        cp.tribT = this.w.tick + DAY_TICKS_ECO / 2 + (ih(cp.id, this.step, 234) % (DAY_TICKS_ECO / 2));
+        cp.tribT = this.w.tick + Math.floor(DAY_TICKS_ECO / 3);
         this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'vassal', x: Math.round(cp.x), y: Math.round(cp.y) } as never);
         this.log(cp.x, cp.y, `{k:${Kind.Goblin}}の集落が、近くに縄張りを持つ{k:${Kind.Orc}}に従った`);
       }
@@ -168,25 +177,62 @@ export function updateVassals(this: Ecology): void {
   }
 }
 
-/** 取り立ての時が来た集落へ、縄張りのオークを一匹送る */
-export function sendCollectors(this: Ecology): void {
-  for (const cp of this.camps) {
-    if (cp.id < 0 || cp.kind !== 0 || !(cp.lx || cp.ly) || this.w.tick < (cp.tribT ?? 0)) continue;
-    if ((cp.store ?? 0) < 10) {
-      cp.tribT = this.w.tick + 600;
-      continue;
+/**
+ * 腹を空かせたオーク c を、従う集落のうち、取り立てから地上の1/3日たち蓄えのあるいちばん近い所へ送る（七巡目）。
+ * 送ったら true（同じ集落へは tribT まで行かない）
+ */
+export function goCollect(this: Ecology, c: Cr): boolean {
+  const s = SPEC[Kind.Orc];
+  if (c.food >= s.cap * 0.5 || c.flee > 0 || c.units > 0) return false;
+  let best: Camp | null = null;
+  let bd = 1e18;
+  for (const cp of this.vassalsOf(c)) {
+    if (this.w.tick < (cp.tribT ?? 0) || (cp.store ?? 0) < 10) continue;
+    const d = sq(cp.x - c.x) + sq(cp.y - c.y);
+    if (d < bd) {
+      bd = d;
+      best = cp;
     }
-    // 腹を空かせたオークも行く（腹を空かせているからこそ取り立てる。五巡目は腹ぺこのオークを送らず、取り立ての時が来ても縄張りのオークが皆腹ぺこで、ほとんど取り立てられなかった）
-    // 飢えて去ろうとしている（st 9）オークも行く：貢ぎ物で腹を満たせば、去らずにとどまる
-    const o = this.list.find((x) => x.k === Kind.Orc && !x.dead && !x.away && x.hx === cp.lx && x.hy === cp.ly && (x.st === 0 || x.st === 9) && x.flee <= 0 && x.units === 0);
-    if (!o) {
-      cp.tribT = this.w.tick + 600;
-      continue;
-    }
-    o.st = 5;
-    o.ref = cp.id;
-    cp.tribT = this.w.tick + Math.floor(DAY_TICKS_ECO * 0.8) + (ih(cp.id, this.step, 235) % Math.floor(DAY_TICKS_ECO * 0.4));
   }
+  if (!best) return false;
+  c.st = 5;
+  c.ref = best.id;
+  best.tribT = this.w.tick + Math.floor(DAY_TICKS_ECO / 3);
+  return true;
+}
+
+/**
+ * オークが来られる口（七巡目）：開いた地表の横穴から歩いて ORC_REACH マス以内に、まだ誰にも従っていないゴブリンの集落があるか、
+ * 獲物（大ネズミ・大トカゲ・コボルト。いるオーク1匹あたり4匹を差し引く）が ORC_MIN_PREY 以上いれば 1
+ */
+export function checkOrcMouths(this: Ecology): void {
+  const m = this.w.map;
+  this.orcMouthOk = m.mouths.map((mo, i) => {
+    if (mo.kind !== 0 || !this.mouthOpen(i)) return 0;
+    const d = this.walkDist(this.tileOf(...this.mouthSpot(i)), Ecology.ORC_REACH);
+    if (this.camps.some((o) => o.id >= 0 && o.kind === 0 && !(o.lx || o.ly) && d[this.tileOf(o.x, o.y)] >= 0)) return 1;
+    // 獲物は、オークが実際に食べてゆける大ネズミ・大トカゲ・コボルト（アリ、冒険者、ドワーフは数えない）。すでにいるオーク1匹あたり4匹を差し引く
+    let prey = 0;
+    let orcs = 0;
+    for (const o of this.list) {
+      if (o.dead || o.away || d[this.tileOf(o.x, o.y)] < 0) continue;
+      if (o.k === Kind.Rat || o.k === Kind.Lizard || o.k === Kind.Kobold) prey++;
+      else if (o.k === Kind.Orc) orcs++;
+    }
+    return prey - 4 * orcs >= Ecology.ORC_MIN_PREY ? 1 : 0;
+  });
+}
+
+/** 口 door から歩いて行ける、まだ従っていないゴブリンの集落（なければ歩いて行ける集落か住処。なければ null）：来たオークが縄張りを持つ目当て */
+export function orcTargetFrom(this: Ecology, door: number): { x: number; y: number } | null {
+  if (door < 0) return null;
+  const d = this.walkDist(this.tileOf(...this.mouthSpot(door)), Ecology.ORC_REACH);
+  const ok = (o: { x: number; y: number }) => d[this.tileOf(o.x, o.y)] >= 0;
+  const free = this.camps.filter((o) => o.id >= 0 && o.kind === 0 && !(o.lx || o.ly) && ok(o));
+  if (free.length) return free[ih(this.step, 3, 95) % free.length];
+  const any = [...this.camps.filter((o) => o.id >= 0 && o.kind === 0 && ok(o)), ...this.warrens.filter((o) => o.id >= 0 && ok(o))];
+  if (any.length) return any[ih(this.step, 4, 95) % any.length];
+  return null;
 }
 
 declare module '../ecology' {
@@ -197,8 +243,10 @@ declare module '../ecology' {
     guardVassals: typeof guardVassals;
     collectTribute: typeof collectTribute;
     updateVassals: typeof updateVassals;
-    sendCollectors: typeof sendCollectors;
+    goCollect: typeof goCollect;
+    checkOrcMouths: typeof checkOrcMouths;
+    orcTargetFrom: typeof orcTargetFrom;
   }
 }
 
-Object.assign(Ecology.prototype, { pickLair, orc, vassalsOf, guardVassals, collectTribute, updateVassals, sendCollectors });
+Object.assign(Ecology.prototype, { pickLair, orc, vassalsOf, guardVassals, collectTribute, updateVassals, goCollect, checkOrcMouths, orcTargetFrom });
