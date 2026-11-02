@@ -1,0 +1,10 @@
+import { World, DAY_TICKS } from '../src/world';
+const w = new World('かしたれ'); const E = w.eco as any;
+const timers: Record<string, number> = {}; const cnt: Record<string, number> = {};
+const wrap = (obj: any, name: string) => { const f = obj[name].bind(obj); obj[name] = (...a: any[]) => { const t = performance.now(); const r = f(...a); timers[name] = (timers[name] ?? 0) + performance.now() - t; cnt[name] = (cnt[name] ?? 0) + 1; return r; }; };
+for (const n of ['pester', 'feeding', 'advInteract', 'adventurer', 'personalSpace', 'buildLitMap', 'checkJoined', 'regionOf', 'syncLongSleep', 'wakeByNoise', 'breed', 'updateDigging', 'arrivals', 'spawnSlimes', 'updateForage', 'updatePresenceBase', 'isSentry', 'groupKey', 'tryMove', 'goTo', 'findPath', 'tendGroups', 'canSense', 'buildLitMap', 'lurk', 'fearFire', 'fires', 'shyOfPeople', 'personalSpace', 'buildGroups', 'doSleep', 'heedAlarm', 'territory', 'hear', 'hunt', 'lightSources', 'presenceAt', 'updatePresenceTrace', 'woundsAndFlight']) wrap(E, n);
+wrap(w, 'mossStep'); wrap(w as any, 'computeMoist');
+const t0 = performance.now();
+for (let i = 0; i < DAY_TICKS * 3; i++) w.step();
+console.log('1日', ((performance.now() - t0) / 1000).toFixed(1));
+for (const [k, v] of Object.entries(timers).sort((a, b) => b[1] - a[1])) console.log(k, (v / 1000).toFixed(2), cnt[k]);

@@ -1,0 +1,23 @@
+{
+  "name": "moss-and-gold",
+  "version": "0.13.12",
+  "description": "Moss & Gold — A Living Dungeon Sim（苔と金貨）：見下ろし2Dのダンジョン生態系シミュレーション（段階13）",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc -p .",
+    "test": "esbuild test/determinism.ts --bundle --platform=node --outfile=build/test.js --log-level=warning && node build/test.js",
+    "export-sprites": "esbuild tools/export-sprites.ts --bundle --platform=node --outfile=build/export.js --log-level=warning && node build/export.js",
+    "sim": "esbuild tools/analysis/sim.ts --bundle --platform=node --outfile=build/sim.js --log-level=warning && node build/sim.js",
+    "report": "esbuild tools/analysis/report.ts --bundle --platform=node --outfile=build/report.js --log-level=warning && node build/report.js",
+    "gallery": "node build.mjs && esbuild tools/gallery/scenes.ts --bundle --platform=node --outfile=build/scenes.js --log-level=warning && node build/scenes.js && python3 tools/gallery/shoot.py"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "esbuild": "^0.21.5",
+    "typescript": "^5.4.5"
+  },
+  "private": true
+}

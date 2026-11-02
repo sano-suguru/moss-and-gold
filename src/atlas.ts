@@ -1,0 +1,565 @@
+import { adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, fireSpirit, phantomKnight, crownS, chiefHelm, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat } from './sprites';
+
+/** 種の並び（シミュレーションの Kind と同じ順） */
+export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
+export const DIRS = ['down', 'up', 'side'] as const;
+export const ACTS = ['idle', 'move', 'attack', 'death'] as const;
+
+export interface FrameInfo {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  ax: number;
+  ay: number;
+}
+
+interface RawFrame {
+  W: number;
+  H: number;
+  px: Uint8ClampedArray;
+  mat: (string | null)[];
+  ax: number;
+  ay: number;
+}
+
+export interface Atlas {
+  width: number;
+  height: number;
+  /** RGBA。アルファは 255 = 体、254 = 輪郭など、253 = それ自体が光る（ウィスプ）、252 = 光を帯びたときに光る模様、251 = ゴースト（暗闇でもかすかに見える） */
+  data: Uint8Array;
+  frames: FrameInfo[];
+  /** 種・向き・動作・コマ（ウィスプは明るさの段階も）からコマ番号を引く */
+  index: (species: number, dir: number, act: number, f: number, bright?: number) => number;
+  web: number;
+  burrow: number;
+  anthill: number;
+  /** 宝の山（大きさ 0..2、きらめきのコマ） */
+  treasure: (size: number, f: number) => number;
+  wormSeg: (kind: number) => number;
+  /** ドラゴンの炎の柱（down = 正面向き） */
+  breath: (down: boolean, f: number) => number;
+  /** 床に落ちた道具（ItemKind の順） */
+  item: (kind: number, f: number) => number;
+  dust: (f: number) => number;
+  forge: (f: number) => number;
+  campfire: (f: number) => number;
+  /** 眠り：Z / z / eye（半分だけ眠る片目）/ dragon / bat / worm / bed-職業 */
+  sleep: (key: string, f: number) => number;
+  /** 見た目の粒：0 塵、1 火の粉、2 胞子、3 しずく。f は消えていく段 */
+  speck: (kind: number, f: number) => number;
+  /** 生き物のまわりの淡い暈（0 小、1 中、2 大） */
+  halo: (z: number) => number;
+  /** 幼竜が生まれた場所に残る卵の殻 */
+  eggShell: () => number;
+  /** 大ネズミの王の冠、ゴブリンの頭の角兜 */
+  crown: () => number;
+  chiefHelm: () => number;
+  /** 攻撃の演出の部品（'arc:大きさ:色:段'、'arrow:向き' など） */
+  fx: (key: string) => number;
+  /** 気づいた印（'!' か '?'） */
+  mark: (k: string) => number;
+  /** 当たった印（0〜2） */
+  slash: (f: number) => number;
+  /** 宝：tier 0〜4、owner は '' / vault / goblin / dwarf / dragon */
+  hoard: (tier: number, owner: string, f: number) => number;
+  /** 外とつながる口と卵：day / night（横穴の外）、fissure、mote、inlet、sac（クモの卵嚢）、clutch（トカゲの卵） */
+  mouth: (key: string, f: number) => number;
+  blood: (c: number, v: number) => number;
+  lamp: (f: number) => number;
+  camp: number;
+  hut: number;
+  /** 段階4以降の生き物（名前、向き、動作、コマ、段階）からコマ番号を引く */
+  named: (name: string, dir: number, act: number, f: number, v?: number) => number;
+  /** 死骸（種の番号と段階 0 新しい、1 腐りかけ、2 骨） */
+  corpse: (species: number, stage: number) => number;
+}
+
+const GEN = [
+  (d: string, a: string, f: number, b: number) => wisp(d, a, f, b ? 1 : 0.2),
+  (d: string, a: string, f: number) => bat(d, a, f),
+  (d: string, a: string, f: number) => rat(d, a, f),
+  (d: string, a: string, f: number) => lizard(d, a, f),
+  (d: string, a: string, f: number) => spider(d, a, f),
+];
+
+function makeWeb(): RawFrame {
+  const W = 35;
+  const H = 35;
+  const px = new Uint8ClampedArray(W * H * 4);
+  const mat: (string | null)[] = new Array(W * H).fill(null);
+  const c = 17;
+  const put = (x: number, y: number) => {
+    x = Math.round(x);
+    y = Math.round(y);
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    const p = y * W + x;
+    px[p * 4] = 206;
+    px[p * 4 + 1] = 212;
+    px[p * 4 + 2] = 224;
+    px[p * 4 + 3] = 255;
+    mat[p] = 'ol';
+  };
+  const line = (x0: number, y0: number, x1: number, y1: number) => {
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+    for (let i = 0; i <= n; i++) put(x0 + ((x1 - x0) * i) / n, y0 + ((y1 - y0) * i) / n);
+  };
+  const N = 9;
+  const pts = (r: number) => [...Array(N)].map((_, i) => [c + Math.cos((i / N) * 6.283 + 0.2) * r * 1.0, c + Math.sin((i / N) * 6.283 + 0.2) * r * 0.85]);
+  const outer = pts(16);
+  outer.forEach(([x, y]) => line(c, c, x, y));
+  for (const r of [4, 7.5, 11, 14.5]) {
+    const p = pts(r);
+    for (let i = 0; i < N; i++) line(p[i][0], p[i][1], p[(i + 1) % N][0], p[(i + 1) % N][1]);
+  }
+  return { W, H, px, mat, ax: c, ay: c };
+}
+
+function makeBurrow(): RawFrame {
+  const W = 14;
+  const H = 8;
+  const px = new Uint8ClampedArray(W * H * 4);
+  const mat: (string | null)[] = new Array(W * H).fill(null);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const nx = (x + 0.5 - 7) / 6.5;
+      const ny = (y + 0.5 - 4.5) / 3.4;
+      const d = nx * nx + ny * ny;
+      if (d > 1) continue;
+      const p = y * W + x;
+      const rim = d > 0.55;
+      const col = rim ? (ny < 0 ? [92, 78, 70] : [60, 50, 46]) : [12, 9, 12];
+      px[p * 4] = col[0];
+      px[p * 4 + 1] = col[1];
+      px[p * 4 + 2] = col[2];
+      px[p * 4 + 3] = 255;
+      mat[p] = 'ol';
+    }
+  return { W, H, px, mat, ax: 7, ay: 6 };
+}
+
+export function buildAtlas(): Atlas {
+  const raws: RawFrame[] = [];
+  // 骨の竜のための塗り替え（赤みの強い色を、明るさに応じて骨の段へ）
+  const bone = [[52, 48, 44], [104, 98, 86], [156, 150, 134], [204, 198, 180], [236, 232, 214]];
+  const recolor = (fr: RawFrame): RawFrame => {
+      const px = new Uint8ClampedArray(fr.px);
+      for (let i = 0; i < px.length; i += 4) {
+        if (!px[i + 3]) continue;
+        const r = px[i];
+        const g = px[i + 1];
+        const b = px[i + 2];
+        if (r > g + 12 && r > b + 6) {
+          const lum = (r + g + b) / 3;
+          const c = bone[Math.min(4, Math.floor(lum / 34))];
+          px[i] = c[0];
+          px[i + 1] = c[1];
+          px[i + 2] = c[2];
+        }
+      }
+      return { ...fr, px };
+    };
+
+  const keyIndex = new Map<string, number>();
+  for (let s = 0; s < SPECIES.length; s++)
+    for (let d = 0; d < DIRS.length; d++)
+      for (let a = 0; a < ACTS.length; a++)
+        for (let f = 0; f < 4; f++)
+          for (let b = 0; b < (s === 0 ? 2 : 1); b++) {
+            keyIndex.set(`${s},${d},${a},${f},${b}`, raws.length);
+            raws.push(GEN[s](DIRS[d], ACTS[a], f, b) as RawFrame);
+          }
+  const named = new Map<string, number>();
+  const NAMED: [string, number, (d: string, a: string, f: number, v: number) => RawFrame][] = [
+    ['zrat', 1, (d, a, f) => zrat(d, a, f) as RawFrame],
+    ['zlizard', 1, (d, a, f) => zlizard(d, a, f) as RawFrame],
+    ['slime', 3, (d, a, f, v) => slime(d, a, f, [0.55, 0.78, 1][v]) as RawFrame],
+    ['ghost', 1, (d, a, f) => ghost(d, a, f) as RawFrame],
+    ['myconid', 1, (d, a, f) => myconid(d, a, f) as RawFrame],
+    ['ant', 2, (d, a, f, v) => ant(d, a, f, v === 1) as RawFrame],
+    ['kobold', 1, (d, a, f) => kobold(d, a, f) as RawFrame],
+    ['salamander', 1, (d, a, f) => salamander(d, a, f) as RawFrame],
+    ['goblin', 3, (d, a, f, v) => goblin(d, a, f, v) as RawFrame],
+    ['orc', 2, (d, a, f, v) => orc(d, a, f, v) as RawFrame],
+    ['lizardman', 1, (d, a, f) => lizardman(d, a, f) as RawFrame],
+    ['minotaur', 1, (d, a, f) => minotaur(d, a, f) as RawFrame],
+    ['troll', 1, (d, a, f) => troll(d, a, f) as RawFrame],
+    ['basilisk', 1, (d, a, f) => basilisk(d, a, f) as RawFrame],
+    ['gargoyle', 1, (d, a, f) => gargoyle(d, a, f) as RawFrame],
+    ['vampire', 1, (d, a, f) => vampire(d, a, f) as RawFrame],
+    ['golem', 1, (d, a, f) => golem(d, a, f) as RawFrame],
+    ['mimic', 1, (d, a, f) => mimic(d, a, f) as RawFrame],
+    ['worm', 1, (d, a, f) => wormHead(d, a, f) as RawFrame],
+    ['wyvern', 1, (d, a, f) => wyvern(d, a, f) as RawFrame],
+    // 冒険者：v = 職業×2 + 松明を持つか
+    ['adv', 8, (d, a, f, v) => adventurer(['warrior', 'wizard', 'thief', 'priest'][v >> 1], d, a, f, (v & 1) === 1) as RawFrame],
+    ['adv2', 3, (d, a, f, v) => adventurer2(['bard', 'hunter', 'slayer'][v], d, a, f, false) as RawFrame],
+    // スケルトン：v = 0 素手、1 戦士、2 盗賊、3 僧侶、4 狩人、5 吟遊詩人、6 竜殺しの装備
+    ['skel', 7, (d, a, f, v) => skeleton(['none', 'warrior', 'thief', 'priest', 'hunter', 'bard', 'slayer'][v], d, a, f) as RawFrame],
+    ['lich', 1, (d, a, f) => lich(d, a, f) as RawFrame],
+    ['pup', 1, (d, a, f) => ratPup(d, a, f) as RawFrame],
+    // ドワーフ：v = 0 坑夫、1 鍛冶屋、2 戦士
+    ['dwarf', 3, (d, a, f, v) => dwarf(['miner', 'smith', 'warrior'][v], d, a, f) as RawFrame],
+  ];
+  for (const [name, nv, gen] of NAMED)
+    for (let d = 0; d < DIRS.length; d++)
+      for (let a = 0; a < ACTS.length; a++)
+        for (let f = 0; f < 4; f++)
+          for (let v = 0; v < nv; v++) {
+            named.set(`${name},${d},${a},${f},${v}`, raws.length);
+            raws.push(gen(DIRS[d], ACTS[a], f, v));
+          }
+  // ドラゴン：眠り（向きなし）、やられ（向きなし）、歩く・炎を吐く・飛ぶ（向きあり）。v=1 は飛ぶ姿
+  for (let f = 0; f < 4; f++) {
+    const idle = raws.length;
+    raws.push(dragon('side', 'idle', f) as RawFrame);
+    const death = raws.length;
+    raws.push(dragon('side', 'death', f) as RawFrame);
+    for (let d = 0; d < DIRS.length; d++) {
+      named.set(`dragon,${d},0,${f},0`, idle);
+      named.set(`dragon,${d},0,${f},1`, idle);
+      named.set(`dragon,${d},3,${f},0`, death);
+      named.set(`dragon,${d},3,${f},1`, death);
+    }
+  }
+  for (let d = 0; d < DIRS.length; d++)
+    for (let f = 0; f < 4; f++) {
+      for (const [a, act] of [[1, 'move'], [2, 'attack']] as [number, string][]) {
+        named.set(`dragon,${d},${a},${f},0`, raws.length);
+        raws.push(dragon(DIRS[d], act, f) as RawFrame);
+      }
+      named.set(`dragon,${d},1,${f},1`, raws.length);
+      named.set(`dragon,${d},2,${f},1`, raws.length);
+      raws.push(dragon(DIRS[d], 'fly', f) as RawFrame);
+    }
+  // 幼竜と若い竜：成竜の絵を、ドット絵らしさを保つ縮め方で縮める（小さくした一画素ごとに、もとの絵で一番多い色を選ぶ。縁取りの暗い色は残しやすく）
+  const shrink = (fr: RawFrame, sc: number): RawFrame => {
+    const W = Math.max(1, Math.round(fr.W * sc));
+    const H = Math.max(1, Math.round(fr.H * sc));
+    const px = new Uint8ClampedArray(W * H * 4);
+    const mat: (string | null)[] = new Array(W * H).fill(null);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const x0 = Math.floor(x / sc);
+        const x1 = Math.max(x0 + 1, Math.floor((x + 1) / sc));
+        const y0 = Math.floor(y / sc);
+        const y1 = Math.max(y0 + 1, Math.floor((y + 1) / sc));
+        const votes = new Map<number, number>();
+        const matOf = new Map<number, string | null>();
+        let opaque = 0;
+        let total = 0;
+        for (let yy = y0; yy < Math.min(fr.H, y1); yy++)
+          for (let xx = x0; xx < Math.min(fr.W, x1); xx++) {
+            total++;
+            const p = (yy * fr.W + xx) * 4;
+            if (!fr.px[p + 3]) continue;
+            opaque++;
+            const key = (fr.px[p] << 16) | (fr.px[p + 1] << 8) | fr.px[p + 2];
+            const lum = fr.px[p] + fr.px[p + 1] + fr.px[p + 2];
+            votes.set(key, (votes.get(key) ?? 0) + (lum < 120 ? 1.4 : 1));
+            if (!matOf.has(key)) matOf.set(key, fr.mat[yy * fr.W + xx]);
+          }
+        if (opaque * 2 < total) continue;
+        let best = 0;
+        let bv = -1;
+        for (const [k, v] of votes) if (v > bv) {
+          bv = v;
+          best = k;
+        }
+        const q = (y * W + x) * 4;
+        px[q] = best >> 16;
+        px[q + 1] = (best >> 8) & 255;
+        px[q + 2] = best & 255;
+        px[q + 3] = 255;
+        mat[y * W + x] = matOf.get(best) ?? null;
+      }
+    return { W, H, px, mat, ax: Math.round(fr.ax * sc), ay: Math.round(fr.ay * sc) } as RawFrame;
+  };
+  // 骨の竜：成竜の絵の鱗の色を、骨の色に塗り替える（赤みの強い色を明るさに応じて骨の段へ。光る目は青白く）
+  {
+    const cache = new Map<number, number>();
+    for (const [key, idx] of [...named]) {
+      if (!key.startsWith('dragon,')) continue;
+      if (!cache.has(idx)) {
+        cache.set(idx, raws.length);
+        raws.push(recolor(raws[idx]));
+      }
+      named.set(key.replace('dragon,', 'dragonB,'), cache.get(idx) as number);
+    }
+  }
+  // 幼竜と若い竜：描き起こした姿（どの向きも横向きの絵を使う。左向きは描くときに反転）
+  for (const [nm, stg] of [['dragonH', 0], ['dragonY', 1]] as [string, number][])
+    for (let f = 0; f < 4; f++) {
+      const fr: Record<string, number> = {};
+      for (const act of ['idle', 'move', 'attack', 'death', 'fly']) {
+        fr[act] = raws.length;
+        raws.push(dragonling(stg, act, f) as RawFrame);
+      }
+      for (let d = 0; d < DIRS.length; d++) {
+        named.set(`${nm},${d},0,${f},0`, fr.idle);
+        named.set(`${nm},${d},0,${f},1`, fr.idle);
+        named.set(`${nm},${d},1,${f},0`, fr.move);
+        named.set(`${nm},${d},1,${f},1`, stg === 1 ? fr.fly : fr.move);
+        named.set(`${nm},${d},2,${f},0`, fr.attack);
+        named.set(`${nm},${d},2,${f},1`, stg === 1 ? fr.fly : fr.attack);
+        named.set(`${nm},${d},3,${f},0`, fr.death);
+        named.set(`${nm},${d},3,${f},1`, fr.death);
+      }
+    }
+  const eggShellFrame = raws.length;
+  raws.push(eggShell(0) as RawFrame);
+  // 特別な個体：火の精と亡霊の騎士（どの向きも同じ絵。左向きは反転）、冠と角兜
+  for (const [nm, gen] of [['firespirit', fireSpirit], ['pknight', phantomKnight], ['wspirit', waterSpirit], ['lspirit', (_a: string, f: number) => lightSpirit(f)], ['mlord', mushroomLord]] as [string, (a: string, f: number) => unknown][])
+    for (let f = 0; f < 4; f++) {
+      const idle = raws.length;
+      raws.push(gen('idle', f) as RawFrame);
+      const atk = raws.length;
+      raws.push(gen('attack', f) as RawFrame);
+      for (let d = 0; d < DIRS.length; d++)
+        for (let a = 0; a < 4; a++)
+          for (let v = 0; v < 2; v++) named.set(`${nm},${d},${a},${f},${v}`, a === 2 ? atk : idle);
+    }
+  const crownFrame = raws.length;
+  raws.push(crownS() as RawFrame);
+  const helmFrame = raws.length;
+  raws.push(chiefHelm() as RawFrame);
+  // ドラゴンの炎の柱（横向きと正面）
+  const breathFrames: number[] = [];
+  for (let f = 0; f < 4; f++) {
+    breathFrames.push(raws.length);
+    raws.push(fireBreath('side', f, 38, true) as RawFrame);
+  }
+  for (let f = 0; f < 4; f++) {
+    breathFrames.push(raws.length);
+    raws.push(fireBreath('down', f, 42, true) as RawFrame);
+  }
+  // 床に落ちた道具
+  const itemFrames: number[] = [];
+  for (const kd of ['torch', 'stub', 'sword', 'shield', 'staff', 'mace', 'dagger', 'symbol', 'lute', 'bow', 'greatsword'])
+    for (let f = 0; f < 4; f++) {
+      itemFrames.push(raws.length);
+      raws.push(item(kd, f) as RawFrame);
+    }
+  const bloodFrames: number[] = [];
+  for (let c = 0; c < 4; c++)
+    for (let v = 0; v < 4; v++) {
+      bloodFrames.push(raws.length);
+      raws.push(blood(c, v) as RawFrame);
+    }
+  const mouthFrames: Record<string, number[]> = { gateDay: [], gateNight: [], day: [], night: [], dayTop: [], nightTop: [], fissure: [], mote: [], inlet: [], sac: [], clutch: [] };
+  for (let f = 0; f < 4; f++) {
+    const push = (key: string, fr: RawFrame) => {
+      mouthFrames[key].push(raws.length);
+      raws.push(fr);
+    };
+    push('day', outside(0, f) as RawFrame);
+    push('night', outside(1, f) as RawFrame);
+    push('dayTop', outsideTop(0, f) as RawFrame);
+    push('gateDay', gate(0, f) as RawFrame);
+    push('gateNight', gate(1, f) as RawFrame);
+    push('nightTop', outsideTop(1, f) as RawFrame);
+    push('fissure', fissure(f) as RawFrame);
+    push('mote', mote(f) as RawFrame);
+    push('inlet', inlet(f) as RawFrame);
+    push('sac', eggSac(f) as RawFrame);
+    push('clutch', clutch(f) as RawFrame);
+  }
+  // 宝（五段階×持ち主×きらめき2コマ）
+  const hoardFrames: Record<string, number> = {};
+  for (const o of ['', 'vault', 'goblin', 'dwarf', 'dragon'])
+    for (let t = 0; t < 5; t++)
+      for (let f = 0; f < 2; f++) {
+        hoardFrames[`${o}:${t}:${f}`] = raws.length;
+        raws.push(hoardArt(t, o, f) as RawFrame);
+      }
+  // 攻撃の演出の部品（名前と引数から、コマの番号へ）
+  const fxFrames = new Map<string, number>();
+  const addFx = (key: string, fr: RawFrame) => {
+    fxFrames.set(key, raws.length);
+    raws.push(fr);
+  };
+  for (let col = 0; col < 8; col++)
+    for (let f = 0; f < 3; f++) {
+      for (let size = 0; size < 3; size++) addFx(`arc:${size}:${col}:${f}`, fxArc(size, col, f) as RawFrame);
+      addFx(`jag:${col}:${f}`, fxJag(col, f) as RawFrame);
+      addFx(`bite:0:${col}:${f}`, fxBite(0, col, f) as RawFrame);
+      addFx(`bite:1:${col}:${f}`, fxBite(1, col, f) as RawFrame);
+      addFx(`claw:${col}:${f}`, fxClaw(col, f) as RawFrame);
+      addFx(`burst:${col}:${f}`, fxBurst(col, f) as RawFrame);
+      addFx(`splash:${col}:${f}`, fxSplash(col, f) as RawFrame);
+    }
+  for (let col = 0; col < 8; col++) for (let f = 0; f < 2; f++) addFx(`orb:${col}:${f}`, fxOrb(col, f) as RawFrame);
+  for (let d = 0; d < 8; d++) addFx(`arrow:${d}`, fxArrow(d) as RawFrame);
+  // 作り込み版（6コマ）
+  for (let f = 0; f < 6; f++) {
+    for (let col = 0; col < 8; col++) {
+      for (let size = 0; size < 3; size++) addFx(`slash2:${size}:${col}:${f}`, fxSlash2(size, col, f) as RawFrame);
+      addFx(`claw2:${col}:${f}`, fxClaw2(col, f) as RawFrame);
+      for (let size = 0; size < 3; size++) addFx(`ring:${size}:${col}:${f}`, fxRing(size, col, f) as RawFrame);
+      for (let size = 0; size < 3; size++) if (col >= 2 && col !== 5 && col !== 6) addFx(`blast:${size}:${col}:${f}`, fxBlast(size, col, f) as RawFrame);
+    }
+    addFx(`blast:2:0:${f}`, fxBlast(2, 0, f) as RawFrame);
+    addFx(`blast:1:0:${f}`, fxBlast(1, 0, f) as RawFrame);
+    for (let size = 0; size < 2; size++) addFx(`bite2:${size}:${f}`, fxBite2(size, f) as RawFrame);
+  }
+  for (let col = 0; col < 8; col++) for (let f = 0; f < 4; f++) addFx(`orb2:${col}:${f}`, fxOrb2(col, f) as RawFrame);
+  for (let d = 0; d < 8; d++) addFx(`arrow2:${d}`, fxArrow2(d) as RawFrame);
+  for (let kind = 0; kind < 5; kind++) for (let col = 0; col < 8; col++) for (let f = 0; f < 4; f++) addFx(`bit:${kind}:${col}:${f}`, fxBit(kind, col, f) as RawFrame);
+  for (let v = 0; v < 3; v++) addFx(`crack:${v}`, fxCrack(v) as RawFrame);
+  for (let k = 0; k < 3; k++) for (let v = 0; v < 3; v++) addFx(`stain:${k}:${v}`, fxStain(k, v) as RawFrame);
+  // 気づいた印と、当たった印
+  const markFrames: Record<string, number> = {};
+  for (const k of ['!', '?']) {
+    markFrames[k] = raws.length;
+    raws.push(mark(k) as RawFrame);
+  }
+  const slashFrames: number[] = [];
+  for (let f = 0; f < 3; f++) {
+    slashFrames.push(raws.length);
+    raws.push(slash(f) as RawFrame);
+  }
+  // 生き物のまわりの淡い暈
+  const haloFrames: number[] = [];
+  for (let z = 0; z < 3; z++) {
+    haloFrames.push(raws.length);
+    raws.push(halo(z) as RawFrame);
+  }
+  // 見た目の粒
+  const speckFrames: number[] = [];
+  for (let k = 0; k < 4; k++)
+    for (let f = 0; f < 4; f++) {
+      speckFrames.push(raws.length);
+      raws.push(speck(k, f) as RawFrame);
+    }
+  // 眠り
+  const sleepFrames: Record<string, number[]> = {};
+  const addS = (key: string, fr: RawFrame) => {
+    (sleepFrames[key] ??= []).push(raws.length);
+    raws.push(fr);
+  };
+  for (let f = 0; f < 4; f++) {
+    addS('Z', zMark(true, f) as RawFrame);
+    addS('z', zMark(false, f) as RawFrame);
+    addS('eye', halfEye(f) as RawFrame);
+    addS('dragon', dragonSleep(f) as RawFrame);
+    addS('dragonB', recolor(dragonSleep(f) as RawFrame));
+    addS('dragonH', dragonlingSleep(0, f) as RawFrame);
+    addS('dragonY', dragonlingSleep(1, f) as RawFrame);
+    addS('bat', batSleep(f) as RawFrame);
+    addS('worm', wormCoil(f) as RawFrame);
+    for (const j of ['warrior', 'wizard', 'thief', 'priest', 'bard', 'hunter', 'slayer']) addS('bed-' + j, bedroll(j, f) as RawFrame);
+  }
+  const fireFrames: number[] = [];
+  for (let f = 0; f < 4; f++) {
+    fireFrames.push(raws.length);
+    raws.push(campfire(f) as RawFrame);
+  }
+  const forgeFrames: number[] = [];
+  const lampFrames: number[] = [];
+  for (let f = 0; f < 4; f++) {
+    forgeFrames.push(raws.length);
+    raws.push(forge(f) as RawFrame);
+    lampFrames.push(raws.length);
+    raws.push(wallLamp(f) as RawFrame);
+  }
+  const dustFrames: number[] = [];
+  for (let f = 0; f < 4; f++) {
+    dustFrames.push(raws.length);
+    raws.push(dust(f) as RawFrame);
+  }
+  const corpses = new Map<string, number>();
+  const CSP: [number, string][] = [[1, 'bat'], [2, 'rat'], [3, 'lizard'], [4, 'spider'], [9, 'ant'], [10, 'kobold'], [11, 'salamander'], [12, 'goblin'], [13, 'orc'], [14, 'lizardman'], [15, 'minotaur'], [16, 'troll'], [17, 'basilisk'], [18, 'gargoyle'], [19, 'vampire'], [20, 'mimic'], [21, 'golem'], [23, 'wyvern'], [24, 'dragon'], [25, 'adventurer'], [26, 'skeleton'], [27, 'lich'], [28, 'dwarf']];
+  for (const [si, name] of CSP)
+    for (let st = 0; st < 3; st++) {
+      corpses.set(`${si},${st}`, raws.length);
+      raws.push(corpse(name, st) as RawFrame);
+    }
+  const anthillFrame = raws.length;
+  raws.push(anthill() as RawFrame);
+  const campFrame = raws.length;
+  raws.push(goblinCamp() as RawFrame);
+  const hutFrame = raws.length;
+  raws.push(reedHut() as RawFrame);
+  const treasureFrames: number[] = [];
+  for (let sz = 0; sz < 3; sz++) for (let f = 0; f < 4; f++) {
+    treasureFrames.push(raws.length);
+    raws.push(treasure(sz, f) as RawFrame);
+  }
+  const segFrames = [raws.length, raws.length + 1];
+  raws.push(wormSeg(0, 0) as RawFrame, wormSeg(1, 0) as RawFrame);
+  const web = raws.length;
+  raws.push(makeWeb());
+  const burrow = raws.length;
+  raws.push(makeBurrow());
+
+  // 棚詰め
+  // 高さの順に棚へ詰める（コマの番号はそのまま）
+  const width = 2048;
+  let x = 0;
+  let y = 0;
+  let rowH = 0;
+  const frames: FrameInfo[] = new Array(raws.length);
+  const order = raws.map((_, i) => i).sort((a, b) => raws[b].H - raws[a].H || a - b);
+  for (const i of order) {
+    const r = raws[i];
+    if (x + r.W + 1 > width) {
+      x = 0;
+      y += rowH + 1;
+      rowH = 0;
+    }
+    frames[i] = { x, y, w: r.W, h: r.H, ax: r.ax, ay: r.ay };
+    x += r.W + 1;
+    rowH = Math.max(rowH, r.H);
+  }
+  let height = 1;
+  while (height < y + rowH + 1) height *= 2;
+  const data = new Uint8Array(width * height * 4);
+  raws.forEach((r, i) => {
+    const fr = frames[i];
+    for (let yy = 0; yy < r.H; yy++)
+      for (let xx = 0; xx < r.W; xx++) {
+        const p = yy * r.W + xx;
+        if (!r.px[p * 4 + 3]) continue;
+        const q = ((fr.y + yy) * width + fr.x + xx) * 4;
+        data[q] = r.px[p * 4];
+        data[q + 1] = r.px[p * 4 + 1];
+        data[q + 2] = r.px[p * 4 + 2];
+        const m = r.mat[p];
+        data[q + 3] = m === 'wisp' ? 253 : m === 'glw' ? 252 : m === 'ghost' ? 251 : m === 'glint' ? 250 : m && m !== 'ol' ? 255 : 254;
+      }
+  });
+  return {
+    width,
+    height,
+    data,
+    frames,
+    web,
+    burrow,
+    index: (s, d, a, f, b = 0) => keyIndex.get(`${s},${d},${a},${f & 3},${s === 0 ? b : 0}`) ?? 0,
+    anthill: anthillFrame,
+    treasure: (size, f) => treasureFrames[size * 4 + (f & 3)],
+    wormSeg: (kind) => segFrames[kind],
+    breath: (down, f) => breathFrames[(down ? 4 : 0) + (f & 3)],
+    item: (kind, f) => itemFrames[kind * 4 + (f & 3)],
+    dust: (f) => dustFrames[f & 3],
+    forge: (f) => forgeFrames[f & 3],
+    campfire: (f) => fireFrames[f & 3],
+    sleep: (key, f) => sleepFrames[key][f & 3],
+    hoard: (tier, owner, f) => hoardFrames[`${owner}:${Math.min(4, Math.max(0, tier))}:${f & 1}`],
+    fx: (key) => fxFrames.get(key) ?? 0,
+    eggShell: () => eggShellFrame,
+    crown: () => crownFrame,
+    chiefHelm: () => helmFrame,
+    mark: (k) => markFrames[k] ?? markFrames['!'],
+    slash: (f) => slashFrames[Math.min(2, Math.max(0, f))],
+    halo: (z) => haloFrames[Math.min(2, Math.max(0, z))],
+    speck: (kind, f) => speckFrames[(kind & 3) * 4 + Math.min(3, Math.max(0, f))],
+    mouth: (key, f) => mouthFrames[key][f & 3],
+    blood: (c, v) => bloodFrames[(c & 3) * 4 + (v & 3)],
+    lamp: (f) => lampFrames[f & 3],
+    camp: campFrame,
+    hut: hutFrame,
+    named: (name, d, a, f, v = 0) => named.get(`${name},${d},${a},${f & 3},${v}`) ?? 0,
+    corpse: (sp, st) => corpses.get(`${sp},${st}`) ?? 0,
+  };
+}
