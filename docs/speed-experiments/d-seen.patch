@@ -1,0 +1,17 @@
+diff --git a/tools/analysis/lib/engine.ts b/tools/analysis/lib/engine.ts
+index c39747b..cef68d6 100644
+--- a/tools/analysis/lib/engine.ts
++++ b/tools/analysis/lib/engine.ts
+@@ -7,8 +7,11 @@ import { Ecology } from '../../../src/ecology'; // メソッドは world.ts が
+ 
+ export { DAY_TICKS, World, Ecology };
+ 
++/** 実験：見たマスの更新の間隔（刻み） */
++export const SEEN_EVERY = 200;
++
+ /** 1刻み進める（見たマスの更新は状態に入る：種の発見の記録など） */
+ export function tick(w: World): void {
+   w.step();
+-  if (w.tick % 20 === 0) w.updateSeen();
++  if (w.tick % SEEN_EVERY === 0) w.updateSeen();
+ }
