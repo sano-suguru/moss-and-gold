@@ -3497,7 +3497,8 @@ export class Ecology {
         cp.tribT = this.w.tick + 600;
         continue;
       }
-      const o = this.list.find((x) => x.k === Kind.Orc && !x.dead && !x.away && x.hx === cp.lx && x.hy === cp.ly && x.st === 0 && !x.hungry && x.flee <= 0 && x.units === 0);
+      // 腹を空かせたオークも行く（腹を空かせているからこそ取り立てる。五巡目は腹ぺこのオークを送らず、取り立ての時が来ても縄張りのオークが皆腹ぺこで、ほとんど取り立てられなかった）
+      const o = this.list.find((x) => x.k === Kind.Orc && !x.dead && !x.away && x.hx === cp.lx && x.hy === cp.ly && x.st === 0 && x.flee <= 0 && x.units === 0);
       if (!o) {
         cp.tribT = this.w.tick + 600;
         continue;

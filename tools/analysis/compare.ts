@@ -24,7 +24,7 @@ const median = (a: number[]) => {
 };
 const f1 = (v: number) => (isFinite(v) ? v.toFixed(1) : '—');
 
-interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number }
+interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number; orcStarveExit: number; storeMean: number; storeMax: number; storePos: number; storeKnown: boolean }
 function measure(dir: string): M {
   const S = rd(dir, 'samples.jsonl');
   const D = rd(dir, 'deaths.jsonl');
@@ -110,6 +110,12 @@ function measure(dir: string): M {
           const m = new World(meta.seed).map;
           const sh = m.shafts.map((q) => [q.x * 16 + 8, q.y * 16 + 8]);
           return D.filter((d) => d.k === 2 && d.cause === 'starve' && sh.some(([x, y]) => Math.hypot(x - d.x, y - d.y) < 15 * 16)).length;
+        })(),
+        orcStarveExit: cnt(X, 13, (x) => x.reason === 'starving'),
+        // 集落の蓄えの推移（samples の settle.campStore。六巡目から）：集落のあった記録での蓄えの合計の平均・最大と、蓄えが0でなかった記録の割合
+        ...(() => {
+          const v = S.filter((x) => (x.settle?.campStore ?? []).length).map((x) => (x.settle.campStore as number[]).reduce((a, b) => a + b, 0));
+          return { storeKnown: S.some((x) => x.settle?.campStore), storeMean: v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0, storeMax: Math.max(0, ...v), storePos: v.length ? (100 * v.filter((x) => x > 0).length) / v.length : 0 };
         })(),
         advDeaths: cnt(D, 25), gobStarveExit: cnt(X, 12, (x) => x.reason === 'starving'), gobAbandonExit: cnt(X, 12, (x) => x.reason === 'abandoned'), gobStarveDeath: cnt(D, 12, (d) => d.cause === 'starve'),
       };
@@ -225,8 +231,10 @@ const ER = ['food', 'raids', 'alone', 'dragon', 'empty'];
 tbl('集落の終わり方：蓄えが尽きた / 襲われた / 1匹 / 竜 / 皆いなくなった（settle.jsonl があるときだけ）', (m) => ER.map((r) => m.gobEnd[r] ?? 0).join(' / '), (ms) => ER.map((r) => sum(ms, (m) => m.gobEnd[r] ?? 0)).join(' / '));
 tbl('去り方：一匹ずつ飢えて / 集落ごと群れで / 飢え死に', (m) => `${m.gobStarveExit} / ${m.gobAbandonExit} / ${m.gobStarveDeath}`, (ms) => `${sum(ms, (m) => m.gobStarveExit)} / ${sum(ms, (m) => m.gobAbandonExit)} / ${sum(ms, (m) => m.gobStarveDeath)}`);
 tbl('ゴブリンを倒した種：冒険者 / オーク / コボルト / そのほか', (m) => `${m.gobAdv} / ${m.gobByOrc} / ${m.gobByKob} / ${m.gobByOther}`, (ms) => `${sum(ms, (m) => m.gobAdv)} / ${sum(ms, (m) => m.gobByOrc)} / ${sum(ms, (m) => m.gobByKob)} / ${sum(ms, (m) => m.gobByOther)}`);
+tbl('集落の蓄え：平均 / 最大 / 0でなかった記録の割合（集落のあった記録だけ）', (m) => (m.storeKnown ? `${f1(m.storeMean)} / ${m.storeMax} / ${Math.round(m.storePos)}％` : '—'), (ms) => (ms.some((m) => m.storeKnown) ? `平均の中央値 ${f1(median(ms.filter((m) => m.storeKnown && m.camps).map((m) => m.storeMean)))}` : '—'));
 L.push('## オーク', '');
 tbl('従えた集落 / 取り立て（回）/ 取り立てた食べ物', (m) => `${m.vassals} / ${m.tributes} / ${m.tributeFood}`, (ms) => `${sum(ms, (m) => m.vassals)} / ${sum(ms, (m) => m.tributes)} / ${sum(ms, (m) => m.tributeFood)}`);
+tbl('飢えて去ったオーク', (m) => m.orcStarveExit, (ms) => sum(ms, (m) => m.orcStarveExit));
 tbl('縄張りが続いた日数（中央値 / 最長 / 数）', (m) => `${f1(median(m.lairDur))} / ${f1(Math.max(0, ...m.lairDur))} / ${m.lairDur.length}`, (ms) => `中央値 ${f1(median(ms.flatMap((m) => m.lairDur)))}`);
 tbl('コボルトに倒されたゴブリン / ゴブリンに倒されたコボルト', (m) => `${m.gobByKob} / ${m.kobByGob}`, (ms) => `${sum(ms, (m) => m.gobByKob)} / ${sum(ms, (m) => m.kobByGob)}`);
 L.push('## ほかの種', '');
