@@ -20,31 +20,57 @@
 
 ## よく使うコマンド
 
+道具はすべて `node tools/analysis/launch.mjs <道具>` を通る（npm run が呼ぶ）。組み立てたものは `runs/.cache/bin/<道具>-<中身のハッシュ>.js` に置いて書き換えないので、batch の最中にソースを直してもよい。
+回した結果と1日ごとの状態は、**版（シミュレーションのソースの中身のハッシュ）ごとの保存庫** `runs/.cache/` に残り、同じ版・同じシードならどの道具からも使い回す（しくみは docs/rework-tools.md）。
+
 ```bash
 npm install                       # 初回
-npm test                          # 決定性・帳簿・保存からの再現など（四つの部分を別のプロセスで同時に回す。約26秒）
+npm test                          # 決定性・帳簿・保存からの再現など（約12秒。保存からの再現は test/fixtures の5日目の状態から。TEST_FULL=1 で0日目から6日回すもとの確かめ）
 npm run build                     # dist/index.html（外部依存なしの1ファイル）
-npm run sim -- --seed かしたれ --days 30 --out runs/kashitare     # 画面なしで全速（地上1日あたり約2.5〜3秒。生き物が増える終盤ほど遅い）
-npm run sim -- --resume runs/kashitare                              # 時間切れで止まった所から続ける
+
+# ふだんの一巡：手直し → 早めの確かめ → 8シードの対にした比較 → 原因を追う →（最後に）16シード×25日
+npm run check                                      # 早めの確かめ（4シード、前の版の10日目の状態から18日目まで。中身は tools/analysis/checks.ts。約1分）
+npm run ab -- --preset quick                       # 8シード：前の版（HEAD）の10日目の状態から、前の版といまの版で18日目まで（いまの版は8日ぶんだけ回す）→ compare.md
+npm run ab -- --preset final                       # 16シード×25日、最初から（最終確認。前の版の結果は保存庫にあれば回さない）
+npm run ab -- --base HEAD~1 --fork 5 --days 15 --seeds abc,かしたれ   # 分かれ目・日数・シードを選ぶ（--seeds 8 / 16 は決まった組。lib/seeds.ts）
+npm run ab -- --base HEAD~1 --seeds abc,seed5 --days 10               # 1バイトも違わないか（整理・高速化の確かめ。違えば終わりの値が 1）
+npm run ab -- --resume-check 7 --seeds かしたれ --days 10              # 7日目で分けて回しても、状態も記録も通しと一致するか
+
+# 調べ物（途中の状態の保存庫から始める。どの版の何日目から始めたかを最初に表示する）
+npm run probe -- deaths --seed seed7 --kind 2 --cause starve --day 19    # 19.0〜20.0日（20日目）に飢え死にした大ネズミの、死ぬ前1000刻みの履歴と様子の内訳（--warm で範囲の前から）
+npm run probe -- life --seed abc --id 1234                               # ある個体の一生（生まれた日は自動で探す）
+npm run probe -- calls --seed abc --method sendCollectors,vassalsOf --from 10 --to 12   # メソッドの呼び出しの回数と戻り値の内訳（日ごと）
+npm run probe -- look --seed abc --at 18.5 --id 1234 --expr "e.camps.map(c => c.store)" # その刻みのまわりの地形と生き物、式の値
+npm run probe -- stuck --seed seed7 --from 10 --to 12 --kind 2           # 動こうとして進めない場所の地図（stuck.png）
+#   共通：--run <回したフォルダ>（その回の状態を使う）、--base <参照>（いまの版の状態がないとき使う前の版）、--pure（いまの版で最初から回した状態だけ）
+
+# 回し直さずに値を計算する（1日ごとの状態を読み直す。記録に無い値が後から要るとき）
+npm run metric -- --runs runs/ab-x/base,runs/ab-x/new --name campStore --days 10-18   # 決まった名前は metric.ts の NAMED。二つ渡すと対にした比較も
+npm run metric -- --runs runs/b16 --expr "e.warrens.length"                           # 式（w, e, m, s, K）
+
+# 回す・並べる（保存庫を使い回す。同じ版・シードを前に回していれば回さない。足りなければ続きから）
+npm run sim -- --seed かしたれ --days 30 --out runs/kashitare     # 画面なしで全速（地上1日あたり約2.5〜4秒。生き物が増える終盤ほど遅い）。snap/ に1日ごとの状態
+npm run sim -- --resume runs/kashitare                              # 時間切れで止まった所から続ける（記録も状態も通しと1バイトも違わない）
 npm run sim -- --seed abc --days 5 --out runs/t --trace 1234        # 生き物1234の一生を毎刻み記録
 npm run report -- --run runs/kashitare                              # report.md と deaths.png / births.png
-npm run batch -- --seeds "abc,かしたれ,seed4" --days 25 --out runs/batch-x  # CPU の数だけ sim を並べて回し、report と比較の表 summary.md を作る
-npm run batch -- --out runs/batch-x                                 # 途中で止まった batch を続ける（--summary で表だけ作り直す）
+npm run batch -- --seeds 16 --days 25 --out runs/b16                # 並べて回し、report と比較の表 summary.md（かかる時間の長いシードから）
+npm run batch -- --seeds 8 --days 25 --ref HEAD~1                   # 前の版で回す（--fork 10 --base HEAD で前の版の10日目から）
+npm run batch -- --out runs/b16 --summary                           # 表だけ作り直す
 npm run batch -- --seeds ... --days 25 --adv-max 2 --out runs/b-adv2 # 冒険者の一行の上限を切り替えて回す（既定 1。段階13までは 2）
-npm run compare -- --runs runs/b1,runs/b2 --names "前,後" --out docs/x.md  # batch どうしをコボルトと大ネズミの目安で並べる
-npm run compare -- --runs ... --goals tools/analysis/goals-settling.json   # 目安に届いたか（✅/❌）の表をつける
-npm run compare -- --runs ... --seeds "abc,かしたれ"   # 一部のシードだけ比べる（ゴブリンの集落、冒険者やコボルトとの殺し合いの表もある。目安は goals-round4.json）
-npm run autopsy -- --seed seed7 --days 25 --kind 2 --cause starve   # 死んだときの様子の内訳と、死ぬ直前の様子の例（runs/autopsy-*.md）
-npm run stuckmap -- --seed seed7 --days 12 --kind 2                 # 動こうとして進めない場所の地図（stuck.png）と上位のマス
-npm run ab -- --base HEAD~1 --seeds abc,seed5 --days 10             # 前の版といまの版の出力が1バイトも違わないか（整理・高速化の確かめ）
-npm run ab -- --resume-check 7 --seeds かしたれ --days 10            # 7日目で分けて回しても通しと一致するか
-npm run ab -- --base HEAD~1 --fork 5 --days 15 --seeds ... --out runs/ab-x  # 同じ5日目の状態から前の版といまの版を続けて compare
+npm run compare -- --runs runs/b1,runs/b2 --names "前,後" --out docs/x.md   # batch どうしをコボルトと大ネズミの目安で並べる
+npm run compare -- --runs ... --paired --since 10                            # 同じシードどうしの差の分布と「はっきり / ばらつきの内」の目安（ab が付ける）
+npm run compare -- --runs ... --goals tools/analysis/goals-settling.json     # 目安に届いたか（✅/❌）の表をつける
+npm run autopsy -- --seed seed7 --days 25 --kind 2 --cause starve   # probe deaths の別名（0〜25日目すべて）
+npm run stuckmap -- --seed seed7 --days 12 --kind 2                 # probe stuck の別名
+npm run bench -- --repeat 3                                         # 速さ：seed4・かしたれ・seed7 を10日目の状態から1日ずつ（同時に回さない）。手直しの前後は続けて測る（揺れが1割ほどある）
 ```
 
-手直しの効き目は、1シードでは分からない（展開が少しの違いで大きく分かれる）。8シードの batch か、`ab --fork` で同じ途中の状態から比べる。
+手直しの効き目は、1シードでは分からない（展開が少しの違いで大きく分かれる）。`ab --preset quick`（同じ途中の状態から前の版といまの版を続ける対にした比較）で見て、compare.md の「対にした比較」の目安が「はっきり」のものだけを効き目とみなす。「ばらつきの内」は、その差がシードごとの展開の揺れで説明できる大きさということ（16シードでも1シードの出来事に引っ張られることがあるので、「1シードの寄与」の列も見る）。
 
-`sim` は `--budget 秒`（既定270）を超えそうになると途中の状態（checkpoint.json）を書き出して止まる。
-Claude Code の実行時間に制限がある環境では、`--resume` で何回かに分けて回す。分けても結果は同じ。
+途中の状態の保存庫は、コードの版ごとに分かれる（版が変われば使わない）。コードを直した直後は、いまの版の状態はまだないので、調べ物は前の版（HEAD）の状態から、いまの版で続けて回す（何日目から分かれたかを表示する）。
+`runs/.cache` は大きくなったら消してよい（次に回したときに作り直す）。
+
+`sim` を直接回すときは `--budget 秒`（既定270）を超えそうになると途中の状態を書き出して止まる（`--resume` で続ける。分けても結果は同じ）。batch・ab・check は時間で止めない。
 
 ## 見た目の確認（スクショの一覧）
 
@@ -65,12 +91,12 @@ npm run shot -- --seed かしたれ --find warren         # 見たいもの（wa
 
 ## 分析の流れ（推奨）
 
-1. 複数のシードで、少なくとも20〜30日回す（`かしたれ`、`abc`、`はじまりの洞窟` など）。
-2. `report.md` の「おかしな兆候」を見る（種の絶滅、一時的な増えすぎ、帳簿のずれ、死の一区画への集中）。
-3. 死因と「誰が誰を」で、食物連鎖が意図どおりか確かめる。生き物の由来で、外からの来訪に頼りすぎていないか見る。
-4. `deaths.png` / `births.png` で場所の偏りを見る。
-5. 気になる個体は `--trace` で一生を追う。帳簿のずれは `tools/analysis/drift.ts`（`--from 日 --to 日`）で、ずれた刻みと、その刻みに変わった生き物を突き止める。
-6. 直したら `npm test`、もう一度 `sim` と `report` で比べる。
+1. 手直しをしたら `npm test`、そして `npm run check`（新しい流れが実際に起きるかを、決まった途中の状態から1〜2分で）。届かない確かめがあれば、大きな比較の前に `probe` で原因を追う。新しい流れを足したら、その確かめを `tools/analysis/checks.ts` に足す（起きることがわかっているシードと日を、前の batch の settle.jsonl などから選ぶ）。
+2. `npm run ab -- --preset quick` で、8シードの対にした比較（compare.md）。「はっきり」の行と「1シードの寄与」を見る。
+3. 気になるものは `probe`（deaths / life / calls / look / stuck）で追う。途中の状態から始まるので数秒で始められる。使い捨てのスクリプトを書く前に、まず probe と `--expr` で足りないかを見る。短い自前のスクリプトが要るときは `lib/open.ts` の `openAt(シード, 刻み)` で状態を手に入れる。
+4. 比べたい値が記録に無ければ、`npm run metric`（1日ごとの状態から計算）で足りるかを見る。足りなければ sim.ts の記録に足す（記録の仕方が変われば保存庫の結果は使われず、回し直しになる）。
+5. 区切りがついたら `npm run ab -- --preset final`（16シード×25日）で最終確認し、report.md の「おかしな兆候」と帳簿を見る。
+6. 帳簿のずれは `tools/analysis/drift.ts`（`--from 日 --to 日`）、`manacheck.ts`、`goldcheck.ts` で、ずれた刻みと、その刻みに変わった生き物を突き止める。
 
 ### 記録の中身（runs/<名前>/）
 
@@ -84,6 +110,10 @@ npm run shot -- --seed かしたれ --find warren         # 見たいもの（wa
 | exits.jsonl | `{t, k, reason}`。starving 飢えて去った（住処のないコボルト、大物など） / returned 生還した冒険者 / home 満ちて巣へ帰った（ワイバーン） / abandoned 住処を捨てて群れで去った（コボルト） / dispersed 腹を空かせて群れで出ていった（大ネズミ） |
 | events.jsonl | ゲームの「記録」に出る出来事（`{k:番号}` は種の名前） |
 | checkpoint.json | ゲームの保存と同じ形。ブラウザの localStorage（キーは save.ts の KEY）に入れれば、その場面をゲームで開ける |
+| snap/dNNN.json.gz | 地上の1日ごとの状態（checkpoint と同じ形を gzip）。batch や ab の出力では meta.json の `snaps` が保存庫の場所を指す |
+| meta.json | シード、日数、刻み、冒険者の上限、版の系譜 `lineage`（どの版がどの刻みから回したか）、かかった秒数 |
+
+samples.jsonl は、刻みが `DAY_TICKS/4` の倍数のときに記録する（続きから回しても同じ刻み。以前は0.3日目から1/4日ごとだった）。
 
 種の番号と名前は `src/names.ts`、賢さの段階は `TIER`、強さは `STR`（ecology.ts）。
 
@@ -93,13 +123,15 @@ npm run shot -- --seed かしたれ --find warren         # 見たいもの（wa
 |---|---|
 | src/mapgen.ts | 地形の生成（洞窟、迷路、水路、溶岩、苔、養分、宝物庫、深部、閉じた空洞） |
 | src/world.ts | 世界の1刻み（水、養分、熱、苔、キノコ、光る苔の光、掘削、瓦礫、崩落、養分の生まれる元と流れ出る先）、地形の変化の記録（`digs`：`k*8+種類`、0 掘る / 1 瓦礫 / 2 崩落 / 3 風化 / 4 石畳） |
-| src/ecology.ts | 生き物すべて（行動、戦い、傷、逃げる、物音、冒険者の一行と噂と外の世界の地図、ドワーフ、集落、宝、記録、分析用の記録 `stats`） |
+| src/ecology.ts | 生き物たち（Ecology）のクラスの本体：状態のフィールド、保存しない控え、定数（SPEC、STR、TIER など）、型。メソッドはここには無い |
+| src/eco/*.ts | Ecology のメソッドを種・仕組みごとに（rat、kobold、goblin、orc、adventurer、dwarf、dragon、step（1歩）、move（道のりと移動）、senses、groups、sleep、combat、arrivals（外から来るもの）、save など）。各ファイルが `Object.assign(Ecology.prototype, …)` で足す。index.ts がすべてを読み込む（world.ts が読む） |
 | src/sprites.ts, atlas.ts | ドット絵の部品と、それを詰めた画像 |
 | src/creatureView.ts, renderer.ts, shaders.ts | 描画 |
 | src/main.ts | ループ、画面の部品（ミニマップ、記録、養分の表示）、保存 |
 | test/*.ts | テスト |
 | tools/gallery/ | 見た目の確認（scenes.ts と shoot.mjs：決まった場面の一覧、shot.ts と shot.mjs：見たいものを探して撮る） |
-| tools/analysis/ | 分析の道具（sim, report, batch：多くのシードを並べて回して比較の表, compare：batch どうしの目安の比較, autopsy：死んだときの様子, stuckmap：足止めの地図, ab：前の版との比較, drift, ratdiag：飢え死にの調査, stuck：動かない個体, digmap：掘られたマスと岩の硬さの地図, planview：ドワーフの坑道の計画を文字で描く） |
+| tools/analysis/ | 分析の道具（launch.mjs：組み立てて回す入口, sim, report, batch, ab：前の版との比較, compare, probe：調べ物, check と checks.ts：早めの確かめ, metric：回し直さずに値を計算, drift, digmap, planview など） |
+| tools/analysis/lib/ | 道具の共通部品（bins.mjs：版の見分けと組み立て, engine.ts：進め方, state.ts：状態の読み書き, runs.ts：保存庫, open.ts：途中の状態を手に入れる, batchrun.ts, stats.ts：対にした比較の目安, seeds.ts：決まったシードの組） |
 | README.md | 段階ごとの仕組みの詳しい説明（仕様書として読める） |
 
 ## いまの仕組みの要点（段階13まで）
@@ -124,13 +156,18 @@ npm run shot -- --seed かしたれ --find warren         # 見たいもの（wa
   道筋の見つからない目当てはあきらめる（`paths` の gk で判定）。飢えが7割を越えた者・着ける口のない者は群れで出ていかない（`ratDisperse`）。向かい合った仲間には列の間合いを働かせない。おびえたら目当てを替える（`gait` に避ける目当て）。
   ゴブリンの食べ物の主は、集めに出た者（`st 4`）が集落のまわり14マスで摘んで持ち帰るキノコと苔（袋＝`units`、20まで）。狩り（8マス）と死骸（`goblinCarrion`）は足し。腹を空かせたら苔とキノコを腹の7割まで。
   貢ぎ物の取り立てには、腹ぺこのオークも飢えて去る途中（`st 9`）のオークも行く（取り立ては飢えて去るより先に扱う）。samples の `settle.campStore` に集落の蓄え
+- 大ネズミの目当ての見直し：腹を空かせて目当てへ向かう途中も、10歩に1回まわり（歩いて12マス、`nearestEdibleD`）を見直し、目当てまでの残りの道のりより近い食べ物があれば替える。おびえて避ける目当て（`gait`）は、まわり1マスも避ける（ゴーストの居座る群落のそばで、隣のマスを目当てにしてはおびえる、を繰り返して飢えていた）
+- 速さのための間引き（docs/speed-experiments）：ウィスプ（光の精を除く）は生き物の1歩の4回に1回だけ判断し、その回に4回ぶん動いて食べる（`Ecology.WISP_EVERY`、`wispIdle`。描画は `moveAlpha` で4回ぶんの時間をかけて補間）。苔とキノコは40刻みごとに2回ぶん進める（`MOSS_EVERY`、`MOSS_R`）。画面なしでは見たマスの更新を200刻みごと（lib/engine.ts。見たマスは生き物の判断に使わない）
 - 描画だけ：攻撃の技の演出（`fxAttacks`、`creatureView.drawAttacks`）、気づいた印、のけぞり、飛び散る粒。見本は `dist/index.html#fxdemo`。画面の部品を隠すのは `#clean`。
 
 ## 変更するときの注意
 
-- 生き物の行動を変えたら、`npm test` に加えて、少なくとも1シードを20日回して `report.md` の兆候と帳簿を確かめる。テストは1日半しか回さないので、長く回して初めて出る不具合がある（例：ドワーフがあきらめて去るとき食料が帳簿から消えていた）。
+- 生き物の行動を変えたら、`npm test` と `npm run check` に加えて、`npm run ab -- --preset quick` で兆候と帳簿を確かめる。テストは1日半しか回さないので、長く回して初めて出る不具合がある（例：ドワーフがあきらめて去るとき食料が帳簿から消えていた）。
+- ウィスプの処理を足すときは、判断する回が4回に1回であることに気をつける（間引いた回は代謝だけ。`px` は動いた回の前の位置のまま残し、描画の補間に使う）。苔とキノコの刻みに確率や増減を足すときは、`MOSS_R` 倍にする。
 - 新しい「消える」「現れる」経路を足したら、帳簿（imported / exported / born / washed / goldIn / goldOut / 岩）と、`stats`（deaths / births / exits）の両方に記録する。
 - 描画だけの状態（血の跡、土ぼこりなど）は保存しない。シミュレーションの判断に使わないこと。
 - 帳簿のずれは、`tools/analysis/manacheck.ts` と `goldcheck.ts`（ずれた刻みと、その刻みに変わった生き物・宝の山を表示する）で突き止めるのが早い。
+- Ecology にメソッドを足すときは、種・仕組みに合う src/eco/*.ts に `export function 名前(this: Ecology, …)` で書き、そのファイルの末尾の `declare module` と `Object.assign` に名前を足す。新しいファイルなら src/eco/index.ts に import を足す。
+- 展開を変えないはずの整理は `npm run ab -- --base <整理の前のコミット> --seeds abc,かしたれ,seed4,seed7 --days 10` で1バイトも違わないことを確かめる。
 - `false &&` で古い処理を止めると、TypeScript の型の絞り込みで別の所が型エラーになることがある。止めるなら処理ごと消す。
 - 見た目の確認は、`node build.mjs` のし忘れに注意（古い dist で撮ってしまう）。

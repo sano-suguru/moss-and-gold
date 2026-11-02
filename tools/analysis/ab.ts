@@ -1,58 +1,48 @@
 /**
- * 前の版といまの版を比べる。
+ * 前の版といまの版を比べる。回した結果は版ごとの保存庫（runs/.cache、lib/runs.ts）から使い回すので、前の版はふつう回し直さない。
  *
+ *   npm run ab -- --preset quick
+ *       手直しの効き目を見る標準：8シード、前の版（HEAD）の10日目の状態から、前の版といまの版で18日目まで続けて、対にして比べる
+ *       （前の版の続きは保存庫にあれば回さない。いまの版は8日ぶん×8シードだけ）
+ *   npm run ab -- --preset final
+ *       最終確認：16シード×25日、最初から
+ *   npm run ab -- --base HEAD~1 --fork 5 --days 15 --seeds abc,かしたれ,seed4
+ *       前の版の5日目の状態から、前の版といまの版を15日まで続けて、npm run compare で並べる
  *   npm run ab -- --base HEAD~1 --seeds abc,seed5 --days 10
- *       前の版（git の参照）といまの版を同じシード・日数で回し、samples.jsonl と checkpoint.json が1バイトも違わないかを確かめる
- *       （整理や高速化など、展開を変えないはずの変更の確かめ）。違えば、最初に違う記録の日を示す
+ *       最初から同じ日数を回し、samples.jsonl と checkpoint.json が1バイトも違わないかを確かめる
+ *       （整理や高速化など、展開を変えないはずの変更の確かめ）。違えば、最初に違う記録の日を示し、終わりの値を 1 にする
  *   npm run ab -- --resume-check 7 --seeds かしたれ --days 10
- *       いまの版で、通して回したものと、7日目で止めて続きから回したものの checkpoint が一致するかを確かめる
- *   npm run ab -- --base HEAD~1 --fork 5 --days 15 --seeds abc,かしたれ,seed4 --out runs/ab-x
- *       いまの版で5日目まで回した同じ途中の状態から、前の版といまの版を15日まで続けて回し、npm run compare で並べる
- *       （最初から回すより展開の分かれが小さく、短い日数で手直しの差が見える）
+ *       いまの版で、通して回したものと、7日目で止めて続きから回したものの、記録と状態が一致するかを確かめる（保存庫は使わない）
  *
- * --base を省くと HEAD（コミット前の変更と比べる）。--jobs 同時に回す数（既定は CPU の数）。
+ * --base を省くと HEAD（コミット前の変更と比べる）。--seeds 8 / 16 は決まった組。--jobs 同時に回す数（既定は CPU の数）。
+ * 比較は <out>/compare.md（シードごとの差と、その分布・ばらつきの目安。compare.ts の --paired）。
  */
-import { execFileSync, spawn } from 'child_process';
 import { cpus } from 'os';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync } from 'fs';
-import { join, resolve } from 'path';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs';
+import { spawn } from 'child_process';
+import { join } from 'path';
 import { parseArgs } from './common';
+import { defaultAdv, getBin, pool } from './lib/runs';
+import { dirName, runSets } from './lib/batchrun';
+import { parseSeeds, PRESETS, SEEDS8 } from './lib/seeds';
 
 const a = parseArgs(process.argv.slice(2));
-const seeds = (a.seeds || 'abc').split(',').filter(Boolean);
-const days = +(a.days || 10);
+const preset = a.preset ? PRESETS[a.preset] : undefined;
+if (a.preset && !preset) throw new Error(`知らない preset：${a.preset}（${Object.keys(PRESETS).join(', ')}）`);
+const seeds = parseSeeds(a.seeds, preset?.seeds ?? ['abc']);
+const days = +(a.days || preset?.days || 10);
+const fork = a.fork ? +a.fork : preset?.fork;
 const jobs = +(a.jobs || cpus().length);
-const ROOT = resolve('.');
-const tag = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 13);
-const out = a.out || `runs/ab-${tag}`;
+const tag = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+const out = a.out || `runs/ab-${a.preset ? a.preset + '-' : ''}${tag}`;
 mkdirSync(out, { recursive: true });
+const baseRef = a.base || 'HEAD';
 
-function bundleCurrent(): string {
-  execFileSync('npx', ['esbuild', 'tools/analysis/sim.ts', '--bundle', '--platform=node', `--outfile=${out}/sim-new.js`, '--log-level=warning'], { stdio: 'inherit' });
-  return `${out}/sim-new.js`;
-}
-/** 前の版の sim を、git worktree に取り出して組み立てる */
-function bundleBase(ref: string): string {
-  const wt = join(ROOT, 'build', 'ab-base');
-  if (existsSync(wt)) execFileSync('git', ['worktree', 'remove', '--force', wt], { stdio: 'ignore' });
-  execFileSync('git', ['worktree', 'add', '--detach', wt, ref], { stdio: 'ignore' });
-  if (!existsSync(join(wt, 'node_modules'))) symlinkSync(join(ROOT, 'node_modules'), join(wt, 'node_modules'));
-  execFileSync(join(ROOT, 'node_modules/.bin/esbuild'), ['tools/analysis/sim.ts', '--bundle', '--platform=node', `--outfile=${join(ROOT, out, 'sim-base.js')}`, '--log-level=warning'], { cwd: wt, stdio: 'inherit' });
-  execFileSync('git', ['worktree', 'remove', '--force', wt], { stdio: 'ignore' });
-  return `${out}/sim-base.js`;
-}
-const run = (args: string[]) =>
+const run = (args: string[], quiet = true) =>
   new Promise<void>((res, rej) => {
-    const p = spawn('node', args, { stdio: ['ignore', 'ignore', 'inherit'] });
+    const p = spawn(process.execPath, args, { stdio: ['ignore', quiet ? 'ignore' : 'inherit', 'inherit'] });
     p.on('exit', (c) => (c === 0 ? res() : rej(new Error(`失敗：node ${args.join(' ')}`))));
   });
-async function pool(tasks: (() => Promise<void>)[]) {
-  let i = 0;
-  await Promise.all(Array.from({ length: Math.min(jobs, tasks.length) }, async () => {
-    while (i < tasks.length) await tasks[i++]();
-  }));
-}
-const dirName = (i: number) => `${String(i + 1).padStart(2, '0')}-${seeds[i].replace(/[\\/:*?"<>|\s]/g, '_')}`;
 const read = (f: string) => (existsSync(f) ? readFileSync(f) : Buffer.alloc(0));
 function firstDiff(fa: string, fb: string): string {
   const A = read(fa).toString().split('\n');
@@ -64,55 +54,55 @@ function firstDiff(fa: string, fb: string): string {
 }
 
 async function main() {
-  const B = ['--budget', '100000'];
+  const t0 = Date.now();
   if (a['resume-check']) {
     const split = +a['resume-check'];
-    const sim = bundleCurrent();
+    const sim = (await getBin('sim')).path;
+    const B = ['--budget', '1e9'];
+    rmSync(join(out, 'full'), { recursive: true, force: true });
+    rmSync(join(out, 'split'), { recursive: true, force: true });
     await pool(seeds.flatMap((s, i) => [
-      () => run([sim, '--seed', s, '--days', String(days), '--out', `${out}/full/${dirName(i)}`, ...B]),
-      async () => {
-        await run([sim, '--seed', s, '--days', String(split), '--out', `${out}/split/${dirName(i)}`, ...B]);
-        await run([sim, '--resume', `${out}/split/${dirName(i)}`, '--days', String(days), ...B]);
-      },
-    ]));
+      { w: days, f: () => run([sim, '--seed', s, '--days', String(days), '--out', `${out}/full/${dirName(seeds, i)}`, ...B]) },
+      { w: days, f: async () => {
+        await run([sim, '--seed', s, '--days', String(split), '--out', `${out}/split/${dirName(seeds, i)}`, ...B]);
+        await run([sim, '--resume', `${out}/split/${dirName(seeds, i)}`, '--days', String(days), ...B]);
+      } },
+    ]), jobs);
     let ok = true;
     for (let i = 0; i < seeds.length; i++) {
-      const same = read(`${out}/full/${dirName(i)}/checkpoint.json`).equals(read(`${out}/split/${dirName(i)}/checkpoint.json`));
-      ok &&= same;
-      console.log(`${seeds[i]}：${split}日目で分けて回した${days}日目の状態は、通しと${same ? '一致' : '一致しない'}`);
+      const f = (x: string, n: string) => `${out}/${x}/${dirName(seeds, i)}/${n}`;
+      const files = ['checkpoint.json', 'samples.jsonl', 'deaths.jsonl', 'births.jsonl', 'settle.jsonl', 'events.jsonl'];
+      const bad = files.filter((n) => !read(f('full', n)).equals(read(f('split', n))));
+      ok &&= !bad.length;
+      console.log(`${seeds[i]}：${split}日目で分けて回した${days}日目の状態と記録は、通しと${bad.length ? `一致しない（${bad.join('、')}）` : '一致'}`);
     }
     process.exit(ok ? 0 : 1);
   }
-  const base = bundleBase(a.base || 'HEAD');
-  const cur = bundleCurrent();
-  if (a.fork) {
-    const fork = +a.fork;
-    // 同じ途中の状態を作り、二つの版で続ける
-    await pool(seeds.map((s, i) => () => run([cur, '--seed', s, '--days', String(fork), '--out', `${out}/start/${dirName(i)}`, ...B])));
-    for (const v of ['base', 'new']) for (let i = 0; i < seeds.length; i++) cpSync(`${out}/start/${dirName(i)}`, `${out}/${v}/${dirName(i)}`, { recursive: true });
-    await pool(seeds.flatMap((_, i) => [
-      () => run([base, '--resume', `${out}/base/${dirName(i)}`, '--days', String(days), ...B]),
-      () => run([cur, '--resume', `${out}/new/${dirName(i)}`, '--days', String(days), ...B]),
-    ]));
-    rmSync(`${out}/start`, { recursive: true, force: true });
-    execFileSync('npx', ['esbuild', 'tools/analysis/compare.ts', '--bundle', '--platform=node', '--outfile=build/compare.js', '--log-level=warning'], { stdio: 'inherit' });
-    execFileSync('node', ['build/compare.js', '--runs', `${out}/base,${out}/new`, '--names', `前の版（${a.base || 'HEAD'}）,いまの版`, '--out', `${out}/compare.md`, ...(a.goals ? ['--goals', a.goals] : [])], { stdio: 'inherit' });
-    console.log(`\n${fork}日目の同じ状態から${days}日目まで。比較：${out}/compare.md`);
-    return;
-  }
-  await pool(seeds.flatMap((s, i) => [
-    () => run([base, '--seed', s, '--days', String(days), '--out', `${out}/base/${dirName(i)}`, ...B]),
-    () => run([cur, '--seed', s, '--days', String(days), '--out', `${out}/new/${dirName(i)}`, ...B]),
-  ]));
+  const base = await getBin('sim', baseRef);
+  const cur = await getBin('sim');
+  const adv = a['adv-max'] !== undefined ? +a['adv-max'] : defaultAdv();
+  console.log(`前の版 ${baseRef}（${base.simHash}）といまの版（${cur.simHash}）${base.simHash === cur.simHash ? '：シミュレーションのソースは同じ' : ''}、${seeds.length} シード、${fork ? `${fork}日目の前の版の状態から` : '最初から'}${days}日目まで（${out}）`);
+  await runSets([
+    { seeds, days, adv, ver: base, out: join(out, 'base') },
+    { seeds, days, adv, ver: cur, fork: fork ? { day: fork, base } : undefined, out: join(out, 'new') },
+  ], jobs);
+  console.log(`回し終わり（${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
   let same = true;
-  for (let i = 0; i < seeds.length; i++) {
-    const d = (f: string) => [`${out}/base/${dirName(i)}/${f}`, `${out}/new/${dirName(i)}/${f}`] as const;
-    const sOk = read(d('samples.jsonl')[0]).equals(read(d('samples.jsonl')[1]));
-    const cOk = read(d('checkpoint.json')[0]).equals(read(d('checkpoint.json')[1]));
-    same &&= sOk && cOk;
-    console.log(`${seeds[i]}：${sOk && cOk ? '同じ（samples と checkpoint が1バイトも違わない）' : `違う（${sOk ? 'samples は同じ' : firstDiff(...d('samples.jsonl'))}、checkpoint ${cOk ? '同じ' : '違う'}）`}`);
+  if (!fork) {
+    for (let i = 0; i < seeds.length; i++) {
+      const d = (f: string) => [`${out}/base/${dirName(seeds, i)}/${f}`, `${out}/new/${dirName(seeds, i)}/${f}`] as const;
+      const sOk = read(d('samples.jsonl')[0]).equals(read(d('samples.jsonl')[1]));
+      const cOk = read(d('checkpoint.json')[0]).equals(read(d('checkpoint.json')[1]));
+      same &&= sOk && cOk;
+      console.log(`${seeds[i]}：${sOk && cOk ? '同じ（samples と checkpoint が1バイトも違わない）' : `違う（${sOk ? 'samples は同じ' : firstDiff(...d('samples.jsonl'))}、checkpoint ${cOk ? '同じ' : '違う'}）`}`);
+    }
   }
-  process.exit(same ? 0 : 1);
+  if (!same || fork || a.preset || a.compare) {
+    const cmp = await getBin('compare');
+    await run([cmp.path, '--runs', `${out}/base,${out}/new`, '--names', `前の版（${baseRef}）,いまの版`, '--out', `${out}/compare.md`, '--paired', ...(fork ? ['--since', String(fork)] : []), ...(a.goals ? ['--goals', a.goals] : [])]);
+    console.log(`比較：${out}/compare.md（${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
+  }
+  if (!fork && !a.preset) process.exit(same ? 0 : 1);
 }
 main().catch((e) => {
   console.error(e);

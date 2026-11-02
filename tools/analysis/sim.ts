@@ -9,67 +9,70 @@
  * もう一度 --resume で同じフォルダを指定すれば続きから回る（決定的なので、分けても結果は同じ）。
  *
  * 書き出すもの（--out のフォルダ）：
- *   meta.json        シード、目標の日数、いまの刻み
- *   samples.jsonl    地上の 1/4 日ごとの数値（種ごとの数、死骸、養分、金貨、岩、開いた床、帳簿のずれ）
+ *   meta.json        シード、目標の日数、いまの刻み、版の系譜（lineage：どの版がどの刻みから回したか）
+ *   samples.jsonl    地上の 1/4 日ごとの数値（刻みが DAY_TICKS/4 の倍数のとき。続きから回しても同じ刻みで記録する）
  *   deaths.jsonl     死んだ生き物（刻み、種、死因、手を下した種、場所）
  *   births.jsonl     現れた生き物（刻み、種、由来、場所）
  *   exits.jsonl      外へ出ていった生き物
  *   moves.jsonl      群れの引っ越し（大ネズミの巣穴）
- *   settle.jsonl     住みつく群れの出来事（コボルトの住処とゴブリンの集落を作った・捨てた・消えた）
+ *   settle.jsonl     住みつく群れの出来事（コボルトの住処とゴブリンの集落を作った・捨てた・消えた、従えた、取り立て）
  *   events.jsonl     ゲームの「記録」に出る出来事
  *   trace.jsonl      --trace で指定した生き物の毎刻みの状態
+ *   snap/dNNN.json.gz 地上の1日ごとの状態（ゲームの保存と同じ形。調べ物と、後から値を計算するのに使う）
  *   checkpoint.json  続きから回すための状態（ゲームの保存と同じ形）
+ * 最初から一つの版で回したもの（混じりけのないもの）は、1日ごとの状態を runs/.cache/snap/<版>/ にも置く（調べ物が使い回す）。
  * 報告と画像は npm run report -- --run <フォルダ> で作る。
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { appendFileSync, existsSync, linkSync, mkdirSync, readFileSync, writeFileSync, cpSync } from 'fs';
 import { join } from 'path';
-import { DAY_TICKS, World } from '../../src/world';
-import { Ecology } from '../../src/ecology';
+import { DAY_TICKS, Ecology, World, tick } from './lib/engine';
+import { decodeState, encodeState, readState, writeState } from './lib/state';
+import { dayName, SELF_BIN, SELF_SIM, snapDir } from './lib/runs';
 import { parseArgs } from './common';
 
 const args = parseArgs(process.argv.slice(2));
 const out = args.resume || args.out || `runs/${args.seed || 'かしたれ'}`;
-mkdirSync(out, { recursive: true });
+mkdirSync(join(out, 'snap'), { recursive: true });
 const budget = +(args.budget || 270) * 1000;
 const started = Date.now();
 
-const b64 = (u: Uint8Array) => Buffer.from(u.buffer, u.byteOffset, u.byteLength).toString('base64');
-const unb64 = (s: string) => new Uint8Array(Buffer.from(s, 'base64'));
-const bits = (a: Uint8Array) => {
-  const b = new Uint8Array(Math.ceil(a.length / 8));
-  for (let i = 0; i < a.length; i++) if (a[i]) b[i >> 3] |= 1 << (i & 7);
-  return b64(b);
-};
-const unbits = (s: string, n: number) => {
-  const b = unb64(s);
-  const a = new Uint8Array(n);
-  for (let i = 0; i < n; i++) a[i] = (b[i >> 3] >> (i & 7)) & 1;
-  return a;
-};
-
 let w: World;
-let meta: { seed: string; days: number; tick: number; total0: number; gold0: number; trace: number; advMax?: number };
+let meta: { seed: string; days: number; tick: number; total0: number; gold0: number; trace: number; advMax?: number; lineage?: { sim: string; from: number }[]; bin?: string; secs?: number; secTicks?: number };
 if (args.resume && existsSync(join(out, 'checkpoint.json'))) {
   meta = JSON.parse(readFileSync(join(out, 'meta.json'), 'utf8'));
   if (args.days) meta.days = +args.days;
   // 冒険者の一行の数の上限（分析の切り替え）は、続きから回すときも同じにする
   if (meta.advMax !== undefined) Ecology.ADV_MAX_PARTIES = meta.advMax;
-  const s = JSON.parse(readFileSync(join(out, 'checkpoint.json'), 'utf8'));
-  const N = s.n;
-  w = new World(s.seed, {
-    tick: s.tick, seen: unbits(s.seen, N), water: new Int32Array(unb64(s.water).buffer), nutr: new Int32Array(unb64(s.nutr).buffer),
-    moss: unb64(s.moss), fungus: unb64(s.fungus), burn: unb64(s.burn), ash: unb64(s.ash), mat: unb64(s.mat), born: s.born, washed: s.washed, mana: s.mana ? new Int32Array(unb64(s.mana).buffer) : undefined, manaBorn: s.manaBorn, manaLeaked: s.manaLeaked, manaFaded: s.manaFaded, digs: s.digs, eco: s.eco,
-  });
+  w = decodeState(readState(join(out, 'checkpoint.json')));
+  // 版の系譜：別の版の状態から続けるときは、その刻みから先はこの版
+  meta.lineage ??= [{ sim: '?', from: 0 }];
+  if (meta.lineage[meta.lineage.length - 1].sim !== SELF_SIM) meta.lineage.push({ sim: SELF_SIM, from: w.tick });
   console.log(`続きから：${(w.tick / DAY_TICKS).toFixed(2)}日目`);
 } else {
   const seed = args.seed || 'かしたれ';
   if (args['adv-max'] !== undefined) Ecology.ADV_MAX_PARTIES = +args['adv-max'];
   w = new World(seed);
-  meta = { seed, days: +(args.days || 10), tick: 0, total0: 0, gold0: 0, trace: +(args.trace || 0), advMax: Ecology.ADV_MAX_PARTIES };
+  meta = { seed, days: +(args.days || 10), tick: 0, total0: 0, gold0: 0, trace: +(args.trace || 0), advMax: Ecology.ADV_MAX_PARTIES, lineage: [{ sim: SELF_SIM, from: 0 }] };
   meta.total0 = w.totalNutrients();
   meta.gold0 = w.eco.totalGold();
   for (const f of ['samples', 'deaths', 'births', 'exits', 'moves', 'settle', 'events', 'trace']) writeFileSync(join(out, `${f}.jsonl`), '');
   console.log(`新しく：シード「${seed}」を ${meta.days} 日`);
+}
+meta.bin = SELF_BIN;
+/** 最初から一つの版だけで回したもの（途中の状態を版ごとの保存庫にも置く） */
+const pure = meta.lineage!.length === 1 && meta.lineage![0].sim === SELF_SIM && SELF_SIM !== '?';
+const shared = pure ? snapDir(SELF_SIM, meta.advMax ?? Ecology.ADV_MAX_PARTIES, meta.seed) : '';
+if (shared) mkdirSync(shared, { recursive: true });
+function snapshot(txt: string, day: number) {
+  const p = join(out, 'snap', dayName(day));
+  writeState(p, txt);
+  if (shared && !existsSync(join(shared, dayName(day)))) {
+    try {
+      linkSync(p, join(shared, dayName(day)));
+    } catch {
+      try { cpSync(p, join(shared, dayName(day))); } catch { /* 置けなくても続ける */ }
+    }
+  }
 }
 
 const append = (f: string, rows: unknown[]) => {
@@ -166,13 +169,16 @@ function sample() {
   };
 }
 
+const startTick = w.tick;
 const target = meta.days * DAY_TICKS;
+const Q = DAY_TICKS / 4;
 let stopped = false;
 while (w.tick < target) {
   const traceId = meta.trace;
-  for (let i = 0; i < DAY_TICKS / 4 && w.tick < target; i++) {
-    w.step();
-    if (w.tick % 20 === 0) w.updateSeen();
+  // 地上の 1/4 日の区切り（刻みが Q の倍数）まで進める。続きから回しても同じ区切りで記録する
+  const until = Math.min(target, (Math.floor(w.tick / Q) + 1) * Q);
+  while (w.tick < until) {
+    tick(w);
     if (traceId) {
       const c = w.eco.list.find((o) => o.id === traceId);
       if (c && w.tick % 2 === 0) append('trace', [{ t: w.tick, k: c.k, x: +c.x.toFixed(1), y: +c.y.toFixed(1), act: c.act, st: c.st, hp: +c.hp.toFixed(1), food: c.food, flee: c.flee, dead: c.dead }]);
@@ -187,20 +193,16 @@ while (w.tick < target) {
   append('events', w.eco.events.filter((ev) => ev.t > lastEventT));
   if (w.eco.events.length) lastEventT = Math.max(lastEventT, w.eco.events[w.eco.events.length - 1].t);
   append('samples', [sample()]);
+  if (w.tick % DAY_TICKS === 0) snapshot(JSON.stringify(encodeState(w)), w.tick / DAY_TICKS);
   process.stdout.write(`\r${(w.tick / DAY_TICKS).toFixed(2)}日目  生き物${w.eco.list.filter((c) => !c.dead).length}  ${((Date.now() - started) / 1000).toFixed(0)}秒   `);
   if (Date.now() - started > budget) {
     stopped = true;
     break;
   }
 }
+meta.secs = (meta.secs ?? 0) + (Date.now() - started) / 1000;
+meta.secTicks = (meta.secTicks ?? 0) + w.tick - startTick;
 meta.tick = w.tick;
+writeState(join(out, 'checkpoint.json'), encodeState(w));
 writeFileSync(join(out, 'meta.json'), JSON.stringify(meta, null, 1));
-writeFileSync(
-  join(out, 'checkpoint.json'),
-  JSON.stringify({
-    v: 3, n: w.map.w * w.map.h, seed: w.map.seed, tick: w.tick, cam: { x: w.map.entrance.x * 16, y: 200, zoom: 2 }, speed: 1,
-    seen: bits(w.seen), water: b64(new Uint8Array(w.water.buffer)), nutr: b64(new Uint8Array(w.nutr.buffer)), moss: b64(w.moss), fungus: b64(w.fungus),
-    burn: b64(w.burn), ash: b64(w.ash), mat: b64(w.mat), born: w.born, washed: w.washed, mana: b64(new Uint8Array(w.mana.buffer)), manaBorn: w.manaBorn, manaLeaked: w.manaLeaked, manaFaded: w.manaFaded, digs: w.digs.slice(), eco: w.eco.serialize(),
-  }),
-);
 console.log(stopped ? `\n時間切れが近いので ${(w.tick / DAY_TICKS).toFixed(2)} 日目で止めました。続きは：npm run sim -- --resume ${out}` : `\n${meta.days} 日まで回しました。報告は：npm run report -- --run ${out}`);

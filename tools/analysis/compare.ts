@@ -3,6 +3,8 @@
  *
  *   npm run compare -- --runs runs/batch-a,runs/batch-b --names "前,後" --out docs/compare.md
  *   npm run compare -- --runs ... --seeds "abc,かしたれ"     一部のシードだけ
+ *   npm run compare -- --runs runs/ab-x/base,runs/ab-x/new --paired --since 10
+ *       10日目より後の記録だけで比べ、シードごとの差の分布と、差がばらつきに埋もれていないかの目安の表を先頭に付ける（ab が使う）
  *
  * 各 batch のシードごとに：ゴブリンの集落（続いた日数、終わり方、冒険者・コボルトとの殺し合い）、コボルトの住処が続いた日数（中央値、地上の1/4日ごとの記録から）、冒険者に倒されたコボルト、
  * ドラゴンに焼かれたコボルト、コボルトの去り方（starving 一匹ずつ飢えて / abandoned 住処ごと）、大ネズミの飢え死に、
@@ -11,12 +13,16 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { parseArgs } from './common';
-import { World } from '../../src/world';
+import { DAY_TICKS } from '../../src/world';
+import { generate } from '../../src/mapgen';
+import { paired, pairedRow, PAIRED_HEAD, PAIRED_NOTE } from './lib/stats';
 
 const args = parseArgs(process.argv.slice(2));
 const runs = (args.runs || '').split(',').filter(Boolean);
 const names = (args.names || runs.join(',')).split(',');
-const rd = (dir: string, f: string) => (existsSync(join(dir, f)) ? readFileSync(join(dir, f), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []);
+/** --since 日：その日より後の記録だけを使う（同じ途中の状態から続けた二つを比べるとき、分かれる前の同じ部分を除く） */
+const sinceT = args.since ? +args.since * DAY_TICKS : -1;
+const rd = (dir: string, f: string) => (existsSync(join(dir, f)) ? readFileSync(join(dir, f), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((r) => !(typeof r.t === 'number' && r.t <= sinceT && !(f === 'samples.jsonl' && r.t === sinceT))) : []);
 const median = (a: number[]) => {
   if (!a.length) return NaN;
   const s = [...a].sort((x, y) => x - y);
@@ -107,7 +113,7 @@ function measure(dir: string): M {
         ratShaftArr: cnt(B, 2, (b) => b.origin === 'shaft'), ratMouthArr: cnt(B, 2, (b) => b.origin === 'mouth'),
         // 天井の裂け目から15マス以内での大ネズミの飢え死に（裂け目の場所は地図から）
         ratStarveShaft: (() => {
-          const m = new World(meta.seed).map;
+          const m = generate(meta.seed);
           const sh = m.shafts.map((q) => [q.x * 16 + 8, q.y * 16 + 8]);
           return D.filter((d) => d.k === 2 && d.cause === 'starve' && sh.some(([x, y]) => Math.hypot(x - d.x, y - d.y) < 15 * 16)).length;
         })(),
@@ -186,6 +192,30 @@ const METRICS: Record<string, (ms: M[]) => number> = {
   poorKobArr: (ms) => sum(halves(ms)[1], (m) => m.kobArr),
   poorEndFood: (ms) => sum(halves(ms)[1], (m) => m.endFood),
 };
+// 対にした比較（最初の回と最後の回の、同じシードどうしの差）
+if (args.paired && all.length >= 2) {
+  const A = all[0];
+  const Bm = all[all.length - 1];
+  const md = (a: number[]) => (a.length ? median(a) : NaN);
+  const P: [string, (m: M) => number][] = [
+    ['大ネズミ：飢え死に', (m) => m.ratStarve], ['大ネズミ：来た', (m) => m.ratArr], ['大ネズミ：中で生まれた', (m) => m.ratBorn], ['大ネズミ：群れで出ていった', (m) => m.ratDisp], ['大ネズミ：巣穴の引っ越し', (m) => m.ratMoves], ['大ネズミ：最後の数', (m) => m.ratLast],
+    ['コボルト：来た', (m) => m.kobArr], ['コボルト：中で生まれた', (m) => m.kobBorn], ['コボルト：住処の数', (m) => m.warrens], ['コボルト：住処の日数の中央値', (m) => md(m.dur)], ['コボルト：飢え死に', (m) => m.kobStarveDeath], ['コボルト：一匹ずつ飢えて去った', (m) => m.kobStarveExit], ['コボルト：冒険者に倒された', (m) => m.advKob], ['コボルト：最後の数', (m) => m.kobLast],
+    ['ゴブリン：来た', (m) => m.gobArr], ['ゴブリン：中で生まれた', (m) => m.gobBorn], ['ゴブリン：集落の数', (m) => m.camps], ['ゴブリン：集落の日数の中央値', (m) => md(m.campDur)], ['ゴブリン：最後の数', (m) => m.gobLast], ['ゴブリン：飢え死に', (m) => m.gobStarveDeath], ['ゴブリン：冒険者に倒された', (m) => m.gobAdv],
+    ['ゴブリン：集落の蓄えの平均', (m) => (m.storeKnown ? m.storeMean : NaN)], ['ゴブリン：蓄えが0でなかった記録の割合（％）', (m) => (m.storeKnown && m.camps ? m.storePos : NaN)],
+    ['オーク：来た', (m) => m.orcArr], ['オーク：従えた集落', (m) => m.vassals], ['オーク：取り立て（回）', (m) => m.tributes], ['オーク：取り立てた食べ物', (m) => m.tributeFood], ['オーク：飢えて去った', (m) => m.orcStarveExit],
+    ['冒険者：死んだ', (m) => m.advDeaths], ['ゴブリンに倒されたコボルト', (m) => m.kobByGob], ['コボルトに倒されたゴブリン', (m) => m.gobByKob],
+  ];
+  const sd = A.map((m) => m.seed);
+  const Bs = sd.map((s) => Bm.find((m) => m.seed === s));
+  L.push(`## 対にした比較：${names[0]} → ${names[names.length - 1]}（${sd.length} シード${args.since ? `、${args.since}日目より後` : ''}）`, '', PAIRED_NOTE, '', ...PAIRED_HEAD);
+  for (const [label, f] of P) {
+    const pr = paired(A.map(f), Bs.map((m) => (m ? f(m) : NaN)), sd);
+    if (pr.verdict === '差なし' && pr.sumA === 0) continue;
+    L.push(pairedRow(label, pr));
+  }
+  const dr = Math.max(0, ...Bm.map((m) => m.drift));
+  L.push('', `帳簿のずれ（${names[names.length - 1]}、最大）：${dr}${dr ? ' ⚠' : ''}`, '');
+}
 if (args.goals) {
   const goals: { label: string; metric: string; op: string; value: number }[] = JSON.parse(readFileSync(args.goals, 'utf8'));
   const ok = (v: number, op: string, x: number) => (op === '>=' ? v >= x : op === '<=' ? v <= x : op === '>' ? v > x : op === '<' ? v < x : v === x);

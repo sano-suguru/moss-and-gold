@@ -1,0 +1,476 @@
+diff --git a/src/eco/adventurer.ts b/src/eco/adventurer.ts
+index 0a0338b..93a967b 100644
+--- a/src/eco/adventurer.ts
++++ b/src/eco/adventurer.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：冒険者（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/ant.ts b/src/eco/ant.ts
+index 8d1c7be..ab39c9f 100644
+--- a/src/eco/ant.ts
++++ b/src/eco/ant.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：ジャイアントアント（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/arrivals.ts b/src/eco/arrivals.ts
+index cfde4f9..3166c61 100644
+--- a/src/eco/arrivals.ts
++++ b/src/eco/arrivals.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：外から来るもの（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/bat.ts b/src/eco/bat.ts
+index 4c9ad3f..4c5520f 100644
+--- a/src/eco/bat.ts
++++ b/src/eco/bat.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：コウモリ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/breed.ts b/src/eco/breed.ts
+index f9ebb9c..b6ed3a2 100644
+--- a/src/eco/breed.ts
++++ b/src/eco/breed.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：中で殖える（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/combat.ts b/src/eco/combat.ts
+index 76c2f1d..f6d2f3f 100644
+--- a/src/eco/combat.ts
++++ b/src/eco/combat.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：強さと戦い、飢えて去ること、傷と戦い（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/dragon.ts b/src/eco/dragon.ts
+index 9c39c49..073323e 100644
+--- a/src/eco/dragon.ts
++++ b/src/eco/dragon.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：ワイバーン、ドラゴン（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/dwarf.ts b/src/eco/dwarf.ts
+index e48eccf..03f9c42 100644
+--- a/src/eco/dwarf.ts
++++ b/src/eco/dwarf.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：ドワーフ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/fire.ts b/src/eco/fire.ts
+index 574e3d9..cf6728d 100644
+--- a/src/eco/fire.ts
++++ b/src/eco/fire.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：炎（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/goblin.ts b/src/eco/goblin.ts
+index 300e374..2de6b33 100644
+--- a/src/eco/goblin.ts
++++ b/src/eco/goblin.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：ゴブリン（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/groups.ts b/src/eco/groups.ts
+index 1fa7122..ab94597 100644
+--- a/src/eco/groups.ts
++++ b/src/eco/groups.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：群れ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/islands.ts b/src/eco/islands.ts
+index 376845b..dfabd40 100644
+--- a/src/eco/islands.ts
++++ b/src/eco/islands.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：島（入口側の洞窟とつながっていない洞窟）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/kobold.ts b/src/eco/kobold.ts
+index 6e9293b..472e277 100644
+--- a/src/eco/kobold.ts
++++ b/src/eco/kobold.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：コボルト（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/lizard.ts b/src/eco/lizard.ts
+index 827463f..d280a4f 100644
+--- a/src/eco/lizard.ts
++++ b/src/eco/lizard.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：大トカゲ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/lizardman.ts b/src/eco/lizardman.ts
+index 32da73d..8058930 100644
+--- a/src/eco/lizardman.ts
++++ b/src/eco/lizardman.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：リザードマン（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/log.ts b/src/eco/log.ts
+index 8cb449d..0b10c0a 100644
+--- a/src/eco/log.ts
++++ b/src/eco/log.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：記録（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/monsters.ts b/src/eco/monsters.ts
+index fa9b0d1..1f07b04 100644
+--- a/src/eco/monsters.ts
++++ b/src/eco/monsters.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：ミノタウロス、トロール、バジリスク、ガーゴイル、ミミック、ゴーレム、ワーム（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/move.ts b/src/eco/move.ts
+index cf6bde5..7cbcae8 100644
+--- a/src/eco/move.ts
++++ b/src/eco/move.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：小道具、生き物の格子（近くの相手を探す）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+@@ -285,6 +285,8 @@ export function gaitOf(this: Ecology, c: Cr): [number, number] {
+ }
+ 
+ export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
++  mx *= CR_SCALE;
++  my *= CR_SCALE;
+   if (c.hp > 0 && c.hp < this.maxHp(c) * 0.35) {
+     mx *= 0.6;
+     my *= 0.6;
+diff --git a/src/eco/myconid.ts b/src/eco/myconid.ts
+index ee2a7ab..6d2b4bd 100644
+--- a/src/eco/myconid.ts
++++ b/src/eco/myconid.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：マイコニド（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/orc.ts b/src/eco/orc.ts
+index ad651e9..11c20f4 100644
+--- a/src/eco/orc.ts
++++ b/src/eco/orc.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：オーク（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/rat.ts b/src/eco/rat.ts
+index 77caa4e..f879021 100644
+--- a/src/eco/rat.ts
++++ b/src/eco/rat.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：大ネズミ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/salamander.ts b/src/eco/salamander.ts
+index f6fc98d..185beaa 100644
+--- a/src/eco/salamander.ts
++++ b/src/eco/salamander.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：サラマンダー（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/save.ts b/src/eco/save.ts
+index 2d97426..a87267f 100644
+--- a/src/eco/save.ts
++++ b/src/eco/save.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：保存（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/senses.ts b/src/eco/senses.ts
+index 149c97b..6c7db7c 100644
+--- a/src/eco/senses.ts
++++ b/src/eco/senses.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：人の気配（危険の勾配）、気づき方、火を怖がる、光に寄る、弱い生き物の害、食べる時間、物音（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/sleep.ts b/src/eco/sleep.ts
+index 0ee8777..5bf0dd6 100644
+--- a/src/eco/sleep.ts
++++ b/src/eco/sleep.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：眠り（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/slime.ts b/src/eco/slime.ts
+index c739333..ffc55e9 100644
+--- a/src/eco/slime.ts
++++ b/src/eco/slime.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：スライム（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/spider.ts b/src/eco/spider.ts
+index e41729d..cb6a048 100644
+--- a/src/eco/spider.ts
++++ b/src/eco/spider.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：大グモ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/statue.ts b/src/eco/statue.ts
+index 5d69cbc..432528f 100644
+--- a/src/eco/statue.ts
++++ b/src/eco/statue.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：石像（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/step.ts b/src/eco/step.ts
+index bb3c106..39ec5ba 100644
+--- a/src/eco/step.ts
++++ b/src/eco/step.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：1歩（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+@@ -23,7 +23,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
+     c.py = c.y;
+     c.actT++;
+     if (c.dead === 1) {
+-      this.decay(c);
++      for (let r = 0; r < CR_SCALE && c.dead === 1; r++) this.decay(c);
+       continue;
+     }
+     if (c.caught) {
+@@ -159,6 +159,10 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
+ }
+ 
+ export function metabolism(this: Ecology, c: Cr): void {
++  for (let r = 0; r < CR_SCALE && !c.dead; r++) this.metabolism1(c);
++}
++
++export function metabolism1(this: Ecology, c: Cr): void {
+   // 水の精と光の精は、マナで体を保つので腹が減らない（食べ物も体も減らない）
+   if (c.elite === 6 || c.elite === 7) return;
+   if (c.k === Kind.Zombie || c.k === Kind.Ghost) return;
+@@ -266,9 +270,10 @@ declare module '../ecology' {
+   interface Ecology {
+     update: typeof update;
+     metabolism: typeof metabolism;
++    metabolism1: typeof metabolism1;
+     corpseStage: typeof corpseStage;
+     decay: typeof decay;
+   }
+ }
+ 
+-Object.assign(Ecology.prototype, { update, metabolism, corpseStage, decay });
++Object.assign(Ecology.prototype, { update, metabolism, metabolism1, corpseStage, decay });
+diff --git a/src/eco/terrain.ts b/src/eco/terrain.ts
+index 3ec9bb6..33d63a9 100644
+--- a/src/eco/terrain.ts
++++ b/src/eco/terrain.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：掘ることと、空洞と崩落（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/treasure.ts b/src/eco/treasure.ts
+index bb94476..2a9afb7 100644
+--- a/src/eco/treasure.ts
++++ b/src/eco/treasure.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：宝（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/undead.ts b/src/eco/undead.ts
+index ee7f2bc..4a00143 100644
+--- a/src/eco/undead.ts
++++ b/src/eco/undead.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：死の気配（ゴーストが現れる）、ゾンビ、ゴースト、スケルトンとリッチ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/vampire.ts b/src/eco/vampire.ts
+index f877728..7cd4c27 100644
+--- a/src/eco/vampire.ts
++++ b/src/eco/vampire.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：ヴァンパイア（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/view.ts b/src/eco/view.ts
+index 48f7bb7..ff4fad6 100644
+--- a/src/eco/view.ts
++++ b/src/eco/view.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：生き物の様子（画面の札のため。シミュレーションには関わらない）、見た目のための印（描画だけに使う。シミュレーションの判断には使わない）、演出のデモ（#fxdemo。シミュレーションは回さない）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/eco/wisp.ts b/src/eco/wisp.ts
+index 7bdded8..35dee7e 100644
+--- a/src/eco/wisp.ts
++++ b/src/eco/wisp.ts
+@@ -1,6 +1,6 @@
+ /** Ecology のメソッド：ウィスプ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+ /* eslint-disable @typescript-eslint/no-unused-vars */
+-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
++import { BLOOD, Burrow, CELL, CR_EVERY, CR_SCALE, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+ import { lineOfSight, TILE } from '../mapgen';
+ import { JOB_NAMES } from '../names';
+ import type { World } from '../world';
+diff --git a/src/ecology.ts b/src/ecology.ts
+index fe53b10..3387145 100644
+--- a/src/ecology.ts
++++ b/src/ecology.ts
+@@ -5,7 +5,9 @@ export const DAY_TICKS_ECO = 14400;
+ import type { World } from './world';
+ 
+ /** 生き物を動かす間隔（刻み） */
+-export const CR_EVERY = 2;
++export const CR_EVERY = 4;
++/** 実験：生き物の1歩の間隔を広げたぶん、一度に進める量（移動と代謝を CR_SCALE 倍） */
++export const CR_SCALE = CR_EVERY / 2;
+ 
+ export const enum Kind {
+   Wisp = 0,

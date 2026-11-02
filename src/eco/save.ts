@@ -1,0 +1,114 @@
+/** Ecology のメソッド：保存（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+import { lineOfSight, TILE } from '../mapgen';
+import { JOB_NAMES } from '../names';
+import type { World } from '../world';
+
+export function serialize(this: Ecology): object {
+  const L: number[] = [];
+  for (const c of this.list) {
+    if (c.dead === 2) continue;
+    L.push(c.id, c.k, c.x, c.y, c.vx, c.vy, c.dir, c.act, c.actT, c.body, c.food, c.glow, c.hungry, c.sinceMeal, c.st, c.hx, c.hy, c.tx, c.ty, c.dead, c.units, c.away ? 1 : 0, c.caught ? 1 : 0, c.ref, c.sp, c.init, c.ref2, c.gold, c.party, c.torch, c.hp, c.hitAt, c.foe, c.flee, c.gait, c.bornAt, c.sleep, c.drowsy, c.lure, c.lureAt, c.feed, c.mana, c.elite);
+  }
+  const P: number[][] = [];
+  for (const [id, p] of this.paths) if (this.byId.get(id)?.dead === 0) P.push([id, p.gx, p.gy, p.pi, p.stall, p.gk, p.at, ...p.path]);
+  return { V: 43, PV: 2, G: Array.from(this.deathMap), GV: Array.from(this.graveMap), AG: Array.from(this.advGrave), NM: [...this.names], LE: this.lastElite.map((v) => v ?? null), AC: this.colonies.map((o) => [o.id, o.x, o.y, o.store, o.queen, o.starve, o.hk ?? -1, o.len ?? 0]), KW: this.warrens.map((o) => [o.id, o.x, o.y, o.target, o.prog, o.len, o.stall ?? 0, o.lastProg ?? 0, o.door ?? -1, o.dir ?? -1, o.tun ?? 0, o.store ?? 0, o.hide ?? 0, o.raids ?? 0, o.empty ?? -1, o.alone ?? -1]), KT: this.traps.map((o) => [o.id, o.k, o.w]), KS: this.koboldShun, KM: this.kobMouthOk, RM: [this.ratMouthOk, this.ratShaftOk], GC: this.camps.map((o) => [o.id, o.kind, o.x, o.y, o.dry, o.fuel ?? 0, o.store ?? 0, o.hide ?? 0, o.raids ?? 0, o.empty ?? -1, o.alone ?? -1, o.lx ?? 0, o.ly ?? 0, o.tribT ?? 0]), GS: this.goblinShun, GM: this.gobMouthOk, LA: this.lastArrival.map((v) => v ?? null), ST: this.statues.map((o) => [o.id, o.x, o.y, o.k, o.sp, o.dir, o.act, o.f, o.units, o.age, o.blocks ?? -1]), TP: this.piles.map((o) => [o.id, o.x, o.y, o.gold, o.age]), TR: [...this.trails].map(([id, t]) => [id, ...t]), PD: this.pendingDigs, BN: this.burning, PT2: this.parties, LO: this.lore, IT: this.gear.map((o) => [o.id, o.x, o.y, o.kind, o.fuel]), RU: [this.rumors.light, this.rumors.gold, this.rumors.undead, this.rumors.beast, this.rumors.dragon, this.rumors.beastKind, this.rumors.beastX, this.rumors.beastY], GL: [this.goldIn, this.goldOut, this.returned, this.fallen], EV: this.events.map((e) => [e.t, e.x, e.y, e.m]), HD2: this.hold, LP: this.lamps, EG: this.eggs, DSH: this.dragonShell, FX: [this.fxHits.filter((h) => this.w.tick - h.t < 10), this.fxMarks.filter((m) => this.w.tick - m.t < 20), this.fxAttacks.filter((m) => this.w.tick - m.t < 20)], IS: [...this.islandIds], WB: this.wallBroken, PS: this.pendingScraps, PRB: Array.from(this.presenceBase), PRT: Array.from(this.presenceTrace), AL: [...this.alarms.entries()], FG: this.forage, OM: [this.openMoss, this.openFungus, this.edibleMoss, this.wildFungus], DL: [this.dwarfLore, this.lastDwarves], LL: this.lastLogged.map((v) => v ?? null), NZ: this.noises, LD: this.lastDigCount, DS: Array.from(this.discovered), L, P, W: this.webs.map((w) => [w.id, w.x, w.y, w.r, w.owner, w.age]), B: this.burrows.map((b) => [b.x, b.y, b.hk ?? -1, b.len ?? 0, b.moved ?? -1e9, b.cap ?? -1]), n: this.nextId, i: this.imported, e: this.exported, s: this.step };
+}
+
+export function restore(this: Ecology, o: any): void {
+  this.list = [];
+  this.byId.clear();
+  const L: number[] = o.L || [];
+  const V = o.V || 24;
+  if (o.G) this.deathMap.set(o.G);
+  if (o.GV) this.graveMap.set(o.GV);
+  if (o.AG) this.advGrave.set(o.AG);
+  this.names = new Map(o.NM ?? []);
+  this.lastElite = (o.LE ?? []).map((v: number | null) => (v === null ? undefined : v)) as number[];
+  this.colonies = (o.AC || []).map((a: number[]) => ({ id: a[0], x: a[1], y: a[2], store: a[3], queen: a[4], starve: a[5] ?? 0, hk: a[6] ?? -1, len: a[7] ?? 0 }));
+  this.warrens = (o.KW || []).map((a: number[]) => ({ id: a[0], x: a[1], y: a[2], target: a[3], prog: a[4], len: a[5], stall: a[6] ?? 0, lastProg: a[7] ?? 0, door: a[8] ?? -1, dir: a[9] ?? -1, tun: a[10] ?? 0, store: a[11] ?? 0, hide: a[12] ?? 0, raids: a[13] ?? 0, empty: a[14] ?? -1, alone: a[15] ?? -1 }));
+  this.traps = (o.KT || []).map((a: number[]) => ({ id: a[0], k: a[1], w: a[2] }));
+  this.koboldShun = o.KS ?? 0;
+  this.kobMouthOk = o.KM ?? [];
+  [this.ratMouthOk, this.ratShaftOk] = o.RM ?? [[], []];
+  this.camps = (o.GC || []).map((a: number[]) => ({ id: a[0], kind: a[1], x: a[2], y: a[3], dry: a[4], fuel: a[5] ?? 0, store: a[6] ?? 0, hide: a[7] ?? 0, raids: a[8] ?? 0, empty: a[9] ?? -1, alone: a[10] ?? -1, lx: a[11] ?? 0, ly: a[12] ?? 0, tribT: a[13] ?? 0 }));
+  this.goblinShun = o.GS ?? 0;
+  this.gobMouthOk = o.GM ?? [];
+  this.lastArrival = (o.LA || []).map((v: number | null) => (v === null ? undefined : v)) as number[];
+  this.statues = (o.ST || []).map((a: number[]) => ({ id: a[0], x: a[1], y: a[2], k: a[3], sp: a[4], dir: a[5], act: a[6], f: a[7], units: a[8], age: a[9], blocks: a[10] === undefined || a[10] < 0 ? undefined : a[10] }));
+  this.rebuildStatueIndex();
+  this.piles = (o.TP || []).map((a: number[]) => ({ id: a[0], x: a[1], y: a[2], gold: a[3], age: a[4] }));
+  this.trails = new Map((o.TR || []).map((a: number[]) => [a[0], a.slice(1)] as [number, number[]]));
+  this.pendingDigs = o.PD || [];
+  this.burning = o.BN || [];
+  this.parties = o.PT2 ? JSON.parse(JSON.stringify(o.PT2)) : (o.PT || []).map((a: number[]) => ({ id: a[0], goal: a[1], tx: a[2], ty: a[3], since: a[4], tier: a[5], initial: a[6], saw: a[7], targetAt: a[8], waitT: a[9], bk: a[10], bx: a[11], by: a[12], members: a.slice(13) }));
+  this.lore = o.LO ? JSON.parse(JSON.stringify(o.LO)) : { explored: [], gold: [], danger: [] };
+  this.gear = (o.IT || []).map((a: number[]) => ({ id: a[0], x: a[1], y: a[2], kind: a[3], fuel: a[4] }));
+  const ru = o.RU || [0, 0, 0, 0, 0];
+  this.rumors = { light: ru[0], gold: ru[1], undead: ru[2], beast: ru[3], dragon: ru[4], beastKind: ru[5] ?? 0, beastX: ru[6] ?? 0, beastY: ru[7] ?? 0 };
+  this.events = (o.EV || []).map((a: [number, number, number, string]) => ({ t: a[0], x: a[1], y: a[2], m: a[3] }));
+  if (o.DS) this.discovered.set(o.DS);
+  const hd = o.HD as number[] | null | undefined;
+  this.hold = o.HD2 !== undefined ? (o.HD2 ? JSON.parse(JSON.stringify(o.HD2)) : null) : hd ? { stage: hd[0], sx: hd[1], sy: hd[2], dx: hd[3], dy: hd[4], hk: hd[5], target: hd[6], head: hd[7], len: hd[8], forge: hd[9], golem: hd[10], since: hd[11], store: hd[12], farm: hd.slice(14, 14 + hd[13]), todo: hd.slice(14 + hd[13]) } : null;
+  this.lamps = o.LP || [];
+  this.eggs = o.EG ? JSON.parse(JSON.stringify(o.EG)) : [];
+  this.dragonShell = o.DSH ? { ...o.DSH } : null;
+  // 見た目のための印（描画だけ）
+  if (o.FX) {
+    this.fxHits = JSON.parse(JSON.stringify(o.FX[0]));
+    this.fxMarks = JSON.parse(JSON.stringify(o.FX[1]));
+    if (o.FX[2]) this.fxAttacks = JSON.parse(JSON.stringify(o.FX[2]));
+  }
+  this.islandIds = new Set(o.IS ?? []);
+  this.wallBroken = !!o.WB;
+  this.pendingScraps = o.PS ? o.PS.slice() : [];
+  if (o.PRB) this.presenceBase = Float32Array.from(o.PRB);
+  if (o.PRT) this.presenceTrace = Float32Array.from(o.PRT);
+  this.alarms = new Map((o.AL ?? []).map((e: [string, { t: number; foe: number; x: number; y: number }]) => [e[0], { ...e[1] }]));
+  this.forage = o.FG ? o.FG.slice() : [];
+  [this.openMoss, this.openFungus] = o.OM ?? [0, 0];
+  this.edibleMoss = o.OM?.[2] ?? 0;
+  this.wildFungus = o.OM?.[3] ?? this.openFungus;
+  this.lastLogged = (o.LL || []).map((v: number | null) => (v === null ? undefined : v)) as number[];
+  this.noises = o.NZ ? JSON.parse(JSON.stringify(o.NZ)) : [];
+  this.lastDigCount = o.LD ?? -1;
+  const dl = o.DL || [0, -1];
+  this.dwarfLore = dl[0];
+  this.lastDwarves = dl[1];
+  const gl = o.GL || [0, 0, 0, 0];
+  this.goldIn = gl[0];
+  this.goldOut = gl[1];
+  this.returned = gl[2];
+  this.fallen = gl[3];
+  for (let i = 0; i + V - 1 < L.length; i += V) {
+    const c: Cr = {
+      id: L[i], k: L[i + 1], x: L[i + 2], y: L[i + 3], px: L[i + 2], py: L[i + 3], vx: L[i + 4], vy: L[i + 5], dir: L[i + 6], act: L[i + 7], actT: L[i + 8],
+      body: L[i + 9], food: L[i + 10], glow: L[i + 11], hungry: L[i + 12], sinceMeal: L[i + 13], st: L[i + 14], hx: L[i + 15], hy: L[i + 16], tx: L[i + 17], ty: L[i + 18],
+      dead: L[i + 19], units: L[i + 20], away: !!L[i + 21], caught: !!L[i + 22], ref: L[i + 23],
+      sp: V > 24 ? L[i + 24] : L[i + 1], init: V > 25 ? L[i + 25] : L[i + 20], ref2: V > 26 ? L[i + 26] : 0, gold: V > 27 ? L[i + 27] : 0, party: V > 28 ? L[i + 28] : 0, torch: V > 28 ? L[i + 29] : 0, hp: V > 30 ? L[i + 30] : -1, hitAt: V > 31 ? L[i + 31] : -99, foe: V > 32 ? L[i + 32] : 0, flee: V > 33 ? L[i + 33] : 0, gait: V > 34 ? L[i + 34] : 0, bornAt: V > 35 ? L[i + 35] : -1e9, sleep: V > 36 ? L[i + 36] : 0, drowsy: V > 37 ? L[i + 37] : 0, lure: V > 38 ? L[i + 38] : 0, lureAt: V > 39 ? L[i + 39] : 0, feed: V > 40 ? L[i + 40] : 0, mana: V > 41 ? L[i + 41] : 0, elite: V > 42 ? L[i + 42] : 0,
+    };
+    this.list.push(c);
+    this.byId.set(c.id, c);
+  }
+  this.paths.clear();
+  for (const a of (o.P || []) as number[][]) {
+    if ((o.PV || 1) >= 2) this.paths.set(a[0], { gx: a[1], gy: a[2], pi: a[3], stall: a[4], gk: a[5], at: a[6], path: a.slice(7) });
+    else this.paths.set(a[0], { gx: a[1], gy: a[2], pi: a[3], stall: a[4], gk: this.tileOf(a[1], a[2]), at: 0, path: a.slice(5) });
+  }
+  this.webs = (o.W || []).map((a: number[]) => ({ id: a[0], x: a[1], y: a[2], r: a[3], owner: a[4], age: a[5] }));
+  this.burrows = (o.B || []).map((a: number[]) => ({ x: a[0], y: a[1], hk: a[2] ?? -1, len: a[3] ?? 0, moved: a[4] ?? -1e9, cap: a[5] ?? -1 }));
+  this.nextId = o.n || 1;
+  this.imported = o.i || 0;
+  this.exported = o.e || 0;
+  this.step = o.s || 0;
+}
+
+declare module '../ecology' {
+  interface Ecology {
+    serialize: typeof serialize;
+    restore: typeof restore;
+  }
+}
+
+Object.assign(Ecology.prototype, { serialize, restore });
