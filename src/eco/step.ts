@@ -121,7 +121,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   if (this.step % 10 === 3) this.watchWarrens();
   if (this.step % 10 === 7) this.watchCamps();
   if (this.step % 600 === 115) this.updateVassals();
-  if (this.step % 50 === 25) this.sendCollectors();
+  if (this.step % 600 === 125) this.checkOrcMouths();
   if (this.step % 600 === 105) this.checkGoblinMouths();
   this.checkTraps();
   if (this.step % 200 === 100) this.spawnSalamanders();

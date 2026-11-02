@@ -313,7 +313,8 @@ export const SPEC: Spec[] = [
   { body: 12, cap: 30, meta: 60, starve: 1e9, speed: 0.7, glowDecay: 1 },
   // ゴブリン：腹の減り方は五巡目から7割に（meta 40 → 57）
   { body: 20, cap: 50, meta: 57, starve: 3000, speed: 0.9, glowDecay: 1 },
-  { body: 60, cap: 120, meta: 45, starve: 5000, speed: 0.9, glowDecay: 1 },
+  // オーク：腹の減り方は七巡目から8割に（meta 45 → 56）
+  { body: 60, cap: 120, meta: 56, starve: 5000, speed: 0.9, glowDecay: 1 },
   { body: 40, cap: 80, meta: 60, starve: 6000, speed: 0.85, glowDecay: 1 },
   { body: 120, cap: 200, meta: 50, starve: 6000, speed: 0.8, glowDecay: 1 },
   { body: 150, cap: 250, meta: 40, starve: 6000, speed: 0.85, glowDecay: 1 },
@@ -598,6 +599,9 @@ export class Ecology {
    * minFood を指定すれば、まわり8マスの食べ物（warrenFood）がそれに満たない所は選ばない
    */
   static GOBLIN_MIN_FOOD = 1800;
+  /** オークが来る口：歩いて行ける範囲（ORC_REACH マス）に、従えられるゴブリンの集落がなければ、獲物（大ネズミ・大トカゲ・コボルト。いるオーク1匹あたり4匹を差し引く）がこの数以上いること（七巡目） */
+  static ORC_MIN_PREY = 12;
+  static ORC_REACH = 100;
 
   /** 口ごとに、そこからゴブリンが来られるか（コボルトの kobMouthOk と同じ。地上の約2時間ごとに調べ直し、保存する） */
   gobMouthOk: number[] = [];
@@ -750,6 +754,10 @@ export class Ecology {
   /** 大ネズミが来られる口と天井の裂け目（1 なら来られる。600刻みごとに決まった刻みで調べ直し、保存する） */
   ratMouthOk: number[] = [];
   ratShaftOk: number[] = [];
+  /** 大ネズミの入り直し（七巡目）：地表の横穴が開いたあとでも、中の大ネズミが2匹以下になったら 1（天井の割れ目をまた使える）、3匹を超えたら 0。保存する */
+  ratReentry = 0;
+  /** オークが来られる口（1 なら来られる。歩いて行ける範囲に従えられるゴブリンの集落か十分な獲物がある。600刻みごとに調べ直し、保存する） */
+  orcMouthOk: number[] = [];
   /** 大ネズミが入り込む裂け目を、その刻みだけ決めておく（来る群れが同じ裂け目から入るように。保存しない） */
   forcedCrack: [number, number] | null = null;
   /**

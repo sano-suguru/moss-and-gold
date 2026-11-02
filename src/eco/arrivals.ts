@@ -55,6 +55,11 @@ export function pickDoor(this: Ecology, k: Kind, salt: number): number {
     if (quiet.length) open = quiet;
   }
   // ゴブリンも、集落がまだないときは、歩いて行ける範囲に集落の条件を満たし食べ物の足りる場所のある口からだけ来る
+  // オークは、歩いて行ける範囲に従えられるゴブリンの集落か十分な獲物のある口からだけ来る（七巡目）
+  if (k === Kind.Orc) {
+    open = open.filter((i) => this.orcMouthOk[i] === 1);
+    return open.length ? open[ih(this.step, salt, 196) % open.length] : -3;
+  }
   if (k === Kind.Goblin) {
     const founding = !this.camps.some((o) => o.id >= 0 && o.kind === 0);
     open = open.filter((i) => !this.dragonNearMouth(i) && (!founding || this.gobMouthOk[i] === 1));
@@ -62,7 +67,8 @@ export function pickDoor(this: Ecology, k: Kind, salt: number): number {
   // 大ネズミは、まわり（道のり RAT_DOOR_REACH マス）で養える数に余裕のある口か天井の裂け目からだけ来る（裂け目からは、地表の横穴が一つも開いていない間だけ）
   if (k === Kind.Rat) {
     // 天井の割れ目は、地表の横穴が開くまでの序盤の入口（六巡目に戻した。四・五巡目は横穴が開いたあとも割れ目から来て、割れ目のそばで飢えていた）
-    const opts = [...open.filter((i) => this.ratMouthOk[i] === 1), ...(!open.length && this.ratShaftOk.some((v) => v === 1) && this.crackSpot(Kind.Rat) ? [-2] : [])];
+    // 七巡目：ただし中の大ネズミが絶えかけたら（ratReentry）、割れ目からまた入り直せる
+    const opts = [...open.filter((i) => this.ratMouthOk[i] === 1), ...((!open.length || this.ratReentry) && this.ratShaftOk.some((v) => v === 1) && this.crackSpot(Kind.Rat) ? [-2] : [])];
     return opts.length ? opts[ih(this.step, salt, 196) % opts.length] : -3;
   }
   if (open.length) return open[ih(this.step, salt, 196) % open.length];
@@ -183,6 +189,9 @@ export function arrivals(this: Ecology, day: number): void {
   // 中の食べ物に合わせる：食べられる苔（20以上の群落の、根元を除いた分）に対して大ネズミがすでに多いか、腹を空かせた者が多ければ来ない
   // 来るかどうかは、口や裂け目ごとに、まわり（道のり40マス）の食べられる苔と、そこにいる大ネズミの数で決める（ratMouthOk / ratShaftOk）。
   // ダンジョン全体の上限（ratCap）は越えない
+  // 入り直し（七巡目）：地表の横穴が開いたあとでも、中の大ネズミが2匹以下になったら割れ目をまた開き、3匹を超えたら閉じる
+  if (n[Kind.Rat] <= 2) this.ratReentry = 1;
+  else if (n[Kind.Rat] > 3) this.ratReentry = 0;
   if (this.canEnter(Kind.Rat) && n[Kind.Rat] < this.ratCap() && ih(this.step, 1, 71) % (n[Kind.Rat] < 4 ? 5 : 80) === 0) {
     next();
     // 入ってきた口や裂け目のまわり（道のり40マス）に巣穴を決める
@@ -190,7 +199,11 @@ export function arrivals(this: Ecology, day: number): void {
     const spot = door >= 0 ? this.mouthSpot(door) : this.crackSpot(Kind.Rat);
     if (door === -2 && spot) this.forcedCrack = spot;
     const home = spot ? this.pickBurrowNear(spot) : this.pickBurrow();
-    for (let i = 0; i < 2; i++) {
+    // 地表の横穴が開いたあとの割れ目からの入り直しは、一度に2〜3匹
+    const reenter = door === -2 && m.mouths.some((mo, i) => mo.kind === 0 && this.mouthOpen(i));
+    const nr = reenter ? 2 + (ih(this.step, 2, 71) & 1) : 2;
+    if (reenter && spot) this.record('settle', { t: this.w.tick, k: Kind.Rat, ev: 'reenter', n: nr, x: Math.round(spot[0]), y: Math.round(spot[1]) } as never);
+    for (let i = 0; i < nr; i++) {
       const r = enter(Kind.Rat, 16, 20);
       r.hx = home.x;
       r.hy = home.y;
@@ -258,7 +271,9 @@ export function arrivals(this: Ecology, day: number): void {
   if (this.canEnter(Kind.Orc) && settlements > 0 && n[Kind.Goblin] + n[Kind.Kobold] >= 8 && n[Kind.Orc] < Math.min(6, settlements * 3) && cool(Kind.Orc) && ih(this.step, 7, 71) % 30 === 0) {
     next();
     this.lastArrival[Kind.Orc] = this.step;
-    const home = this.pickLair();
+    door = this.pickDoor(Kind.Orc, Kind.Orc);
+    const tgt = this.orcTargetFrom(door);
+    const home = tgt ? this.pickLair(tgt) : -1;
     if (home >= 0) {
       const k = 2 + (ih(this.step, 8, 71) & 1);
       for (let i = 0; i < k; i++) {

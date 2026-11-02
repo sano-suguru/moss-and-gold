@@ -51,11 +51,13 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'コボルトの住処ができる（4シードで1つ以上）',
+    // PR #2 のあと、この4シードでは10〜18日に新しい住処ができない（abc と seed7 は10日目より前からの住処が続く）。住処があるかで見る
+    name: 'コボルトの住処がある（4シードの記録の合計の1割以上）',
     ...RUN_A,
     test: (rs) => {
-      const n = rs.map((r) => r.settle.filter((x) => x.k === 10 && x.ev === 'found').length);
-      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+      const n = rs.map((r) => r.samples.filter((s) => (s.settle?.warren ?? []).length).length);
+      const all = sum(rs.map((r) => r.samples.length));
+      return { ok: sum(n) >= 0.1 * all, value: rs.map((r, i) => `${r.seed} ${n[i]}/${r.samples.length}`).join('、') };
     },
   },
   {
@@ -65,6 +67,25 @@ export const CHECKS: Check[] = [
     test: (rs) => {
       const n = rs.map((r) => r.births.filter((b) => b.k === 2 && b.origin !== 'born').length);
       return { ok: sum(n) >= 10, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // 七巡目：地表の横穴が開いたあとでも、絶えかけたら天井の割れ目から入り直す（abc と seed7 は前の版で0匹の日が続く）
+    name: '大ネズミが割れ目から入り直す（4シードで1回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 2 && x.ev === 'reenter').length);
+      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // 七巡目：取り立ては腹を空かせたときに、要る分（腹の空き＝120まで）を、蓄えの半分まで。空振り（0）は記録しない
+    name: 'オークの取り立ては1回につき1〜120',
+    ...RUN_A,
+    test: (rs) => {
+      const t = rs.flatMap((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'tribute'));
+      const v = t.length ? sum(t.map((x) => x.n ?? 0)) / t.length : 0;
+      return { ok: t.length > 0 && t.every((x) => x.n >= 1 && x.n <= 120), value: `${t.length} 回、平均 ${v.toFixed(0)}` };
     },
   },
   {
