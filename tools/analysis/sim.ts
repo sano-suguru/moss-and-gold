@@ -15,6 +15,7 @@
  *   births.jsonl     現れた生き物（刻み、種、由来、場所）
  *   exits.jsonl      外へ出ていった生き物
  *   moves.jsonl      群れの引っ越し（大ネズミの巣穴）
+ *   settle.jsonl     住みつく群れの出来事（コボルトの住処を作った・捨てた・消えた）
  *   events.jsonl     ゲームの「記録」に出る出来事
  *   trace.jsonl      --trace で指定した生き物の毎刻みの状態
  *   checkpoint.json  続きから回すための状態（ゲームの保存と同じ形）
@@ -67,7 +68,7 @@ if (args.resume && existsSync(join(out, 'checkpoint.json'))) {
   meta = { seed, days: +(args.days || 10), tick: 0, total0: 0, gold0: 0, trace: +(args.trace || 0), advMax: Ecology.ADV_MAX_PARTIES };
   meta.total0 = w.totalNutrients();
   meta.gold0 = w.eco.totalGold();
-  for (const f of ['samples', 'deaths', 'births', 'exits', 'moves', 'events', 'trace']) writeFileSync(join(out, `${f}.jsonl`), '');
+  for (const f of ['samples', 'deaths', 'births', 'exits', 'moves', 'settle', 'events', 'trace']) writeFileSync(join(out, `${f}.jsonl`), '');
   console.log(`新しく：シード「${seed}」を ${meta.days} 日`);
 }
 
@@ -152,6 +153,7 @@ while (w.tick < target) {
   append('births', st.births.splice(0));
   append('exits', st.exits.splice(0));
   append('moves', st.moves.splice(0));
+  append('settle', st.settle.splice(0));
   append('events', w.eco.events.filter((ev) => ev.t > lastEventT));
   if (w.eco.events.length) lastEventT = Math.max(lastEventT, w.eco.events[w.eco.events.length - 1].t);
   append('samples', [sample()]);

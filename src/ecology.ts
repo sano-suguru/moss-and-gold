@@ -452,10 +452,16 @@ export class Ecology {
     exits: { t: number; k: number; reason: string; x: number; y: number }[];
     /** 群れの引っ越し（大ネズミの巣穴など）：刻み、種、何匹、元の場所と移った先（画素） */
     moves: { t: number; k: number; n: number; x: number; y: number; tx: number; ty: number }[];
-  } = { deaths: [], births: [], exits: [], moves: [] };
+    /**
+     * 住みつく群れの出来事（いまはコボルトの住処）：ev は found 作った（how：arrive 来て / move 移って / split 分かれて）、
+     * abandon 捨てた（reason：food 蓄えが尽きた / raids 何度も襲われた / alone 1匹になった / dragon 竜を恐れた、to：leave 去った / move 移った）、
+     * empty 誰もいなくなって消えた
+     */
+    settle: { t: number; k: number; id: number; ev: string; how?: string; reason?: string; to?: string; n?: number; x: number; y: number }[];
+  } = { deaths: [], births: [], exits: [], moves: [], settle: [] };
   /** 次に生まれる生き物の由来（spawn の直前に設定し、spawn が読んで戻す） */
   private originNext = '';
-  private record(kind: 'deaths' | 'births' | 'exits' | 'moves', e: never): void {
+  private record(kind: 'deaths' | 'births' | 'exits' | 'moves' | 'settle', e: never): void {
     const a = this.stats[kind] as unknown[];
     a.push(e);
     if (a.length > 5000) a.splice(0, a.length - 4000);
@@ -7735,8 +7741,9 @@ export class Ecology {
   }
 
   /** 新しい住処を作る（door は入口の床のマス） */
-  private newWarren(door: number): Warren {
+  private newWarren(door: number, how = 'arrive'): Warren {
     const m = this.w.map;
+    this.record('settle', { t: this.w.tick, k: Kind.Kobold, id: this.nextId, ev: 'found', how, x: (door % m.w) * TILE + 8, y: Math.floor(door / m.w) * TILE + 8 } as never);
     const wr: Warren = { id: this.nextId++, x: (door % m.w) * TILE + 8, y: Math.floor(door / m.w) * TILE + 8, target: -1, prog: 0, len: 0, door, dir: this.tunnelDir(door), tun: 0, store: 0, hide: 0, raids: 0, empty: -1 };
     this.warrens.push(wr);
     return wr;
@@ -8029,11 +8036,13 @@ export class Ecology {
     const members = this.warrenMembers(wr);
     const why = ['蓄えが尽きて', '何度も襲われて', '1匹になって', '竜を恐れて'][reason];
     const open = m.mouths.some((mo, i) => mo.kind === 0 && this.mouthOpen(i));
+    const rec = (to: string) => this.record('settle', { t: this.w.tick, k: Kind.Kobold, id: wr.id, ev: 'abandon', reason: ['food', 'raids', 'alone', 'dragon'][reason], to, n: members.length, x: Math.round(wr.x), y: Math.round(wr.y) } as never);
     if (reason === 1 || reason === 3) this.koboldShun = Math.max(this.koboldShun, this.w.tick + DAY_TICKS_ECO * 2);
     if (!open) {
       const site = this.pickWarren(wr, [wr.x, wr.y]);
       if (site < 0) return false;
-      const nw = this.newWarren(site);
+      rec('move');
+      const nw = this.newWarren(site, 'move');
       nw.store = wr.store ?? 0;
       wr.store = 0;
       for (const c of members) {
@@ -8056,6 +8065,7 @@ export class Ecology {
       }
       this.deposit(wr.x, wr.y, st);
       wr.store = 0;
+      rec('leave');
       this.log(wr.x, wr.y, `{k:${Kind.Kobold}}の一団が${why}住処を捨てて去った`);
     }
     this.traps = this.traps.filter((t) => t.w !== wr.id);
@@ -8070,6 +8080,7 @@ export class Ecology {
       if (wr.id < 0) continue;
       const members = this.warrenMembers(wr);
       if (!members.length) {
+        this.record('settle', { t: this.w.tick, k: Kind.Kobold, id: wr.id, ev: 'empty', x: Math.round(wr.x), y: Math.round(wr.y) } as never);
         this.deposit(wr.x, wr.y, wr.store ?? 0);
         wr.store = 0;
         this.traps = this.traps.filter((t) => t.w !== wr.id);
@@ -8155,7 +8166,7 @@ export class Ecology {
       if (this.step % 600 === 335 && members.length >= 12 && (wr.store ?? 0) >= 40 && this.warrens.filter((o) => o.id >= 0).length < 3) {
         const site = this.pickWarren(undefined, [wr.x, wr.y]);
         if (site >= 0) {
-          const nw = this.newWarren(site);
+          const nw = this.newWarren(site, 'split');
           const young = members.slice().sort((p, q) => q.id - p.id).slice(0, 4);
           for (const c of young) {
             c.ref = nw.id;

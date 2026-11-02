@@ -8,11 +8,12 @@ import { CR_EVERY } from './ecology';
 import { DAY_TICKS, TICKS_PER_SEC, World, dayIntensity, timeLabel } from './world';
 import { JOB_NAMES, NAMES, renderEvent } from './names';
 
-// 確認用の表示：URL の末尾に #lit（全体を明るく照らす）か #albedo（地形の色だけ）を付ける
+// 確認用の表示：URL の末尾に #lit（全体を明るく照らす）か #albedo（地形の色だけ）を付ける（#clean,lit のように並べてもよい）
 const debugMode = (): number => {
   const q = new URLSearchParams(location.search).get('debug');
-  const h = location.hash.slice(1);
-  return h === 'albedo' || q === 'albedo' ? 1 : h === 'lit' || q === 'lit' ? 2 : 0;
+  // #clean,lit のように、ほかの指定と並べてもよい
+  const h = location.hash.slice(1).split(',');
+  return h.includes('albedo') || q === 'albedo' ? 1 : h.includes('lit') || q === 'lit' ? 2 : 0;
 };
 let DEBUG = debugMode();
 // #clean を付けると画面の部品を隠す（見た目の確認用）

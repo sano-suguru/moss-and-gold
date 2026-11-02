@@ -55,7 +55,14 @@ function measure(dir: string): M {
     ratStarve: cnt(D, 2, (d) => d.cause === 'starve'), ratArr: cnt(B, 2, (b) => b.origin !== 'born'), ratBorn: cnt(B, 2, (b) => b.origin === 'born'), ratDisp: cnt(X, 2, (x) => x.reason === 'dispersed'),
     ratLast: rs[rs.length - 1] ?? 0, ratMax: Math.max(0, ...rs), ratGone: (rs[rs.length - 1] ?? 0) === 0 && (rs[rs.length - 2] ?? 0) === 0, drift,
     ratMoves: MV.filter((x) => x.k === 2).length,
-    endFood: evc(/^\{k:10\}の一団が蓄えが尽きて/), endAlone: evc(/^\{k:10\}の一団が(数が減って|1匹になって)/), endRaid: evc(/^\{k:10\}の一団が何度も襲われて/), endDragon: evc(/^\{k:10\}の一団が竜を恐れて/),
+    // 住処の終わり方：settle.jsonl（構造化した記録）があればそれを、なければ記録の文章から数える（古い回のため）
+    ...(existsSync(join(dir, 'settle.jsonl'))
+      ? (() => {
+          const SE = rd(dir, 'settle.jsonl').filter((x) => x.k === 10 && x.ev === 'abandon');
+          const r = (why: string) => SE.filter((x) => x.reason === why).length;
+          return { endFood: r('food'), endAlone: r('alone'), endRaid: r('raids'), endDragon: r('dragon') };
+        })()
+      : { endFood: evc(/^\{k:10\}の一団が蓄えが尽きて/), endAlone: evc(/^\{k:10\}の一団が(数が減って|1匹になって)/), endRaid: evc(/^\{k:10\}の一団が何度も襲われて/), endDragon: evc(/^\{k:10\}の一団が竜を恐れて/) }),
     gobArr: cnt(B, 12, (b) => b.origin !== 'born'), orcArr: cnt(B, 13, (b) => b.origin !== 'born'),
   };
 }
@@ -70,6 +77,47 @@ const tbl = (title: string, f: (m: M) => string | number, total?: (ms: M[]) => s
   L.push('');
 };
 const sum = (ms: M[], f: (m: M) => number) => ms.reduce((a, m) => a + f(m), 0);
+
+/**
+ * 目安（--goals goals.json）：[{ "label": "住処の日数の中央値", "metric": "warrenMedian", "op": ">=", "value": 5 }, ...]
+ * metric は下の METRICS の名前（8シードまとめた値）。届いたかどうかを表にする
+ */
+const METRICS: Record<string, (ms: M[]) => number> = {
+  warrenMedian: (ms) => median(ms.flatMap((m) => m.dur)),
+  warrenSeedMedian: (ms) => median(ms.filter((m) => m.dur.length).map((m) => median(m.dur))),
+  warrenShare5: (ms) => (100 * sum(ms, (m) => m.dur.filter((d) => d >= 5).length)) / Math.max(1, sum(ms, (m) => m.warrens)),
+  warrens: (ms) => sum(ms, (m) => m.warrens),
+  advKob: (ms) => sum(ms, (m) => m.advKob),
+  fireKob: (ms) => sum(ms, (m) => m.fireKob),
+  kobStarveExit: (ms) => sum(ms, (m) => m.kobStarveExit),
+  kobAbandon: (ms) => sum(ms, (m) => m.kobAbandon),
+  kobStarveDeath: (ms) => sum(ms, (m) => m.kobStarveDeath),
+  kobArr: (ms) => sum(ms, (m) => m.kobArr),
+  kobBorn: (ms) => sum(ms, (m) => m.kobBorn),
+  endFood: (ms) => sum(ms, (m) => m.endFood),
+  endAlone: (ms) => sum(ms, (m) => m.endAlone),
+  endRaid: (ms) => sum(ms, (m) => m.endRaid),
+  ratStarve: (ms) => sum(ms, (m) => m.ratStarve),
+  ratArr: (ms) => sum(ms, (m) => m.ratArr),
+  ratBorn: (ms) => sum(ms, (m) => m.ratBorn),
+  ratDisp: (ms) => sum(ms, (m) => m.ratDisp),
+  ratMoves: (ms) => sum(ms, (m) => m.ratMoves),
+  ratGoneSeeds: (ms) => ms.filter((m) => m.ratGone).length,
+  gobArr: (ms) => sum(ms, (m) => m.gobArr),
+  orcArr: (ms) => sum(ms, (m) => m.orcArr),
+  drift: (ms) => Math.max(0, ...ms.map((m) => m.drift)),
+};
+if (args.goals) {
+  const goals: { label: string; metric: string; op: string; value: number }[] = JSON.parse(readFileSync(args.goals, 'utf8'));
+  const ok = (v: number, op: string, x: number) => (op === '>=' ? v >= x : op === '<=' ? v <= x : op === '>' ? v > x : op === '<' ? v < x : v === x);
+  L.push('## 目安', '', `| 目安 | ${names.join(' | ')} |`, `|---|${names.map(() => '---:').join('|')}|`);
+  for (const g of goals) {
+    const f = METRICS[g.metric];
+    if (!f) throw new Error(`知らない metric：${g.metric}（使えるもの：${Object.keys(METRICS).join(', ')}）`);
+    L.push(`| ${g.label}（${g.op} ${g.value}） | ${all.map((ms) => { const v = f(ms); return `${ok(v, g.op, g.value) ? '✅' : '❌'} ${Number.isInteger(v) ? v : v.toFixed(1)}`; }).join(' | ')} |`);
+  }
+  L.push('');
+}
 L.push('## コボルト', '');
 tbl('住処が続いた日数（中央値 / 最長 / できた数）', (m) => `${f1(median(m.dur))} / ${f1(Math.max(0, ...m.dur))} / ${m.warrens}`, (ms) => `中央値 ${f1(median(ms.flatMap((m) => m.dur)))}（シードごとの中央値の中央値 ${f1(median(ms.filter((m) => m.dur.length).map((m) => median(m.dur))))}）`);
 tbl('5日以上続いた住処 / 終わった住処の日数の中央値', (m) => `${m.dur.filter((d) => d >= 5).length}/${m.warrens} / ${f1(median(m.ended))}`, (ms) => `${ms.reduce((a, m) => a + m.dur.filter((d) => d >= 5).length, 0)}/${ms.reduce((a, m) => a + m.warrens, 0)}（${f1((100 * ms.reduce((a, m) => a + m.dur.filter((d) => d >= 5).length, 0)) / Math.max(1, ms.reduce((a, m) => a + m.warrens, 0)))}％） / ${f1(median(ms.flatMap((m) => m.ended)))}`);

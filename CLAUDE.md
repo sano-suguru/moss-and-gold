@@ -32,7 +32,15 @@ npm run batch -- --seeds "abc,かしたれ,seed4" --days 25 --out runs/batch-x  
 npm run batch -- --out runs/batch-x                                 # 途中で止まった batch を続ける（--summary で表だけ作り直す）
 npm run batch -- --seeds ... --days 25 --adv-max 2 --out runs/b-adv2 # 冒険者の一行の上限を切り替えて回す（既定 1。段階13までは 2）
 npm run compare -- --runs runs/b1,runs/b2 --names "前,後" --out docs/x.md  # batch どうしをコボルトと大ネズミの目安で並べる
+npm run compare -- --runs ... --goals tools/analysis/goals-settling.json   # 目安に届いたか（✅/❌）の表をつける
+npm run autopsy -- --seed seed7 --days 25 --kind 2 --cause starve   # 死んだときの様子の内訳と、死ぬ直前の様子の例（runs/autopsy-*.md）
+npm run stuckmap -- --seed seed7 --days 12 --kind 2                 # 動こうとして進めない場所の地図（stuck.png）と上位のマス
+npm run ab -- --base HEAD~1 --seeds abc,seed5 --days 10             # 前の版といまの版の出力が1バイトも違わないか（整理・高速化の確かめ）
+npm run ab -- --resume-check 7 --seeds かしたれ --days 10            # 7日目で分けて回しても通しと一致するか
+npm run ab -- --base HEAD~1 --fork 5 --days 15 --seeds ... --out runs/ab-x  # 同じ5日目の状態から前の版といまの版を続けて compare
 ```
+
+手直しの効き目は、1シードでは分からない（展開が少しの違いで大きく分かれる）。8シードの batch か、`ab --fork` で同じ途中の状態から比べる。
 
 `sim` は `--budget 秒`（既定270）を超えそうになると途中の状態（checkpoint.json）を書き出して止まる。
 Claude Code の実行時間に制限がある環境では、`--resume` で何回かに分けて回す。分けても結果は同じ。
@@ -43,8 +51,13 @@ Claude Code の実行時間に制限がある環境では、`--resume` で何回
 npm run gallery                      # 決まった場面を作って撮り、build/gallery/sheet.png（一覧）を作る
 npm run gallery -- --label before    # 撮った画像を build/gallery/before/ に残す（直す前に）
 npm run gallery -- --compare before  # いまの画像と before を左右に並べた build/gallery/compare-before.png
-python3 tools/gallery/shoot.py --only dragon,camp   # 場面を選んで撮り直す（場面の保存はそのまま）
+node tools/gallery/shoot.mjs --only dragon,camp     # 場面を選んで撮り直す（場面の保存はそのまま。node build.mjs を先に）
+node tools/gallery/shoot.mjs --light                # 確認用の明かり（#lit）をつけて撮る（暗さと絵の出来を分けて見る）
+npm run shot -- --seed かしたれ --find warren         # 見たいもの（warren / hide / kind:番号 / xy:x,y）が出るまで進めて撮る。
+                                                    # build/shots/ に、そのまま・印つき（-marked）・真ん中を3倍に切り出し（-crop）
 ```
+
+撮るのは Node の Playwright（Python は要らない）。ゲームの URL の末尾に `#lit`（全体を明るく照らす）、`#albedo`（地形の色だけ）、`#clean`（画面の部品を隠す）を付けられ、`#clean,lit` のように並べてもよい。
 
 場面は `tools/gallery/scenes.ts` の `SCENES`（シード、時刻、見たい場所を探す関数、拡大率、スマホかどうか）。見た目を変えたら、直す前に `--label` で残し、直したあと `--compare` で並べて確かめる。数値では測れないので、必ず画像を見て判断する（一箇所を直すと別の場面が崩れることがある）。
 
@@ -61,6 +74,7 @@ python3 tools/gallery/shoot.py --only dragon,camp   # 場面を選んで撮り�
 
 | ファイル | 中身 |
 |---|---|
+| settle.jsonl | `{t, k, id, ev, how, reason, to, n, x, y}`。住みつく群れの出来事（いまはコボルトの住処）：ev は found（how：arrive / move / split）、abandon（reason：food / raids / alone / dragon、to：leave / move）、empty |
 | samples.jsonl | 地上の1/4日ごと：種ごとの数（`counts` のキーは種の番号）、死骸、開いた床、瓦礫、使える養分、総量、帳簿のずれ（nutrientDrift / goldDrift / rockDrift）、噂、一行の数、外の世界の地図の区画数、ドワーフの住みかの段階 |
 | deaths.jsonl | `{t, k, cause, by, x, y}`。cause：eaten 食べられた / fight 打ち合い / starve 飢え / burned 焼けた / crushed 崩落 / petrified 石化 / killed 襲われた（ゾンビなど）/ dried 干からびた（スライム）/ faded ゴーストが消えた / planted マイコニドがキノコになった / crumbled スケルトンが崩れて消えた / other。by は手を下した種（なければ −1） |
 | births.jsonl | `{t, k, origin, x, y}`。origin：entrance 正面の入口 / mouth 地表の横穴 / fissure 地底の裂け目 / river 川の口 / shaft 天井の裂け目 / mana マナから / born 中で生まれた |
@@ -82,8 +96,8 @@ python3 tools/gallery/shoot.py --only dragon,camp   # 場面を選んで撮り�
 | src/creatureView.ts, renderer.ts, shaders.ts | 描画 |
 | src/main.ts | ループ、画面の部品（ミニマップ、記録、養分の表示）、保存 |
 | test/*.ts | テスト |
-| tools/gallery/koboldshots.* | コボルトの住処のスクショ（場面を作る .ts と、Node の Playwright で撮る .mjs） |
-| tools/analysis/ | 分析の道具（sim, report, batch：多くのシードを並べて回して比較の表, compare：batch どうしの目安の比較, drift, ratdiag：飢え死にの調査, stuck：動かない個体, digmap：掘られたマスと岩の硬さの地図, planview：ドワーフの坑道の計画を文字で描く） |
+| tools/gallery/ | 見た目の確認（scenes.ts と shoot.mjs：決まった場面の一覧、shot.ts と shot.mjs：見たいものを探して撮る） |
+| tools/analysis/ | 分析の道具（sim, report, batch：多くのシードを並べて回して比較の表, compare：batch どうしの目安の比較, autopsy：死んだときの様子, stuckmap：足止めの地図, ab：前の版との比較, drift, ratdiag：飢え死にの調査, stuck：動かない個体, digmap：掘られたマスと岩の硬さの地図, planview：ドワーフの坑道の計画を文字で描く） |
 | README.md | 段階ごとの仕組みの詳しい説明（仕様書として読める） |
 
 ## いまの仕組みの要点（段階13まで）
