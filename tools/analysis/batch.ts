@@ -2,74 +2,52 @@
  * 多くのシードの試運転を並べて回し、シードを横に並べた比較の表を作る。
  *
  *   npm run batch -- --seeds "abc,かしたれ,はじまりの洞窟,seed4" --days 25
- *   npm run batch -- --seeds ... --days 25 --jobs 4 --out runs/batch-mine
- *   npm run batch -- --out runs/batch-mine           （途中で止まったものを続ける。表だけ作り直すときも同じ）
- *   npm run batch -- --out runs/batch-mine --summary  （回さずに表だけ作り直す）
+ *   npm run batch -- --seeds 16 --days 25 --out runs/b16          （--seeds 8 / 16 は決まったシードの組。lib/seeds.ts）
+ *   npm run batch -- --seeds 8 --days 18 --fork 10 --base HEAD     （前の版の10日目の状態から、いまの版で18日目まで）
+ *   npm run batch -- --seeds 8 --days 25 --ref HEAD~1              （前の版で回す）
+ *   npm run batch -- --out runs/batch-mine --summary               （回さずに表だけ作り直す）
  *
- * CPU の数（--jobs）だけ sim を同時に回す。各シードは <out>/<番号>-<シード>/ に sim と同じ形で書き出す。
- * 時間切れで止まったシード（checkpoint.json があって目標の日数に届いていないもの）は --resume で続ける（分けても結果は同じ）。
- * --budget 秒（既定 100000）は各 sim にそのまま渡す。終わったら各フォルダに report.md を作り、<out>/summary.md を書く。
+ * 回した結果は版ごとの保存庫（runs/.cache/run、lib/runs.ts）に置き、<out>/<番号>-<シード>/ にはそこから切り出して写す。
+ * 同じ版・同じシードを前に回していれば回さずに使い、日数が足りなければ続きから回す（分けても結果は同じ）。
+ * 同時に --jobs（既定は CPU の数）個、かかる時間の長いシードから回す。終わったら各フォルダに report.md を作り、<out>/summary.md を書く。
  */
-import { spawn, execFileSync } from 'child_process';
 import { cpus } from 'os';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { generate } from '../../src/mapgen';
 import { DAY_TICKS } from '../../src/world';
 import { KIND_NAMES, parseArgs } from './common';
+import { defaultAdv, getBin } from './lib/runs';
+import { dirName, finished, reports, runSets } from './lib/batchrun';
+import { parseSeeds } from './lib/seeds';
 
 const args = parseArgs(process.argv.slice(2));
-const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 13);
+const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
 const out = args.out || `runs/batch-${stamp}`;
 mkdirSync(out, { recursive: true });
 const cfgPath = join(out, 'batch.json');
-let cfg: { seeds: string[]; days: number; advMax?: number };
+let cfg: { seeds: string[]; days: number; advMax?: number; ref?: string; fork?: { day: number; ref?: string } };
 if (args.seeds) {
-  cfg = { seeds: args.seeds.split(',').map((s) => s.trim()).filter(Boolean), days: +(args.days || 25) };
+  cfg = { seeds: parseSeeds(args.seeds, []), days: +(args.days || 25) };
   if (args['adv-max'] !== undefined) cfg.advMax = +args['adv-max'];
-  writeFileSync(cfgPath, JSON.stringify(cfg, null, 1));
+  if (args.ref) cfg.ref = args.ref;
+  if (args.fork) cfg.fork = { day: +args.fork, ref: args.base || 'HEAD' };
 } else if (existsSync(cfgPath)) {
   cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
   if (args.days) cfg.days = +args.days;
-} else throw new Error('--seeds "a,b,c" を指定してください（続きなら --out に前のフォルダ）');
+} else throw new Error('--seeds "a,b,c" を指定してください（表だけ作り直すなら --out に前のフォルダと --summary）');
 const jobs = Math.max(1, +(args.jobs || cpus().length));
-const budget = args.budget || '100000';
-const dirOf = (i: number) => join(out, `${String(i + 1).padStart(2, '0')}-${cfg.seeds[i].replace(/[\\/:*?"<>|\s]/g, '_')}`);
-
-function bundle(name: string) {
-  execFileSync('npx', ['esbuild', `tools/analysis/${name}.ts`, '--bundle', '--platform=node', `--outfile=build/${name}.js`, '--log-level=warning'], { stdio: 'inherit' });
-}
-
-function done(dir: string): boolean {
-  if (!existsSync(join(dir, 'meta.json'))) return false;
-  const meta = JSON.parse(readFileSync(join(dir, 'meta.json'), 'utf8'));
-  return meta.tick >= cfg.days * DAY_TICKS;
-}
-
-function runOne(i: number): Promise<void> {
-  const dir = dirOf(i);
-  const resume = existsSync(join(dir, 'checkpoint.json'));
-  const a = resume ? ['build/sim.js', '--resume', dir, '--days', String(cfg.days), '--budget', budget] : ['build/sim.js', '--seed', cfg.seeds[i], '--days', String(cfg.days), '--out', dir, '--budget', budget, ...(cfg.advMax !== undefined ? ['--adv-max', String(cfg.advMax)] : [])];
-  const t0 = Date.now();
-  return new Promise((res, rej) => {
-    const p = spawn('node', a, { stdio: ['ignore', 'ignore', 'inherit'] });
-    p.on('exit', (code) => {
-      const st = done(dir) ? '終わり' : '途中で止まった';
-      console.log(`  ${cfg.seeds[i]}：${st}（${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
-      code === 0 ? res() : rej(new Error(`sim が失敗：${cfg.seeds[i]}（${code}）`));
-    });
-  });
-}
+const dirOf = (i: number) => join(out, dirName(cfg.seeds, i));
+const done = (dir: string) => finished(dir, cfg.days);
 
 async function runAll() {
-  bundle('sim');
-  const todo = cfg.seeds.map((_, i) => i).filter((i) => !done(dirOf(i)));
-  console.log(`${cfg.seeds.length} シード × ${cfg.days} 日、残り ${todo.length}、同時に ${jobs}（${out}）`);
-  let next = 0;
-  const worker = async () => {
-    while (next < todo.length) await runOne(todo[next++]);
-  };
-  await Promise.all(Array.from({ length: Math.min(jobs, todo.length) }, worker));
+  const t0 = Date.now();
+  const ver = await getBin('sim', cfg.ref || 'cur');
+  const base = cfg.fork ? await getBin('sim', cfg.fork.ref || 'HEAD') : undefined;
+  const adv = cfg.advMax ?? defaultAdv();
+  console.log(`${cfg.seeds.length} シード × ${cfg.days} 日${cfg.fork ? `（${cfg.fork.ref} の ${cfg.fork.day} 日目の状態から）` : ''}、版 ${ver.simHash}、同時に ${jobs}（${out}）`);
+  await runSets([{ seeds: cfg.seeds, days: cfg.days, adv, ver, fork: cfg.fork && base ? { day: cfg.fork.day, base } : undefined, out }], jobs);
+  console.log(`回し終わり（${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
 }
 
 // ---------------- 比較の表 ----------------
@@ -298,14 +276,10 @@ const CAUSE_SHORT: Record<string, string> = { crumbled: '朽', burned: '焼', cr
 
 async function main() {
   if (!args.summary) await runAll();
-  const ready = cfg.seeds.map((_, i) => i).filter((i) => existsSync(join(dirOf(i), 'samples.jsonl')));
-  if (!args.summary || args.report) {
-    bundle('report');
-    for (const i of ready) execFileSync('node', ['build/report.js', '--run', dirOf(i)], { stdio: ['ignore', 'ignore', 'inherit'] });
-  }
+  if (!args.summary || args.report) await reports(out, cfg.seeds, jobs);
   writeSummary();
   const unfinished = cfg.seeds.filter((_, i) => !done(dirOf(i)));
-  if (unfinished.length) console.log(`まだ終わっていないシード：${unfinished.join('、')}。続きは：npm run batch -- --out ${out}`);
+  if (unfinished.length) console.log(`まだ終わっていないシード：${unfinished.join('、')}`);
 }
 main().catch((e) => {
   console.error(e);

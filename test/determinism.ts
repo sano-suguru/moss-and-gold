@@ -1,9 +1,13 @@
 // 同じシードから同じダンジョンと同じ展開が得られることを確かめる
-// 互いに独立な四つの部分（地形の検査、1日半の通し二回、保存からの再現）を、別々の Node の子プロセスで同時に回す（CPU の数だけ速くなる）。
+// 互いに独立な部分（地形の検査、1日半の通し二回、保存からの再現の二つ）を、別々の Node の子プロセスで同時に回す（CPU の数だけ速くなる）。
+// 保存からの再現は、決まった途中の状態（test/fixtures/kashitare-d5.json.gz：かしたれの5日目）から始める。
+// TEST_FULL=1 npm test なら、もとのとおり0日目から6日回してから確かめる（約30秒）。
 // 子は `node build/test.js <部分>` で、親は結果を集めて、もとと同じ順に表示する。
 import { spawn } from 'child_process';
 import { generate, MAP_W, MAP_H } from '../src/mapgen';
 import { World, DAY_TICKS } from '../src/world';
+import { decodeState, encodeState, readState } from '../tools/analysis/lib/state';
+import { join } from 'path';
 
 function fnv(a: ArrayLike<number>): number {
   let h = 2166136261;
@@ -11,6 +15,13 @@ function fnv(a: ArrayLike<number>): number {
   return h >>> 0;
 }
 function check(cond: boolean, msg: string) { if (!cond) { console.error('NG: ' + msg); process.exitCode = 1; } else console.log('OK: ' + msg); }
+
+const genMemo = new Map<string, ReturnType<typeof generate>>();
+/** 同じシードの地形を何度も作らない（検査は地形を書き換えない） */
+const gen = (seed: string) => {
+  if (!genMemo.has(seed)) genMemo.set(seed, generate(seed));
+  return genMemo.get(seed)!;
+};
 
 function partMap() {
 for (const seed of ['かしたれ', 'abc', 'はじまりの洞窟']) {
@@ -26,7 +37,7 @@ check(fnv(generate('かしたれ').solid) !== fnv(generate('abc').solid), '別�
   // 30個のシードで、溶岩を除いた床がすべて入口から歩いて行けること
   let bad = 0;
   for (let i = 0; i < 30; i++) {
-    const m = generate('seed' + i);
+    const m = gen('seed' + i);
     const seen = new Uint8Array(m.w * m.h); const st = [m.entrance.x]; seen[m.entrance.x] = 1; let n = 0;
     while (st.length) { const c = st.pop()!; n++; const x = c % m.w, y = (c / m.w) | 0;
       for (const [nx, ny] of [[x+1,y],[x-1,y],[x,y+1],[x,y-1]]) { if (nx<0||ny<0||nx>=m.w||ny>=m.h) continue; const q = ny*m.w+nx; if (!seen[q] && !m.solid[q] && !m.lava[q]) { seen[q] = 1; st.push(q); } } }
@@ -39,7 +50,7 @@ check(fnv(generate('かしたれ').solid) !== fnv(generate('abc').solid), '別�
   // 開いた洞窟の広さ、光の筋と湧き水、すぐそばの閉じた空洞
   let badOpen = 0;
   for (let i = 0; i < 30; i++) {
-    const m = generate('seed' + i);
+    const m = gen('seed' + i);
     let open = 0;
     let nearPocket = false;
     for (let k = 0; k < m.w * m.h; k++) {
@@ -54,10 +65,10 @@ check(fnv(generate('かしたれ').solid) !== fnv(generate('abc').solid), '別�
   }
   check(badOpen === 0, `30個のシードすべてで、開いた洞窟は地図の約12分の1、光の筋と湧き水があり、3マス以内に閉じた空洞がある`);
   let mz = 0;
-  for (let i = 0; i < 30; i++) if (generate('seed' + i).maze.some((v) => v)) mz++;
+  for (let i = 0; i < 30; i++) if (gen('seed' + i).maze.some((v) => v)) mz++;
   check(mz >= 27, `30個のシードのうち ${mz} 個に迷路の区画がある`);
   let vs = 0;
-  for (let i = 0; i < 30; i++) if (generate('seed' + i).vaultCenter.x >= 0) vs++;
+  for (let i = 0; i < 30; i++) if (gen('seed' + i).vaultCenter.x >= 0) vs++;
   check(vs >= 28, `30個のシードのうち ${vs} 個に宝物庫がある`);
 }
 
@@ -88,7 +99,7 @@ const run = () => {
 };
 
 function partSave() {
-// 保存して読み込み直しても、続きの展開が変わらない
+// 保存して読み込み直しても、続きの展開が変わらない（0日目から6日回してから。TEST_FULL=1 のとき）
 {
   const a = new World('かしたれ');
   for (let i = 0; i < DAY_TICKS * 6.0; i++) a.step();
@@ -98,6 +109,22 @@ function partSave() {
   check(JSON.stringify(a.eco.serialize()) === JSON.stringify(b.eco.serialize()) && fnv(a.moss) === fnv(b.moss) && fnv(a.fungus) === fnv(b.fungus) && a.digs.join() === b.digs.join() && fnv(a.ash) === fnv(b.ash), `保存から読み込み直しても続きの展開が一致（掘られた岩 ${digs0}→${a.digs.length} マス、キノコ ${a.totalFungus}）`);
 }
 
+}
+
+/**
+ * 保存からの再現（速い版）：決まった5日目の状態から0.5日進めて（読み込んだ直後の控えが、進めるうちに作り直される）、
+ *   A：そのまま0.5日進める
+ *   B：そこで保存して読み込み直し、0.5日進める
+ * を別々のプロセスで回し、終わりの状態のハッシュを比べる。
+ */
+function partSaveHalf(reload: boolean) {
+  let w = decodeState(readState(join(__dirname, '..', 'test', 'fixtures', 'kashitare-d5.json.gz')));
+  for (let i = 0; i < DAY_TICKS * 0.5; i++) w.step();
+  const digs0 = w.digs.length;
+  if (reload) w = decodeState(JSON.parse(JSON.stringify(encodeState(w))));
+  for (let i = 0; i < DAY_TICKS * 0.5; i++) w.step();
+  const h = { eco: fnv(new TextEncoder().encode(JSON.stringify(w.eco.serialize()))), moss: fnv(w.moss), fungus: fnv(w.fungus), digs: w.digs.join(), ash: fnv(w.ash), water: fnv(new Uint8Array(w.water.buffer)), mana: fnv(new Uint8Array(w.mana.buffer)) };
+  console.log('RESULT ' + JSON.stringify({ h, digs0, digs: w.digs.length, fungus: w.totalFungus }));
 }
 
 function partAscii() {
@@ -123,6 +150,8 @@ else if (part === 'run') {
   const r = run();
   console.log('RESULT ' + JSON.stringify({ r, lastGold, lastRock }));
 } else if (part === 'save') partSave();
+else if (part === 'saveA') partSaveHalf(false);
+else if (part === 'saveB') partSaveHalf(true);
 else {
   // 親：四つの部分を同時に回す
   const child = (p: string) =>
@@ -133,7 +162,8 @@ else {
       c.on('exit', (code) => res({ out, code: code ?? 1 }));
     });
   (async () => {
-    const [mp, a, b, sv] = await Promise.all([child('map'), child('run'), child('run'), child('save')]);
+    const full = !!process.env.TEST_FULL;
+    const [mp, a, b, sv, sb] = await Promise.all([child('map'), child('run'), child('run'), child(full ? 'save' : 'saveA'), full ? Promise.resolve({ out: '', code: 0 }) : child('saveB')]);
     process.stdout.write(mp.out);
     const res = (o: string) => JSON.parse(o.split('\n').find((l) => l.startsWith('RESULT '))!.slice(7));
     const A = res(a.out);
@@ -148,8 +178,13 @@ else {
     check(r1.conserved, `養分の総量（土＋苔＋生き物）が、外との出入りと生まれた分・流れ出た分を除いて常に一定（${r1.total}）`);
     check(lastRock.ok, `岩の帳簿（岩＋瓦礫＋掘り出した土−崩落）が常にはじめの岩と一致（掘った ${lastRock.dug}、瓦礫と崩落 ${lastRock.rub}）`);
     check(lastGold.ok, `金貨の総量（山＋抱えている分）が、外との出入りを除いて常に一定（${lastGold.g}）`);
-    process.stdout.write(sv.out);
+    if (full) process.stdout.write(sv.out);
+    else {
+      const SA = res(sv.out);
+      const SB = res(sb.out);
+      check(JSON.stringify(SA.h) === JSON.stringify(SB.h), `保存から読み込み直しても続きの展開が一致（5日目の決まった状態から。掘られた岩 ${SA.digs0}→${SA.digs} マス、キノコ ${SA.fungus}）`);
+    }
     partAscii();
-    if ([mp, a, b, sv].some((x) => x.code !== 0)) process.exitCode = 1;
+    if ([mp, a, b, sv, sb].some((x) => x.code !== 0)) process.exitCode = 1;
   })();
 }
