@@ -30,9 +30,10 @@ npm run sim -- --seed abc --days 5 --out runs/t --trace 1234        # 生き物1
 npm run report -- --run runs/kashitare                              # report.md と deaths.png / births.png
 npm run batch -- --seeds "abc,かしたれ,seed4" --days 25 --out runs/batch-x  # CPU の数だけ sim を並べて回し、report と比較の表 summary.md を作る
 npm run batch -- --out runs/batch-x                                 # 途中で止まった batch を続ける（--summary で表だけ作り直す）
-npm run batch -- --seeds ... --days 25 --adv-max 2 --out runs/b-adv2 # 冒険者の一行の上限を切り替えて回す（既定 1。段階13までは 2）。--goblin-farm 1 で、ゴブリンの来る条件に畑のキノコも数える（比べる用）
+npm run batch -- --seeds ... --days 25 --adv-max 2 --out runs/b-adv2 # 冒険者の一行の上限を切り替えて回す（既定 1。段階13までは 2）
 npm run compare -- --runs runs/b1,runs/b2 --names "前,後" --out docs/x.md  # batch どうしをコボルトと大ネズミの目安で並べる
 npm run compare -- --runs ... --goals tools/analysis/goals-settling.json   # 目安に届いたか（✅/❌）の表をつける
+npm run compare -- --runs ... --seeds "abc,かしたれ"   # 一部のシードだけ比べる（ゴブリンの集落、冒険者やコボルトとの殺し合いの表もある。目安は goals-round4.json）
 npm run autopsy -- --seed seed7 --days 25 --kind 2 --cause starve   # 死んだときの様子の内訳と、死ぬ直前の様子の例（runs/autopsy-*.md）
 npm run stuckmap -- --seed seed7 --days 12 --kind 2                 # 動こうとして進めない場所の地図（stuck.png）と上位のマス
 npm run ab -- --base HEAD~1 --seeds abc,seed5 --days 10             # 前の版といまの版の出力が1バイトも違わないか（整理・高速化の確かめ）
@@ -54,7 +55,7 @@ npm run gallery -- --compare before  # いまの画像と before を左右に並
 node tools/gallery/shoot.mjs --only dragon,camp     # 場面を選んで撮り直す（場面の保存はそのまま。node build.mjs を先に）
 npm run gallery -- --fresh           # 場面をかならず作り直す（ふだんは、シミュレーションのコードと場面の定義が前回と同じなら作り直さない）
 node tools/gallery/shoot.mjs --light                # 確認用の明かり（#lit）をつけて撮る（暗さと絵の出来を分けて見る）
-npm run shot -- --seed かしたれ --find warren         # 見たいもの（warren / hide / kind:番号 / xy:x,y）が出るまで進めて撮る。
+npm run shot -- --seed かしたれ --find warren         # 見たいもの（warren / hide / camp / gobhide / kind:番号 / xy:x,y）が出るまで進めて撮る。
                                                     # build/shots/ に、そのまま・印つき（-marked）・真ん中を3倍に切り出し（-crop）
 ```
 
@@ -75,7 +76,7 @@ npm run shot -- --seed かしたれ --find warren         # 見たいもの（wa
 
 | ファイル | 中身 |
 |---|---|
-| settle.jsonl | `{t, k, id, ev, how, reason, to, n, x, y}`。住みつく群れの出来事（いまはコボルトの住処）：ev は found（how：arrive / move / split）、abandon（reason：food / raids / alone / dragon、to：leave / move）、empty |
+| settle.jsonl | `{t, k, id, ev, how, reason, to, n, x, y}`。住みつく群れの出来事（k 10 コボルトの住処、k 12 ゴブリンの集落）：ev は found（how：arrive / move / split）、abandon（reason：food / raids / alone / dragon、to：leave / move）、empty |
 | samples.jsonl | 地上の1/4日ごと：シードの豊かさ（rich：開いた地表の横穴から道のり100マスで行ける床1マスあたりの、食べられる苔とキノコ）、種ごとの数（`counts` のキーは種の番号）、死骸、開いた床、瓦礫、使える養分、総量、帳簿のずれ（nutrientDrift / goldDrift / rockDrift）、噂、一行の数、外の世界の地図の区画数、ドワーフの住みかの段階 |
 | deaths.jsonl | `{t, k, cause, by, x, y, near?}`（near：飢え死にした大ネズミの、食べられる苔・キノコまでの歩いた道のり。60マスまで、なければ -1）。cause：eaten 食べられた / fight 打ち合い / starve 飢え / burned 焼けた / crushed 崩落 / petrified 石化 / killed 襲われた（ゾンビなど）/ dried 干からびた（スライム）/ faded ゴーストが消えた / planted マイコニドがキノコになった / crumbled スケルトンが崩れて消えた / other。by は手を下した種（なければ −1） |
 | births.jsonl | `{t, k, origin, x, y}`。origin：entrance 正面の入口 / mouth 地表の横穴 / fissure 地底の裂け目 / river 川の口 / shaft 天井の裂け目 / mana マナから / born 中で生まれた |
@@ -113,7 +114,10 @@ npm run shot -- --seed かしたれ --find warren         # 見たいもの（wa
 - 三巡目：大ネズミの殖える数は巣穴のまわりで決める（`Burrow.cap`、土地勘と同じ時機に数え直して保存）。巣穴は火のそばに作らない。届かない巣穴へは帰らず、はぐれ者になる。
   列の間合いは、前の仲間が動いているときだけ（止まっている仲間は脇へよけて追い越す）。
   コボルトは、口から歩いて行ける範囲に住めて食べ物の足りる場所（`warrenFood` が `KOBOLD_MIN_FOOD` 以上）がある口からだけ来る（`kobMouthOk`、600刻みごと、保存）。
-  ゴブリンが来る条件のキノコは、コボルトの畑の外のもの（`wildFungus`。`--goblin-farm 1` で二巡目までの数え方）
+- 四巡目：大ネズミは、口か天井の裂け目のまわり（道のり40マス）の食べられる苔で養える数に余裕があるときだけ、そこから来る（`ratMouthOk` / `ratShaftOk`、600刻みごと、保存）。来た群れは入ってきた所のそばの巣穴に入る（`pickBurrowNear`）。
+  ゴブリンの集落（`Camp` の kind 0）もコボルトと同じ枠組み：場所は `pickGoblinCamp`（暗い、人の気配が薄い、冒険者の通り道（`routeDist`）から15マス以上、竜30・トロールとバジリスク15・コボルトの住処15マス離れ、まわり14マスの食べ物 `campFood` が `GOBLIN_MIN_FOOD` 以上）、口ごとの来訪 `gobMouthOk`、
+  蓄え `store`（養分の帳簿に入る。狩り・死骸・盗みの余りを持ち帰る `st 4`）、蓄えからの出産、`watchCamps`（一行が明らかに強ければ `hide 1`：集落のまわりの暗がりに散って隠れる＝`st 7`、目だけ光る。弱ければ `hide 2`：暗がりで待ち伏せ。見つかる・劣勢なら逃げ散って `raids` に数える）、
+  `abandonCamp`（蓄えが尽きて1/3日たち皆が飢えかけ、`raids` 4、1匹で1日、竜。開いた横穴があれば `st 10` で群れごと去る＝exits `abandoned`、なければ移る）、`goblinShun`。ゴブリンの頭（elite 5）のいる集落は盗みと待ち伏せに大胆。settle.jsonl に k 12 の出来事も残る
 - 描画だけ：攻撃の技の演出（`fxAttacks`、`creatureView.drawAttacks`）、気づいた印、のけぞり、飛び散る粒。見本は `dist/index.html#fxdemo`。画面の部品を隠すのは `#clean`。
 
 ## 変更するときの注意

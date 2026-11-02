@@ -6,7 +6,7 @@
  *   npm run shot -- --seed abc --find kind:24 --day 6 --zoom 3 --lit
  *   npm run shot -- --seed abc --find xy:120,40 --day 10
  *
- * --find：warren（横穴を掘り終え罠が2つ以上の住処）、hide（奥に隠れているコボルトのいる住処）、kind:番号（その種の生き物）、xy:マスx,マスy
+ * --find：warren（横穴を掘り終え罠が2つ以上の住処）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、kind:番号（その種の生き物）、xy:マスx,マスy
  * --day 探し始める日（既定 0）、--until 探すのをやめる日（既定 25）、--zoom 拡大率（既定 4）、--lit 確認用の明かり（#lit）、
  * --fog 霧をそのまま（既定は見たマスを地図全体にする）、--name 書き出す名前（既定は find から）、--out 書き出す先（既定 build/shots）
  *
@@ -63,6 +63,16 @@ function look(): Hit | null {
     }
     return null;
   }
+  if (find === 'gobhide' || find === 'camp') {
+    for (const cp of e.camps) {
+      if (cp.id < 0 || cp.kind !== 0) continue;
+      const ms = e.campMembers(cp);
+      const hid = ms.filter((c: any) => e.isHidden(c));
+      if (find === 'camp' && ms.length >= 3) return { cam: { x: Math.round(cp.x), y: Math.round(cp.y), zoom }, marks: [{ x: cp.x, y: cp.y, label: `集落 蓄え${cp.store ?? 0}`, color: '#ffd24a', size: 2 }], title: 'ゴブリンの集落' };
+      if (find === 'gobhide' && cp.hide === 1 && hid.length >= 1) return { cam: { x: Math.round(cp.x), y: Math.round(cp.y), zoom }, marks: [{ x: cp.x, y: cp.y, label: '集落', color: '#ffd24a', size: 2 }, ...hid.map((c: any) => ({ x: c.x, y: c.y, label: '隠れている', color: '#80ff9a' }))], title: '散って隠れたゴブリン' };
+    }
+    return null;
+  }
   if (find.startsWith('kind:')) {
     const k = +find.slice(5);
     const c = e.list.find((o: any) => o.k === k && !o.dead && !o.away);
@@ -77,10 +87,12 @@ function look(): Hit | null {
 
 const from = +(opt('day', '0') as string) * DAY_TICKS;
 const until = +(opt('until', '25') as string) * DAY_TICKS;
+// 何刻みごとに探すか（短いあいだしか起きないもの、たとえば隠れているゴブリンは小さくする）
+const every = +(opt('every', '200') as string);
 while (w.tick < from) { w.step(); if (w.tick % 20 === 0) w.updateSeen(); }
 let hit = look();
 while (!hit && w.tick < until) {
-  for (let i = 0; i < 200; i++) { w.step(); if (w.tick % 20 === 0) w.updateSeen(); }
+  for (let i = 0; i < every; i++) { w.step(); if (w.tick % 20 === 0) w.updateSeen(); }
   hit = look();
 }
 if (!hit) {

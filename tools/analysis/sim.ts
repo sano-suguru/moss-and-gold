@@ -15,7 +15,7 @@
  *   births.jsonl     現れた生き物（刻み、種、由来、場所）
  *   exits.jsonl      外へ出ていった生き物
  *   moves.jsonl      群れの引っ越し（大ネズミの巣穴）
- *   settle.jsonl     住みつく群れの出来事（コボルトの住処を作った・捨てた・消えた）
+ *   settle.jsonl     住みつく群れの出来事（コボルトの住処とゴブリンの集落を作った・捨てた・消えた）
  *   events.jsonl     ゲームの「記録」に出る出来事
  *   trace.jsonl      --trace で指定した生き物の毎刻みの状態
  *   checkpoint.json  続きから回すための状態（ゲームの保存と同じ形）
