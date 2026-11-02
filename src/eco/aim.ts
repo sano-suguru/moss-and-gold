@@ -500,6 +500,20 @@ export function aimTarget(this: Ecology, p: Party, from: Cr): boolean {
   if (!p.aim || p.aimEnd || p.goal !== 0) return false;
   const m = this.w.map;
   if (!p.aimKnown) {
+    // ゴブリン退治：盗まれた場所に着いても集落が見えなければ、そのまわり（12〜35マス。盗みに出たゴブリンはそのくらい遠くから来る）を順に探し歩く。
+    // かがり火が見えるか、近くに来れば集落を知る（aimStep）
+    if (!p.aimGuess && p.aim === 5 && (this.rumors.goblinX || this.rumors.goblinY)) {
+      for (let i = 0; i < 30; i++) {
+        const a = (ih(p.id, this.step, 263 + i) % 628) / 100;
+        const r = (12 + (ih(p.id, this.step, 293 + i) % 24)) * TILE;
+        const k = this.tileOf(this.rumors.goblinX + Math.cos(a) * r, this.rumors.goblinY + Math.sin(a) * r);
+        if (k < 0 || m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 40) continue;
+        p.tx = (k % m.w) * TILE + 8;
+        p.ty = Math.floor(k / m.w) * TILE + 8;
+        p.targetAt = this.step;
+        return true;
+      }
+    }
     // 当て推量の行き先へまっすぐ。着いたら、まわりの奥を探す（pickTarget が深部へ寄せる）
     if (!p.aimGuess) return false;
     // 着いたか、地上の時間で長く（4000歩）向かっても着かなければ、まわりを探す

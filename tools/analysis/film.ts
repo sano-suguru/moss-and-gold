@@ -80,7 +80,8 @@ for (let i = 0; i < n; i++) {
   }
   if (p) cam = { x: Math.round(p.x), y: Math.round(p.y), zoom };
   w.seen.set(all);
-  const save = encodeState(w) as any;
+  // その場で写し取る（保存の形には生きたオブジェクト（一行の PT2 など）がそのまま入っているので、あとで書き出すと後の刻みの値になる）
+  const save = JSON.parse(JSON.stringify(encodeState(w))) as any;
   save.cam = cam;
   save.speed = 0;
   const lead = party && e.byId.get(party.members[0]);
