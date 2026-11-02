@@ -309,6 +309,12 @@ export class CreatureView {
 
     // 地面のもの（巣穴、クモの巣）
     for (const b of eco.burrows) if (inView(b.x, b.y, 16)) pushSprite(b.x, b.y, 0, false, A.burrow, 0, 2);
+    // コボルトの罠：小さな印
+    for (const t of eco.traps) {
+      const tx = (t.k % eco.mapW) * 16 + 8;
+      const ty = Math.floor(t.k / eco.mapW) * 16 + 10;
+      if (inView(tx, ty, 16)) pushSprite(tx, ty, 0, false, A.speck(3, 3), 0, 2);
+    }
     for (const w of eco.webs) if (inView(w.x, w.y, 24)) pushSprite(w.x, w.y, 0, false, A.web, 0, 2);
     for (const c of eco.colonies) if (inView(c.x, c.y, 24)) pushSprite(c.x, c.y + 4, 0, false, A.anthill, 0, 2);
     for (const c of eco.camps) if (inView(c.x, c.y, 32)) pushSprite(c.x, c.y + 6, 0, false, c.kind === 0 ? A.camp : A.hut, 0, 2);
@@ -559,7 +565,7 @@ export class CreatureView {
     // 生き物は足元の位置で前後を決める
     this.order.length = 0;
     for (const c of eco.list) {
-      if (c.dead === 2 || c.away) continue;
+      if (c.dead === 2 || c.away || eco.isHidden(c)) continue;
       const x = c.px + (c.x - c.px) * alpha;
       const y = c.py + (c.y - c.py) * alpha;
       if (!inView(x, y, 40)) continue;

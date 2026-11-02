@@ -23,9 +23,10 @@ const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').sl
 const out = args.out || `runs/batch-${stamp}`;
 mkdirSync(out, { recursive: true });
 const cfgPath = join(out, 'batch.json');
-let cfg: { seeds: string[]; days: number };
+let cfg: { seeds: string[]; days: number; advMax?: number };
 if (args.seeds) {
   cfg = { seeds: args.seeds.split(',').map((s) => s.trim()).filter(Boolean), days: +(args.days || 25) };
+  if (args['adv-max'] !== undefined) cfg.advMax = +args['adv-max'];
   writeFileSync(cfgPath, JSON.stringify(cfg, null, 1));
 } else if (existsSync(cfgPath)) {
   cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
@@ -48,7 +49,7 @@ function done(dir: string): boolean {
 function runOne(i: number): Promise<void> {
   const dir = dirOf(i);
   const resume = existsSync(join(dir, 'checkpoint.json'));
-  const a = resume ? ['build/sim.js', '--resume', dir, '--days', String(cfg.days), '--budget', budget] : ['build/sim.js', '--seed', cfg.seeds[i], '--days', String(cfg.days), '--out', dir, '--budget', budget];
+  const a = resume ? ['build/sim.js', '--resume', dir, '--days', String(cfg.days), '--budget', budget] : ['build/sim.js', '--seed', cfg.seeds[i], '--days', String(cfg.days), '--out', dir, '--budget', budget, ...(cfg.advMax !== undefined ? ['--adv-max', String(cfg.advMax)] : [])];
   const t0 = Date.now();
   return new Promise((res, rej) => {
     const p = spawn('node', a, { stdio: ['ignore', 'ignore', 'inherit'] });
@@ -102,6 +103,9 @@ interface SeedSum {
   born: Map<number, number>;
   exits: Map<number, Map<string, number>>;
   deaths: Map<number, Map<string, number>>;
+  /** 種ごとの、冒険者に倒された数、ドラゴンに焼かれた数 */
+  byAdv: Map<number, number>;
+  byDragonFire: Map<number, number>;
   series: Map<number, number[]>;
   sampleDays: number[];
   settle: Map<string, { n: number; dur: number[]; live: number }>;
@@ -125,7 +129,7 @@ function summarizeSeed(i: number): SeedSum | null {
     return m.get(k) as Map<K, number>;
   };
   const s: SeedSum = {
-    seed: cfg.seeds[i], days: samples[samples.length - 1].day, alive: 0, arrived: new Map(), born: new Map(), exits: new Map(), deaths: new Map(),
+    seed: cfg.seeds[i], days: samples[samples.length - 1].day, alive: 0, arrived: new Map(), born: new Map(), exits: new Map(), deaths: new Map(), byAdv: new Map(), byDragonFire: new Map(),
     series: new Map(), sampleDays: samples.map((x) => x.day), settle: new Map(), mouths: [], dragon: [null, null, null], elites: new Map(),
     drift: { nutr: 0, gold: 0, rock: 0, mana: 0 }, anomalies: [],
   };
@@ -134,7 +138,11 @@ function summarizeSeed(i: number): SeedSum | null {
     else if (b.origin === 'born') inc(s.born, b.k);
   }
   for (const e of exits) inc(sub(s.exits, e.k), e.reason);
-  for (const d of deaths) inc(sub(s.deaths, d.k), d.cause);
+  for (const d of deaths) {
+    inc(sub(s.deaths, d.k), d.cause);
+    if (d.by === 25) inc(s.byAdv, d.k);
+    if (d.by === 24 && d.cause === 'burned') inc(s.byDragonFire, d.k);
+  }
   const kinds = new Set<number>();
   for (const x of samples) for (const k of Object.keys(x.counts)) kinds.add(+k);
   for (const k of kinds) s.series.set(k, samples.map((x) => x.counts[k] ?? 0));
@@ -199,7 +207,7 @@ function writeSummary() {
   const L: string[] = [];
   const head = (first: string) => [`| ${first} | ${sums.map((s) => s.seed).join(' | ')} |`, `|---|${sums.map(() => '---:').join('|')}|`];
   const row = (label: string, f: (s: SeedSum) => string | number) => `| ${label} | ${sums.map((s) => String(f(s))).join(' | ')} |`;
-  L.push(`# 比較の表：${sums.length} シード × ${cfg.days} 日`, '', `作った日時：${new Date().toISOString()}。各シードの詳しい報告は ${out}/<番号>-<シード>/report.md。`, '');
+  L.push(`# 比較の表：${sums.length} シード × ${cfg.days} 日${cfg.advMax !== undefined ? `（冒険者の一行の上限 ${cfg.advMax}）` : ''}`, '', `作った日時：${new Date().toISOString()}。各シードの詳しい報告は ${out}/<番号>-<シード>/report.md。`, '');
 
   L.push('## 概要と帳簿', '', ...head('項目'));
   L.push(row('回した日数', (s) => fx(s.days, 2)));
@@ -236,10 +244,12 @@ function writeSummary() {
     L.push(row('中で生まれた', (s) => s.born.get(k) ?? 0));
     L.push(row('去った：飢えて', (s) => ex(s, 'starving')));
     const otherReasons = [...new Set(sums.flatMap((s) => [...(s.exits.get(k)?.keys() ?? [])]))].filter((r) => r !== 'starving');
-    for (const r of otherReasons) L.push(row(`去った：${r === 'returned' ? '生還' : r === 'home' ? '満ちて帰った' : r}`, (s) => ex(s, r)));
+    for (const r of otherReasons) L.push(row(`去った：${EXIT_NAMES[r] ?? r}`, (s) => ex(s, r)));
     L.push(row('死んだ：飢え', (s) => dc(s, 'starve')));
     L.push(row('死んだ：食べられた', (s) => dc(s, 'eaten')));
     L.push(row('死んだ：戦い', (s) => dc(s, 'fight')));
+    L.push(row('（死んだうち）冒険者に倒された', (s) => s.byAdv.get(k) ?? 0));
+    L.push(row('（死んだうち）ドラゴンに焼かれた', (s) => s.byDragonFire.get(k) ?? 0));
     L.push(row('死んだ：そのほか', (s) => {
       const n = dother(s);
       if (!n) return 0;
@@ -283,7 +293,8 @@ function writeSummary() {
   writeFileSync(join(out, 'summary.md'), L.join('\n'));
   console.log(`比較の表を書きました：${join(out, 'summary.md')}`);
 }
-const CAUSE_SHORT: Record<string, string> = { burned: '焼', crushed: '崩', petrified: '石', killed: '襲', dried: '乾', faded: '消', planted: '茸', other: '他' };
+const EXIT_NAMES: Record<string, string> = { returned: '生還', home: '満ちて帰った', abandoned: '住処を捨てて群れで', dispersed: '群れで出ていった' };
+const CAUSE_SHORT: Record<string, string> = { crumbled: '朽', burned: '焼', crushed: '崩', petrified: '石', killed: '襲', dried: '乾', faded: '消', planted: '茸', other: '他' };
 
 async function main() {
   if (!args.summary) await runAll();
