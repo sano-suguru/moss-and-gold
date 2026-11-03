@@ -1,7 +1,7 @@
 import type { Atlas } from './atlas';
 import { Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
-import { unpackLook } from './eco/roster';
+import { RANK_AT, unpackLook } from './eco/roster';
 import { MAX_DYN } from './shaders';
 
 const MAX_SPRITES = 4096;
@@ -764,6 +764,15 @@ export class CreatureView {
       if (sp === Kind.Adventurer && !isCorpse) {
         const h = eco.heroOf(c);
         if (h) frame = this.atlas.hero(c.sp, c.torch > 0 && c.sp !== 1 && c.sp < 4, h.look, h.rank, dir, act, f);
+        // 位が上がって初めての遠征：入ってきてしばらく、金の光の粒が体のまわりを立ちのぼる（「見違えた」）
+        const pt = h && h.rank > 0 && h.ret === RANK_AT[h.rank] ? eco.parties.find((q) => q.id === c.party) : undefined;
+        if (pt && eco.step - pt.since < 400) {
+          for (let i = 0; i < 3 + h!.rank * 2; i++) {
+            const ph = (t * 0.7 + i / (3 + h!.rank * 2)) % 1;
+            pushSprite(x + Math.cos(i * 2.4 + t * 2) * 7, yy + Math.sin(i * 2.4 + t * 2) * 2, 2 + ph * 26, false, A.speck(1, Math.min(3, Math.floor(ph * 4))), 0, 2);
+          }
+          if (h!.rank >= 3) pushSprite(x, yy - 0.05, 6, false, A.halo(0), 0, 2);
+        }
       }
       const glow = c.glow / 255;
       // 影
@@ -782,7 +791,10 @@ export class CreatureView {
         if (sp === Kind.Dragon) frame = A.sleep(c.elite === 8 ? 'dragonB' : ['dragonH', 'dragonY', 'dragon'][Math.min(2, c.sp)], sf);
         else if (sp === Kind.Worm) frame = A.sleep('worm', sf);
         else if (sp === Kind.Bat && lift === 0) frame = A.sleep('bat', sf);
-        else if (sp === Kind.Adventurer) frame = A.sleep('bed-' + ['warrior', 'wizard', 'thief', 'priest', 'bard', 'hunter', 'slayer'][c.sp], sf);
+        else if (sp === Kind.Adventurer) {
+          const h = eco.heroOf(c);
+          frame = h ? A.heroBed(c.sp, h.look, h.rank, sf) : A.sleep('bed-' + ['warrior', 'wizard', 'thief', 'priest', 'bard', 'hunter', 'slayer'][c.sp], sf);
+        }
       }
       // 攻める側：打つ前にわずかに身を引き、打つ瞬間に相手の方へ踏み込む
       {
