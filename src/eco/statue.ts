@@ -9,7 +9,7 @@ import type { World } from '../world';
 export function petrify(this: Ecology, c: Cr): void {
   this.dropBelongings(c);
   if (c.gold > 0) {
-    this.dropGold(c.x, c.y, c.gold);
+    this.dropGold(c.x, c.y, c.gold, this.ownerNote(c, 'fell'));
     c.gold = 0;
   }
   if (c.k === Kind.Golem || c.k === Kind.Worm) return;
@@ -25,6 +25,7 @@ export function petrify(this: Ecology, c: Cr): void {
   this.releaseMana(c);
   const st: Statue = { id: this.nextId++, x: Math.round(c.x), y: Math.round(c.y), k: c.k, sp: c.sp, dir: c.dir, act: c.act === 3 ? 0 : c.act, f: (this.step >> 2) & 3, units: c.body + c.food + c.units, age: 0 };
   this.statues.push(st);
+  this.note(st.id, this.ownerNote(c, 'petrified'));
   if (STR[c.k] >= 5) this.log(c.x, c.y, `{k:${c.k}}が石になった`);
   // 石像のマスは、覚えておく位置（丸めた座標）で決める（ロードし直したときと同じマスになるように）
   const sk = this.tileOf(st.x, st.y);

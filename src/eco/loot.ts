@@ -78,7 +78,7 @@ export function dropTrophy(this: Ecology, p: Party, at: Cr | undefined): void {
   if (!p.trophy) return;
   const by = this.byId.get(p.trophyBy ?? 0) ?? at;
   if (by) {
-    this.dropItem(by.x + 5, by.y - 2, ItemKind.Trophy, p.trophy);
+    this.dropItem(by.x + 5, by.y - 2, ItemKind.Trophy, p.trophy, this.partyNote(p));
     this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'trophy', how: 'lost', n: p.trophy, x: Math.round(by.x), y: Math.round(by.y) } as never);
   }
   p.trophy = 0;

@@ -418,7 +418,7 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
       }
     } else if (c.gold > 0 && sq(c.hx - c.x) + sq(c.hy - c.y) < 30 * 30) {
       const before = this.piles.length;
-      this.dropGold(c.hx - 18, c.hy + 4, c.gold);
+      this.dropGold(c.hx - 18, c.hy + 4, c.gold, this.ownerNote(c, 'stash'));
       c.gold = 0;
       const np = this.piles.length > before ? this.piles[this.piles.length - 1] : this.piles.reduce((b: Pile | null, p) => (sq(p.x - c.hx) + sq(p.y - c.hy) < 40 * 40 && (!b || p.gold > b.gold) ? p : b), null);
       if (np) c.ref = np.id;

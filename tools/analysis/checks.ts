@@ -239,6 +239,19 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 情報パネルのための「いきさつ」（src/eco/notes.ts）：死骸には死んだ理由が、落とし物と金貨の山には持ち主が覚えられ、セーブに入る（18日目の日次スナップショットの eco.NT）。
+    // 覚え書きは判断に使わないので、数は展開に関わらない。死骸の分は4シードとも数十、持ち主の分は数個〜数十ある
+    name: '死骸と落とし物のいきさつがセーブに残る（各シードで死骸10件以上、合計で持ち主のわかる物10件以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const DEATH = ['eaten', 'fight', 'killed', 'starve', 'burned', 'crushed', 'dried', 'other', 'petrified'];
+      const nt = rs.map((r) => ((r.state(r.to)?.eco?.NT ?? []) as (number | string)[][]).filter((a) => (a[1] as number) > r.from * 14400));
+      const dead = nt.map((a) => a.filter((x) => DEATH.includes(x[2] as string)).length);
+      const own = nt.map((a) => a.filter((x) => ['fell', 'spent', 'stash'].includes(x[2] as string) || (x[2] === '' && (x[5] as number) >= 0)).length);
+      return { ok: dead.every((n) => n >= 10) && sum(own) >= 10, value: rs.map((r, i) => `${r.seed} 死骸${dead[i]}・物${own[i]}`).join('、') };
+    },
+  },
+  {
     name: '四つの保存則がずれない',
     ...RUN_A,
     test: (rs) => {

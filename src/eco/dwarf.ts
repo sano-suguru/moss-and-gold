@@ -370,7 +370,7 @@ export function dwarf(this: Ecology, c: Cr): void {
   if (c.gold > 0) {
     c.act = 1;
     if (sq(hx - c.x) + sq(hy - c.y) < 20 * 20 || this.goTo(c, hx, hy, s.speed)) {
-      this.dropGold(hx, hy, c.gold);
+      this.dropGold(hx, hy, c.gold, this.ownerNote(c, 'stash'));
       c.gold = 0;
     }
     return;

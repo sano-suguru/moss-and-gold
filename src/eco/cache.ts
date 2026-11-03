@@ -194,6 +194,7 @@ export function dropCache(this: Ecology, p: Party, alive: Cr[]): void {
   else {
     o = { id: this.nextId++, x, y, food, d, at: this.w.tick, by: p.id, rt: -1e9 };
     this.caches.push(o);
+    this.note(o.id, this.partyNote(p));
     // 多すぎれば、古い空の置き場（残骸）から片づける
     while (this.caches.length > CACHE_MAX) {
       const i = this.caches.findIndex((q) => q.food <= 0);
