@@ -12,9 +12,9 @@ Rats, goblins and adventurers go about their lives in a cave full of glowing mos
 
 ## What it is
 
-Moss and mushrooms grow in an underground dungeon. Creatures move in to eat them, and adventurers come down from the surface. The creatures eat, steal from and chase off one another.
+Moss and mushrooms grow in an underground dungeon. Creatures move in to eat them, and adventurers come down from the surface. They also fight over food and drive each other off.
 
-Each creature follows fairly simple rules, but put together they do things I didn't plan for. Watching that happen is the reason I'm making this.
+Each creature follows simple rules, but together they do things I didn't expect.
 
 ## What you can see right now
 
@@ -22,24 +22,26 @@ Each creature follows fairly simple rules, but put together they do things I did
 
 - Glowing moss and mushrooms, underground water and lava. During the day, light comes in through cracks in the ceiling. Wisps, little specks of light born from the moss, drift toward the brightest patches.
 - Small creatures that live on the moss, and the things that hunt them.
-- Peoples that settle down. Kobolds and goblins build warrens and camps, fight over food with their neighbors, and sometimes end up working for someone stronger.
-- Adventurers and dwarves from outside. Adventurers go back to town and come down again, so you'll keep running into the same faces.
-- Bigger things sleep further down.
+- Settlers. Kobolds and goblins build warrens and camps, fight over food with their neighbors, and sometimes end up working for someone stronger.
+- Adventurers and dwarves from outside. Adventurers travel back and forth to town, so the same ones come back again and again.
+- Further down there are bigger monsters, such as golems and dragons.
 
 The settlers take a while to show up, so it helps to fast-forward.
 
-## What's missing
+## What I want to add
 
-A lot. There are no biomes yet, and I'd like the labyrinth layouts to mean something. I want many more monsters, and both the dungeon and the monsters could look a lot better.
+- Biomes
+- A better way of generating the labyrinth
+- More kinds of monsters
+- Better-looking dungeons and monsters
+- Making it easier to tell from the screen what's going on
 
-What bothers me most is that it's hard to tell from the screen what's going on.
+## Questions
 
-## If you give it a try
+If you try it, I'd like to know:
 
-I'd love to know:
-
-- whether you could tell what was happening (and which scenes you couldn't follow)
-- how long you kept watching
+- whether you could tell what was happening, and which scenes you couldn't follow
+- how long you watched
 - what creatures or events you'd like to see
 
 ## Controls
@@ -49,12 +51,3 @@ I'd love to know:
 - Click or tap a creature to see its name and what it's doing.
 - The "シード" (seed) button at the top right makes a new dungeon.
 - The game saves on its own, so you can close the page and pick up where you left off.
-
-## Running it locally
-
-```bash
-npm install
-npm run build   # creates dist/index.html
-```
-
-Open dist/index.html in a browser. The development guide is in [CLAUDE.md](CLAUDE.md) (Japanese).
