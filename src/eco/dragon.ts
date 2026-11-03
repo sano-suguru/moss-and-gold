@@ -240,7 +240,7 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
     this.nearby(c.x, c.y, 5, (o) => {
       if (!o.dead && o !== c && o.k !== Kind.Golem && this.str(o) >= 9) disturbed = true;
     });
-    for (const n of this.noises) if (this.step - n.t < 30 && sq(n.x - c.x) + sq(n.y - c.y) < 6 * TILE * 6 * TILE) disturbed = true;
+    for (const n of this.noises) if (this.step - n.t < 30 && !n.s && sq(n.x - c.x) + sq(n.y - c.y) < 6 * TILE * 6 * TILE) disturbed = true;
     // 眠りの周期：眠りについてから地上の1〜2日たつと、自然に目を覚ます
     const slept = this.step - c.lureAt;
     const nap = DAY_TICKS_ECO / 2 + (ih(c.id, c.lureAt, 213) % (DAY_TICKS_ECO / 2));

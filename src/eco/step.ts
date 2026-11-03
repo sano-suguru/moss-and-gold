@@ -127,6 +127,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   if (this.step % 200 === 100) this.spawnSalamanders();
   if (this.step % 50 === 15) this.updateCamps();
   if (this.step % 50 === 25) this.planRaids();
+  if (this.step % 50 === 35) this.planSnatch();
   if (this.step % 50 === 45) this.updateStatues(day);
   if (this.step % 50 === 30) this.updateTreasure(day);
   this.updateFire();
@@ -147,6 +148,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   this.breed();
   if (this.step % 300 === 211) this.tendGroups();
   if (this.step % 300 === 7 || !this.forage.length) this.updateForage();
+  if (this.step % 8 === 3) this.creatureSounds();
   this.updateParties();
   this.updateHold();
   this.updateItems();

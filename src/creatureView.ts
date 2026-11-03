@@ -1,5 +1,6 @@
 import type { Atlas } from './atlas';
-import { Ecology, Kind, type Cr } from './ecology';
+import { Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
+import { TROPHY } from './eco/loot';
 import { MAX_DYN } from './shaders';
 
 const MAX_SPRITES = 4096;
@@ -585,7 +586,7 @@ export class CreatureView {
     }
     // 床に落ちた道具（松明は燃え、金属は光が当たるときらめく）
     const itf = Math.floor(t * 6);
-    for (const it of eco.gear) if (inView(it.x, it.y, 16)) pushSprite(it.x, it.y + 2, 0, false, A.item(it.kind, itf + it.id), 0, 2);
+    for (const it of eco.gear) if (inView(it.x, it.y, 16)) pushSprite(it.x, it.y + 2, 0, false, it.kind === 12 ? A.trophy(TROPHY[it.fuel]?.[1] ?? 'fang') : A.item(it.kind, itf + it.id), 0, 2);
     // 宝の山：量に応じた大きさ。光が当たるときらめく
     const tf = Math.floor(t * 3);
     // 宝：溜まった量で五段階（1〜9、10〜39、40〜99、100〜249、250〜）、持ち主で飾りを変える
@@ -632,6 +633,11 @@ export class CreatureView {
     // 身構えている一行（描画だけ：武器を構えた姿で止める。目標に着いたときは振りかぶり、そばを通るときは構えるだけ）
     const braced = new Map<number, number>();
     for (const p of eco.parties) if ((p.braceT ?? 0) > eco.step) for (const id of p.members) braced.set(id, p.braceK ?? 2);
+    // 戦利品を担ぐ者
+    const trophyOf = new Map<number, number>();
+    for (const p of eco.parties) if (p.trophy && p.trophyBy) trophyOf.set(p.trophyBy, p.trophy);
+    // 物音に耳を澄ます一行：前に出た前衛だけが構える
+    for (const p of eco.parties) if ((p.listenT ?? 0) > eco.step && p.listenBy) braced.set(p.listenBy, 2);
     for (const ord of this.order) {
       const c = ord.c;
       let x = ord.x;
@@ -786,11 +792,20 @@ export class CreatureView {
       if (!isCorpse && sp === Kind.Orc && c.units > 0 && !hidden) pushSprite(x + (flip ? 6 : -6), yy + 0.05, lift + 16, flip, A.sack(), 0, 2);
       // ゴブリンの袋：摘んだキノコや苔、冒険者から盗んだ食べ物を背負って集落へ持ち帰る
       if (!isCorpse && sp === Kind.Goblin && c.units >= 6 && !hidden && !c.dead) pushSprite(x + (flip ? 5 : -5), yy + 0.05, lift + 10, flip, A.sack(), 0, 2);
+      // 冒険者の荷：金貨の袋（持つ量に応じた大きさ）を背に担ぎ、目標を果たした一行の担ぐ者は戦利品を肩に
+      if (!isCorpse && sp === Kind.Adventurer && !c.dead && c.sleep !== 2) {
+        if (c.gold > 0) {
+          const z = c.gold >= GOLD_CAP[c.sp] * 0.6 ? 2 : c.gold >= GOLD_CAP[c.sp] * 0.25 ? 1 : 0;
+          pushSprite(x + (flip ? 5 : -5), yy + 0.05, lift + 9 + z, flip, A.goldSack(z), 0, 2);
+        }
+        const tp = trophyOf.get(c.id);
+        if (tp) pushSprite(x + (flip ? -4 : 4), yy + 0.06, lift + 15, flip, A.trophy(TROPHY[tp]?.[1] ?? 'fang'), 0, 2);
+      }
       // 傷を受けた瞬間は白く光る
       const flash = !isCorpse && eco.w.tick - c.hitAt < 2 ? 20 : 0;
       pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0), (c.id * 0.6180339) % 1);
       // 隠れている者の目：影の姿の上で光る（ときどきまばたき）。暗がりで灯りを狙って潜む者（待ち伏せのゴブリンなど）も、暗ければ目だけ光る
-      if (hidden || (!isCorpse && c.lure && !c.dead && c.act === 0 && !eco.isLit(c))) {
+      if (hidden || (!isCorpse && (c.lure || (sp === Kind.Goblin && c.st === 17)) && !c.dead && c.act === 0 && !eco.isLit(c))) {
         const ph = Math.floor(t * 2 + c.id * 0.37) % 7;
         pushSprite(x, yy + 0.05, lift + (sp === Kind.Goblin ? 14 : 7), false, A.eyes(ph === 6 ? 3 : ph & 1), 0, 0);
       }

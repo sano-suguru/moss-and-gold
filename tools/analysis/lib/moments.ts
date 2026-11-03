@@ -16,6 +16,9 @@ export interface Moment {
 
 /** 数える瞬間（並べる順） */
 export const MOMENTS: Moment[] = [
+  { key: 'snatch', label: '通路での掠め取り：盗んだ' },
+  { key: 'stalk', label: '通路での掠め取り：つけた' },
+  { key: 'anyRob', label: 'ゴブリンの盗み（夜と通路の合計）' },
   { key: 'raid', label: '夜の盗み：忍び寄った' },
   { key: 'raidRob', label: '夜の盗み：盗んだ' },
   { key: 'dozeRob', label: '見張りがうとうとする間に盗まれた' },
@@ -31,6 +34,9 @@ export const MOMENTS: Moment[] = [
   { key: 'manaBirth', label: 'マナからの出現（幼竜を除く）' },
   { key: 'hatch', label: '幼竜の孵化' },
   { key: 'march', label: '大ネズミの引っ越しの列' },
+  { key: 'hear', label: '聞き耳で止まる（一行が物音に立ち止まった）' },
+  { key: 'trophyHome', label: '戦利品を持ち帰った' },
+  { key: 'trophyTake', label: '戦利品を手に入れた' },
   { key: 'abandon', label: '住処・集落を群れで捨てた' },
   { key: 'tribute', label: 'オークの取り立て' },
 ];
@@ -53,6 +59,12 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
   const rob = ev(K.Goblin, 'rob');
   const uniq = (a: { id: number; to?: number }[]) => new Set(a.map((x) => `${x.id},${x.to ?? ''}`)).size;
   return {
+    snatch: rob.filter((x) => x.how === 'snatch').length,
+    stalk: ev(K.Goblin, 'stalk').length,
+    anyRob: rob.filter((x) => x.how === 'snatch' || x.how === 'raid').length,
+    hear: ev(K.Adventurer, 'hear').length,
+    trophyHome: ev(K.Adventurer, 'trophy').filter((x) => x.how === 'home').length,
+    trophyTake: ev(K.Adventurer, 'trophy').filter((x) => x.how === 'take').length,
     raid: ev(K.Goblin, 'raid').length,
     raidRob: rob.filter((x) => x.how === 'raid').length,
     dozeRob: rob.filter((x) => x.doze === 1).length,
