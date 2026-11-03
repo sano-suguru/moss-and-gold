@@ -2097,12 +2097,13 @@ function ratPup(dir,act,f){
 /** 眠りの Z。big なら大きな Z（深い眠り）、そうでなければ小さな z。縁取りつきで暗がりでも読める（光る） */
 function zMark(big,f){
  const q=mod(f,4);
- const pat=big?['#####','...#.','..#..','.#...','#####']:['###','.#.','###'];
+ // 小さな z も 4×4 画素（前は3×3で、暗い所では見分けにくかった）。縁取りは斜めにも回して、明るい床の上でも読める
+ const pat=big?['#####','...#.','..#..','.#...','#####']:['####','..#.','.#..','####'];
  const W=pat[0].length+2,H=pat.length+2,fr=blank(W,H);
  const a=[1,0.9,0.75,0.55][q];
- const fill=[Math.round(220*a+20),Math.round(230*a+20),Math.round(255*a)],ol=[30,34,60];
+ const fill=[Math.round(220*a+20),Math.round(230*a+20),Math.round(255*a)],ol=[14,16,36];
  for(let y=0;y<pat.length;y++)for(let x=0;x<pat[0].length;x++)if(pat[y][x]==='#'){
-  for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const X=x+1+dx,Y=y+1+dy;const p=Y*W+X;if(!fr.px[p*4+3])setPx(fr,X,Y,ol,false)}
+  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const X=x+1+dx,Y=y+1+dy;if(X<0||Y<0||X>=W||Y>=H)continue;const p=Y*W+X;if(!fr.px[p*4+3])setPx(fr,X,Y,ol,false)}
  }
  for(let y=0;y<pat.length;y++)for(let x=0;x<pat[0].length;x++)if(pat[y][x]==='#')setPx(fr,x+1,y+1,fill,true);
  return {...fr,ax:Math.floor(W/2),ay:H-1};
@@ -2262,16 +2263,30 @@ function hoardArt(tier,owner,f){
 
 
 // ===== 気づいた印と、当たった印 =====
-/** 「！」か「？」の小さな吹き出し（光る。縁取りつき） */
+/**
+ * 「！」か「？」の吹き出し：暗い縁取りの吹き出しに、光る太い字（明るい所では暗い吹き出しが、暗い所では光る字が目に入る）。
+ * 9×12 画素（吹き出し 9×10 と下の尾）。字は 5×8 画素で、線の太さは2〜3画素
+ */
 function mark(kind){
- const pat=kind==='!'?['.#.','.#.','.#.','...','.#.']:['###','..#','.##','...','.#.'];
- const W=7,H=8,fr=blank(W,H);
- const fill=kind==='!'?[255,214,90]:[170,220,255],ol=[30,24,30];
- for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(y===0||y===H-2||x===0||x===W-1){if(!(y===H-2&&(x<2||x>4)))setPx(fr,x,y,ol,false)}}
- for(let y=1;y<H-2;y++)for(let x=1;x<W-1;x++)setPx(fr,x,y,[52,44,52],false);
- setPx(fr,3,H-1,ol,false);
- for(let y=0;y<5;y++)for(let x=0;x<3;x++)if(pat[y][x]==='#')setPx(fr,x+2,y+1,fill,true);
- return {...fr,ax:3,ay:H-1};
+ const pat=kind==='!'
+  ?['.###.','.###.','.###.','.###.','..#..','.....','.###.','.###.']
+  :['.###.','##.##','...##','..##.','..#..','.....','..#..','..#..'];
+ const W=9,BH=10,H=12,fr=blank(W,H);
+ const fill=kind==='!'?[255,214,90]:[170,220,255],shade=kind==='!'?[224,150,40]:[110,170,230],ol=[14,10,16],bg=[46,38,48];
+ for(let y=0;y<BH;y++)for(let x=0;x<W;x++){
+  const corner=(x===0||x===W-1)&&(y===0||y===BH-1);
+  if(corner)continue;
+  const edge=y===0||y===BH-1||x===0||x===W-1||((x===1||x===W-2)&&(y===1||y===BH-2));
+  setPx(fr,x,y,edge?ol:bg,false);
+ }
+ // 下の尾
+ setPx(fr,4,BH-1,bg,false);setPx(fr,3,BH,ol,false);setPx(fr,4,BH,bg,false);setPx(fr,5,BH,ol,false);setPx(fr,4,BH+1,ol,false);
+ for(let y=0;y<8;y++)for(let x=0;x<5;x++)if(pat[y][x]==='#'){
+  // 字の下の端と右の端は少し濃く（浮き上がって見える）
+  const low=y+1>=8||pat[y+1][x]!=='#';
+  setPx(fr,x+2,y+1,low?shade:fill,true);
+ }
+ return {...fr,ax:4,ay:H-1};
 }
 /** 当たった印：短い光の弧（f は 0〜2 で広がって消える） */
 function slash(f){

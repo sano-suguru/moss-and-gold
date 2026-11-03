@@ -99,7 +99,7 @@ export function partyTail(this: Ecology, p: Party): Cr | null {
  */
 export function planSnatch(this: Ecology): void {
   for (const cp of this.camps) {
-    if (cp.id < 0 || cp.kind !== 0 || cp.hide || (cp.raidT ?? 0) > this.w.tick) continue;
+    if (cp.id < 0 || cp.kind !== 0 || cp.hide || (cp.snatchT ?? 0) > this.w.tick) continue;
     if ((cp.store ?? 0) >= this.campStoreGoal(cp) * SNATCH_STORE) continue;
     const members = this.campMembers(cp);
     if (!members.length || members.some((c) => c.st === 15 || c.st === 16 || c.st === 17)) continue;
@@ -143,7 +143,7 @@ export function planSnatch(this: Ecology): void {
       c.gait = 0;
       c.ref2 = 0;
     }
-    cp.raidT = this.w.tick + DAY_TICKS_ECO / 8;
+    cp.snatchT = this.w.tick + DAY_TICKS_ECO / 8;
     this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'stalk', n, to: p.id, x: Math.round(t.x), y: Math.round(t.y) } as never);
     if (this.step - (this.lastLogged[980] ?? -99999) > 1500) {
       this.lastLogged[980] = this.step;
@@ -173,7 +173,7 @@ export function sendWatchers(this: Ecology, cp: Camp, ready: Cr[]): void {
   const m = this.w.map;
   const k = this.snatchSpot(cp);
   // 待ち伏せできる所がなければ、しばらく（地上の1/8日）見送る
-  cp.raidT = this.w.tick + DAY_TICKS_ECO / 8;
+  cp.snatchT = this.w.tick + DAY_TICKS_ECO / 8;
   if (k < 0) return;
   const x = (k % m.w) * TILE + 8;
   const y = Math.floor(k / m.w) * TILE + 8;
@@ -190,7 +190,7 @@ export function sendWatchers(this: Ecology, cp: Camp, ready: Cr[]): void {
     c.ref2 = 0;
   }
   // 待ち伏せのあいだと、帰ってからしばらくは出ない
-  cp.raidT = this.w.tick + WATCH_STEPS + DAY_TICKS_ECO / 8;
+  cp.snatchT = this.w.tick + WATCH_STEPS + DAY_TICKS_ECO / 8;
   this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'ambush', n, x, y } as never);
 }
 
