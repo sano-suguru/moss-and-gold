@@ -57,9 +57,9 @@ npm run build                     # dist/index.html（外部依存なしの1フ�
 通常の作業の流れ：
 
 1. 変更したら `npm test` と `npm run check`。check は、固定のスナップショットから実行して、新しい挙動が実際に起きるかを確かめる短いテスト（約1分。項目は tools/analysis/checks.ts）。新しい挙動を足したら、その項目を checks.ts に足す。
-2. `npm run ab -- --preset quick`：8シードについて、HEAD の10日目のスナップショットから、HEAD と作業ツリーのそれぞれで18日目まで実行し、同じシード同士で比べる（結果は compare.md）。**判定が「はっきり」の行だけを効果とみなす**。「ばらつきの内」は、シードごとの展開のばらつきで説明できる程度の差という意味。1シードの出来事に引っ張られていないか「1シードの寄与」の列も見る。1シードだけでは効果は判断できない。
+2. `npm run ab -- --preset quick`：8シードについて、HEAD の10日目のスナップショットから、HEAD と作業ツリーのそれぞれで18日目まで実行し、同じシード同士で比べる（結果は `runs/ab-quick-<日時>/compare.md`）。**判定が「はっきり」の行だけを効果とみなす**。「ばらつきの内」は、シードごとの展開のばらつきで説明できる程度の差という意味。1シードの出来事に引っ張られていないか「1シードの寄与」の列も見る。1シードだけでは効果は判断できない。
 3. 気になるものは `npm run probe -- deaths|life|calls|look|stuck` で調べる（スナップショットから始めるので数秒で動き出す）。使い捨てのスクリプトを書く前に、probe の `--expr` で足りないか見る。スクリプトが要るなら、`lib/open.ts` の `openAt(シード, tick)` でその時点の状態を取得する。ログに無い値は、まず `npm run metric`（日次スナップショットから計算する）で足りるか見て、足りなければ sim.ts のログ出力に足す。
-4. 区切りがついたら `npm run ab -- --preset final`（16シード×25日、0日目から）で最終確認し、report.md の「おかしな兆候」と保存則のずれを見る。
+4. 区切りがついたら `npm run ab -- --preset final`（16シード×25日、0日目から）で最終確認する。保存則のずれは compare.md の末尾に出る。ab はシードごとの report.md を作らないので、「おかしな兆候」は続けて `npm run batch -- --seeds 16 --days 25` で見る（ab が作業ツリーで実行した結果をキャッシュから使うので、もう一度は実行しない。シードごとの report.md と、兆候の数をまとめた summary.md ができる）。
 5. 保存則がずれたら、`tools/analysis/drift.ts`・`manacheck.ts`・`goldcheck.ts` で、ずれた tick と、その tick に変化した生き物を特定する。
 
 ```bash
@@ -102,6 +102,7 @@ URL の末尾に `#lit`（全体を明るくする）、`#albedo`（地形の色
 | test/*.ts | テスト |
 | tools/gallery/ | ビジュアル確認（scenes.ts・shoot.mjs：固定シーンの一覧、shot.ts：探して撮る、film.mjs：連続フレーム） |
 | tools/analysis/ | 分析ツール（入口は launch.mjs）。共通部品は lib/（engine.ts 実行、state.ts 状態の読み書き、runs.ts キャッシュ、open.ts スナップショットの取得、stats.ts A/B 比較の判定、seeds.ts 固定のシードの組、moments.ts 見せたい場面の数え方） |
+| tools/*.ts, *.py（直下） | 過去の調査に使った使い捨てのスクリプト。手入れしていない。新しく調べるときは probe と tools/analysis を使う |
 
 ## 変更するときの注意
 
