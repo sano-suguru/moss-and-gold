@@ -119,6 +119,16 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 五歩目：町の名簿。同じ顔がまた来て、生きて帰れば位が上がる
+    name: '名簿の冒険者が再び来て、位が上がる（4シードの合計で再訪4回以上・位が上がる1回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const again = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'hero' && (x.how ?? 0) >= 2).length);
+      const up = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'rank').length);
+      return { ok: sum(again) >= 4 && sum(up) >= 1, value: rs.map((r, i) => `${r.seed} 再訪 ${again[i]}・位 ${up[i]}`).join('、') };
+    },
+  },
+  {
     name: 'オークが貢ぎ物を取り立てる（4シードで1回以上）',
     ...RUN_A,
     test: (rs) => {

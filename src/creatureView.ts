@@ -1,6 +1,7 @@
 import type { Atlas } from './atlas';
 import { Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
+import { unpackLook } from './eco/roster';
 import { MAX_DYN } from './shaders';
 
 const MAX_SPRITES = 4096;
@@ -567,6 +568,21 @@ export class CreatureView {
         pushSprite(c.x + 5, c.y, 22 + pop + Ecology.bodySize(c.k) * 0.6, false, A.mark(mk.m), 0, 2);
       }
     }
+    // 墓標（熟練以上の冒険者が倒れた所）
+    for (const g of eco.graves) if (inView(g.x, g.y, 20)) pushSprite(g.x, g.y, 0, false, A.grave(g.rank, unpackLook(g.look).color), 0, 2);
+    // 墓標の前で祈る僧侶：墓標から光の粒が立ちのぼる（描画だけ）
+    for (const p of eco.parties) {
+      if ((p.braceT ?? 0) <= eco.step || p.braceK !== 4) continue;
+      const pr = p.members.map((id) => eco.byId.get(id)).find((o) => o && !o.dead && o.sp === 3);
+      if (!pr) continue;
+      const gx = p.braceX ?? pr.x;
+      const gy = p.braceY ?? pr.y;
+      for (let i = 0; i < 4; i++) {
+        const ph = (t * 0.6 + i * 0.25) % 1;
+        pushSprite(gx + Math.sin(i * 2.1 + t * 1.3) * 5, gy, 6 + ph * 22, false, A.speck(1, Math.min(3, Math.floor(ph * 4))), 0, 2);
+      }
+      pushSprite(pr.x, pr.y, 26 + Math.sin(t * 2) * 1.5, false, A.speck(1, Math.floor(t * 3) & 1), 0, 2);
+    }
     // 幼竜が生まれた場所の卵の殻
     if (eco.dragonShell && eco.w.tick - eco.dragonShell.t >= 52 && eco.w.tick - eco.dragonShell.t < 14400 * 3 && inView(eco.dragonShell.x, eco.dragonShell.y, 20)) pushSprite(eco.dragonShell.x, eco.dragonShell.y, 0, false, A.eggShell(), 0, 2);
     // 血の跡（地面に描く）
@@ -657,6 +673,10 @@ export class CreatureView {
       } else if (c.caught) {
         act = 1;
         f = Math.floor(t * 10 + seed) & 1;
+      } else if (sp === Kind.Adventurer && braced.get(c.id) === 4) {
+        // 墓標の前：武器は構えず、静かに立つ
+        act = 0;
+        f = 0;
       } else if (sp === Kind.Adventurer && braced.has(c.id) && act === 0) {
         act = 2;
         f = braced.get(c.id) === 1 ? 1 : 0;
@@ -734,6 +754,11 @@ export class CreatureView {
       const isCorpse = c.dead === 1 && c.actT >= 4 && sp !== Kind.Wisp && sp !== Kind.Slime && sp !== Kind.Ghost && sp !== Kind.Myconid;
       const eliteName = ['', 'firespirit', 'pknight', '', '', '', 'wspirit', 'lspirit', '', 'mlord'][c.elite] ?? '';
       let frame = !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : c.sp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Adventurer ? (c.sp >= 4 ? 8 + c.sp - 4 : c.sp * 2 + (c.torch > 0 && c.sp !== 1 ? 1 : 0)) : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][c.sp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? c.sp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
+      // 名簿の冒険者：一人ひとりの姿と位の装備（src/eco/roster.ts、src/sprites.ts の heroSprite）
+      if (sp === Kind.Adventurer && !isCorpse) {
+        const h = eco.heroOf(c);
+        if (h) frame = this.atlas.hero(c.sp, c.torch > 0 && c.sp !== 1 && c.sp < 4, h.look, h.rank, dir, act, f);
+      }
       const glow = c.glow / 255;
       // 影
       if (o.nShadows < MAX_SPRITES && sp !== Kind.Wisp && sp !== Kind.Ghost && !isCorpse && !(sp === Kind.Bat && act === 0 && lift === 0)) {

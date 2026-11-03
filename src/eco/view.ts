@@ -3,6 +3,7 @@
 import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
+import { heroTitle } from './roster';
 import type { World } from '../world';
 
 /** 触れた場所のいちばん近い生き物（死骸は除く） */
@@ -29,7 +30,9 @@ export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]):
     const nm = this.names.get(c.id) ?? '';
     title = [`${title}`, `火の精「${nm}」`, `亡霊の騎士「${nm}」`, title, `大ネズミの王「${nm}」`, `ゴブリンの頭「${nm}」`, `水の精「${nm}」`, `光の精「${nm}」`, `骨の竜「${nm}」`, `キノコの主「${nm}」`][c.elite] ?? title;
   }
-  if (known && c.k === Kind.Adventurer) title += `（${jobs[c.sp]}）`;
+  const hero = c.k === Kind.Adventurer ? this.heroOf(c) : null;
+  if (known && hero) title = `${heroTitle(hero)}（帰還${hero.ret}回）`;
+  else if (known && c.k === Kind.Adventurer) title += `（${jobs[c.sp]}）`;
   if (known && c.k === Kind.Dwarf) title += `（${['坑夫', '鍛冶屋', '戦士'][c.sp]}）`;
   if (c.k === Kind.Rat && this.w.tick - c.bornAt < DAY_TICKS_ECO / 4) title += '（子）';
   const lines: string[] = [];
@@ -48,7 +51,7 @@ export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]):
   else if (c.k === Kind.Golem) state = '宝物庫の入口を見張っている';
   else if (c.k === Kind.Dragon) state = c.st === 2 ? '飛んでいる' : c.foe ? '宝を盗った者を追っている' : '目を覚まして獲物を探している';
   else if (party && (party.camp ?? -1) >= 0) state = party.members[0] === c.id ? '焚き火のそばで見張りをしている' : '焚き火で休んでいる';
-  else if (party && (party.braceT ?? 0) > this.step) state = party.braceK === 1 ? '目標に着いて、武器を構えている' : party.braceK === 3 ? '荷を掠め取られて、振り返っている' : '住みかの気配に身構えている';
+  else if (party && (party.braceT ?? 0) > this.step) state = party.braceK === 1 ? '目標に着いて、武器を構えている' : party.braceK === 3 ? '荷を掠め取られて、振り返っている' : party.braceK === 4 ? (c.sp === Job.Priest ? '墓標の前で祈りを捧げている' : '墓標の前で立ち止まっている') : '住みかの気配に身構えている';
   else if (party && (party.listenT ?? 0) > this.step) state = party.listenBy === c.id ? '暗がりの物音の方へ一歩出て、構えている' : '暗がりの物音に、立ち止まって耳を澄ませている';
   else if (party && party.goal === 1) state = '引き返している';
   else if (key && this.isSentry(c, key) && this.groups.get(key)!.members.some((o) => o.sleep > 0)) state = '群れの見張りをしている';
@@ -346,10 +349,16 @@ export function demoTick(this: Ecology): void {
   });
 }
 
+/** 墓標の札：そこに眠る者の名前と位 */
+export function describeGrave(this: Ecology, g: { name: string; job: number; rank: number; ret: number; t: number }): { title: string; lines: string[] } {
+  return { title: '墓標', lines: [`${heroTitle(g)}がここに眠る`, `帰還${g.ret}回。${(g.t / DAY_TICKS_ECO).toFixed(1)}日目に倒れた`] };
+}
+
 declare module '../ecology' {
   interface Ecology {
     pick: typeof pick;
     describe: typeof describe;
+    describeGrave: typeof describeGrave;
     attackStyle: typeof attackStyle;
     nameOf: typeof nameOf;
     riseLeaders: typeof riseLeaders;
@@ -362,4 +371,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { pick, describe, attackStyle, nameOf, riseLeaders, pushGrowFx, pushAttackFx, markNotice, advInteract, demoSetup, demoTick });
+Object.assign(Ecology.prototype, { pick, describe, describeGrave, attackStyle, nameOf, riseLeaders, pushGrowFx, pushAttackFx, markNotice, advInteract, demoSetup, demoTick });

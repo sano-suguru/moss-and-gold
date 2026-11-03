@@ -12,6 +12,7 @@
 import { CELL, Camp, Cr, Ecology, Job, Kind, Party, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { ADV_NAMES, AIM_NAMES, JOB_NAMES } from '../names';
+import { heroTitle } from './roster';
 
 const DRAGONS = [Kind.Dragon, Kind.Wyvern, Kind.Worm];
 const UNDEAD = [Kind.Zombie, Kind.Skeleton, Kind.Lich, Kind.Ghost];
@@ -45,7 +46,7 @@ export function loreKnows(this: Ecology, x: number, y: number): boolean {
 export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: boolean): void {
   const r = this.rumors;
   const m = this.w.map;
-  p.name = ADV_NAMES[ih(p.id, this.step, 260) % ADV_NAMES.length];
+  p.name ??= ADV_NAMES[ih(p.id, this.step, 260) % ADV_NAMES.length];
   p.aim = 0;
   p.aimId = 0;
   p.aimX = 0;
@@ -339,6 +340,7 @@ export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
   const m = this.w.map;
   const lead = alive[0];
   if (this.step % 5 === p.id % 5 && (p.camp ?? -1) < 0) this.passBrace(p, lead);
+  if (this.step % 5 === (p.id + 2) % 5 && (p.camp ?? -1) < 0) this.graveBrace(p, lead);
   if (!p.aim || p.aimEnd || p.goal !== 0 || this.step % 10 !== p.id % 10) return;
   const lights = this.partyLights(p);
   const sees = (o: Cr, r: number) => alive.some((c) => sq(o.x - c.x) + sq(o.y - c.y) < r * TILE * r * TILE && this.seenBy(c, lights, o));
@@ -611,7 +613,8 @@ export function inPartyLight(this: Ecology, p: Party, o: Cr): boolean {
 /** 札と記録のため：率いる者の呼び方（「戦士アルド」） */
 export function partyTitle(this: Ecology, p: Party): string {
   const lead = this.byId.get(p.members[0]);
-  return `${lead ? JOB_NAMES[lead.sp] : ''}${p.name ?? ''}`;
+  const h = lead ? this.heroOf(lead) : null;
+  return h ? heroTitle(h) : `${lead ? JOB_NAMES[lead.sp] : ''}${p.name ?? ''}`;
 }
 
 declare module '../ecology' {

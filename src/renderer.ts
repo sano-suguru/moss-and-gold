@@ -204,6 +204,24 @@ export class Renderer {
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, this.atlasTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, a.width, a.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, a.data);
+    a.dirty.length = 0;
+  }
+
+  /** 名簿の冒険者のコマなど、あとから描き足したます目だけを送り直す */
+  flushAtlas(a: Atlas): void {
+    if (!a.dirty.length) return;
+    const gl = this.gl;
+    gl.bindTexture(gl.TEXTURE_2D, this.atlasTex);
+    gl.pixelStorei(gl.UNPACK_ROW_LENGTH, a.width);
+    for (const [x, y, w, h] of a.dirty) {
+      gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, x);
+      gl.pixelStorei(gl.UNPACK_SKIP_ROWS, y);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, a.data);
+    }
+    gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0);
+    gl.pixelStorei(gl.UNPACK_SKIP_PIXELS, 0);
+    gl.pixelStorei(gl.UNPACK_SKIP_ROWS, 0);
+    a.dirty.length = 0;
   }
 
   /** 苔、見たマス、水、養分 */

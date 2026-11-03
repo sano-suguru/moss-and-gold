@@ -38,6 +38,13 @@ export const MOMENTS: Moment[] = [
   { key: 'trophyHome', label: '戦利品を持ち帰った' },
   { key: 'trophyTake', label: '戦利品を手に入れた' },
   { key: 'abandon', label: '住処・集落を群れで捨てた' },
+  { key: 'heroAgain', label: '同じ顔の再訪（2回目以上の遠征の冒険者）' },
+  { key: 'rank1', label: '位が上がった：熟練' },
+  { key: 'rank2', label: '位が上がった：歴戦' },
+  { key: 'rank3', label: '位が上がった：英雄' },
+  { key: 'grave', label: '墓標が立った' },
+  { key: 'mourn', label: '墓標の前で一行が立ち止まった' },
+  { key: 'pray', label: '墓標の前で僧侶が祈った' },
   { key: 'tribute', label: 'オークの取り立て' },
 ];
 
@@ -82,6 +89,13 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     march: ev(K.Rat, 'march').length,
     abandon: s.filter((x) => (x.k === K.Kobold || x.k === K.Goblin) && x.ev === 'abandon').length,
     tribute: ev(K.Orc, 'tribute').length,
+    heroAgain: ev(K.Adventurer, 'hero').filter((x) => (x.how ?? 0) >= 2).length,
+    rank1: ev(K.Adventurer, 'rank').filter((x) => x.how === 1).length,
+    rank2: ev(K.Adventurer, 'rank').filter((x) => x.how === 2).length,
+    rank3: ev(K.Adventurer, 'rank').filter((x) => x.how === 3).length,
+    grave: ev(K.Adventurer, 'grave').length,
+    mourn: ev(K.Adventurer, 'mourn').length,
+    pray: ev(K.Adventurer, 'mourn').filter((x) => x.how === 1).length,
   };
 }
 
