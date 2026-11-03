@@ -13,7 +13,7 @@ import { TILE } from '../mapgen';
 /** 盗みに出る集落の、蓄えの乏しさ（蓄えの目安に対する割合） */
 const RAID_STORE = 0.7;
 /** 盗みに出る遠さ（集落から焚き火まで、マス）。焚き火の残りの時間で着ける所だけ（1マスあたり約25歩で見積もる） */
-const RAID_R = 50;
+const RAID_R = 80;
 
 export function isNight(this: Ecology): boolean {
   return this.phaseNow > 0.79 || this.phaseNow < 0.18;
