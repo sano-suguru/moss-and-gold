@@ -66,7 +66,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       this.metabolism(c);
       continue;
     }
-    if (this.heedAlarm(c) || this.fearFire(c) || this.lurk(c) || this.territory(c) || this.shyOfPeople(c)) {
+    if ((c.k === Kind.Orc && this.orcWary(c)) || this.heedAlarm(c) || this.fearFire(c) || this.lurk(c) || this.territory(c) || this.shyOfPeople(c)) {
       this.metabolism(c);
       continue;
     }

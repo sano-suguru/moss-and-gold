@@ -182,6 +182,7 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1): boolean {
   const sa = this.str(a) * (1 + 0.4 * allies(a));
   const dmg = sa * (1.2 + (ih(a.id, d.id ^ this.step, 161) % 1000) / 1000 * 1.2) * mul;
   d.hp -= dmg;
+  if (d.k === Kind.Adventurer && d.hp > 0) this.heroHurt(d);
   d.hitAt = this.w.tick;
   d.foe = a.id;
   d.sleep = 0;

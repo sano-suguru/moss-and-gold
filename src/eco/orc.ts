@@ -70,6 +70,158 @@ export function orc(this: Ecology, c: Cr): void {
   }
 }
 
+/**
+ * オークの見極め（威嚇して退く）：冒険者の一行に気づき（7マス、見通しが利く）、一行の強さ（英雄のいる一行はそれだけ強く見積もる）が
+ * 自分たち（6マスの内のオーク）よりはっきり上（1.5倍）なら、襲わずにその場で唸って武器を打ち鳴らし（st 20：一行の方を向いて
+ * 武器を振る動きを3回、ORC_BLUFF 歩）、縄張りの奥へ退く（st 21：住みかの印 hx, hy へ。住みかがなければ一行から離れる方へ）。
+ * 勝ち目があれば今までどおり。退いているオークを、目標でない一行は追わない（orcYields）。
+ * 状態は st と ref（一行）と lureAt（始めた歩）。step.ts の判断のはじめ（潜む・縄張り・狩りより先）に呼ぶ
+ */
+export const ORC_BLUFF = 24;
+const ORC_WITHDRAW = 600;
+export function orcWary(this: Ecology, c: Cr): boolean {
+  const s = SPEC[Kind.Orc];
+  if (c.st === 20 || c.st === 21) {
+    const p = this.parties.find((q) => q.id === c.ref);
+    // 一行に打たれたら、打ち返す（今までどおり）
+    const struck = this.w.tick - c.hitAt < 150 && !!p && p.members.includes(c.foe);
+    if (!p || struck) {
+      c.st = 0;
+      c.ref = 0;
+      return false;
+    }
+    let near: Cr | null = null;
+    let bd = 1e18;
+    for (const id of p.members) {
+      const o = this.byId.get(id);
+      if (!o || o.dead || o.away) continue;
+      const d = sq(o.x - c.x) + sq(o.y - c.y);
+      if (d < bd) {
+        bd = d;
+        near = o;
+      }
+    }
+    const el = this.step - c.lureAt;
+    if (c.st === 20) {
+      // 唸って武器を打ち鳴らす：一行の方を向き、武器を振る動きを8歩ごとに
+      if (near) c.dir = Math.abs(near.x - c.x) > Math.abs(near.y - c.y) ? (near.x > c.x ? 2 : 3) : near.y > c.y ? 0 : 1;
+      // 威嚇の間は武器を振る動きを続け（8歩ごとに振り直す）、唸り声を上げる。頭の上の「！」は描画（creatureView）が st 20 を見て出す
+      c.act = 2;
+      if (el % 8 === 0) {
+        c.actT = 0;
+        this.noise(c.x, c.y, 7);
+      }
+      if (el >= ORC_BLUFF) {
+        c.st = 21;
+        c.lureAt = this.step;
+        // 退く先：見通しの利く6マス先（16方向）のうち、一行からいちばん遠い所（tx, ty）。まずそこまで下がる
+        c.tx = c.x;
+        c.ty = c.y;
+        let best = -1;
+        for (const [ux, uy] of DIR16) {
+          for (const r of [6, 4, 2.5]) {
+            const x = c.x + ux * r * TILE;
+            const y = c.y + uy * r * TILE;
+            const k = this.tileOf(x, y);
+            if (k < 0 || this.w.map.solid[k] || this.w.map.lava[k] || this.w.water[k] > 20 || !lineOfSight(this.w.map, c.x, c.y, x, y)) continue;
+            let dmin = 1e18;
+            for (const id of p.members) {
+              const o = this.byId.get(id);
+              if (o && !o.dead) dmin = Math.min(dmin, sq(o.x - x) + sq(o.y - y));
+            }
+            if (dmin > best) {
+              best = dmin;
+              c.tx = x;
+              c.ty = y;
+            }
+            break;
+          }
+        }
+      }
+      return true;
+    }
+    // 退く：縄張りの奥（住みかの印）へ。着いて一行が10マスより遠ければ、ふだんに戻る
+    const far = !near || bd > 10 * TILE * 10 * TILE;
+    const home = c.hx || c.hy;
+    if (el > ORC_WITHDRAW || (far && (!home || sq(c.hx - c.x) + sq(c.hy - c.y) < 3 * TILE * 3 * TILE))) {
+      c.st = 0;
+      c.ref = 0;
+      return false;
+    }
+    c.act = 1;
+    // 一行が近いうちは、まず一行から離れる方（tx, ty）へ下がる。離れたら縄張りの奥（住みかの印）へ
+    const back = !far && bd < 9 * TILE * 9 * TILE && sq(c.tx - c.x) + sq(c.ty - c.y) > TILE * TILE;
+    if (back) this.goTo(c, c.tx, c.ty, s.speed * 1.1);
+    else if (home && sq(c.hx - c.x) + sq(c.hy - c.y) >= 2 * TILE * 2 * TILE && (far || bd >= 9 * TILE * 9 * TILE)) this.goTo(c, c.hx, c.hy, s.speed * 1.1);
+    else if (near) {
+      const dx = c.x - near.x;
+      const dy = c.y - near.y;
+      const l = Math.sqrt(dx * dx + dy * dy) || 1;
+      this.tryMove(c, (dx / l) * s.speed, (dy / l) * s.speed);
+    } else c.act = 0;
+    return true;
+  }
+  // 担いだ貢ぎ物を運ぶ途中、戦いの中、逃げている間は見極めない
+  if (c.st === 6 || c.flee > 0 || (c.act === 2 && this.w.tick - c.hitAt < 150) || this.step % 4 !== c.id % 4 || !this.parties.length) return false;
+  const m = this.w.map;
+  let seen: Cr | null = null;
+  let bd = 7 * TILE * 7 * TILE;
+  for (const p of this.parties)
+    for (const id of p.members) {
+      const o = this.byId.get(id);
+      if (!o || o.dead || o.away) continue;
+      const d = sq(o.x - c.x) + sq(o.y - c.y);
+      if (d >= bd || !this.canSense(c, o) || !lineOfSight(m, c.x, c.y, o.x, o.y)) continue;
+      bd = d;
+      seen = o;
+    }
+  if (!seen) return false;
+  const p = this.parties.find((q) => q.id === (seen as Cr).party);
+  if (!p) return false;
+  // 一行に打たれたばかりなら、見極めずに打ち返す
+  if (this.w.tick - c.hitAt < 150 && p.members.includes(c.foe)) return false;
+  const theirs = this.partyMight(p);
+  let ours = 0;
+  this.nearby(c.x, c.y, 6, (o) => {
+    if (o.dead || o.away || o.k !== Kind.Orc || sq(o.x - c.x) + sq(o.y - c.y) > 6 * TILE * 6 * TILE) return;
+    ours += this.str(o) * (o.hp > 0 ? o.hp / this.maxHp(o) : 1);
+  });
+  if (theirs <= ours * 1.5) return false;
+  c.st = 20;
+  c.ref = p.id;
+  c.lure = 0;
+  c.lureAt = this.step;
+  c.act = 2;
+  c.actT = 0;
+  this.markNotice(c, seen as Cr, '!');
+  this.noise(c.x, c.y, 7);
+  this.record('settle', { t: this.w.tick, k: Kind.Orc, id: p.id, ev: 'bluff', n: c.id, how: Math.round((theirs / Math.max(1, ours)) * 10), x: Math.round(c.x), y: Math.round(c.y) } as never);
+  if (this.step - (this.lastLogged[997] ?? -99999) > 1500) {
+    this.lastLogged[997] = this.step;
+    this.log(c.x, c.y, `{k:${Kind.Orc}}が${this.partyTitle(p)}の一行に唸って武器を打ち鳴らし、縄張りの奥へ退いた`);
+  }
+  return true;
+}
+
+/** 一行の強さの見積もり（オークの見極め）：体力を加味した強さの和に、英雄一人ごとに2割を足す */
+export function partyMight(this: Ecology, p: Party): number {
+  let heroes = 0;
+  for (const id of p.members) {
+    const o = this.byId.get(id);
+    if (!o || o.dead) continue;
+    const h = this.heroOf(o);
+    if (h && h.rank >= 3) heroes++;
+  }
+  return this.partyStr(p) * (1 + 0.2 * heroes);
+}
+
+/** 威嚇して退いているオークを、一行は追わない（どの一行も。大物退治の目標がオークのときは除く） */
+export function orcYields(this: Ecology, p: Party, o: Cr): boolean {
+  if (o.k !== Kind.Orc || (o.st !== 20 && o.st !== 21)) return false;
+  if (p.aim === 3 && !p.aimEnd && this.rumors.beastKind === Kind.Orc) return false;
+  return true;
+}
+
 /** オーク c の縄張りに従う集落 */
 export function vassalsOf(this: Ecology, c: Cr): Camp[] {
   if (!c.hx && !c.hy) return [];
@@ -248,7 +400,10 @@ declare module '../ecology' {
     goCollect: typeof goCollect;
     checkOrcMouths: typeof checkOrcMouths;
     orcTargetFrom: typeof orcTargetFrom;
+    orcWary: typeof orcWary;
+    partyMight: typeof partyMight;
+    orcYields: typeof orcYields;
   }
 }
 
-Object.assign(Ecology.prototype, { pickLair, orc, vassalsOf, guardVassals, collectTribute, updateVassals, goCollect, checkOrcMouths, orcTargetFrom });
+Object.assign(Ecology.prototype, { pickLair, orc, vassalsOf, guardVassals, collectTribute, updateVassals, goCollect, checkOrcMouths, orcTargetFrom, orcWary, partyMight, orcYields });

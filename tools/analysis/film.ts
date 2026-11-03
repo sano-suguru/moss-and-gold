@@ -74,6 +74,20 @@ for (let i = 0; i < n; i++) {
       if (cp) marks.push({ x: cp.x, y: cp.y, label: '目標：ゴブリンの集落', color: '#ffd24a' });
     } else if (party.aimKnown && party.aim) marks.push({ x: party.aimX, y: party.aimY, label: '目標', color: '#ffd24a' });
   }
+  // 引退の前の最後の遠征：英雄と、連れてきた見習い（同じ職業の、初めての遠征の者）に名前の印（一行を追うときと、その一行の者を追うとき）
+  const crew = party ?? (follow.startsWith('id:') ? e.parties.find((q: any) => q.members.includes(+follow.slice(3))) : null);
+  if (crew) {
+    const oc = crew.members.map((id: number) => e.byId.get(id)).find((c: any) => c && !c.dead && e.heroOf(c)?.last && e.heroOf(c)?.rank >= 3);
+    const oh = oc ? e.heroOf(oc) : null;
+    if (oh) {
+      for (const id of crew.members) {
+        const c = e.byId.get(id);
+        const h = c && !c.dead ? e.heroOf(c) : null;
+        if (h === oh) marks.push({ x: c.x, y: c.y - 16, label: `英雄${h.name}（最後の遠征）`, color: '#ffd24a' });
+        else if (h && h.rank === 0 && h.trips === 1 && h.job === oh.job) marks.push({ x: c.x, y: c.y + 4, label: `見習い${h.name}`, color: '#9ad8ff' });
+      }
+    }
+  }
   if (party) {
     if ((party.braceT ?? 0) > e.step && party.braceK === 2) marks.unshift({ x: party.braceX, y: party.braceY, label: '身構えた住みか', color: '#80ff9a' });
     // 目標がそばにあれば、カメラを一行と目標の間に寄せる

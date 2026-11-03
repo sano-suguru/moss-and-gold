@@ -570,6 +570,12 @@ export class CreatureView {
         if (mk.m === '?' && listening.has(c.id)) continue;
         pushSprite(c.x + 5, c.y, 22 + pop + Ecology.bodySize(c.k) * 0.6, false, A.mark(mk.m), 0, 2);
       }
+      // オークの威嚇（src/eco/orc.ts の orcWary、st 20）：唸って武器を打ち鳴らしているあいだずっと、頭の上に「！」が跳ねる
+      for (const c of eco.list) {
+        if (c.k !== Kind.Orc || c.st !== 20 || c.dead || !inView(c.x, c.y, 20)) continue;
+        const hop = Math.abs(Math.sin(t * 9 + c.id)) * 2.5;
+        pushSprite(c.x + 5, c.y, 24 + hop + Ecology.bodySize(c.k) * 0.6, false, A.mark('!'), 0, 2);
+      }
       // 聞き耳の「？」：立ち止まって耳を澄ませているあいだずっと、皆の頭の上に（前は出た瞬間の2秒だけで、見落としやすかった）
       for (const id of listening) {
         const c = byId.get(id);
@@ -782,6 +788,13 @@ export class CreatureView {
             pushSprite(x + Math.cos(i * 2.4 + t * 2) * 7, yy + Math.sin(i * 2.4 + t * 2) * 2, 2 + ph * 26, false, A.speck(1, Math.min(3, Math.floor(ph * 4))), 0, 2);
           }
           if (h!.rank >= 3) pushSprite(x, yy - 0.05, 6, false, A.halo(0), 0, 2);
+        }
+        // 引退の前の最後の遠征の英雄：金の粒が二つ、ゆっくり立ちのぼる（「これが最後」。描画だけ）
+        if (h && h.last && h.rank >= 3) {
+          for (let i = 0; i < 2; i++) {
+            const ph = (t * 0.35 + i * 0.5 + c.id * 0.13) % 1;
+            pushSprite(x + Math.sin(ph * 6 + i * 3) * 6, yy, 6 + ph * 30, false, A.speck(1, Math.min(3, Math.floor(ph * 4))), 0, 2);
+          }
         }
       }
       const glow = c.glow / 255;

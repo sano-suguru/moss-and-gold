@@ -46,6 +46,10 @@ export const MOMENTS: Moment[] = [
   { key: 'mourn', label: '墓標の前で一行が立ち止まった' },
   { key: 'pray', label: '墓標の前で僧侶が祈った' },
   { key: 'tribute', label: 'オークの取り立て' },
+  { key: 'farewell', label: '英雄の最後の遠征（見習いを連れて入った）' },
+  { key: 'retire', label: '英雄が引退した' },
+  { key: 'scar', label: '傷の残った帰還（眼帯・包帯）' },
+  { key: 'orcBluff', label: 'オークが威嚇して退いた' },
 ];
 
 const read = (dir: string, f: string, since: number) =>
@@ -96,6 +100,10 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     grave: ev(K.Adventurer, 'grave').length,
     mourn: ev(K.Adventurer, 'mourn').length,
     pray: ev(K.Adventurer, 'mourn').filter((x) => x.how === 1).length,
+    farewell: ev(K.Adventurer, 'farewell').filter((x) => (x.how ?? 0) > 0).length,
+    retire: ev(K.Adventurer, 'retire').length,
+    scar: ev(K.Adventurer, 'scar').length,
+    orcBluff: ev(K.Orc, 'bluff').length,
   };
 }
 
