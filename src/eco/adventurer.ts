@@ -589,7 +589,8 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     c.act = 0;
     const watch = idx === 0;
     c.dir = watch ? (Math.cos(a) > 0 ? 2 : 3) : Math.abs(fx - c.x) > Math.abs(fy - c.y) ? (fx > c.x ? 2 : 3) : fy > c.y ? 0 : 1;
-    if (c.sp === Job.Priest && this.step % 15 === c.id % 15) {
+    // 僧侶は、傷ついた者がいる間だけ起きていて、生き物の更新15回に1回ずつ癒やす（皆が治ったら、僧侶も眠る。syncLongSleep）
+    if (c.sp === Job.Priest && this.step % 15 === c.id % 15 && this.campWounded(p)) {
       for (const id of p.members) {
         const o = this.byId.get(id);
         if (o && !o.dead && sq(o.x - fx) + sq(o.y - fy) < 40 * 40) o.hp = Math.min(this.maxHp(o), (o.hp > 0 ? o.hp : this.maxHp(o)) + this.maxHp(o) / 20);
@@ -697,6 +698,19 @@ export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: numbe
   p.dozeT = 0;
   p.dozeNext = 0;
   this.log((best % m.w) * TILE + 8, Math.floor(best / m.w) * TILE + 8, `冒険者の一行が焚き火を囲んで休みはじめた`);
+}
+
+/** 焚き火を囲む一行に、焚き火のそば（僧侶が癒やせる所）で傷ついている者がいるか（僧侶が起きて手当てを続けるか） */
+export function campWounded(this: Ecology, p: Party): boolean {
+  const k = p.camp ?? -1;
+  if (k < 0) return false;
+  const fx = (k % this.w.map.w) * TILE + 8;
+  const fy = Math.floor(k / this.w.map.w) * TILE + 8;
+  for (const id of p.members) {
+    const o = this.byId.get(id);
+    if (o && !o.dead && o.hp > 0 && o.hp < this.maxHp(o) && sq(o.x - fx) + sq(o.y - fy) < 40 * 40) return true;
+  }
+  return false;
 }
 
 /** 焚き火のまわりの席 (x, y) に座れるか：立てる床で、焚き火のマスか、その隣のマス（壁を隔てた向こうではない） */
@@ -927,6 +941,7 @@ declare module '../ecology' {
     startCamp: typeof startCamp;
     endCamp: typeof endCamp;
     campSeatOk: typeof campSeatOk;
+    campWounded: typeof campWounded;
     dropScraps: typeof dropScraps;
     leaveDungeon: typeof leaveDungeon;
     dropBelongings: typeof dropBelongings;
@@ -938,4 +953,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { reputation, maybeParty, partyLights, seenBy, updateParties, cellOf, cellFloor, partyStr, pickTarget, pickTargetRandom, adventurer, setExit, startCamp, endCamp, campSeatOk, dropScraps, leaveDungeon, dropBelongings, dropJobItems, dropItem, updateItems, eachLight, lightSources });
+Object.assign(Ecology.prototype, { reputation, maybeParty, partyLights, seenBy, updateParties, cellOf, cellFloor, partyStr, pickTarget, pickTargetRandom, adventurer, setExit, startCamp, endCamp, campSeatOk, campWounded, dropScraps, leaveDungeon, dropBelongings, dropJobItems, dropItem, updateItems, eachLight, lightSources });
