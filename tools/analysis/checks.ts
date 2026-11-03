@@ -52,6 +52,25 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 冒険者の作り直しの二歩目：夜、蓄えの乏しい集落のゴブリンが、焚き火を囲む一行のところへ盗みに出る
+    name: 'ゴブリンが夜に盗みに出る（4シードで1回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 12 && x.ev === 'raid').length);
+      const rob = rs.map((r) => r.settle.filter((x) => x.k === 12 && x.ev === 'rob').length);
+      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}（盗んだ ${rob[i]}）`).join('、') };
+    },
+  },
+  {
+    // 大ネズミの巣穴の引っ越しは、群れが一列になって歩いていく
+    name: '大ネズミが一列になって巣穴を引っ越す（4シードで1回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 2 && x.ev === 'march').length);
+      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
     name: 'オークが貢ぎ物を取り立てる（4シードで1回以上）',
     ...RUN_A,
     test: (rs) => {

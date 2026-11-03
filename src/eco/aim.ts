@@ -77,8 +77,28 @@ export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: bool
     }
   }
   if (jobs.includes(Job.Slayer)) {
-    // 狙うのはドラゴン、いなければワイバーン、岩の中を動くワームは床にいるときだけ
-    const d = this.list.find((o) => !o.dead && !o.away && o.k === Kind.Dragon) ?? this.list.find((o) => !o.dead && !o.away && o.k === Kind.Wyvern) ?? this.list.find((o) => !o.dead && !o.away && o.k === Kind.Worm && this.tileOf(o.x, o.y) >= 0 && !m.solid[this.tileOf(o.x, o.y)]);
+    const dragon = this.list.find((o) => !o.dead && !o.away && o.k === Kind.Dragon);
+    if (dragon) {
+      // ドラゴン：寝床までの道が町で知られている（前の一行が見つけて持ち帰った）ときだけ、竜退治を目標にする
+      const way = this.lore.dragonWay;
+      const wd = way ? this.byId.get(way[2]) : undefined;
+      if (way && wd && !wd.dead && !wd.away && wd.k === Kind.Dragon) {
+        p.aim = 2;
+        p.aimId = wd.id;
+        p.aimX = way[0];
+        p.aimY = way[1];
+        p.aimKnown = 1;
+        p.aimWay = 1;
+        return;
+      }
+      // 知られていなければ、深部を探って、竜の寝床への道を見つけて持ち帰る
+      if (way) this.lore.dragonWay = undefined;
+      p.aim = 6;
+      this.guessDeep(p);
+      return;
+    }
+    // ドラゴンがいなければ、ワイバーン、岩の中を動くワームは床にいるときだけ（場所は噂か深部で当て推量）
+    const d = this.list.find((o) => !o.dead && !o.away && o.k === Kind.Wyvern) ?? this.list.find((o) => !o.dead && !o.away && o.k === Kind.Worm && this.tileOf(o.x, o.y) >= 0 && !m.solid[this.tileOf(o.x, o.y)]);
     p.aim = 2;
     if (d) {
       p.aimId = d.id;
@@ -86,7 +106,6 @@ export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: bool
       p.aimY = d.y;
       p.aimKnown = this.loreKnows(d.x, d.y) ? 1 : 0;
     }
-    // 寝床が地図に載っていなければ、竜を見かけたという噂の場所か、深部を目指す（着いて見えなければ、まわりの奥を探す）
     this.guessDeep(p);
     return;
   }
@@ -168,7 +187,9 @@ export function aimPhrase(this: Ecology, p: Party): string {
     case 1:
       return '知られた宝の山を目指して';
     case 2:
-      return p.aimKnown ? `{k:${dk}}の寝床を目指して` : `深部の{k:${dk}}を探しに`;
+      return p.aimWay ? `知られた道をたどって{k:${dk}}の寝床を目指し` : p.aimKnown ? `{k:${dk}}の寝床を目指して` : `深部の{k:${dk}}を探しに`;
+    case 6:
+      return `{k:${Kind.Dragon}}の寝床への道を探しに、深部へ`;
     case 3:
       return `噂の{k:${this.rumors.beastKind}}を狩りに`;
     case 4:
@@ -325,13 +346,29 @@ export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
       p.aimKnown = 1;
       p.aimX = tt.x;
       p.aimY = tt.y;
-    } else if (tt && p.aimKnown && p.aim === 2 && this.loreKnows(tt.x, tt.y)) {
+    } else if (tt && p.aimKnown && p.aimWay && sq((p.aimX ?? 0) - lead.x) + sq((p.aimY ?? 0) - lead.y) >= 2.5 * TILE * 2.5 * TILE) {
+      // 知られた道をたどる：道の先（前の一行が竜を見た所）までは、迷わずまっすぐ
+    } else if (tt && p.aimKnown && p.aim === 2 && !p.aimWay && this.loreKnows(tt.x, tt.y)) {
       // 地図に載った寝床の竜：寝床へ向かう（竜が動けば、地図に載った所にいる限り追う）
       p.aimX = tt.x;
       p.aimY = tt.y;
     } else if (p.aimKnown && sq((p.aimX ?? 0) - lead.x) + sq((p.aimY ?? 0) - lead.y) < 2.5 * TILE * 2.5 * TILE) {
       // 噂の場所に着いたのに見当たらない：見失って、まわりを探す（見えたらまた目標にする）
       p.aimKnown = 0;
+    }
+  } else if (p.aim === 6) {
+    // 深部の探索：寝床のドラゴンを見通しの利く所から見たら、道を見つけたので、生きて持ち帰る
+    if (p.dgId) {
+      const t = this.byId.get(p.dgId);
+      this.brace(p, t?.x ?? lead.x, t?.y ?? lead.y, 1, BRACE_ARRIVE);
+      this.partyMark(p, '!', true);
+      p.aimAt = this.step;
+      this.endAim(p, lead, 1);
+      p.goal = 1;
+      p.camp = -1;
+      this.setExit(p);
+      this.log(lead.x, lead.y, `${p.name ?? ''}の一行が深部で{k:${Kind.Dragon}}の寝床を見つけ、道を持ち帰ろうと引き返した`);
+      return;
     }
   } else if (p.aim === 4 && !p.aimAt) {
     let u: Cr | null = null;
@@ -398,7 +435,11 @@ export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
     } else if (p.aim === 5) {
       const cp = this.aimCamp(p);
       if (!cp || !this.list.some((o) => !o.dead && o.k === Kind.Goblin && o.ref === cp.id)) end = 1;
-      else if (since > 3000) end = 2;
+      else {
+        // 集落のゴブリンが見えたら覚える。着いてから誰も見えないまま、集落のまわりを探し歩いて（地上の時間で約1分半）見つからなければ引き返す
+        if (alive.some((c) => this.list.some((o) => !o.dead && o.k === Kind.Goblin && o.ref === cp.id && sq(o.x - c.x) + sq(o.y - c.y) < 6 * TILE * 6 * TILE && this.seenBy(c, lights, o)))) p.gobSeen = this.step;
+        if (this.step - Math.max(p.aimAt, p.gobSeen ?? 0) > 900 || since > 3000) end = 2;
+      }
     }
     if (end) this.endAim(p, lead, end);
   }
@@ -412,13 +453,19 @@ export function endAim(this: Ecology, p: Party, lead: Cr, end: number): void {
   if (a === 1 && end === 2 && !(p.goneGold ??= []).includes(p.aimId ?? -1)) p.goneGold.push(p.aimId ?? -1);
   this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'aim', how: a, reason: end, n: p.aimId ?? 0, x: Math.round(lead.x), y: Math.round(lead.y) } as never);
   if (end === 1) {
-    this.log(lead.x, lead.y, a === 5 ? `${p.name ?? ''}の一行が{k:${Kind.Goblin}}の集落を退治し、引き返した` : `${p.name ?? ''}の一行が目的（${AIM_NAMES[a]}）を果たした`);
+    if (a !== 6) this.log(lead.x, lead.y, a === 5 ? `${p.name ?? ''}の一行が{k:${Kind.Goblin}}の集落を退治し、引き返した` : `${p.name ?? ''}の一行が目的（${AIM_NAMES[a]}）を果たした`);
     // ゴブリン退治を果たしたら、誇らしく外へ帰る
     if (a === 5 && p.goal === 0) {
       p.goal = 1;
       p.camp = -1;
       this.setExit(p);
     }
+  } else if (a === 5 && p.goal === 0) {
+    // 集落のまわりを探しても見つからない：引き返す
+    p.goal = 1;
+    p.camp = -1;
+    this.setExit(p);
+    this.log(lead.x, lead.y, `${p.name ?? ''}の一行は{k:${Kind.Goblin}}を見つけられず、集落のまわりを探しあぐねて引き返した`);
   } else this.log(lead.x, lead.y, `${p.name ?? ''}の一行が目的（${AIM_NAMES[a]}）をあきらめた`);
 }
 
@@ -453,6 +500,20 @@ export function aimTarget(this: Ecology, p: Party, from: Cr): boolean {
   if (!p.aim || p.aimEnd || p.goal !== 0) return false;
   const m = this.w.map;
   if (!p.aimKnown) {
+    // ゴブリン退治：盗まれた場所に着いても集落が見えなければ、そのまわり（12〜35マス。盗みに出たゴブリンはそのくらい遠くから来る）を順に探し歩く。
+    // かがり火が見えるか、近くに来れば集落を知る（aimStep）
+    if (!p.aimGuess && p.aim === 5 && (this.rumors.goblinX || this.rumors.goblinY)) {
+      for (let i = 0; i < 30; i++) {
+        const a = (ih(p.id, this.step, 263 + i) % 628) / 100;
+        const r = (12 + (ih(p.id, this.step, 293 + i) % 24)) * TILE;
+        const k = this.tileOf(this.rumors.goblinX + Math.cos(a) * r, this.rumors.goblinY + Math.sin(a) * r);
+        if (k < 0 || m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 40) continue;
+        p.tx = (k % m.w) * TILE + 8;
+        p.ty = Math.floor(k / m.w) * TILE + 8;
+        p.targetAt = this.step;
+        return true;
+      }
+    }
     // 当て推量の行き先へまっすぐ。着いたら、まわりの奥を探す（pickTarget が深部へ寄せる）
     if (!p.aimGuess) return false;
     // 着いたか、地上の時間で長く（4000歩）向かっても着かなければ、まわりを探す
@@ -470,8 +531,10 @@ export function aimTarget(this: Ecology, p: Party, from: Cr): boolean {
     const cp = this.aimCamp(p);
     if (!cp) return false;
     for (let i = 0; i < 8; i++) {
-      const a = ((Math.floor(this.step / 150) + i) * 2.399) % 6.283;
-      const k = this.tileOf(cp.x + Math.cos(a) * 5 * TILE, cp.y + Math.sin(a) * 5 * TILE);
+      const j = Math.floor(this.step / 120) + i;
+      const a = (j * 2.399) % 6.283;
+      const r = 4 + (j % 4);
+      const k = this.tileOf(cp.x + Math.cos(a) * r * TILE, cp.y + Math.sin(a) * r * TILE);
       if (k < 0 || m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 40) continue;
       p.tx = (k % m.w) * TILE + 8;
       p.ty = Math.floor(k / m.w) * TILE + 8;
@@ -505,12 +568,27 @@ export function aimDeep(this: Ecology, p: Party): boolean {
   return !!p.aim && p.aim !== 3 && !p.aimEnd && !p.aimKnown && !p.aimGuess && p.goal === 0;
 }
 
-/** ゴブリン退治の一行は、目指す集落に踏み込んだら、暗がりに隠れた者も3マスまでなら見つける */
+/**
+ * ゴブリン退治の一行は、目指す集落の、暗がりに隠れた者も、松明の光の届く範囲（5.5マス）までなら見つける
+ * （目標でない集落のそばを通る一行は、ほかの見る者と同じく、すぐそばに来るまで見つけられない）
+ */
 export function searchesCamp(this: Ecology, c: Cr, o: Cr): boolean {
   if (c.k !== Kind.Adventurer || o.k !== Kind.Goblin) return false;
   const p = this.parties.find((q) => q.id === c.party);
-  if (!p || p.aim !== 5 || p.aimEnd || !p.aimAt || o.ref !== p.aimId) return false;
-  return sq(o.x - c.x) + sq(o.y - c.y) < 3 * TILE * 3 * TILE;
+  if (!p || !this.huntsCamp(p, o.ref)) return false;
+  if (sq(o.x - c.x) + sq(o.y - c.y) < 3 * TILE * 3 * TILE) return true;
+  return this.inPartyLight(p, o);
+}
+
+/** その一行が、この集落を退治しに来ているか */
+export function huntsCamp(this: Ecology, p: Party, campId: number): boolean {
+  return p.aim === 5 && !p.aimEnd && p.goal === 0 && p.aimId === campId;
+}
+
+/** 一行の松明（と光の呪文）の光の届く範囲（5.5マス）にいるか */
+export function inPartyLight(this: Ecology, p: Party, o: Cr): boolean {
+  for (const l of this.partyLights(p)) if (sq(o.x - l.x) + sq(o.y - l.y) < 5.5 * TILE * 5.5 * TILE) return true;
+  return false;
 }
 
 /** 札と記録のため：率いる者の呼び方（「戦士アルド」） */
@@ -542,7 +620,9 @@ declare module '../ecology' {
     partyTitle: typeof partyTitle;
     guessDeep: typeof guessDeep;
     searchesCamp: typeof searchesCamp;
+    huntsCamp: typeof huntsCamp;
+    inPartyLight: typeof inPartyLight;
   }
 }
 
-Object.assign(Ecology.prototype, { goblinHuntReady, loreKnows, chooseAim, aimPhrase, aimLine, aimCamp, homeKey, spareResident, avoidZones, advPath, brace, partyMark, aimPoint, aimStep, endAim, passBrace, aimTarget, aimDeep, partyTitle, searchesCamp, guessDeep });
+Object.assign(Ecology.prototype, { goblinHuntReady, loreKnows, chooseAim, aimPhrase, aimLine, aimCamp, homeKey, spareResident, avoidZones, advPath, brace, partyMark, aimPoint, aimStep, endAim, passBrace, aimTarget, aimDeep, partyTitle, searchesCamp, guessDeep, huntsCamp, inPartyLight });

@@ -32,6 +32,11 @@ export function rat(this: Ecology, c: Cr, day: number): void {
     }
     return;
   }
+  // 一列になって、新しい巣穴へ引っ越していくところ
+  if (c.st === 11) {
+    this.ratMarch(c);
+    return;
+  }
   // 群れで外へ出ていくところ
   if (c.st === 8) {
     c.act = 1;
@@ -170,6 +175,59 @@ export function burrowFood(this: Ecology, x: number, y: number): number {
  * 巣穴の引っ越し：まわりの苔が尽きてきた巣穴は、歩いて行ける（道のり120マスまで）苔の豊かな所へ群れごと移る。
  * 地上の1/4日に一度まで試す。移った先が見つかれば true
  */
+/** 引っ越しの列（st 11）：先頭は新しい巣穴へ、ほかは前を行く仲間のすぐ後ろについて歩く。先頭は、すぐ後ろの仲間が遅れたら待つ */
+export function ratMarch(this: Ecology, c: Cr): void {
+  const s = SPEC[Kind.Rat];
+  const done = () => {
+    c.st = 0;
+    c.ref2 = 0;
+    c.tx = 0;
+  };
+  // 長くかかりすぎたか、ひどく腹が減ったら、列を離れる（それぞれ新しい巣穴へ帰る）
+  if (this.step - c.tx > 2500 || c.hungry > s.starve * 0.5) return done();
+  if (sq(c.hx - c.x) + sq(c.hy - c.y) < 1.2 * TILE * 1.2 * TILE) {
+    c.act = 0;
+    return done();
+  }
+  // 冒険者やドワーフが近く（3マス）にいれば、列のまま、まず離れる（以前は列のまま足もとを通って払われていた）
+  let man: Cr | null = null;
+  this.nearby(c.x, c.y, 3, (o) => {
+    if (!man && !o.dead && !o.away && (o.k === Kind.Adventurer || o.k === Kind.Dwarf) && sq(o.x - c.x) + sq(o.y - c.y) < 3 * TILE * 3 * TILE) man = o;
+  });
+  if (man) {
+    const mm = man as Cr;
+    const dx = c.x - mm.x;
+    const dy = c.y - mm.y;
+    const L = Math.sqrt(dx * dx + dy * dy) || 1;
+    c.act = 1;
+    this.tryMove(c, (dx / L) * s.speed * 1.3, (dy / L) * s.speed * 1.3);
+    return;
+  }
+  // 前を行く仲間（列を離れた者、死んだ者は飛ばして、その前の者）
+  let ahead = c.ref2 ? this.byId.get(c.ref2) : undefined;
+  for (let i = 0; i < 12 && ahead && (ahead.dead || ahead.st !== 11); i++) ahead = ahead.ref2 ? this.byId.get(ahead.ref2) : undefined;
+  if (ahead && (ahead.dead || ahead.st !== 11)) ahead = undefined;
+  c.act = 1;
+  if (!ahead) {
+    // 先頭：すぐ後ろの仲間が3マスより遅れていたら、立ち止まって待つ
+    let lag = false;
+    for (const o of this.list) if (o.k === Kind.Rat && !o.dead && o.st === 11 && o.ref2 === c.id && sq(o.x - c.x) + sq(o.y - c.y) > 3 * TILE * 3 * TILE) lag = true;
+    if (lag && ih(c.id, this.step, 236) % 4 !== 0) {
+      c.act = 0;
+      return;
+    }
+    this.goTo(c, c.hx, c.hy, s.speed * 0.85);
+    return;
+  }
+  const d2 = sq(ahead.x - c.x) + sq(ahead.y - c.y);
+  if (d2 > 12 * 12) this.goTo(c, ahead.x, ahead.y, s.speed);
+  else if (ahead.act === 1 && d2 > 7 * 7) this.moveToward(c, ahead.x, ahead.y, s.speed * 0.85);
+  else {
+    c.act = 0;
+    c.dir = Math.abs(ahead.x - c.x) > Math.abs(ahead.y - c.y) ? (ahead.x > c.x ? 2 : 3) : ahead.y > c.y ? 0 : 1;
+  }
+}
+
 export function relocateBurrow(this: Ecology, b: Burrow, fromFire = false): boolean {
   if (this.w.tick - (b.moved ?? -1e9) < DAY_TICKS_ECO / 4) return false;
   b.moved = this.w.tick;
@@ -204,11 +262,21 @@ export function relocateBurrow(this: Ecology, b: Burrow, fromFire = false): bool
   if (best < 0) return false;
   const nx = (best % m.w) * TILE + 8;
   const ny = Math.floor(best / m.w) * TILE + 11;
+  // 巣穴のそば（15マス）にいる仲間は、一列になって新しい巣穴まで歩いていく（先頭は古い巣穴にいちばん近い者。st 11、ref2 は前を行く仲間）
+  const line = res.filter((c) => sq(c.x - b.x) + sq(c.y - b.y) < 15 * TILE * 15 * TILE && c.sleep !== 2).sort((a, z) => sq(a.x - b.x) + sq(a.y - b.y) - (sq(z.x - b.x) + sq(z.y - b.y)) || a.id - z.id);
   for (const c of res) {
     c.hx = nx;
     c.hy = ny;
     if (c.st === 8) c.st = 0;
   }
+  line.forEach((c, i) => {
+    c.st = 11;
+    c.ref = 0;
+    c.ref2 = i === 0 ? 0 : line[i - 1].id;
+    c.tx = this.step;
+    c.sleep = 0;
+  });
+  if (line.length) this.record('settle', { t: this.w.tick, k: Kind.Rat, id: line[0].id, ev: 'march', n: line.length, x: Math.round(b.x), y: Math.round(b.y), tx: nx, ty: ny } as never);
   this.record('moves', { t: this.w.tick, k: Kind.Rat, n: res.length, x: Math.round(b.x), y: Math.round(b.y), tx: nx, ty: ny } as never);
   b.x = nx;
   b.y = ny;
@@ -337,6 +405,7 @@ declare module '../ecology' {
     ratFoodCap: typeof ratFoodCap;
     burrowFood: typeof burrowFood;
     relocateBurrow: typeof relocateBurrow;
+    ratMarch: typeof ratMarch;
     burrowCap: typeof burrowCap;
     burrowCapOf: typeof burrowCapOf;
     burrowResidents: typeof burrowResidents;
@@ -347,4 +416,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { rat, ratCap, ratFoodCap, burrowFood, relocateBurrow, burrowCap, burrowCapOf, burrowResidents, hungryRats, nearestEdible, nearestEdibleD, ratDisperse });
+Object.assign(Ecology.prototype, { rat, ratCap, ratFoodCap, burrowFood, relocateBurrow, ratMarch, burrowCap, burrowCapOf, burrowResidents, hungryRats, nearestEdible, nearestEdibleD, ratDisperse });

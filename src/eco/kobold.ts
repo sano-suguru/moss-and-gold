@@ -257,15 +257,24 @@ export function kobold(this: Ecology, c: Cr): void {
     }
   }
   // 蓄えを運び込む：腹が満ちた者は、余りを住処に置く
-  if (wr && c.food > s.cap * 0.75 && home < 2 * TILE * 2 * TILE && (wr.store ?? 0) < this.storeGoal(wr)) {
+  if (wr && c.food > s.cap * (c.st === 13 ? 0.55 : 0.75) && home < 2 * TILE * 2 * TILE && (wr.store ?? 0) < this.storeGoal(wr)) {
     const t = c.food - Math.floor(s.cap * 0.5);
     c.food -= t;
     wr.store = (wr.store ?? 0) + t;
     c.act = 2;
     c.actT = 0;
-    if (c.st === 4) c.st = 0;
+    if (c.st === 4 || c.st === 13) c.st = 0;
     return;
   }
+  // 腹いっぱいの者は、蓄えが足りなければ住処へ持ち帰る（集めに出た者が腹を満たしたあとも。以前は1歩だけ住処へ向かって、そのまま忘れていた）
+  // 持ち帰る道中（st 13）は、歩くうちに腹がこなれても、半分を超えて残っていれば運び込む
+  if (wr && !c.hungry && c.food > s.cap * (c.st === 13 ? 0.55 : 0.75) && home < 30 * TILE * 30 * TILE && (wr.store ?? 0) < this.storeGoal(wr) && (c.st === 0 || c.st === 4 || c.st === 13)) {
+    c.st = 13;
+    c.act = 1;
+    this.goTo(c, wr.x, wr.y, s.speed);
+    return;
+  }
+  if (c.st === 13) c.st = 0;
   // 食べ物を集めに出る：蓄えが足りなければ、群れのうち何匹かが交代で狩りに出て、腹いっぱいにして帰る
   if (wr && c.st === 0 && !c.hungry && (wr.store ?? 0) < this.storeGoal(wr) && c.food < s.cap * 0.85 && ih(c.id, this.step >> 7, 76) % 3 === 0) c.st = 4;
   if (c.st === 4 && c.food >= s.cap * 0.95) {
@@ -280,6 +289,31 @@ export function kobold(this: Ecology, c: Cr): void {
   if (c.st === 3 && c.food >= s.cap * 0.7) c.st = 0;
   if (c.hungry || c.st === 3 || c.st === 4) {
     if (c.hungry && c.st !== 4) c.st = 3;
+    // 集めに出た者は、まず住処の畑で育ったキノコを摘む（腹に入れて持ち帰り、蓄えにする）
+    if (c.st === 4 && wr && !c.hungry) {
+      let fk = -1;
+      let fv = 49;
+      for (const k of this.farmTiles(wr))
+        if (this.w.fungus[k] > fv) {
+          fv = this.w.fungus[k];
+          fk = k;
+        }
+      if (fk >= 0) {
+        const m = this.w.map;
+        c.act = 1;
+        if (this.goTo(c, (fk % m.w) * TILE + 8, Math.floor(fk / m.w) * TILE + 8, s.speed) || this.tileOf(c.x, c.y) === fk) {
+          const t = Math.min(4, this.w.fungus[fk] - 30, s.cap - c.food);
+          if (t > 0) {
+            this.w.fungus[fk] -= t;
+            c.food += t;
+            this.mossTouched = true;
+          }
+          c.act = 2;
+          if (c.actT > 4) c.actT = 0;
+        }
+        return;
+      }
+    }
     let prey: Cr | null = null;
     let bd = 8 * TILE * 8 * TILE;
     this.nearby(c.x, c.y, 8, (o) => {
@@ -478,10 +512,54 @@ export function abandonWarren(this: Ecology, wr: Warren, reason: number): boolea
 }
 
 /** 住処ごとに、次に掘る岩を決め、群れが増えたら子を産む。誰もいない住処は消える。立ち行かなくなった住処は捨てる */
+/** 住処の横穴（入口から奥まで、まっすぐの並び）のマスか。掘り出した土を置く所から除く */
+export function inWarrenTunnel(this: Ecology, k: number): boolean {
+  const m = this.w.map;
+  const x = k % m.w;
+  const y = (k / m.w) | 0;
+  for (const wr of this.warrens) {
+    if (wr.id < 0) continue;
+    const hk = this.tileOf(wr.x, wr.y);
+    const d = wr.door ?? -1;
+    if (k === hk || k === d) return true;
+    if (d < 0 || hk < 0) continue;
+    const ax = d % m.w;
+    const ay = (d / m.w) | 0;
+    const bx = hk % m.w;
+    const by = (hk / m.w) | 0;
+    if ((ax === bx && x === ax && y >= Math.min(ay, by) && y <= Math.max(ay, by)) || (ay === by && y === ay && x >= Math.min(ax, bx) && x <= Math.max(ax, bx))) return true;
+  }
+  return false;
+}
+
 export function updateWarrens(this: Ecology): void {
   const m = this.w.map;
   for (const wr of this.warrens) {
     if (wr.id < 0) continue;
+    // 住処の奥が瓦礫や崩落で埋まっていたら、寝床を入口の側の開いたマスへ移す（埋まったままでは誰も奥へ入れず、蓄えを運び込めない）
+    const hk0 = this.tileOf(wr.x, wr.y);
+    if (hk0 >= 0 && m.solid[hk0]) {
+      const d = wr.door ?? -1;
+      let nk = -1;
+      if (d >= 0) {
+        const ax = d % m.w;
+        const ay = (d / m.w) | 0;
+        let x = hk0 % m.w;
+        let y = (hk0 / m.w) | 0;
+        while ((x !== ax || y !== ay) && nk < 0) {
+          x += Math.sign(ax - x);
+          y += Math.sign(ay - y);
+          if (!m.solid[y * m.w + x]) nk = y * m.w + x;
+        }
+      }
+      if (nk < 0) nk = this.floorNear(hk0);
+      if (nk >= 0) {
+        wr.x = (nk % m.w) * TILE + 8;
+        wr.y = Math.floor(nk / m.w) * TILE + 8;
+        wr.target = -1;
+        wr.prog = 0;
+      }
+    }
     const members = this.warrenMembers(wr);
     if (!members.length) {
       this.record('settle', { t: this.w.tick, k: Kind.Kobold, id: wr.id, ev: 'empty', x: Math.round(wr.x), y: Math.round(wr.y) } as never);
@@ -797,6 +875,7 @@ declare module '../ecology' {
     floorNear: typeof floorNear;
     tunnelNext: typeof tunnelNext;
     storeGoal: typeof storeGoal;
+    inWarrenTunnel: typeof inWarrenTunnel;
     leaveWithGroup: typeof leaveWithGroup;
     exitCreature: typeof exitCreature;
     abandonWarren: typeof abandonWarren;
@@ -811,4 +890,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { pickWarren, walkDist, warrenFood, checkKoboldMouths, tunnelDir, newWarren, warrenMembers, isHidden, atDoorOf, warrenOf, kobold, floorNear, tunnelNext, storeGoal, leaveWithGroup, exitCreature, abandonWarren, updateWarrens, farmTiles, farmFungus, koboldTransit, underground, placeTrap, checkTraps, watchWarrens });
+Object.assign(Ecology.prototype, { pickWarren, walkDist, warrenFood, checkKoboldMouths, tunnelDir, newWarren, warrenMembers, isHidden, atDoorOf, warrenOf, kobold, floorNear, tunnelNext, storeGoal, inWarrenTunnel, leaveWithGroup, exitCreature, abandonWarren, updateWarrens, farmTiles, farmFungus, koboldTransit, underground, placeTrap, checkTraps, watchWarrens });

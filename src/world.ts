@@ -585,6 +585,8 @@ export class World {
           if (x < 3 || y < 4 || x >= m.w - 3 || y >= m.h - 3) continue;
           const k = y * m.w + x;
           if (m.solid[k] || m.lava[k] || this.water[k] > 20 || m.paved[k]) continue;
+          // コボルトの住処の横穴（入口から奥まで）は行き止まりでも埋めない（以前は掘り出した土で自分たちの住処の奥を埋めていた）
+          if (this.eco.inWarrenTunnel(k)) continue;
           const o = [k - m.w, k + 1, k + m.w, k - 1].map((q) => !m.solid[q]);
           const n4 = o.filter(Boolean).length;
           let ok = n4 <= 1;

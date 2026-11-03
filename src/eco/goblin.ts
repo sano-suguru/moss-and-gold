@@ -276,7 +276,20 @@ export function watchCamps(this: Ecology): void {
     }
     if (cp.hide === 1) {
       const found = members.some((c) => c.st === 7 && this.goblinHidden(c) === false && sq(c.x - cp.x) + sq(c.y - cp.y) < 9 * TILE * 9 * TILE && sq(c.x - a.x) + sq(c.y - a.y) < 3 * TILE * 3 * TILE) || members.some((c) => c.st === 7 && this.goblinHidden(c) && this.atDoorOf(a, c));
-      if (found) this.scatterCamp(cp, members, a, `隠れていた{k:${Kind.Goblin}}たちが見つかり、奥へ逃げ散った`);
+      // 集落を退治しに来た一行は、松明を掲げて照らし、光の届く範囲（5.5マス）の隠れた者を見つける（光の縁で目が光り、見つかった者が逃げ出す）
+      let lit: Cr | null = null;
+      if (!found)
+        for (const p of this.parties) {
+          if (!this.huntsCamp(p, cp.id)) continue;
+          lit = members.find((c) => c.st === 7 && this.inPartyLight(p, c)) ?? null;
+          if (lit) {
+            this.fxMarks.push({ t: this.w.tick, id: lit.id, m: '!' });
+            this.partyMark(p, '!', false);
+            this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'reveal', n: cp.id, x: Math.round(lit.x), y: Math.round(lit.y) } as never);
+            break;
+          }
+        }
+      if (found || lit) this.scatterCamp(cp, members, a, lit ? `松明の光の縁で、隠れていた{k:${Kind.Goblin}}の目が光った。見つかった{k:${Kind.Goblin}}たちが奥へ逃げ散った` : `隠れていた{k:${Kind.Goblin}}たちが見つかり、奥へ逃げ散った`);
       continue;
     }
     if (nd > 13 * TILE * 13 * TILE) continue;

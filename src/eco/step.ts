@@ -126,6 +126,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   this.checkTraps();
   if (this.step % 200 === 100) this.spawnSalamanders();
   if (this.step % 50 === 15) this.updateCamps();
+  if (this.step % 50 === 25) this.planRaids();
   if (this.step % 50 === 45) this.updateStatues(day);
   if (this.step % 50 === 30) this.updateTreasure(day);
   this.updateFire();

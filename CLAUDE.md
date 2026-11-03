@@ -18,6 +18,7 @@
 # 動きを数こまの連続に撮る（途中の状態の保存庫から始める。こまの下に日と先頭の札）→ docs/img/<name>.png
 npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 --name adv-enter
 npm run film -- --seed abc --tick 180000 --frames 6 --every 30 --xy 1200,640 --zoom 3 --name camp
+npm run film -- --run runs/.cache/run/<道具の版>/a1/seed5-xxxx/0 --seed seed5 --tick 310600 --ticks 310640,310700 --xy 735,680 --name x   # その回の状態から
 ```
 
 ## 最初に知っておくこと
@@ -75,6 +76,7 @@ npm run batch -- --seeds ... --days 25 --adv-max 2 --out runs/b-adv2 # 冒険者
 npm run compare -- --runs runs/b1,runs/b2 --names "前,後" --out docs/x.md   # batch どうしをコボルトと大ネズミの目安で並べる
 npm run compare -- --runs ... --paired --since 10                            # 同じシードどうしの差の分布と「はっきり / ばらつきの内」の目安（ab が付ける）
 npm run compare -- --runs ... --goals tools/analysis/goals-settling.json     # 目安に届いたか（✅/❌）の表をつける
+npm run advreport -- --runs runs/ab-x/base,runs/ab-x/new --out x.md      # 冒険者の目標（着いた・果たした）、ゴブリンの盗みと退治、竜退治、大ネズミの引っ越しの列を対にして数える
 npm run autopsy -- --seed seed7 --days 25 --kind 2 --cause starve   # probe deaths の別名（0〜25日目すべて）
 npm run stuckmap -- --seed seed7 --days 12 --kind 2                 # probe stuck の別名
 npm run bench -- --repeat 3                                         # 速さ：seed4・かしたれ・seed7 を10日目の状態から1日ずつ（同時に回さない）。手直しの前後は続けて測る（揺れが1割ほどある）
@@ -190,6 +192,11 @@ samples.jsonl は、刻みが `DAY_TICKS/4` の倍数のときに記録する（
 - 冒険者の作り直しの一歩目（docs/adventurer-aims-20261110.md、src/eco/aim.ts）：一行は入ってくるとき目標を一つ持つ（`Party.aim`：1 宝、2 竜、3 大物、4 アンデッド、5 ゴブリン退治、0 探索）。外の噂と職業から決め、場所を知らなければ噂の場所か深部へ当て推量で向かい（`aimGuess`）、見えたら目標にする。着くと止まって構え（`brace`、描画は振りかぶった姿）、皆に「！」。
   目標でない住処・集落・村・縄張りは道筋で避け（`advPath`、通らないと行けないときだけ通る）、その住民には自分たちから戦わない（`spareResident`：襲ってくる者と、すぐそばで行く手をふさぐ者とは戦う）。そばを通ると一度だけ止まって住みかの方を向く（「？」）。
   ゴブリンの盗み（`Party.robbed`）を生還者が噂（`rumors.goblin`）にし、0.5 を超えるとゴブリン退治の一行が来る。率いる者の名前 `Party.name`。settle.jsonl の `{k:25}`（enter / arrive / aim / pass / end）と `{k:12, ev:'rob'}`
+- 冒険者の作り直しの二歩目（docs/adventurer-step2-20261111.md、src/eco/raid.ts）：夜、蓄えの乏しい集落のゴブリン1〜3匹が、10〜50マス先で焚き火を囲む一行へ暗がりを選んで忍び寄り（`st 15`、光の縁で身をひそめてから駆け寄る）、眠っている者の食べ物と松明を盗んで逃げ帰る（`st 16`、袋 `units` を蓄えへ）。見張りの向いている側3マスで見つかれば手ぶらで逃げる。`Camp.raidT`。冒険者は夜は早めに焚き火を囲む。
+  ゴブリン退治の一行だけは、目指す集落の隠れたゴブリンを松明の光（5.5マス）で見つけ（`huntsCamp`）、着いて誰も見えなければ900歩探して引き返す。
+  竜殺しは、竜の寝床への道（`Lore.dragonWay`、寝床のドラゴンを見通しの利く所から見た一行が持ち帰る）が知られているときだけ竜退治（`aimWay`）、なければ深部の探索（`aim 6`、寝床を見たら道を持ち帰る）。
+  コボルトは腹いっぱいなら住処へ持ち帰り（`st 13`）、集めの係は畑のキノコを摘む。住処の横穴には瓦礫を置かない（`inWarrenTunnel`。前は自分たちの掘った土で住処の奥が埋まっていた）。大ネズミの巣穴の引っ越しは一列で歩く（`st 11`、`ratMarch`）。
+  マナから生まれる者の出現の演出（描画だけ、`fxManaBorn`、幼竜は卵が割れて出てくる）
 - 速さのための間引き（docs/speed-experiments）：ウィスプ（光の精を除く）は生き物の1歩の4回に1回だけ判断し、その回に4回ぶん動いて食べる（`Ecology.WISP_EVERY`、`wispIdle`。描画は `moveAlpha` で4回ぶんの時間をかけて補間）。苔とキノコは40刻みごとに2回ぶん進める（`MOSS_EVERY`、`MOSS_R`）。画面なしでは見たマスの更新を200刻みごと（lib/engine.ts。見たマスは生き物の判断に使わない）
 - 描画だけ：攻撃の技の演出（`fxAttacks`、`creatureView.drawAttacks`）、気づいた印、のけぞり、飛び散る粒。見本は `dist/index.html#fxdemo`。画面の部品を隠すのは `#clean`。
 
