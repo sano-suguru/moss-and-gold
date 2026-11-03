@@ -1,27 +1,27 @@
 /**
- * 画面なしでシミュレーションを全速で回し、分析用の記録を書き出す。
+ * 画面なしでシミュレーションを全速で実行し、分析用のログを書き出す。
  *
  *   npm run sim -- --seed かしたれ --days 30 --out runs/kashitare
- *   npm run sim -- --resume runs/kashitare            （途中から続ける）
- *   npm run sim -- --seed abc --days 10 --trace 1234   （生き物 1234 の一生を毎刻み記録）
+ *   npm run sim -- --resume runs/kashitare            （中断した所から再開する）
+ *   npm run sim -- --seed abc --days 10 --trace 1234   （生き物 1234 の一生を毎 tick ログに残す）
  *
- * --budget 秒（既定 270）を超えそうになると、区切りのよい所で途中の状態を書き出して止まる。
- * もう一度 --resume で同じフォルダを指定すれば続きから回る（決定的なので、分けても結果は同じ）。
+ * --budget 秒（既定 270）を超えそうになると、区切りのよい所でチェックポイントを書き出して止まる。
+ * もう一度 --resume で同じフォルダを指定すれば再開する（決定的なので、分けて実行しても結果は同じ）。
  *
  * 書き出すもの（--out のフォルダ）：
- *   meta.json        シード、目標の日数、いまの刻み、版の系譜（lineage：どの版がどの刻みから回したか）
- *   samples.jsonl    地上の 1/4 日ごとの数値（刻みが DAY_TICKS/4 の倍数のとき。続きから回しても同じ刻みで記録する）
- *   deaths.jsonl     死んだ生き物（刻み、種、死因、手を下した種、場所）
- *   births.jsonl     現れた生き物（刻み、種、由来、場所）
+ *   meta.json        シード、目標の日数、現在の tick、バージョンの系譜（lineage：どのバージョンのシミュレーションがどの tick から実行したか）
+ *   samples.jsonl    ゲーム内の 1/4 日ごとの数値（tick が DAY_TICKS/4 の倍数のとき。再開しても同じ tick で記録する）
+ *   deaths.jsonl     死んだ生き物（tick、種、死因、手を下した種、場所）
+ *   births.jsonl     現れた生き物（tick、種、由来、場所）
  *   exits.jsonl      外へ出ていった生き物
  *   moves.jsonl      群れの引っ越し（大ネズミの巣穴）
  *   settle.jsonl     住みつく群れの出来事（コボルトの住処とゴブリンの集落を作った・捨てた・消えた、従えた、取り立て）
- *   events.jsonl     ゲームの「記録」に出る出来事
- *   trace.jsonl      --trace で指定した生き物の毎刻みの状態
- *   snap/dNNN.json.gz 地上の1日ごとの状態（ゲームの保存と同じ形。調べ物と、後から値を計算するのに使う）
- *   checkpoint.json  続きから回すための状態（ゲームの保存と同じ形）
- * 最初から一つの版で回したもの（混じりけのないもの）は、1日ごとの状態を runs/.cache/snap/<版>/ にも置く（調べ物が使い回す）。
- * 報告と画像は npm run report -- --run <フォルダ> で作る。
+ *   events.jsonl     ゲーム内ログ（画面の「記録」）に出る出来事
+ *   trace.jsonl      --trace で指定した生き物の毎 tick の状態
+ *   snap/dNNN.json.gz 日次スナップショット（ゲームのセーブと同じ形。調査と、後から値を計算するのに使う）
+ *   checkpoint.json  再開するためのチェックポイント（ゲームのセーブと同じ形）
+ * 0日目から一つのバージョンだけで実行したもの（pure）は、日次スナップショットを runs/.cache/snap/<バージョン>/ にも置く（probe などが再利用する）。
+ * レポートと画像は npm run report -- --run <フォルダ> で作る。
  */
 import { appendFileSync, existsSync, linkSync, mkdirSync, readFileSync, writeFileSync, cpSync } from 'fs';
 import { join } from 'path';
@@ -41,13 +41,13 @@ let meta: { seed: string; days: number; tick: number; total0: number; gold0: num
 if (args.resume && existsSync(join(out, 'checkpoint.json'))) {
   meta = JSON.parse(readFileSync(join(out, 'meta.json'), 'utf8'));
   if (args.days) meta.days = +args.days;
-  // 冒険者の一行の数の上限（分析の切り替え）は、続きから回すときも同じにする
+  // 冒険者の一行の数の上限（分析用の切り替え）は、再開するときも同じにする
   if (meta.advMax !== undefined) Ecology.ADV_MAX_PARTIES = meta.advMax;
   w = decodeState(readState(join(out, 'checkpoint.json')));
-  // 版の系譜：別の版の状態から続けるときは、その刻みから先はこの版
+  // バージョンの系譜：別のバージョンのチェックポイントから続けるときは、その tick から先はこのバージョン
   meta.lineage ??= [{ sim: '?', from: 0 }];
   if (meta.lineage[meta.lineage.length - 1].sim !== SELF_SIM) meta.lineage.push({ sim: SELF_SIM, from: w.tick });
-  console.log(`続きから：${(w.tick / DAY_TICKS).toFixed(2)}日目`);
+  console.log(`再開：${(w.tick / DAY_TICKS).toFixed(2)}日目`);
 } else {
   const seed = args.seed || 'かしたれ';
   if (args['adv-max'] !== undefined) Ecology.ADV_MAX_PARTIES = +args['adv-max'];
@@ -59,7 +59,7 @@ if (args.resume && existsSync(join(out, 'checkpoint.json'))) {
   console.log(`新しく：シード「${seed}」を ${meta.days} 日`);
 }
 meta.bin = SELF_BIN;
-/** 最初から一つの版だけで回したもの（途中の状態を版ごとの保存庫にも置く） */
+/** 0日目から一つのバージョンだけで実行したもの（日次スナップショットをバージョンごとのキャッシュにも置く） */
 const pure = meta.lineage!.length === 1 && meta.lineage![0].sim === SELF_SIM && SELF_SIM !== '?';
 const shared = pure ? snapDir(SELF_SIM, meta.advMax ?? Ecology.ADV_MAX_PARTIES, meta.seed) : '';
 if (shared) mkdirSync(shared, { recursive: true });
@@ -175,7 +175,7 @@ const Q = DAY_TICKS / 4;
 let stopped = false;
 while (w.tick < target) {
   const traceId = meta.trace;
-  // 地上の 1/4 日の区切り（刻みが Q の倍数）まで進める。続きから回しても同じ区切りで記録する
+  // ゲーム内の 1/4 日の区切り（tick が Q の倍数）まで進める。再開しても同じ区切りで記録する
   const until = Math.min(target, (Math.floor(w.tick / Q) + 1) * Q);
   while (w.tick < until) {
     tick(w);
@@ -205,4 +205,4 @@ meta.secTicks = (meta.secTicks ?? 0) + w.tick - startTick;
 meta.tick = w.tick;
 writeState(join(out, 'checkpoint.json'), encodeState(w));
 writeFileSync(join(out, 'meta.json'), JSON.stringify(meta, null, 1));
-console.log(stopped ? `\n時間切れが近いので ${(w.tick / DAY_TICKS).toFixed(2)} 日目で止めました。続きは：npm run sim -- --resume ${out}` : `\n${meta.days} 日まで回しました。報告は：npm run report -- --run ${out}`);
+console.log(stopped ? `\n時間切れが近いので ${(w.tick / DAY_TICKS).toFixed(2)} 日目で止めました。続きは：npm run sim -- --resume ${out}` : `\n${meta.days} 日まで実行しました。レポートは：npm run report -- --run ${out}`);

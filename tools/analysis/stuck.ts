@@ -17,7 +17,7 @@ while (w.tick < +(a.days || 8) * DAY_TICKS && reported < 8) {
       const tx = Math.floor(c.x / 16), ty = Math.floor(c.y / 16), k = ty * m.w + tx;
       const nb = [k - m.w, k + 1, k + m.w, k - 1].map((q) => (m.solid[q] ? (m.rubble[q] ? 'R' : '#') : w.water[q] > 40 ? '~' : '.')).join('');
       const t = c.ref - 1;
-      console.log(`id${c.id} 刻み${w.tick} (${tx},${ty}) 水${w.water[k]} 上右下左[${nb}] 食${c.food} 飢${c.hungry} 目標${t >= 0 ? `(${t % m.w},${Math.floor(t / m.w)}) 苔${w.moss[t]} 閉${m.sealed[t]}` : 'なし'} 巣(${Math.floor(c.hx / 16)},${Math.floor(c.hy / 16)}) act${c.act} gait${c.gait} hp${c.hp.toFixed(0)}`);
+      console.log(`id${c.id} tick${w.tick} (${tx},${ty}) 水${w.water[k]} 上右下左[${nb}] 食${c.food} 飢${c.hungry} 目標${t >= 0 ? `(${t % m.w},${Math.floor(t / m.w)}) 苔${w.moss[t]} 閉${m.sealed[t]}` : 'なし'} 巣(${Math.floor(c.hx / 16)},${Math.floor(c.hy / 16)}) act${c.act} gait${c.gait} hp${c.hp.toFixed(0)}`);
     }
   }
 }

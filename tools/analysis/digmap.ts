@@ -1,4 +1,4 @@
-/** 掘られたマスと岩の硬さの地図（ドワーフの坑道の形を確かめる） */
+/** 掘られたマスと岩の硬さのマップを PNG に描く（ドワーフの坑道の形を確認する） */
 import { writeFileSync } from 'fs';
 import { DAY_TICKS, World } from '../../src/world';
 import { encodePng, parseArgs } from './common';

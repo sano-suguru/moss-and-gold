@@ -1,20 +1,20 @@
 /**
- * 前の版といまの版を比べる。回した結果は版ごとの保存庫（runs/.cache、lib/runs.ts）から使い回すので、前の版はふつう回し直さない。
+ * ベース（HEAD など）と作業ツリーを比べる。実行結果はシミュレーションのソースのハッシュごとのキャッシュ（runs/.cache、lib/runs.ts）から再利用するので、ベースはふつう再実行しない。
  *
  *   npm run ab -- --preset quick
- *       手直しの効き目を見る標準：8シード、前の版（HEAD）の10日目の状態から、前の版といまの版で18日目まで続けて、対にして比べる
- *       （前の版の続きは保存庫にあれば回さない。いまの版は8日ぶん×8シードだけ）
+ *       変更の効果を見る標準：8シード、HEAD の10日目のスナップショットから、HEAD と作業ツリーのそれぞれで18日目まで続けて、A/B 比較する
+ *       （HEAD の続きはキャッシュにあれば実行しない。作業ツリーは8日分×8シードだけ）
  *   npm run ab -- --preset final
- *       最終確認：16シード×25日、最初から
+ *       最終確認：16シード×25日、0日目から
  *   npm run ab -- --base HEAD~1 --fork 5 --days 15 --seeds abc,かしたれ,seed4
- *       前の版の5日目の状態から、前の版といまの版を15日まで続けて、npm run compare で並べる
+ *       ベースの5日目のスナップショットから、ベースと作業ツリーを15日目まで続けて、npm run compare で並べる
  *   npm run ab -- --base HEAD~1 --seeds abc,seed5 --days 10
- *       最初から同じ日数を回し、samples.jsonl と checkpoint.json が1バイトも違わないかを確かめる
- *       （整理や高速化など、展開を変えないはずの変更の確かめ）。違えば、最初に違う記録の日を示し、終わりの値を 1 にする
+ *       0日目から同じ日数を実行し、samples.jsonl と checkpoint.json が1バイトも違わないかを確かめる
+ *       （リファクタリングや高速化など、展開を変えないはずの変更のチェック）。違えば、最初に違うログの日を示し、終了コードを 1 にする
  *   npm run ab -- --resume-check 7 --seeds かしたれ --days 10
- *       いまの版で、通して回したものと、7日目で止めて続きから回したものの、記録と状態が一致するかを確かめる（保存庫は使わない）
+ *       作業ツリーで、通しで実行したものと、7日目で止めて再開したものの、ログと状態が一致するかを確かめる（キャッシュは使わない）
  *
- * --base を省くと HEAD（コミット前の変更と比べる）。--seeds 8 / 16 は決まった組。--jobs 同時に回す数（既定は CPU の数）。
+ * --base を省くと HEAD（コミット前の変更と比べる）。--seeds 8 / 16 は固定のシードの組。--jobs は並列に実行する数（既定は CPU の数）。
  * 比較は <out>/compare.md（シードごとの差と、その分布・ばらつきの目安。compare.ts の --paired）。
  */
 import { cpus } from 'os';
@@ -48,7 +48,7 @@ function firstDiff(fa: string, fb: string): string {
   const A = read(fa).toString().split('\n');
   const B = read(fb).toString().split('\n');
   for (let i = 0; i < Math.max(A.length, B.length); i++) if (A[i] !== B[i]) {
-    try { return `${JSON.parse(A[i] || B[i]).day} 日目の記録から違う`; } catch { return `${i + 1} 行目から違う`; }
+    try { return `${JSON.parse(A[i] || B[i]).day} 日目のログから違う`; } catch { return `${i + 1} 行目から違う`; }
   }
   return '';
 }
@@ -74,19 +74,19 @@ async function main() {
       const files = ['checkpoint.json', 'samples.jsonl', 'deaths.jsonl', 'births.jsonl', 'settle.jsonl', 'events.jsonl'];
       const bad = files.filter((n) => !read(f('full', n)).equals(read(f('split', n))));
       ok &&= !bad.length;
-      console.log(`${seeds[i]}：${split}日目で分けて回した${days}日目の状態と記録は、通しと${bad.length ? `一致しない（${bad.join('、')}）` : '一致'}`);
+      console.log(`${seeds[i]}：${split}日目で中断・再開した${days}日目の状態とログは、通しと${bad.length ? `一致しない（${bad.join('、')}）` : '一致'}`);
     }
     process.exit(ok ? 0 : 1);
   }
   const base = await getBin('sim', baseRef);
   const cur = await getBin('sim');
   const adv = a['adv-max'] !== undefined ? +a['adv-max'] : defaultAdv();
-  console.log(`前の版 ${baseRef}（${base.simHash}）といまの版（${cur.simHash}）${base.simHash === cur.simHash ? '：シミュレーションのソースは同じ' : ''}、${seeds.length} シード、${fork ? `${fork}日目の前の版の状態から` : '最初から'}${days}日目まで（${out}）`);
+  console.log(`ベース ${baseRef}（${base.simHash}）と作業ツリー（${cur.simHash}）${base.simHash === cur.simHash ? '：シミュレーションのソースは同じ' : ''}、${seeds.length} シード、${fork ? `ベースの${fork}日目のスナップショットから` : '0日目から'}${days}日目まで（${out}）`);
   await runSets([
     { seeds, days, adv, ver: base, out: join(out, 'base') },
     { seeds, days, adv, ver: cur, fork: fork ? { day: fork, base } : undefined, out: join(out, 'new') },
   ], jobs);
-  console.log(`回し終わり（${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
+  console.log(`実行終わり（${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
   let same = true;
   if (!fork) {
     for (let i = 0; i < seeds.length; i++) {
@@ -99,7 +99,7 @@ async function main() {
   }
   if (!same || fork || a.preset || a.compare) {
     const cmp = await getBin('compare');
-    await run([cmp.path, '--runs', `${out}/base,${out}/new`, '--names', `前の版（${baseRef}）,いまの版`, '--out', `${out}/compare.md`, '--paired', ...(fork ? ['--since', String(fork)] : []), ...(a.goals ? ['--goals', a.goals] : [])]);
+    await run([cmp.path, '--runs', `${out}/base,${out}/new`, '--names', `ベース（${baseRef}）,作業ツリー`, '--out', `${out}/compare.md`, '--paired', ...(fork ? ['--since', String(fork)] : []), ...(a.goals ? ['--goals', a.goals] : [])]);
     console.log(`比較：${out}/compare.md（${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
   }
   if (!fork && !a.preset) process.exit(same ? 0 : 1);

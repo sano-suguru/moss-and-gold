@@ -1,7 +1,7 @@
 /**
- * オークと冒険者の数を、batch / ab の回どうしで並べる（六歩目：オークの見極め）。
+ * オークと冒険者の数を、batch / ab の実行結果同士で並べる（六歩目：オークの見極め）。
  *   node tools/analysis/orcadv.mjs runs/ab-x/base runs/ab-x/new
- * シードごとに：冒険者に倒されたオーク、オークのいる日数（地上の1/4日ごとの記録でオークが1匹以上）、ゴブリンの集落のある日数、冒険者の死者、オークの威嚇
+ * シードごとに：冒険者に倒されたオーク、オークのいる日数（ゲーム内の1/4日ごとのサンプルでオークが1匹以上）、ゴブリンの集落のある日数、冒険者の死者、オークの威嚇
  */
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join } from 'path';

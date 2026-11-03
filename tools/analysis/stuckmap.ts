@@ -1,8 +1,8 @@
 /**
- * 動こうとしているのに進めない場所の地図（npm run probe -- stuck の別名）。
+ * 動こうとしているのに進めない場所のマップ（npm run probe -- stuck の別名）。
  *
  *   npm run stuckmap -- --seed seed7 --days 12 --kind 2          0〜12日目
- *   npm run stuckmap -- --seed seed7 --from 10 --to 12 --kind 2  途中の状態の保存庫から
+ *   npm run stuckmap -- --seed seed7 --from 10 --to 12 --kind 2  キャッシュにあるスナップショットから
  */
 import { main } from './probe';
 const argv = process.argv.slice(2);

@@ -1,7 +1,7 @@
 /**
- * 冒険者の目標と、ゴブリンの盗み・退治、竜退治、大ネズミの引っ越しの列を、二つの回（ab の base と new など）で対にして数える。
+ * 冒険者の目標と、ゴブリンの盗み・退治、竜退治、大ネズミの引っ越しの列を、二つの実行結果（ab の base と new など）で数えて A/B 比較する。
  *   npm run advreport -- --runs runs/ab-x/base,runs/ab-x/new [--out docs/x.md]
- * 記録（settle.jsonl・deaths.jsonl）だけを読む（回し直さない）。
+ * ログ（settle.jsonl・deaths.jsonl）だけを読む（再実行しない）。
  */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -46,7 +46,7 @@ function measure(dir: string): M {
   m['竜退治：道を知って入った'] = enter.filter((x) => x.how === 2 && x.to === 1).length;
   m['竜の寝床への道を持ち帰った'] = ev(K.Adventurer, 'way').length;
   m['ゴブリン退治：松明で隠れた者を見つけた'] = ev(K.Adventurer, 'reveal').length;
-  // ゴブリン退治の一行が目指した集落の終わり方（一行が入ってから地上の1日以内）
+  // ゴブリン退治の一行が目指した集落の終わり方（一行が入ってからゲーム内の1日以内）
   for (const h of enter.filter((x) => x.how === 5)) {
     const fin = s.find((x) => x.k === K.Goblin && x.id === h.n && (x.ev === 'abandon' || x.ev === 'empty') && x.t >= h.t && x.t < h.t + 14400);
     add(`退治された集落の終わり：${fin ? (fin.ev === 'empty' ? '皆いなくなった' : `捨てた（${fin.reason}）`) : '続いた'}`);
@@ -74,9 +74,9 @@ const seeds = seedsOf(B).filter((x) => seedsOf(A).includes(x));
 const ma = seeds.map((x) => measure(join(A, x)));
 const mb = seeds.map((x) => measure(join(B, x)));
 const keys = [...new Set([...ma, ...mb].flatMap((o) => Object.keys(o)))];
-const lines = [`# 冒険者の目標・ゴブリンの盗み・竜退治・大ネズミの引っ越し（${seeds.length} シード、${A} → ${B}）`, '', ...momentTable([A, B], [seeds.map((x) => countMoments(join(A, x))), seeds.map((x) => countMoments(join(B, x)))]), '## 対にした比較', '', PAIRED_NOTE, '', ...PAIRED_HEAD];
+const lines = [`# 冒険者の目標・ゴブリンの盗み・竜退治・大ネズミの引っ越し（${seeds.length} シード、${A} → ${B}）`, '', ...momentTable([A, B], [seeds.map((x) => countMoments(join(A, x))), seeds.map((x) => countMoments(join(B, x)))]), '## A/B 比較（同じシード同士）', '', PAIRED_NOTE, '', ...PAIRED_HEAD];
 for (const k of keys) lines.push(pairedRow(k, paired(ma.map((o) => o[k] ?? 0), mb.map((o) => o[k] ?? 0), seeds)));
-lines.push('', '## シードごと（いまの版）', '', `| シード | ${keys.join(' | ')} |`, `|---|${keys.map(() => '---:').join('|')}|`);
+lines.push('', '## シードごと（作業ツリー）', '', `| シード | ${keys.join(' | ')} |`, `|---|${keys.map(() => '---:').join('|')}|`);
 seeds.forEach((sd, i) => lines.push(`| ${sd} | ${keys.map((k) => mb[i][k] ?? 0).join(' | ')} |`));
 const txt = lines.join('\n') + '\n';
 if (out) writeFileSync(out, txt);

@@ -1,4 +1,4 @@
-/** 分析の道具で共通に使うもの */
+/** 分析ツールで共通に使うもの（種などの名前、引数の解析、PNG の書き出し） */
 import { deflateSync } from 'zlib';
 import { NAMES } from '../../src/names';
 

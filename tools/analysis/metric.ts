@@ -1,15 +1,15 @@
 /**
- * 回し直さずに値を計算する：回した結果の1日ごとの状態（snap/）を読み直して、式の値を日ごとに出す。
- * 記録（samples.jsonl など）に無い値が後から必要になっても、sim を書き足して回し直さなくてよい。
+ * 再実行せずに値を計算する：実行結果の日次スナップショット（snap/）を読み直して、式の値を日ごとに出す。
+ * ログ（samples.jsonl など）に無い値が後から必要になっても、sim のログ出力を書き足して再実行しなくてよい。
  *
  *   npm run metric -- --runs runs/b16 --name campStore
  *   npm run metric -- --runs runs/ab-x/base,runs/ab-x/new --expr "e.warrens.length" --days 10-18
- *   npm run metric -- --runs runs/b8 --expr "s.eco.n" --raw          （--raw：World を作らず保存の JSON（s）のまま。速い）
+ *   npm run metric -- --runs runs/b8 --expr "s.eco.n" --raw          （--raw：World を作らずセーブの JSON（s）のまま。速い）
  *
- * 式の中で使える名前：w（World）、e（生き物たち、Ecology）、m（地図）、s（保存の JSON）、K（種の名前→番号）。
- * 決まった名前（--name）は下の NAMED。--agg mean（既定）/ max / last / sum で、シードごとの値のまとめ方を選ぶ。
- * 二つの回（--runs a,b）を渡すと、同じシードどうしの差の分布とばらつきの目安（compare --paired と同じ）も付ける。
- * 状態を一つ読むのに約0.3秒（--raw なら約0.01秒）。シードごとに別のプロセスで同時に計算する（--jobs）。
+ * 式の中で使える名前：w（World）、e（生き物たち、Ecology）、m（マップ）、s（セーブの JSON）、K（種の名前→番号）。
+ * 定義済みの名前（--name）は下の NAMED。--agg mean（既定）/ max / last / sum で、シードごとの値のまとめ方を選ぶ。
+ * 二つの実行結果（--runs a,b）を渡すと、同じシード同士の差の分布とばらつきの目安（compare --paired と同じ）も付ける。
+ * スナップショットを一つ読むのに約0.3秒（--raw なら約0.01秒）。シードごとに別のプロセスで並列に計算する（--jobs）。
  */
 import { cpus } from 'os';
 import { spawn } from 'child_process';
@@ -34,7 +34,7 @@ export const NAMED: Record<string, { expr: string; label: string; raw?: boolean 
 
 const a = parseArgs(process.argv.slice(2));
 
-/** 一つの回のフォルダについて、日ごとの値を計算して JSON で書く（子のプロセス） */
+/** 一つの実行結果のフォルダについて、日ごとの値を計算して JSON で書き出す（子プロセス） */
 function one(dir: string, expr: string, raw: boolean, d0: number, d1: number) {
   const K: Record<string, number> = {};
   KIND_NAMES.forEach((n, i) => (K[n] = i));
@@ -83,7 +83,7 @@ async function main() {
   if (res.length >= 2) {
     const va = seeds.map((s) => A(res[0].find((x) => x.seed === s)?.out.map((p) => p[1]) ?? []));
     const vb = seeds.map((s) => A(res[res.length - 1].find((x) => x.seed === s)?.out.map((p) => p[1]) ?? []));
-    L.push('', `## 対にした比較：${runs[0]} → ${runs[runs.length - 1]}`, '', PAIRED_NOTE, '', ...PAIRED_HEAD, pairedRow(named?.label ?? expr, paired(va, vb, seeds)));
+    L.push('', `## A/B 比較（同じシード同士）：${runs[0]} → ${runs[runs.length - 1]}`, '', PAIRED_NOTE, '', ...PAIRED_HEAD, pairedRow(named?.label ?? expr, paired(va, vb, seeds)));
   }
   L.push('', `（${((Date.now() - t0) / 1000).toFixed(1)}秒）`);
   console.log(L.join('\n'));

@@ -1,14 +1,14 @@
 /**
- * いくつかの batch の結果を、コボルトと大ネズミの目安で並べる（住みつける仕組みの確かめ用）。
+ * いくつかの batch の結果を、コボルトと大ネズミの目安で並べる（住みつける仕組みのチェック用）。
  *
  *   npm run compare -- --runs runs/batch-a,runs/batch-b --names "前,後" --out docs/compare.md
  *   npm run compare -- --runs ... --seeds "abc,かしたれ"     一部のシードだけ
  *   npm run compare -- --runs runs/ab-x/base,runs/ab-x/new --paired --since 10
- *       10日目より後の記録だけで比べ、シードごとの差の分布と、差がばらつきに埋もれていないかの目安の表を先頭に付ける（ab が使う）
+ *       10日目より後のログだけで比べ、シードごとの差の分布と、差がばらつきに埋もれていないかの目安の表を先頭に付ける（ab が使う）
  *
- * 各 batch のシードごとに：ゴブリンの集落（続いた日数、終わり方、冒険者・コボルトとの殺し合い）、コボルトの住処が続いた日数（中央値、地上の1/4日ごとの記録から）、冒険者に倒されたコボルト、
+ * 各 batch のシードごとに：ゴブリンの集落（続いた日数、終わり方、冒険者・コボルトとの殺し合い）、コボルトの住処が続いた日数（中央値、ゲーム内の1/4日ごとのサンプルから）、冒険者に倒されたコボルト、
  * ドラゴンに焼かれたコボルト、コボルトの去り方（starving 一匹ずつ飢えて / abandoned 住処ごと）、大ネズミの飢え死に、
- * 大ネズミの来た数と去り方（dispersed）、大ネズミが最後に生きているか、四つの帳簿のずれ
+ * 大ネズミの来た数と去り方（dispersed）、大ネズミが最後に生きているか、四つの保存則のずれ
  */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -21,7 +21,7 @@ import { MOMENTS, countMoments, momentTable } from './lib/moments';
 const args = parseArgs(process.argv.slice(2));
 const runs = (args.runs || '').split(',').filter(Boolean);
 const names = (args.names || runs.join(',')).split(',');
-/** --since 日：その日より後の記録だけを使う（同じ途中の状態から続けた二つを比べるとき、分かれる前の同じ部分を除く） */
+/** --since 日：その日より後のログだけを使う（同じスナップショットから続けた二つを比べるとき、分岐する前の共通の部分を除く） */
 const sinceT = args.since ? +args.since * DAY_TICKS : -1;
 const rd = (dir: string, f: string) => (existsSync(join(dir, f)) ? readFileSync(join(dir, f), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((r) => !(typeof r.t === 'number' && r.t <= sinceT && !(f === 'samples.jsonl' && r.t === sinceT))) : []);
 const median = (a: number[]) => {
@@ -48,7 +48,7 @@ function measure(dir: string): M {
     last.set(id, s.day);
   }
   const dur = [...first].map(([id, d]) => (last.get(id) as number) - d + 0.25);
-  // 最後の記録まで残っていた住処は打ち切り。終わった住処だけの日数も見る
+  // 最後のサンプルまで残っていた住処は打ち切り。終わった住処だけの日数も見る
   const endDay = S.length ? S[S.length - 1].day : 0;
   const ended = [...first].filter(([id]) => (last.get(id) as number) < endDay).map(([id, d]) => (last.get(id) as number) - d + 0.25);
   const cnt = (a: { k: number }[], k: number, f: (x: any) => boolean = () => true) => a.filter((x) => x.k === k && f(x)).length;
@@ -64,12 +64,12 @@ function measure(dir: string): M {
     ratStarve: cnt(D, 2, (d) => d.cause === 'starve'), ratArr: cnt(B, 2, (b) => b.origin !== 'born'), ratBorn: cnt(B, 2, (b) => b.origin === 'born'), ratDisp: cnt(X, 2, (x) => x.reason === 'dispersed'),
     ratLast: rs[rs.length - 1] ?? 0, ratMax: Math.max(0, ...rs), ratGone: (rs[rs.length - 1] ?? 0) === 0 && (rs[rs.length - 2] ?? 0) === 0, drift,
     ratMoves: MV.filter((x) => x.k === 2).length,
-    // シードの豊かさ：5日目以降の記録の平均（口が開いていない記録は除く）
+    // シードの豊かさ：5日目以降のサンプルの平均（口が開いていないサンプルは除く）
     rich: (() => { const v = S.filter((x) => x.day >= 5 && typeof x.rich === 'number').map((x) => x.rich as number); return v.length ? v.reduce((p, q) => p + q, 0) / v.length : NaN; })(),
-    // 飢え死にした大ネズミのうち、道のり10マス以内に食べられる苔があった数（記録に near があるものだけ）
+    // 飢え死にした大ネズミのうち、道のり10マス以内に食べられる苔があった数（ログに near があるものだけ）
     ratNear: D.filter((d) => d.k === 2 && d.cause === 'starve' && typeof d.near === 'number' && d.near >= 0 && d.near < 10).length,
     ratNearKnown: D.filter((d) => d.k === 2 && d.cause === 'starve' && typeof d.near === 'number').length,
-    // 住処の終わり方：settle.jsonl（構造化した記録）があればそれを、なければ記録の文章から数える（古い回のため）
+    // 住処の終わり方：settle.jsonl（構造化したログ）があればそれを、なければゲーム内ログの文章から数える（古い実行結果のため）
     ...(existsSync(join(dir, 'settle.jsonl'))
       ? (() => {
           const SE = rd(dir, 'settle.jsonl').filter((x) => x.k === 10 && x.ev === 'abandon');
@@ -78,7 +78,7 @@ function measure(dir: string): M {
         })()
       : { endFood: evc(/^\{k:10\}の一団が蓄えが尽きて/), endAlone: evc(/^\{k:10\}の一団が(数が減って|1匹になって)/), endRaid: evc(/^\{k:10\}の一団が何度も襲われて/), endDragon: evc(/^\{k:10\}の一団が竜を恐れて/) }),
     gobArr: cnt(B, 12, (b) => b.origin !== 'born'), orcArr: cnt(B, 13, (b) => b.origin !== 'born'),
-    // ゴブリンの集落（地上の1/4日ごとの記録の settle.camp から。コボルトの住処と同じ数え方）
+    // ゴブリンの集落（ゲーム内の1/4日ごとのサンプルの settle.camp から。コボルトの住処と同じ数え方）
     ...(() => {
       const f = new Map<number, number>();
       const l = new Map<number, number>();
@@ -112,7 +112,7 @@ function measure(dir: string): M {
           return [...f].map(([id, d]) => (l.get(id) as number) - d + 0.25);
         })(),
         ratShaftArr: cnt(B, 2, (b) => b.origin === 'shaft'), ratMouthArr: cnt(B, 2, (b) => b.origin === 'mouth'),
-        // 天井の裂け目から15マス以内での大ネズミの飢え死に（裂け目の場所は地図から）
+        // 天井の裂け目から15マス以内での大ネズミの飢え死に（裂け目の場所は生成したマップから）
         ratStarveShaft: (() => {
           const m = generate(meta.seed);
           const sh = m.shafts.map((q) => [q.x * 16 + 8, q.y * 16 + 8]);
@@ -121,14 +121,14 @@ function measure(dir: string): M {
         orcStarveExit: cnt(X, 13, (x) => x.reason === 'starving'),
         // 七巡目：大ネズミの入り直し（地表の横穴が開いたあと、天井の割れ目から）、分かれてできた集落の続いた日数と、分けて持たせた蓄え
         ratReenter: rd(dir, 'settle.jsonl').filter((x) => x.k === 2 && x.ev === 'reenter').length,
-        // 5日目より後の地上の1/4日ごとの記録のうち、大ネズミが0匹だった記録の数
+        // 5日目より後のゲーム内の1/4日ごとのサンプルのうち、大ネズミが0匹だったサンプルの数
         ratZero: S.filter((x) => x.day > 5 && (x.counts[2] ?? 0) === 0).length,
         splitDur: (() => {
           const ids = new Set(rd(dir, 'settle.jsonl').filter((x) => x.k === 12 && x.ev === 'found' && x.how === 'split').map((x) => x.id));
           return [...f].filter(([id]) => ids.has(id)).map(([id, d]) => (l.get(id) as number) - d + 0.25);
         })(),
         splitStore: rd(dir, 'settle.jsonl').filter((x) => x.k === 12 && x.ev === 'found' && x.how === 'split').reduce((a, x) => a + (x.store ?? 0), 0),
-        // 集落の蓄えの推移（samples の settle.campStore。六巡目から）：集落のあった記録での蓄えの合計の平均・最大と、蓄えが0でなかった記録の割合
+        // 集落の蓄えの推移（samples の settle.campStore。六巡目から）：集落のあったサンプルでの蓄えの合計の平均・最大と、蓄えが0でなかったサンプルの割合
         ...(() => {
           const v = S.filter((x) => (x.settle?.campStore ?? []).length).map((x) => (x.settle.campStore as number[]).reduce((a, b) => a + b, 0));
           return { storeKnown: S.some((x) => x.settle?.campStore), storeMean: v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0, storeMax: Math.max(0, ...v), storePos: v.length ? (100 * v.filter((x) => x > 0).length) / v.length : 0 };
@@ -156,7 +156,7 @@ const sum = (ms: M[], f: (m: M) => number) => ms.reduce((a, m) => a + f(m), 0);
 
 /**
  * 目安（--goals goals.json）：[{ "label": "住処の日数の中央値", "metric": "warrenMedian", "op": ">=", "value": 5 }, ...]
- * metric は下の METRICS の名前（8シードまとめた値）。届いたかどうかを表にする
+ * metric は下の METRICS の名前（8シードまとめた値）。目安に届いたかどうかを表にする
  */
 const halves = (ms: M[]): [M[], M[]] => {
   const o = [...ms].sort((a, b) => (isFinite(b.rich) ? b.rich : -1) - (isFinite(a.rich) ? a.rich : -1));
@@ -217,7 +217,7 @@ const METRICS: Record<string, (ms: M[]) => number> = {
   poorKobArr: (ms) => sum(halves(ms)[1], (m) => m.kobArr),
   poorEndFood: (ms) => sum(halves(ms)[1], (m) => m.endFood),
 };
-// 対にした比較（最初の回と最後の回の、同じシードどうしの差）
+// A/B 比較（最初の実行結果と最後の実行結果の、同じシード同士の差）
 if (args.paired && all.length >= 2) {
   const A = all[0];
   const Bm = all[all.length - 1];
@@ -226,9 +226,9 @@ if (args.paired && all.length >= 2) {
     ['大ネズミ：飢え死に', (m) => m.ratStarve], ['大ネズミ：来た', (m) => m.ratArr], ['大ネズミ：中で生まれた', (m) => m.ratBorn], ['大ネズミ：群れで出ていった', (m) => m.ratDisp], ['大ネズミ：巣穴の引っ越し', (m) => m.ratMoves], ['大ネズミ：最後の数', (m) => m.ratLast],
     ['コボルト：来た', (m) => m.kobArr], ['コボルト：中で生まれた', (m) => m.kobBorn], ['コボルト：住処の数', (m) => m.warrens], ['コボルト：住処の日数の中央値', (m) => md(m.dur)], ['コボルト：飢え死に', (m) => m.kobStarveDeath], ['コボルト：一匹ずつ飢えて去った', (m) => m.kobStarveExit], ['コボルト：冒険者に倒された', (m) => m.advKob], ['コボルト：最後の数', (m) => m.kobLast],
     ['ゴブリン：来た', (m) => m.gobArr], ['ゴブリン：中で生まれた', (m) => m.gobBorn], ['ゴブリン：集落の数', (m) => m.camps], ['ゴブリン：集落の日数の中央値', (m) => md(m.campDur)], ['ゴブリン：最後の数', (m) => m.gobLast], ['ゴブリン：飢え死に', (m) => m.gobStarveDeath], ['ゴブリン：冒険者に倒された', (m) => m.gobAdv],
-    ['ゴブリン：集落の蓄えの平均', (m) => (m.storeKnown ? m.storeMean : NaN)], ['ゴブリン：蓄えが0でなかった記録の割合（％）', (m) => (m.storeKnown && m.camps ? m.storePos : NaN)],
+    ['ゴブリン：集落の蓄えの平均', (m) => (m.storeKnown ? m.storeMean : NaN)], ['ゴブリン：蓄えが0でなかったサンプルの割合（％）', (m) => (m.storeKnown && m.camps ? m.storePos : NaN)],
     ['オーク：来た', (m) => m.orcArr], ['オーク：従えた集落', (m) => m.vassals], ['オーク：取り立て（回）', (m) => m.tributes], ['オーク：取り立てた食べ物', (m) => m.tributeFood], ['オーク：飢えて去った', (m) => m.orcStarveExit],
-    ['大ネズミ：入り直し（回）', (m) => m.ratReenter], ['大ネズミ：絶えた（1＝最後の2回の記録で0）', (m) => (m.ratGone ? 1 : 0)], ['大ネズミ：0匹だった日数（5日目より後）', (m) => m.ratZero / 4],
+    ['大ネズミ：入り直し（回）', (m) => m.ratReenter], ['大ネズミ：絶えた（1＝最後の2回のサンプルで0）', (m) => (m.ratGone ? 1 : 0)], ['大ネズミ：0匹だった日数（5日目より後）', (m) => m.ratZero / 4],
     ['オーク：縄張りの日数の中央値', (m) => md(m.lairDur)], ['ゴブリン：5日以上続いた集落の割合（％）', (m) => (m.camps ? (100 * m.campDur.filter((d) => d >= 5).length) / m.camps : NaN)],
     ['ゴブリン：分かれてできた集落', (m) => m.splitDur.length], ['ゴブリン：分かれた集落の日数の中央値', (m) => md(m.splitDur)], ['ゴブリン：絶えた（1）', (m) => (m.gobGone ? 1 : 0)],
     ['ゴブリン：オークに倒された', (m) => m.gobByOrc], ['ゴブリン：コボルト・冒険者・オーク以外に倒された', (m) => m.gobByOther],
@@ -237,14 +237,14 @@ if (args.paired && all.length >= 2) {
   for (const mo of MOMENTS) P.push([`瞬間：${mo.label}`, (m) => m.mo[mo.key] ?? 0]);
   const sd = A.map((m) => m.seed);
   const Bs = sd.map((s) => Bm.find((m) => m.seed === s));
-  L.push(`## 対にした比較：${names[0]} → ${names[names.length - 1]}（${sd.length} シード${args.since ? `、${args.since}日目より後` : ''}）`, '', PAIRED_NOTE, '', ...PAIRED_HEAD);
+  L.push(`## A/B 比較（同じシード同士）：${names[0]} → ${names[names.length - 1]}（${sd.length} シード${args.since ? `、${args.since}日目より後` : ''}）`, '', PAIRED_NOTE, '', ...PAIRED_HEAD);
   for (const [label, f] of P) {
     const pr = paired(A.map(f), Bs.map((m) => (m ? f(m) : NaN)), sd);
     if (pr.verdict === '差なし' && pr.sumA === 0) continue;
     L.push(pairedRow(label, pr));
   }
   const dr = Math.max(0, ...Bm.map((m) => m.drift));
-  L.push('', `帳簿のずれ（${names[names.length - 1]}、最大）：${dr}${dr ? ' ⚠' : ''}`, '');
+  L.push('', `保存則のずれ（${names[names.length - 1]}、最大）：${dr}${dr ? ' ⚠' : ''}`, '');
 }
 L.push(...momentTable(names, all.map((ms) => ms.map((m) => m.mo))));
 if (args.goals) {
@@ -258,11 +258,11 @@ if (args.goals) {
   }
   L.push('');
 }
-// シードの豊かさの順（最後に並べた回）
+// シードの豊かさの順（最後に並べた実行結果）
 {
   const last = all[all.length - 1];
   if (last.some((m) => isFinite(m.rich))) {
-    L.push(`## シードの豊かさの順（${names[names.length - 1]}）`, '', '豊かさ＝開いた地表の横穴から歩いて行ける範囲（道のり100マス）の床1マスあたりの、食べられる苔とキノコ（20以上の群落の、根元12を除いた分）。5日目以降の地上の1/4日ごとの記録の平均。', '', '| シード | 豊かさ | 住処の日数の中央値 / 最長 / できた数 | 来たコボルト / 中で生まれた | 終わり方：蓄え / 1匹 / 襲われた / 竜 |', '|---|---:|---:|---:|---:|');
+    L.push(`## シードの豊かさの順（${names[names.length - 1]}）`, '', '豊かさ＝開いた地表の横穴から歩いて行ける範囲（道のり100マス）の床1マスあたりの、食べられる苔とキノコ（20以上の群落の、根元12を除いた分）。5日目以降のゲーム内の1/4日ごとのサンプルの平均。', '', '| シード | 豊かさ | 住処の日数の中央値 / 最長 / できた数 | 来たコボルト / 中で生まれた | 終わり方：蓄え / 1匹 / 襲われた / 竜 |', '|---|---:|---:|---:|---:|');
     for (const m of [...last].sort((a, b) => (isFinite(b.rich) ? b.rich : -1) - (isFinite(a.rich) ? a.rich : -1))) L.push(`| ${m.seed} | ${f1(m.rich)} | ${f1(median(m.dur))} / ${f1(Math.max(0, ...m.dur))} / ${m.warrens} | ${m.kobArr} / ${m.kobBorn} | ${m.endFood} / ${m.endAlone} / ${m.endRaid} / ${m.endDragon} |`);
     L.push('');
   }
@@ -284,17 +284,17 @@ tbl('来た：地表の横穴 / 天井の裂け目', (m) => `${m.ratMouthArr} / 
 tbl('天井の裂け目から15マス以内での飢え死に', (m) => m.ratStarveShaft, (ms) => sum(ms, (m) => m.ratStarveShaft));
 tbl('巣穴の引っ越し', (m) => m.ratMoves, (ms) => sum(ms, (m) => m.ratMoves));
 tbl('入り直し（地表の横穴が開いたあと、天井の割れ目から。回） / 0匹だった日数（5日目より後）', (m) => `${m.ratReenter} / ${m.ratZero / 4}`, (ms) => `${sum(ms, (m) => m.ratReenter)} / ${sum(ms, (m) => m.ratZero) / 4}`);
-tbl('最多 / 最後の数（✝ は最後の2回の記録で0）', (m) => `${m.ratMax} / ${m.ratLast}${m.ratGone ? ' ✝' : ''}`, (ms) => `絶えた ${ms.filter((m) => m.ratGone).length} シード`);
+tbl('最多 / 最後の数（✝ は最後の2回のサンプルで0）', (m) => `${m.ratMax} / ${m.ratLast}${m.ratGone ? ' ✝' : ''}`, (ms) => `絶えた ${ms.filter((m) => m.ratGone).length} シード`);
 L.push('## ゴブリン', '');
 tbl('集落が続いた日数（中央値 / 最長 / できた数）', (m) => `${f1(median(m.campDur))} / ${f1(Math.max(0, ...m.campDur))} / ${m.camps}`, (ms) => `中央値 ${f1(median(ms.flatMap((m) => m.campDur)))}`);
 tbl('5日以上続いた集落', (m) => `${m.campDur.filter((d) => d >= 5).length}/${m.camps}`, (ms) => `${sum(ms, (m) => m.campDur.filter((d) => d >= 5).length)}/${sum(ms, (m) => m.camps)}（${f1(METRICS.campShare5(ms))}％）`);
-tbl('来た / 中で生まれた / 最多 / 最後の数（✝ は最後の2回の記録で0）', (m) => `${m.gobArr} / ${m.gobBorn} / ${m.gobMax} / ${m.gobLast}${m.gobGone ? ' ✝' : ''}`, (ms) => `${sum(ms, (m) => m.gobArr)} / ${sum(ms, (m) => m.gobBorn)}、絶えた ${ms.filter((m) => m.gobGone).length} シード`);
+tbl('来た / 中で生まれた / 最多 / 最後の数（✝ は最後の2回のサンプルで0）', (m) => `${m.gobArr} / ${m.gobBorn} / ${m.gobMax} / ${m.gobLast}${m.gobGone ? ' ✝' : ''}`, (ms) => `${sum(ms, (m) => m.gobArr)} / ${sum(ms, (m) => m.gobBorn)}、絶えた ${ms.filter((m) => m.gobGone).length} シード`);
 tbl('分かれてできた集落：続いた日数（中央値 / 数）/ 分けて持たせた蓄え', (m) => `${f1(median(m.splitDur))} / ${m.splitDur.length} / ${m.splitStore}`, (ms) => `中央値 ${f1(median(ms.flatMap((m) => m.splitDur)))} / ${sum(ms, (m) => m.splitDur.length)} / ${sum(ms, (m) => m.splitStore)}`);
 const ER = ['food', 'raids', 'alone', 'dragon', 'empty'];
 tbl('集落の終わり方：蓄えが尽きた / 襲われた / 1匹 / 竜 / 皆いなくなった（settle.jsonl があるときだけ）', (m) => ER.map((r) => m.gobEnd[r] ?? 0).join(' / '), (ms) => ER.map((r) => sum(ms, (m) => m.gobEnd[r] ?? 0)).join(' / '));
 tbl('去り方：一匹ずつ飢えて / 集落ごと群れで / 飢え死に', (m) => `${m.gobStarveExit} / ${m.gobAbandonExit} / ${m.gobStarveDeath}`, (ms) => `${sum(ms, (m) => m.gobStarveExit)} / ${sum(ms, (m) => m.gobAbandonExit)} / ${sum(ms, (m) => m.gobStarveDeath)}`);
 tbl('ゴブリンを倒した種：冒険者 / オーク / コボルト / そのほか', (m) => `${m.gobAdv} / ${m.gobByOrc} / ${m.gobByKob} / ${m.gobByOther}`, (ms) => `${sum(ms, (m) => m.gobAdv)} / ${sum(ms, (m) => m.gobByOrc)} / ${sum(ms, (m) => m.gobByKob)} / ${sum(ms, (m) => m.gobByOther)}`);
-tbl('集落の蓄え：平均 / 最大 / 0でなかった記録の割合（集落のあった記録だけ）', (m) => (m.storeKnown ? `${f1(m.storeMean)} / ${m.storeMax} / ${Math.round(m.storePos)}％` : '—'), (ms) => (ms.some((m) => m.storeKnown) ? `平均の中央値 ${f1(median(ms.filter((m) => m.storeKnown && m.camps).map((m) => m.storeMean)))}` : '—'));
+tbl('集落の蓄え：平均 / 最大 / 0でなかったサンプルの割合（集落のあったサンプルだけ）', (m) => (m.storeKnown ? `${f1(m.storeMean)} / ${m.storeMax} / ${Math.round(m.storePos)}％` : '—'), (ms) => (ms.some((m) => m.storeKnown) ? `平均の中央値 ${f1(median(ms.filter((m) => m.storeKnown && m.camps).map((m) => m.storeMean)))}` : '—'));
 L.push('## オーク', '');
 tbl('従えた集落 / 取り立て（回）/ 取り立てた食べ物', (m) => `${m.vassals} / ${m.tributes} / ${m.tributeFood}`, (ms) => `${sum(ms, (m) => m.vassals)} / ${sum(ms, (m) => m.tributes)} / ${sum(ms, (m) => m.tributeFood)}`);
 tbl('飢えて去ったオーク', (m) => m.orcStarveExit, (ms) => sum(ms, (m) => m.orcStarveExit));
@@ -303,8 +303,8 @@ tbl('コボルトに倒されたゴブリン / ゴブリンに倒されたコボ
 L.push('## ほかの種', '');
 tbl('死んだ冒険者', (m) => m.advDeaths, (ms) => sum(ms, (m) => m.advDeaths));
 tbl('来たゴブリン / 来たオーク', (m) => `${m.gobArr} / ${m.orcArr}`, (ms) => `${sum(ms, (m) => m.gobArr)} / ${sum(ms, (m) => m.orcArr)}`);
-L.push('## 帳簿', '');
-tbl('四つの帳簿のずれ（最大）', (m) => m.drift, (ms) => Math.max(...ms.map((m) => m.drift)));
+L.push('## 保存則', '');
+tbl('四つの保存則のずれ（最大）', (m) => m.drift, (ms) => Math.max(...ms.map((m) => m.drift)));
 const outp = args.out;
 if (outp) writeFileSync(outp, L.join('\n'));
 console.log(L.join('\n'));

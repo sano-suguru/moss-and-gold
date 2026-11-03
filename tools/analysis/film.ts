@@ -1,14 +1,14 @@
 /**
- * 動きを数こまの連続に撮るための場面を作る（見える相互作用の決まり：動きは数こまで撮る）。
- * 途中の状態の保存庫（lib/open.ts）から始めて、決まった刻みごとにゲームの保存と同じ形を書き出し、tools/gallery/film.mjs がゲーム画面で撮って一枚に並べる。
+ * 動きを連続フレームで撮るためのシーンを作る（CLAUDE.md の「画面に見えること」：動きは連続フレームで撮る）。
+ * キャッシュにあるスナップショット（lib/open.ts）から始めて、決まった tick ごとにゲームのセーブと同じ形を書き出し、tools/gallery/film.mjs がゲーム画面でスクリーンショットを撮って一枚に並べる。
  *
  *   npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 --name adv-enter
  *   npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --xy 1200,640 --zoom 3
  *
- * --at 始める日（小数可）か --tick 刻み、--frames こまの数（既定 6）、--every こまの間（刻み、既定 40）、
- * --follow party:<一行の id>（先頭にカメラを合わせ続ける）か id:<生き物の id>、--xy 画素x,画素y（カメラを止める）、--zoom 拡大率（既定 3）、
- * --ticks 刻み,刻み,...（こまの刻みを並べて指定。--tick/--at はその最初の刻み以下にする）、
- * --dy カメラを縦にずらす画素（負で上。寄って撮るとき体の真ん中へ）、--run <回したフォルダ>（その回の1日ごとの状態から始める）、--name 書き出す名前、--title 見出し、--out 書き出す先（既定 docs/img）、--lit 確認用の明かり、--cols 一行のこま数（既定 3）
+ * --at 始める日（小数可）か --tick 始める tick、--frames フレーム数（既定 6）、--every フレームの間隔（tick、既定 40）、
+ * --follow party:<一行の id>（先頭にカメラを合わせ続ける）か id:<生き物の id>、--xy x,y（px。カメラを固定する）、--zoom 拡大率（既定 3）、
+ * --ticks tick,tick,...（各フレームの tick を並べて指定。--tick/--at はその最初の tick 以下にする）、
+ * --dy カメラを縦にずらす量（px、負で上。寄って撮るとき体の真ん中へ）、--run <実行結果のフォルダ>（その実行の日次スナップショットから始める）、--name 出力の名前、--title 見出し、--out 出力先（既定 docs/img）、--lit 確認用の明かり、--cols 1行のフレーム数（既定 3）
  */
 import { mkdirSync, writeFileSync } from 'fs';
 import { execFileSync } from 'child_process';
@@ -29,7 +29,7 @@ const out = opt('out', 'docs/img') as string;
 const follow = opt('follow', '') as string;
 const xy = opt('xy', '');
 const title = opt('title', name) as string;
-/** カメラを縦にずらす（画素。寄って撮るとき、足もとに合ったカメラを体の真ん中へ。負で上） */
+/** カメラを縦にずらす量（px。寄って撮るとき、足もとに合ったカメラを体の真ん中へ。負で上） */
 const dy = +(opt('dy', '0') as string);
 mkdirSync('build/film', { recursive: true });
 mkdirSync(out, { recursive: true });
@@ -96,7 +96,7 @@ for (let i = 0; i < n; i++) {
   }
   if (p) cam = { x: Math.round(p.x), y: Math.round(p.y) + dy, zoom };
   w.seen.set(all);
-  // その場で写し取る（保存の形には生きたオブジェクト（一行の PT2 など）がそのまま入っているので、あとで書き出すと後の刻みの値になる）
+  // その場でディープコピーする（セーブの形には生きたオブジェクト（一行の PT2 など）がそのまま入っているので、あとで書き出すと後の tick の値になる）
   const save = JSON.parse(JSON.stringify(encodeState(w))) as any;
   save.cam = cam;
   save.speed = 0;
@@ -106,7 +106,7 @@ for (let i = 0; i < n; i++) {
 }
 const json = join('build/film', `${name}.json`);
 writeFileSync(json, JSON.stringify({ frames: out2, name, out, title: `${title}（${seed}、${from}）`, lit: argv.includes('--lit'), cols: +(opt('cols', '3') as string) }));
-console.log(`こま ${n}（${seed}、${(t0 / DAY_TICKS).toFixed(3)}日目から ${every}刻みごと）→ ${json}`);
+console.log(`フレーム ${n}（${seed}、${(t0 / DAY_TICKS).toFixed(3)}日目から ${every} tick ごと）→ ${json}`);
 execFileSync('node', ['tools/gallery/film.mjs', json], { stdio: 'inherit' });
 }
 main();

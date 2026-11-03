@@ -1,22 +1,22 @@
 /**
- * 調べ物の道具（使い捨てのスクリプトの代わり）。途中の状態の保存庫（lib/open.ts）から始めるので、0日目から回し直さない。
+ * 調査用のツール（使い捨てのスクリプトの代わり）。キャッシュにあるスナップショット（lib/open.ts）から始めるので、0日目から再実行しない。
  *
  *   npm run probe -- deaths --seed seed7 --kind 2 --cause starve --day 19
- *       19.0〜20.0日（20日目。刻みで 19×DAY_TICKS から 20×DAY_TICKS の手前まで）に飢え死にした大ネズミの、死ぬ直前の履歴（既定で1000刻みぶん）と、
- *       死んだときの様子の組み合わせの内訳。--from 19.5 --to 21 で範囲、--by 手を下した種、--examples 例の数、--keep 履歴の刻み数、
- *       --warm 範囲の始めより keep 刻み前から回す（範囲の始めのすぐ後に死んだものにも履歴が付く。1日ぶん余計にかかる）
+ *       19.0〜20.0日（20日目。tick で 19×DAY_TICKS から 20×DAY_TICKS の手前まで）に飢え死にした大ネズミの、死ぬ直前の履歴（既定で1000 tick 分）と、
+ *       死んだときの様子の組み合わせの内訳。--from 19.5 --to 21 で範囲、--by 手を下した種、--examples 例の数、--keep 履歴の tick 数、
+ *       --warm 範囲の始めより keep tick 前から実行する（範囲の始めのすぐ後に死んだものにも履歴が付く。1日分余計にかかる）
  *   npm run probe -- life --seed abc --id 1234 [--from 5 --to 8]
- *       ある個体の一生（生まれた日を1日ごとの状態の番号から探す）。状態（st、逃げる・眠る・死ぬ。--act なら act も）が変わるたびに1行と、20刻みごとの細かい記録
+ *       ある個体の一生（生まれた日を、日次スナップショットの中の生き物の番号から探す）。状態（st、逃げる・眠る・死ぬ。--act なら act も）が変わるたびに1行と、20 tick ごとの詳しいログ
  *   npm run probe -- calls --seed abc --method sendCollectors,collectTribute --from 10 --to 12 [--by-kind]
  *       メソッドの呼び出しの回数・かかった時間・戻り値の内訳（日ごと）。--by-kind は1つめの引数の種ごとに分ける
  *   npm run probe -- look --seed abc --at 18.5 --id 1234 [--r 12]   （または --xy 40,30）
- *       その刻みの、まわりの地形と生き物（字の地図と一覧）。--expr "e.camps.length" で式の値も出す（w 世界、e 生き物たち、m 地図、c --id の個体）
+ *       その tick の、まわりの地形と生き物（文字で描いたマップと一覧）。--expr "e.camps.length" で式の値も出す（w 世界、e 生き物たち、m マップ、c --id の個体）
  *   npm run probe -- stuck --seed seed7 --from 10 --to 12 --kind 2
- *       動こうとして進めない場所の地図（stuck.png）と上位のマス（npm run stuckmap と同じもの、範囲つき）
+ *       動こうとして進めない場所のマップ（stuck.png）と上位のマス（npm run stuckmap と同じもの、範囲つき）
  *
- * 共通：--run <回したフォルダ>（その回の状態を使う）、--base <git の参照>（いまの版の状態がないときに使う前の版。既定 HEAD）、
- * --pure（いまの版で最初から回した状態だけを使う。なければ回して保存庫に置く）、--adv-max、--out 書き出すファイル。
- * 日（--day, --from, --to, --at）は地上の日数（小数可）。どこから始めたか（どの版の何日目の状態か）を最初に表示する。
+ * 共通：--run <実行結果のフォルダ>（その実行のスナップショットを使う）、--base <git の参照>（作業ツリーのスナップショットがないときに使うベース。既定 HEAD）、
+ * --pure（作業ツリーで0日目から実行したスナップショットだけを使う。なければ実行してキャッシュに置く）、--adv-max、--out 出力先のファイル。
+ * 日（--day, --from, --to, --at）はゲーム内の日数（小数可）。どこから始めたか（どのバージョンの何日目のスナップショットか）を最初に表示する。
  */
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -70,7 +70,7 @@ async function deaths(seed: string, a: Record<string, string>, o: OpenOpts) {
   const to = a.to !== undefined ? +a.to : a.day !== undefined ? +a.day + 1 : from + 1;
   const keep = +(a.keep ?? 1000);
   const every = +(a.every ?? 20);
-  // 始まりは from の刻み（その日の状態から）。範囲の始めの keep 刻みの間に死んだものは履歴が短い（--warm で keep 刻み前から始める）
+  // 始まりは from の tick（その日のスナップショットから）。範囲の始めの keep tick の間に死んだものは履歴が短い（--warm で keep tick 前から始める）
   const startT = Math.max(0, Math.round(from * DAY_TICKS) - (a.warm ? keep : 0));
   const { w } = await openAt(seed, startT, o);
   const e = w.eco as any;
@@ -120,7 +120,7 @@ async function deaths(seed: string, a: Record<string, string>, o: OpenOpts) {
     e.nearby(cc.x, cc.y, 3, (q: any) => {
       if (q.id !== cc.id && !q.dead && Math.hypot(q.x - cc.x, q.y - cc.y) < 3 * T) near.add(name(q.k));
     });
-    // 直前（keep 刻み）に多かった状態
+    // 直前（keep tick）に多かった状態
     const S = sts.get(cc.id) ?? [];
     const cnt = new Map<number, number>();
     for (const s of S) cnt.set(s, (cnt.get(s) ?? 0) + 1);
@@ -140,7 +140,7 @@ async function deaths(seed: string, a: Record<string, string>, o: OpenOpts) {
     hist.set(key, (hist.get(key) ?? 0) + 1);
     if (rows.filter((q) => q.key === key).length < 2) {
       const lines = ring.get(cc.id) ?? [];
-      rows.push({ key, ex: [`#### ${name(cc.k)} ${cc.id}（${dayOf(w.tick)}日目、マス ${tx},${ty}）${w.tick - startT < keep ? `　※履歴は始まりからの ${w.tick - startT} 刻みだけ（--warm で前から）` : ''}`, '', key, '', '近くにいた：' + ([...near].join('、') || 'なし'), '', '```', ...lines, '```', ''].join('\n') });
+      rows.push({ key, ex: [`#### ${name(cc.k)} ${cc.id}（${dayOf(w.tick)}日目、マス ${tx},${ty}）${w.tick - startT < keep ? `　※履歴は始まりからの ${w.tick - startT} tick だけ（--warm で前から）` : ''}`, '', key, '', '近くにいた：' + ([...near].join('、') || 'なし'), '', '```', ...lines, '```', ''].join('\n') });
     }
     return r;
   };
@@ -165,14 +165,14 @@ async function deaths(seed: string, a: Record<string, string>, o: OpenOpts) {
         if (P.length > 5) P.shift();
       }
     }
-    // 死んだものの履歴は捨てる（覚える量を抑える）
+    // 死んだものの履歴は捨てる（メモリを抑える）
     if (w.tick % 2000 === 0) for (const id of ring.keys()) if (!e.list.some((c: any) => c.id === id && !c.dead)) { ring.delete(id); sts.delete(id); pos.delete(id); }
   }
   const total = [...hist.values()].reduce((x, y) => x + y, 0);
   const L: string[] = [
     `# 死んだときの様子：${seed}、${from}〜${to}日目、${kind >= 0 ? name(kind) : 'すべての種'}${cause ? `、死因 ${CAUSE_NAMES[cause] ?? cause}` : ''}${byK !== undefined ? `、手を下した種 ${name(byK)}` : ''}`,
     '',
-    `全${total}件。履歴は死ぬ前の ${keep} 刻み（${every}刻みごと）。「直前に多かった」はその間にいちばん多かった状態。「止まっていた」は直前の地上の約1分で1マスも動いていないこと。食べ物までの道のりは、食べられる苔かキノコ（20以上）までの歩いた距離（60マスまで）。`,
+    `全${total}件。履歴は死ぬ前の ${keep} tick（${every} tick ごと）。「直前に多かった」はその間にいちばん多かった状態。「止まっていた」は直前のゲーム内の約1分で1マスも動いていないこと。食べ物までの道のりは、食べられる苔かキノコ（20以上）までの歩いた距離（60マスまで）。`,
     '',
     '| 件数 | 割合 | 様子 |',
     '|---:|---:|---|',
@@ -192,7 +192,7 @@ async function deaths(seed: string, a: Record<string, string>, o: OpenOpts) {
 
 // ---------------- life ----------------
 
-/** 生き物の番号から、生まれた日（その番号がまだ使われていない、いちばん遅い日の状態）を探す */
+/** 生き物の番号から、生まれた日（その番号がまだ使われていない、いちばん遅い日の日次スナップショット）を探す */
 function bornDay(seed: string, id: number, o: OpenOpts): number {
   const dirs = [o.run ? snapsOf(o.run) : '', snapDir(SELF_SIM, o.adv ?? 1, seed)].filter((d) => d && existsSync(d));
   for (const d of dirs) {
@@ -233,7 +233,7 @@ async function life(seed: string, a: Record<string, string>, o: OpenOpts) {
     }
     const sig = `st${c.st}${a.act ? ` act${c.act}` : ''}${c.flee > 0 ? ' 逃' : ''}${c.sleep > 0 ? ' 眠' : ''}${c.dead ? ` 死${c.dead}` : ''}`;
     if (sig !== last) {
-      changes.push(`${dayOf(w.tick)}（前の状態は地上の${((w.tick - sinceT) / 10).toFixed(0)}秒）${sig}　${line(w, c)}`);
+      changes.push(`${dayOf(w.tick)}（前の状態はゲーム内の${((w.tick - sinceT) / 10).toFixed(0)}秒）${sig}　${line(w, c)}`);
       last = sig;
       sinceT = w.tick;
     }
@@ -247,7 +247,7 @@ async function life(seed: string, a: Record<string, string>, o: OpenOpts) {
   }
   if (!seen) throw new Error(`${id} が ${from}〜${to}日目に見つからない`);
   const out = a.out || `runs/probe-life-${seed}-${id}.md`;
-  writeFileSync(out, [`# ${seed} の生き物 ${id} の一生`, '', '## 状態が変わったとき', '', '```', ...changes, '```', '', `## ${every}刻みごと`, '', '```', ...L, '```'].join('\n'));
+  writeFileSync(out, [`# ${seed} の生き物 ${id} の一生`, '', '## 状態が変わったとき', '', '```', ...changes, '```', '', `## ${every} tick ごと`, '', '```', ...L, '```'].join('\n'));
   console.log(changes.slice(0, 60).join('\n') + (changes.length > 60 ? `\n…（ほか ${changes.length - 60} 行）` : ''));
   console.log(`\n書き出した：${out}`);
 }
@@ -310,7 +310,7 @@ async function look(seed: string, a: Record<string, string>, o: OpenOpts) {
   const m = w.map;
   const R = +(a.r ?? 12);
   const c0 = a.id ? e.list.find((c: any) => c.id === +a.id) : null;
-  if (a.id && !c0) console.log(`（${a.id} はこの刻みにはいない）`);
+  if (a.id && !c0) console.log(`（${a.id} はこの tick にはいない）`);
   const [cx, cy] = c0 ? [Math.floor(c0.x / T), Math.floor(c0.y / T)] : (a.xy || `${m.entrance.x},2`).split(',').map(Number);
   const marks = new Map<number, string>();
   const near = e.list.filter((c: any) => c.dead !== 2 && Math.abs(c.x / T - cx) <= R && Math.abs(c.y / T - cy) <= R).sort((p: any, q: any) => Math.hypot(p.x / T - cx, p.y / T - cy) - Math.hypot(q.x / T - cx, q.y / T - cy));
@@ -427,9 +427,9 @@ async function stuck(seed: string, a: Record<string, string>, o: OpenOpts) {
   const cell = (q: number) => (q < 0 || q >= N ? '#' : m.solid[q] ? '#' : m.lava[q] ? '火' : w.water[q] > 40 ? '~' : '.');
   const top = [...heat.keys()].filter((k) => heat[k] > 0).sort((p, q) => heat[q] - heat[p]).slice(0, 20);
   const L = [
-    `# 足止めの地図：${m.seed}、${from}〜${to}日目、${kind >= 0 ? name(kind) : 'すべての種'}`,
+    `# 足止めのマップ：${m.seed}、${from}〜${to}日目、${kind >= 0 ? name(kind) : 'すべての種'}`,
     '',
-    `動こうとして（act 1）地上の20秒進めなかった回数（20刻みごとに数える）：全${total}回。地図は stuck.png（黄→赤ほど多い）。`,
+    `動こうとして（act 1）ゲーム内の20秒進めなかった回数（20 tick ごとに数える）：全${total}回。マップは stuck.png（黄→赤ほど多い）。`,
     '',
     '| マス | 回数 | 上・右・下・左（自分） | 混み具合（平均） | 多い種と状態 |',
     '|---|---:|---|---:|---|',

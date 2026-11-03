@@ -1,4 +1,4 @@
-/** 帳簿のずれが起きた刻みを突き止める：--from 日目まで回し、そこから毎刻み帳簿を調べる */
+/** 養分の保存則がずれた tick を特定する：--from 日目まで実行し、そこから --to 日目まで毎 tick 保存則を調べ、ずれた tick に変化した生き物を表示する */
 import { DAY_TICKS, World } from '../../src/world';
 import { parseArgs } from './common';
 const a = parseArgs(process.argv.slice(2));
@@ -17,7 +17,7 @@ while (w.tick < to) {
   w.step();
   const d = drift();
   if (d !== d0) {
-    console.log('刻み', w.tick, (w.tick / DAY_TICKS).toFixed(4), 'ずれ', d0, '→', d, '差', d - d0);
+    console.log('tick', w.tick, (w.tick / DAY_TICKS).toFixed(4), 'ずれ', d0, '→', d, '差', d - d0);
     for (const c of w.eco.list) { const b = before.get(c.id); const n = `${c.k},${c.dead},${c.body},${c.food},${c.units},${c.away ? 1 : 0}`; if (b !== n) console.log('  変化', c.id, b, '→', n); }
     for (const [id, b] of before) if (!w.eco.list.some((c) => c.id === id)) console.log('  消えた', id, b);
     console.log('  hold', JSON.stringify(w.eco.hold && { store: w.eco.hold.store }), 'camps', JSON.stringify(w.eco.camps.map((c) => [c.id, c.fuel])));
