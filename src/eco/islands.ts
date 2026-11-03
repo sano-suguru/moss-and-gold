@@ -105,8 +105,12 @@ export function breakTopWall(this: Ecology): void {
   }
   const due = DAY_TICKS_ECO * 3 + (ih(m.mouths[i].x, 5, 212) % (DAY_TICKS_ECO * 2));
   if (this.w.tick < due) return;
-  this.wallBroken = true;
-  if (this.mouthOpen(i)) return;
+  // 掘った通路の出口が、掘った土（dumpSpoil）で埋まって、横穴が開かないことがある（abc で、冒険者の一行の数を変えると起きた）。
+  // 開くまで地上の時間で1日のあいだ、100歩ごとに掘り直す（それでも開かなければあきらめる）
+  if (this.mouthOpen(i) || this.w.tick > due + DAY_TICKS_ECO) {
+    this.wallBroken = true;
+    return;
+  }
   // 横穴の通路を下へたどって、空洞の床を探す
   const mx = m.mouths[i].x;
   let py = 1;
@@ -140,9 +144,11 @@ export function breakTopWall(this: Ecology): void {
   }
   if (path.some((k) => m.lava[k] || m.vault[k] || m.maze[k])) return;
   for (const k of path) if (m.solid[k]) this.w.dig(k);
-  this.log(mx * TILE + 8, py * TILE, '岩壁が崩れ、上の横穴から外の風が吹き込んだ');
   this.noise(mx * TILE + 8, py * TILE, 22);
   void from;
+  if (!this.mouthOpen(i)) return;
+  this.wallBroken = true;
+  this.log(mx * TILE + 8, py * TILE, '岩壁が崩れ、上の横穴から外の風が吹き込んだ');
 }
 
 export function checkJoined(this: Ecology): void {
