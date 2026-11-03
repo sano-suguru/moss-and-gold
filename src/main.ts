@@ -16,7 +16,7 @@ const debugMode = (): number => {
   return h.includes('albedo') || q === 'albedo' ? 1 : h.includes('lit') || q === 'lit' ? 2 : 0;
 };
 let DEBUG = debugMode();
-// #clean を付けると画面の部品を隠す（見た目の確認用）
+// #clean を付けるとUI を隠す（見た目の確認用）
 const applyClean = () => document.body.classList.toggle('clean', location.hash.includes('clean') || location.hash.includes('fxdemo'));
 window.addEventListener('hashchange', () => {
   DEBUG = debugMode();
@@ -156,7 +156,7 @@ function boot(): void {
     onTap: (wx, wy) => onTap(wx, wy),
   });
 
-  // ---- 触れる：一回で生き物の札、二回続けて触れると画面の部品を隠して絵だけ（もう一度で戻る） ----
+  // ---- 触れる：一回で生き物の情報パネル、二回続けて触れると UI を隠して絵だけ（もう一度で戻る） ----
   let tapTimer = 0;
   let lastTap = { t: -1e9, x: 0, y: 0 };
   let selected = 0;
@@ -220,7 +220,7 @@ function boot(): void {
         cardLines.append(li);
       }
     }
-    // 札は生き物の頭の上に
+    // 情報パネルは生き物の頭の上に
     const r = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     const k = dpr / deviceScale(cam.zoom, dpr);
@@ -246,7 +246,7 @@ function boot(): void {
     try {
       localStorage.setItem('dungeon-aquarium-ui', JSON.stringify(ui));
     } catch {
-      /* 保存できなくてもよい */
+      /* localStorage に書けなくてもよい */
     }
   };
   // 狭い画面では、はじめは地図をたたんでおく
@@ -460,9 +460,9 @@ function boot(): void {
     showError('描画が中断されました。ページを読み込み直すと、続きから眺められます。');
   });
 
-  // 古い保存から引き継ぐのはシードだけ（tick が 0 のとき）。そのときは入口から眺め始める
+  // 古いセーブデータから引き継ぐのはシードだけ（tick が 0 のとき）。そのときは入口から眺め始める
   startWorld(saved?.seed ?? randomSeed(), !!saved && (saved.tick > 0 || !!saved.eco));
-  // 見た目の確認用（スクショの道具）：ページを読み込み直さずに、保存と同じ形の場面を開く（絵の部品と WebGL を作り直さないので速い）
+  // 見た目の確認用（スクリーンショットのツール用）：ページをリロードせずに、セーブデータと同じ形の場面を開く（スプライトと WebGL を作り直さないので速い）
   (window as unknown as { __openScene: (json: string) => void }).__openScene = (json: string) => {
     saved = JSON.parse(json) as SaveData;
     speed = saved.speed ?? 0;
@@ -488,10 +488,10 @@ function boot(): void {
     }
   };
 
-  // 描いた回数（スクショの道具が、描き終わるのを待つのに使う）
+  // 描いた回数（スクリーンショットのツールが、描き終わるのを待つのに使う）
   (window as unknown as { __frames: number }).__frames = 0;
   const frame = (now: number) => {
-    // スクショの道具が描き終わりを待ったあと、描くのを止めて撮る（__hold）。止めている間は前の絵のまま
+    // スクリーンショットのツールが描き終わりを待ったあと、描くのを止めて撮る（__hold）。止めている間は前の絵のまま
     const dbg = window as unknown as { __frames: number; __hold?: boolean };
     if (dbg.__hold) {
       last = now;
@@ -509,7 +509,7 @@ function boot(): void {
       if ((speed > 0 && speed <= 3) || DEMO) hitStopUntil = now + 50;
     }
     const stopped = now < hitStopUntil;
-    // 決まった刻みでシミュレーションを進める（タブ復帰時の大きな飛びは1秒分までに抑える）
+    // 固定の tick 間隔でシミュレーションを進める（タブ復帰時の大きな飛びは1秒分までに抑える）
     if (!stopped) acc += Math.min(1, raw) * TICKS_PER_SEC * speed;
     let n = Math.floor(acc);
     acc -= n;
@@ -518,7 +518,7 @@ function boot(): void {
       acc = 0;
     }
     if (DEMO) {
-      // 演出のデモ：シミュレーションは回さず、時刻だけ進めて技を繰り返す
+      // 演出のデモ：シミュレーションは実行せず、時刻だけ進めて技を繰り返す
       if (!stopped) demoAcc += Math.min(0.1, raw) * TICKS_PER_SEC;
       while (demoAcc >= 1) {
         demoAcc -= 1;

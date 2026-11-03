@@ -17,11 +17,11 @@ export interface CreatureFrame {
 
 /** 生き物の描き方（どのコマを、どこに、どれだけ浮かせて）を毎フレーム組み立てる */
 export class CreatureView {
-  /** 技の残した床の跡（描画だけ） */
+  /** 技の残した床の跡（描画専用） */
   private marks: { x: number; y: number; key: string; t: number }[] = [];
   private seenFx = new WeakSet<object>();
   private lunge = new Map<number, { t: number; ux: number; uy: number }>();
-  /** 飛び散る粒（描画だけ）：位置、高さ、速さ、種類、色、生まれた刻み、寿命 */
+  /** 飛び散る粒（描画専用）：位置、高さ、速さ、種類、色、生まれた tick、寿命 */
   private bits: { x: number; y: number; z: number; vx: number; vy: number; vz: number; kind: number; col: number; t0: number; life: number }[] = [];
   private bitsTick = -1;
 
@@ -230,7 +230,7 @@ export class CreatureView {
   }
   /** 生き物ごとの、いちばん新しい当たった印（のけぞりのため） */
   private lastHit = new Map<number, { t: number; ax: number; ay: number }>();
-  /** ウィスプの通った跡（描画だけに使う） */
+  /** ウィスプの通った跡（描画専用） */
   private trails = new Map<number, [number, number, number][]>();
   private out: CreatureFrame = {
     sprites: new Float32Array(MAX_SPRITES * 12),
@@ -311,7 +311,7 @@ export class CreatureView {
     const inView = (x: number, y: number, m: number) => x > view.x0 - m && x < view.x1 + m && y > view.y0 - m && y < view.y1 + m + 40;
 
     // 地面のもの（巣穴、クモの巣）
-    // 大ネズミの巣穴：引っ越しの列の先頭が新しい巣穴に着くまでは、古い場所に穴を描く（描画だけ。fxMarch）
+    // 大ネズミの巣穴：引っ越しの列の先頭が新しい巣穴に着くまでは、古い場所に穴を描く（描画専用。fxMarch）
     for (const b of eco.burrows) {
       let bx = b.x;
       let by = b.y;
@@ -523,7 +523,7 @@ export class CreatureView {
         this.lunge.set(r.aid, { t: r.t, ux: (r.dx - r.ax) / L, uy: (r.dy - r.ay) / L });
       }
       this.drawAttacks(eco, A, inView, pushSprite, dyn);
-      // 粒を動かす（刻みごと）：石のかけらは跳ねて転がり、土ぼこりはふくらんで沈み、しずくと氷は落ち、火花は飛んで消える
+      // 粒を動かす（tick ごと）：石のかけらは跳ねて転がり、土ぼこりはふくらんで沈み、しずくと氷は落ち、火花は飛んで消える
       {
         const now2 = eco.w.tick;
         const steps = this.bitsTick < 0 ? 0 : Math.min(6, now2 - this.bitsTick);
@@ -586,7 +586,7 @@ export class CreatureView {
     }
     // 墓標（熟練以上の冒険者が倒れた所）
     for (const g of eco.graves) if (inView(g.x, g.y, 20)) pushSprite(g.x, g.y, 0, false, A.grave(g.rank, unpackLook(g.look).color), 0, 2);
-    // 墓標の前で祈る僧侶：墓標から光の粒が立ちのぼる（描画だけ）
+    // 墓標の前で祈る僧侶：墓標から光の粒が立ちのぼる（描画専用）
     for (const p of eco.parties) {
       if ((p.braceT ?? 0) <= eco.step || p.braceK !== 4) continue;
       const pr = p.members.map((id) => eco.byId.get(id)).find((o) => o && !o.dead && o.sp === 3);
@@ -609,7 +609,7 @@ export class CreatureView {
     if (eco.dragonShell && eco.w.tick - eco.dragonShell.t >= 52 && eco.w.tick - eco.dragonShell.t < 14400 * 3 && inView(eco.dragonShell.x, eco.dragonShell.y, 20)) pushSprite(eco.dragonShell.x, eco.dragonShell.y, 0, false, A.eggShell(), 0, 2);
     // 血の跡（地面に描く）
     for (const b of eco.blood) if (inView(b.x, b.y, 8)) pushSprite(b.x, b.y, 0, false, A.blood(b.c, b.v), 0, 2);
-    // 技の残した床の跡（ひび、溶け跡、霜。地上の時間で数分かけて消える）
+    // 技の残した床の跡（ひび、溶け跡、霜。通常速度で数分かけて消える）
     this.marks = this.marks.filter((mk) => eco.w.tick - mk.t < 3000);
     for (const mk of this.marks) if (inView(mk.x, mk.y, 16) && ((eco.w.tick - mk.t) < 2000 || ((mk.x + mk.y + eco.w.tick) & 1))) pushSprite(mk.x, mk.y, 0, false, A.fx(mk.key), 0, 2);
     // 崩落の土ぼこり
@@ -665,10 +665,10 @@ export class CreatureView {
     }
     this.order.sort((a, b) => a.y - b.y || a.c.id - b.c.id);
 
-    // マナから生まれた者（描画だけの出現の演出）
+    // マナから生まれた者（描画専用の出現の演出）
     const manaBorn = new Map<number, { t: number; x: number; y: number }>();
     for (const e of eco.fxManaBorn) if (eco.w.tick - e.t < 100) manaBorn.set(e.id, e);
-    // 身構えている一行（描画だけ：武器を構えた姿で止める。目標に着いたときは振りかぶり、そばを通るときは構えるだけ）
+    // 身構えている一行（描画専用：武器を構えた姿で止める。目標に着いたときは振りかぶり、そばを通るときは構えるだけ）
     const braced = new Map<number, number>();
     for (const p of eco.parties) if ((p.braceT ?? 0) > eco.step) for (const id of p.members) braced.set(id, p.braceK ?? 2);
     // 戦利品を担ぐ者
@@ -730,7 +730,7 @@ export class CreatureView {
           }
         } else if (c.caught) lift = 6;
       }
-      // マナから生まれた者の出現（描画だけ）：生まれる場所にマナの粒が渦を巻いて集まり、影の姿から白く光って形が固まる。
+      // マナから生まれた者の出現（描画専用）：生まれる場所にマナの粒が渦を巻いて集まり、影の姿から白く光って形が固まる。
       // ドラゴンの幼子は、マナが卵に集まり、卵が揺れてひびが走り、割れて殻から出てくる
       let veil = 0;
       {
@@ -789,7 +789,7 @@ export class CreatureView {
           }
           if (h!.rank >= 3) pushSprite(x, yy - 0.05, 6, false, A.halo(0), 0, 2);
         }
-        // 引退の前の最後の遠征の英雄：金の粒が二つ、ゆっくり立ちのぼる（「これが最後」。描画だけ）
+        // 引退の前の最後の遠征の英雄：金の粒が二つ、ゆっくり立ちのぼる（「これが最後」。描画専用）
         if (h && h.last && h.rank >= 3) {
           for (let i = 0; i < 2; i++) {
             const ph = (t * 0.35 + i * 0.5 + c.id * 0.13) % 1;
@@ -876,7 +876,7 @@ export class CreatureView {
         const ph = Math.floor(t * 2 + c.id * 0.37) % 7;
         pushSprite(x, yy + 0.05, lift + (sp === Kind.Goblin ? 14 : 7), false, A.eyes(ph === 6 ? 3 : ph & 1), 0, 0);
       }
-      // ウィスプの光の尾：通ったあとに、淡い光の粒が少しのあいだ残る（描画だけ）
+      // ウィスプの光の尾：通ったあとに、淡い光の粒が少しのあいだ残る（描画専用）
       if (sp === Kind.Wisp && !isCorpse) {
         let tr = this.trails.get(c.id);
         if (!tr) this.trails.set(c.id, (tr = []));

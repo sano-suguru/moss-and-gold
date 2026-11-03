@@ -5,7 +5,7 @@ import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
 
-/** 見張り：群れが休む間、一匹は起きている。地上の2時間ごとに交代する（群れの中で順番に） */
+/** 見張り：群れが休む間、一匹は起きている。ゲーム内の2時間ごとに交代する（群れの中で順番に） */
 export function isSentry(this: Ecology, c: Cr, key: string): boolean {
   const g = this.groups.get(key);
   if (!g || g.members.length < 3) return false;
@@ -122,7 +122,7 @@ export function slotOf(this: Ecology, c: Cr, g: { hx: number; hy: number; member
 }
 
 /**
- * やわらかい間合い：近すぎる者どうしは、毎刻み少しだけ離れる。止まっている者どうしほど強く、
+ * やわらかい間合い：近すぎる者どうしは、生き物の更新ごとに少しだけ離れる。止まっている者どうしほど強く、
  * 歩いている者どうしはごく弱く（すれ違いや交差はそのままできる）。動きを止めたり向きを変えさせたりはしない。
  * 群れで寄り添う種（大ネズミ、アリ、コウモリ）は間合いが小さい
  */

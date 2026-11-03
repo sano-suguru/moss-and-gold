@@ -35,7 +35,7 @@ export interface Hero {
   last?: number;
   /** この遠征でいちばん減ったときの体力（上限に対する百分率。帰ったとき2割を切っていれば傷が残る） */
   low?: number;
-  /** 傷が癒えるまで遠征に出ない刻み（この刻みより前は選ばない） */
+  /** 傷が癒えるまで遠征に出ない期限の tick（この tick より前は一行に選ばない） */
   rest?: number;
 }
 
@@ -50,7 +50,7 @@ export interface Grave {
   ret: number;
   /** 姿（墓標の布の色に） */
   look: number;
-  /** 倒れた刻み */
+  /** 倒れた tick */
   t: number;
 }
 
@@ -71,7 +71,7 @@ export const SCAR_AT = 0.5;
 export const SCAR_REST = 14400 * 1.5;
 /** 頭の飾りの種類（src/sprites.ts の CREST_NAMES。名簿は引退の前に13人になることがあるので13種） */
 export const CREST_KINDS = 13;
-/** 墓標で立ち止まる長さ（歩）と、気づく遠さ（マス） */
+/** 墓標で立ち止まる長さ（生き物の更新の回数）と、気づく遠さ（マス） */
 const GRAVE_STOP = 60;
 const GRAVE_R = 6;
 
@@ -186,7 +186,7 @@ export function pickHeroes(this: Ecology, jobs: number[], salt: number): Hero[] 
   return out;
 }
 
-/** 名簿の者に頭の飾りがなければ付ける（飾りのない古い保存から読み込んだとき） */
+/** 名簿の者に頭の飾りがなければ付ける（飾りのない古いセーブデータをロードしたとき） */
 export function ensureCrests(this: Ecology): void {
   for (const h of this.roster) if (unpackLook(h.look).crest < 0) giveCrest(this.roster, h);
 }
@@ -251,7 +251,7 @@ export function heroHome(this: Ecology, c: Cr, returned: boolean): void {
 }
 
 /**
- * 名簿の見直し（updateParties の初め、毎歩）：中にいるはずの者が倒れていれば、名簿から外して新人を加え、熟練以上なら倒れた所に墓標を立てる
+ * 名簿の見直し（updateParties の初め、生き物の更新ごと）：中にいるはずの者が倒れていれば、名簿から外して新人を加え、熟練以上なら倒れた所に墓標を立てる
  */
 export function rosterStep(this: Ecology): void {
   this.ensureCrests();
@@ -322,7 +322,7 @@ export function graveBrace(this: Ecology, p: Party, lead: Cr): void {
   }
 }
 
-/** 触れた場所の墓標（札のため） */
+/** 触れた場所の墓標（情報パネルのため） */
 export function pickGrave(this: Ecology, wx: number, wy: number): Grave | null {
   let best: Grave | null = null;
   let bd = 10 * 10;

@@ -92,7 +92,7 @@ export function canEnter(this: Ecology, k: Kind): boolean {
   return d >= 0 || (d === -2 && this.crackSpot(k) !== null);
 }
 
-/** 口のまわり（道のり RAT_DOOR_REACH マス）で、大ネズミをあと2匹以上養えるか（食べられる苔を、一匹が地上の1日に食べる量で割った数と、いまいる数を比べる） */
+/** 口のまわり（道のり RAT_DOOR_REACH マス）で、大ネズミをあと2匹以上養えるか（食べられる苔を、一匹がゲーム内の1日に食べる量で割った数と、いまいる数を比べる） */
 export function ratRoomAt(this: Ecology, x: number, y: number): boolean {
   const d = this.walkDist(this.tileOf(x, y), Ecology.RAT_DOOR_REACH);
   let food = 0;
@@ -164,7 +164,7 @@ export function arrivals(this: Ecology, day: number): void {
   const m = this.w.map;
   const n = this.counts;
   const moss = this.openMoss;
-  // 同じ刻みに来る群れは同じ口から
+  // 同じ回の更新で来る群れは同じ口から
   let door = -9;
   const enter = (k: Kind, body: number, food: number): Cr => {
     this.imported += body + food;

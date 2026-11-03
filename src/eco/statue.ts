@@ -26,7 +26,7 @@ export function petrify(this: Ecology, c: Cr): void {
   const st: Statue = { id: this.nextId++, x: Math.round(c.x), y: Math.round(c.y), k: c.k, sp: c.sp, dir: c.dir, act: c.act === 3 ? 0 : c.act, f: (this.step >> 2) & 3, units: c.body + c.food + c.units, age: 0 };
   this.statues.push(st);
   if (STR[c.k] >= 5) this.log(c.x, c.y, `{k:${c.k}}が石になった`);
-  // 石像のマスは、覚えておく位置（丸めた座標）で決める（読み込み直したときと同じマスになるように）
+  // 石像のマスは、覚えておく位置（丸めた座標）で決める（ロードし直したときと同じマスになるように）
   const sk = this.tileOf(st.x, st.y);
   st.blocks = sk >= 0 && this.blocksAt(sk) ? 1 : 0;
   if (st.blocks) this.statueAt.set(sk, st.id);

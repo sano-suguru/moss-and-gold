@@ -90,7 +90,7 @@ export function rat(this: Ecology, c: Cr, day: number): void {
     }
     // 目指す苔が食べ尽くされていたら、すぐに選び直す。道筋が見つからなかった所は避ける
     const cur = c.ref - 1;
-    // 道筋の見つからなかった目当てはあきらめる（以前は、道筋を探した直後の4刻みしか見ておらず、その間ほかのことをしていると、
+    // 道筋の見つからなかった目当てはあきらめる（以前は、道筋を探した直後の生き物の更新4回分しか見ておらず、その間ほかのことをしていると、
     // 届かない目当てへまっすぐ歩いて壁に当たり続け、そばの苔に気づかずに飢えていた）
     const pp = this.paths.get(c.id);
     const noPath = !!pp && pp.path.length === 0 && cur >= 0 && pp.gk === cur;
@@ -98,7 +98,7 @@ export function rat(this: Ecology, c: Cr, day: number): void {
       if (noPath) c.gait = cur + 1;
       c.ref = 0;
     }
-    // 腹を空かせて目当てへ向かう途中でも、10歩に1回まわりを見直し、歩いて12マス以内に、目当てまでの残りの道のりより近い食べ物があれば替える
+    // 腹を空かせて目当てへ向かう途中でも、生き物の更新10回に1回まわりを見直し、歩いて12マス以内に、目当てまでの残りの道のりより近い食べ物があれば替える
     // （以前は目当てがまだ食べられる限り選び直さず、道のりの長い目当て（まっすぐなら近くても回り道）へ向かう途中で、
     //  近くの苔やキノコの前を通っても気づかずに飢えていた。seed30 の19日目に飢え死にした19匹の多くは、死んだ所から道のり10マス以内に食べ物があった）
     if (c.hungry > 0 && c.ref > 0 && this.step % 10 === c.id % 10) {
@@ -152,7 +152,7 @@ export function ratCap(this: Ecology): number {
   return Math.min(90, Math.floor(this.openMoss / 300));
 }
 
-/** 中の食べ物で養える大ネズミの数の目安：開いた床の、食べられる苔（20以上の群落の、根元12を除いた分）を、一匹が地上の2日に食べる量で割る */
+/** 中の食べ物で養える大ネズミの数の目安：開いた床の、食べられる苔（20以上の群落の、根元12を除いた分）を、一匹がゲーム内の2日に食べる量で割る */
 export function ratFoodCap(this: Ecology): number {
   return Math.floor(this.edibleMoss / 1200);
 }
@@ -175,7 +175,7 @@ export function burrowFood(this: Ecology, x: number, y: number): number {
 
 /**
  * 巣穴の引っ越し：まわりの苔が尽きてきた巣穴は、歩いて行ける（道のり120マスまで）苔の豊かな所へ群れごと移る。
- * 地上の1/4日に一度まで試す。移った先が見つかれば true
+ * ゲーム内の1/4日に一度まで試す。移った先が見つかれば true
  */
 /** 引っ越しの列（st 11）：先頭は新しい巣穴へ、ほかは前を行く仲間のすぐ後ろについて歩く。先頭は、すぐ後ろの仲間が遅れたら待つ */
 export function ratMarch(this: Ecology, c: Cr): void {
@@ -279,7 +279,7 @@ export function relocateBurrow(this: Ecology, b: Burrow, fromFire = false): bool
     c.sleep = 0;
   });
   if (line.length) this.record('settle', { t: this.w.tick, k: Kind.Rat, id: line[0].id, ev: 'march', n: line.length, x: Math.round(b.x), y: Math.round(b.y), tx: nx, ty: ny } as never);
-  // 描画だけ：列の先頭が新しい巣穴に着くまで、古い場所に穴を描く
+  // 描画専用：列の先頭が新しい巣穴に着くまで、古い場所に穴を描く
   if (line.length) {
     this.fxMarch = this.fxMarch.filter((e) => this.w.tick - e.t < DAY_TICKS_ECO / 4);
     this.fxMarch.push({ t: this.w.tick, x: b.x, y: b.y, tx: nx, ty: ny });
@@ -298,7 +298,7 @@ export function relocateBurrow(this: Ecology, b: Burrow, fromFire = false): bool
 }
 
 /**
- * 巣穴のまわり（10マス）の食べられる苔で養える数：いまある量を、一匹が地上の1日に食べる量（約600）で割る。
+ * 巣穴のまわり（10マス）の食べられる苔で養える数：いまある量を、一匹がゲーム内の1日に食べる量（約600）で割る。
  * 苔はそのあいだにも育つので、いまある量だけで2日分（全体の目安と同じ割り方）とすると少なすぎた（巣穴ごとに2〜5匹、ダンジョン全体で数匹になった）
  */
 export function burrowCap(this: Ecology, b: Burrow): number {
@@ -354,7 +354,7 @@ export function nearestEdibleD(this: Ecology, c: Cr, max: number): [number, numb
 export function ratDisperse(this: Ecology, c: Cr): boolean {
   const m = this.w.map;
   // 出ていく途中で飢えが7割を越えたらあきらめる（st 8）ので、すでに越えている者は出ていこうとしない
-  // （以前は出ていこうとしては次の刻みにあきらめ、そのたびに目当ての苔を忘れて選び直し、苔のそばで行ったり来たりして飢えていた）
+  // （以前は出ていこうとしては次の更新であきらめ、そのたびに目当ての苔を忘れて選び直し、苔のそばで行ったり来たりして飢えていた）
   if (c.hungry > SPEC[Kind.Rat].starve * 0.7) return false;
   // 歩いて10マス以内に食べられる苔かキノコがあれば出ていかない（いくつかの点を選んで調べるやり方では、まばらな苔を見落としていた）
   {

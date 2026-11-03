@@ -170,7 +170,7 @@ export function gargoyle(this: Ecology, c: Cr): void {
 export function mimic(this: Ecology, c: Cr): void {
   if (c.act === 2 && c.actT < 5) return;
   c.act = 0;
-  // 食べたあとはしばらく消化していて、近づくものを襲わない（地上の時間で3時間ほど）
+  // 食べたあとはしばらく消化していて、近づくものを襲わない（ゲーム内の3時間ほど）
   if (c.gait > 0) {
     c.gait--;
     return;

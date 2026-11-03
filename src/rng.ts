@@ -11,7 +11,7 @@ export function hashSeed(str: string): number {
   return (h ^ (h >>> 16)) >>> 0;
 }
 
-/** sfc32 */
+/** 乱数生成器（sfc32） */
 export class Rng {
   private a: number;
   private b: number;

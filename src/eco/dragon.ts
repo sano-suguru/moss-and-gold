@@ -80,7 +80,7 @@ export function pileOwner(this: Ecology, p: Pile): string {
   return '';
 }
 
-/** ドラゴンの浅い眠りの時間か（眠りについてから、地上の1時間ごとに15分ほど） */
+/** ドラゴンの浅い眠りの時間か（眠りについてから、ゲーム内の1時間ごとに15分ほど） */
 export function dragonLightSleep(this: Ecology, c: Cr): boolean {
   return c.st === 0 && ((this.step - c.lureAt) % 600) < 150;
 }
@@ -144,7 +144,7 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
         c.mana += t;
       }
     }
-    // 生まれてからの日数（地上の日）
+    // 生まれてからの日数（ゲーム内の日数）
     const days = (this.w.tick - c.bornAt) / DAY_TICKS_ECO;
     const hoard = this.piles.find((p) => p.id === c.ref);
     // マナが濃いほど早く育つ（深部のマナが薄いダンジョンでも、日数がたてば育つ）
@@ -241,10 +241,10 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
       if (!o.dead && o !== c && o.k !== Kind.Golem && this.str(o) >= 9) disturbed = true;
     });
     for (const n of this.noises) if (this.step - n.t < 30 && !n.s && sq(n.x - c.x) + sq(n.y - c.y) < 6 * TILE * 6 * TILE) disturbed = true;
-    // 眠りの周期：眠りについてから地上の1〜2日たつと、自然に目を覚ます
+    // 眠りの周期：眠りについてからゲーム内の1〜2日たつと、自然に目を覚ます
     const slept = this.step - c.lureAt;
     const nap = DAY_TICKS_ECO / 2 + (ih(c.id, c.lureAt, 213) % (DAY_TICKS_ECO / 2));
-    // 浅い眠りの時間（地上の1時間のうち15分ほど）は、寝床に近づく者に気づきやすい（盗賊は忍び足で気づかれにくい）
+    // 浅い眠りの時間（ゲーム内の1時間のうち15分ほど）は、寝床に近づく者に気づきやすい（盗賊は忍び足で気づかれにくい）
     if (this.dragonLightSleep(c)) {
       let intruder: Cr | null = null;
       this.nearby(c.x, c.y, 5, (o) => {
@@ -425,7 +425,7 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
     if (this.goTo(c, c.hx, c.hy, s.speed) || sq(c.hx - c.x) + sq(c.hy - c.y) < 12 * 12) {
       c.st = 0;
       c.act = 0;
-      // 眠りについた刻み（眠りの周期のため）
+      // 眠りについた step 番号（眠りの周期のため）
       c.lureAt = this.step;
     } else c.act = 1;
     return;

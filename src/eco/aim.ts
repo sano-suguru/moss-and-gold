@@ -6,7 +6,7 @@
  *  2. 目標でない住処・集落・縄張りは道筋を選ぶときに避け、そばを通るときは一瞬足を止めて身構え（「？」）、そのまま通り過ぎる。
  *  3. 目標が集落なら（ゴブリン退治）、まっすぐ踏み込み、集落のまわりの暗がりを探して戦う。
  *
- * 目標（Party.aim）：0 なし（探索）、1 宝、2 竜、3 大物、4 アンデッド、5 ゴブリン退治。状態はすべて Party に入れる（保存は Party ごと JSON）。
+ * 目標（Party.aim）：0 なし（探索）、1 宝、2 竜、3 大物、4 アンデッド、5 ゴブリン退治。状態はすべて Party に入れる（セーブ時は Party ごと JSON にシリアライズする）。
  */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { CELL, Camp, Cr, Ecology, Job, Kind, Party, ih, sq } from '../ecology';
@@ -20,7 +20,7 @@ const UNDEAD = [Kind.Zombie, Kind.Skeleton, Kind.Lich, Kind.Ghost];
 export const GOBLIN_HUNT_AT = 0.5;
 /** ゴブリン退治の一行が来る、生還者が伝えた盗みの回数 */
 export const GOBLIN_HUNT_ROBS = 2;
-/** 構える長さ（生き物の1歩の回数）：目標に着いたとき、住処のそばを通るとき */
+/** 構える長さ（生き物の更新の回数）：目標に着いたとき、住処のそばを通るとき */
 const BRACE_ARRIVE = 16;
 const BRACE_PASS = 8;
 
@@ -215,7 +215,7 @@ export function aimPhrase(this: Ecology, p: Party): string {
   }
 }
 
-/** 札の言葉：「目的：竜退治（向かっている）」 */
+/** 情報パネルに出す言葉：「目的：竜退治（向かっている）」 */
 export function aimLine(this: Ecology, p: Party): string {
   const a = p.aim ?? 0;
   if (!a) return `目的：${AIM_NAMES[0]}`;
@@ -333,7 +333,7 @@ export function aimPoint(this: Ecology, p: Party): [number, number] | null {
 }
 
 /**
- * 一行の目標を進める（updateParties から、探索中の一行について毎刻み）：
+ * 一行の目標を進める（updateParties から、探索中の一行について生き物の更新ごとに）：
  * 見つける（場所を知る）、着く（構えて「！」）、果たす・あきらめる。目標でない住みかのそばでは身構える
  */
 export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
@@ -451,7 +451,7 @@ export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
       const cp = this.aimCamp(p);
       if (!cp || !this.list.some((o) => !o.dead && o.k === Kind.Goblin && o.ref === cp.id)) end = 1;
       else {
-        // 集落のゴブリンが見えたら覚える。着いてから誰も見えないまま、集落のまわりを探し歩いて（地上の時間で約1分半）見つからなければ引き返す
+        // 集落のゴブリンが見えたら覚える。着いてから誰も見えないまま、集落のまわりを探し歩いて（通常速度で約1分半）見つからなければ引き返す
         if (alive.some((c) => this.list.some((o) => !o.dead && o.k === Kind.Goblin && o.ref === cp.id && sq(o.x - c.x) + sq(o.y - c.y) < 6 * TILE * 6 * TILE && this.seenBy(c, lights, o)))) p.gobSeen = this.step;
         if (this.step - Math.max(p.aimAt, p.gobSeen ?? 0) > 900 || since > 3000) end = 2;
       }
@@ -535,7 +535,7 @@ export function aimTarget(this: Ecology, p: Party, from: Cr): boolean {
     }
     // 当て推量の行き先へまっすぐ。着いたら、まわりの奥を探す（pickTarget が深部へ寄せる）
     if (!p.aimGuess) return false;
-    // 着いたか、地上の時間で長く（4000歩。たどった置き場ごとに2500歩足す）向かっても着かなければ、まわりを探す
+    // 着いたか、長く（生き物の更新4000回。たどった置き場ごとに2500回足す）向かっても着かなければ、まわりを探す
     if (sq((p.aimGuessX ?? 0) - from.x) + sq((p.aimGuessY ?? 0) - from.y) < 3 * TILE * 3 * TILE || this.step - p.since > 4000 + 2500 * (p.cacheVis?.length ?? 0)) {
       p.aimGuess = 0;
       return false;
@@ -610,7 +610,7 @@ export function inPartyLight(this: Ecology, p: Party, o: Cr): boolean {
   return false;
 }
 
-/** 札と記録のため：率いる者の呼び方（「戦士アルド」） */
+/** 情報パネルと記録のため：率いる者の呼び方（「戦士アルド」） */
 export function partyTitle(this: Ecology, p: Party): string {
   const lead = this.byId.get(p.members[0]);
   const h = lead ? this.heroOf(lead) : null;

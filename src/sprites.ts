@@ -1210,7 +1210,7 @@ function wyvern(dir,act,f){
  return {...fr,ax:cx,ay:by+12};
 }
 
-/** うろこの模様：体の画素に、ずらした格子状の暗い点を打つ */
+/** うろこの模様：体のピクセルに、ずらした格子状の暗い点を打つ */
 function scales(fr,mats,salt){
  const {W,H,px,mat}=fr;
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=y*W+x;if(!mats.includes(mat[p]))continue;
@@ -1960,7 +1960,7 @@ function heroSprite(job,dir,act,f,torch,look,rank){
  if(job==='warrior'&&rank>=1)weave(fr,'mail',0);
  if(job==='thief')weave(fr,'leather',1);
  if(job==='slayer'&&rank>=1)weave(fr,'plate',3);
- // 英雄の武器：武器を持たずに描いた絵と比べて、違う画素（武器）を光らせる
+ // 英雄の武器：武器を持たずに描いた絵と比べて、違うピクセル（武器）を光らせる
  if(rank>=3&&act!=='death'){
   const o2={...o};
   if(job==='bard')o2.off=null;
@@ -2009,7 +2009,7 @@ function heroSprite(job,dir,act,f,torch,look,rank){
   if(isOrb||isOrb2){mat[p]='wisp';if(act==='attack'&&mod(f,4)>0){const c=isOrb?FLAME[0]:FLAME[2];px[p*4]=c[0];px[p*4+1]=c[1];px[p*4+2]=c[2]}}
   if(job==='thief'&&r===230&&g===230&&b===200)mat[p]='wisp';
  }
- // 英雄：体のまわりのほのかな金の光（一画素おきの縁。暗がりでも光る）
+ // 英雄：体のまわりのほのかな金の光（1ピクセルおきの縁。暗がりでも光る）
  if(rank>=3&&act!=='death'){
   const on=(x,y)=>x>=0&&y>=0&&x<W&&y<H&&px[(y*W+x)*4+3]&&mat[y*W+x]!=='aura';
   const add=[];
@@ -2451,7 +2451,7 @@ function ratPup(dir,act,f){
 /** 眠りの Z。big なら大きな Z（深い眠り）、そうでなければ小さな z。縁取りつきで暗がりでも読める（光る） */
 function zMark(big,f){
  const q=mod(f,4);
- // 小さな z も 4×4 画素（前は3×3で、暗い所では見分けにくかった）。縁取りは斜めにも回して、明るい床の上でも読める
+ // 小さな z も 4×4 px（前は3×3で、暗い所では見分けにくかった）。縁取りは斜めにも回して、明るい床の上でも読める
  const pat=big?['#####','...#.','..#..','.#...','#####']:['####','..#.','.#..','####'];
  const W=pat[0].length+2,H=pat.length+2,fr=blank(W,H);
  const a=[1,0.9,0.75,0.55][q];
@@ -2619,7 +2619,7 @@ function hoardArt(tier,owner,f){
 // ===== 気づいた印と、当たった印 =====
 /**
  * 「！」か「？」の吹き出し：暗い縁取りの吹き出しに、光る太い字（明るい所では暗い吹き出しが、暗い所では光る字が目に入る）。
- * 9×12 画素（吹き出し 9×10 と下の尾）。字は 5×8 画素で、線の太さは2〜3画素
+ * 9×12 px（吹き出し 9×10 と下の尾）。字は 5×8 px で、線の太さは2〜3 px
  */
 function mark(kind){
  const pat=kind==='!'
@@ -2920,7 +2920,7 @@ function eggShell(v){
 }
 
 
-// ===== マナから生まれる者の出現（描画だけ） =====
+// ===== マナから生まれる者の出現（描画専用） =====
 /** マナの粒：紫に光る点（size 0 小 〜 3 大） */
 function manaMote(size){
  const C=[[180,130,255],[200,160,255],[222,196,255],[246,236,255]][size];
@@ -3013,9 +3013,9 @@ function tributeSack(){
 }
 
 /** 描いた形のまわりに濃い縁取りをつける（小さな持ち物を背景から浮かせる） */
-/** 縁取りのために、まわりに1画素の余白をつけて縁取る */
+/** 縁取りのために、まわりに1px の余白をつけて縁取る */
 function pad1(fr){const W=fr.W+2,H=fr.H+2,o=blank(W,H);for(let y=0;y<fr.H;y++)for(let x=0;x<fr.W;x++){const p=y*fr.W+x,q=(y+1)*W+x+1;for(let i=0;i<4;i++)o.px[q*4+i]=fr.px[p*4+i];o.mat[q]=fr.mat[p]}return outline(o)}
-/** 画素を2倍に（戦利品は大きく描いて、遠くからでも見分けられるように） */
+/** ピクセルを2倍に（戦利品は大きく描いて、遠くからでも見分けられるように） */
 function x2(fr){const W=fr.W*2,H=fr.H*2,o=blank(W,H);for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=(y>>1)*fr.W+(x>>1),q=y*W+x;for(let i=0;i<4;i++)o.px[q*4+i]=fr.px[p*4+i];o.mat[q]=fr.mat[p]}return o}
 function outline(fr){
  const {W,H,px}=fr,add=[];

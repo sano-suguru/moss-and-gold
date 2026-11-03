@@ -2,20 +2,20 @@ import { CR_EVERY, Ecology, MOSS_R } from './eco/index';
 import { MapData, TILE, generate, lineOfSight } from './mapgen';
 
 export const TICKS_PER_SEC = 10;
-/** 地上の一日（通常速度で24分、仮） */
+/** ゲーム内の1日の tick 数（通常速度で24分、仮） */
 export const DAY_TICKS = 24 * 60 * TICKS_PER_SEC;
-/** 水を流す間隔（刻み） */
+/** 水を流す間隔（tick） */
 export const WATER_EVERY = 5;
-/** 苔を育てる間隔（刻み） */
+/** 苔を育てる間隔（tick） */
 export const MOSS_EVERY = 40;
 
 /** 高さ1あたりの水の量（水面の高さ = 高さ×HS + 水量） */
 const HS = 2;
-/** 湧き水の基本量（1回の水の刻みあたり） */
+/** 湧き水の基本量（水の更新1回あたり） */
 const SPRING_BASE = 80;
 /** 吸い込み穴が1回に吸う量 */
 const SINK_RATE = 70;
-/** 水量の変化の周期（地上の3日） */
+/** 水量の変化の周期（ゲーム内の3日） */
 const SPRING_PERIOD = DAY_TICKS * 3;
 /** 苔が育つ湿り気 */
 const MOIST_GROW = 110;
@@ -101,10 +101,10 @@ export interface WorldState {
   ash: Uint8Array;
   /** 微生物の膜 */
   mat?: Uint8Array;
-  /** 生まれた養分と、水に溶けて流れ出た養分の帳簿 */
+  /** 生まれた養分と、水に溶けて流れ出た養分の収支（保存則の確認用） */
   born?: number;
   washed?: number;
-  /** マナと、その帳簿（湧いた、外へ逃げた、薄れて消えた） */
+  /** マナと、その収支（湧いた、外へ逃げた、薄れて消えた） */
   mana?: Int32Array;
   manaBorn?: number;
   manaLeaked?: number;
@@ -125,7 +125,7 @@ export class World {
   readonly heat: Uint8Array;
   /** 真昼の光の強さ 0..1000（光の筋と入口から。昼夜で増減させて使う） */
   readonly lightBase: Uint16Array;
-  /** 湿り気（苔の刻みごとに計算） */
+  /** 湿り気（苔の更新ごとに計算） */
   readonly moist: Uint8Array;
   /** 見た目用：苔と溶岩の光のにじみ（マス単位） */
   readonly mossGlow: Float32Array;
@@ -135,11 +135,11 @@ export class World {
   /** 見た目用：キノコの淡い光のにじみ */
   readonly fungusGlow: Float32Array;
   totalFungus = 0;
-  /** 掘られたマス（順番に記録し、保存と再現に使う） */
+  /** 掘られたマス（地形変更ログ。順番に記録し、セーブとロード時の地形の再現に使う） */
   readonly digs: number[] = [];
   /** 地形が変わった（描画側で地図を送り直す） */
   terrainDirty = false;
-  /** 燃えているマス（残りの刻み）と、焼け跡（濃さ、ゆっくり薄れる） */
+  /** 燃えているマス（残りの長さ。生き物の更新の回数）と、焼け跡（濃さ、ゆっくり薄れる） */
   readonly burn: Uint8Array;
   readonly ash: Uint8Array;
   fxDirty = true;
@@ -148,7 +148,7 @@ export class World {
   glowDirty = true;
   /** 生き物たち */
   readonly eco: Ecology;
-  /** 苔の総量（苔の刻みごとに数える） */
+  /** 苔の総量（苔の更新ごとに数える） */
   totalMoss = 0;
   private prevPhase = 0;
 
@@ -189,10 +189,10 @@ export class World {
     this.manaTmp = new Int32Array(N);
     this.born = state?.born ?? 0;
     this.washed = state?.washed ?? 0;
-    // 保存されていた掘削をやり直して、地形を復元する
+    // セーブされていた掘削を再生して、地形を復元する
     this.initialRock = 0;
     for (let k = 0; k < this.map.solid.length; k++) if (this.map.solid[k]) this.initialRock++;
-    // 地形の変化を順に再生する（掘る、瓦礫を置く、崩落）。空洞が開くのも同じ順で起きる
+    // 地形変更ログを順に再生する（掘る、瓦礫を置く、崩落）。空洞が開くのも同じ順で起きる
     for (const op of state?.digs ?? []) this.replayOp(op);
     this.openedQueue.length = 0;
     this.collapseQueue.length = 0;
@@ -204,7 +204,7 @@ export class World {
     // 新しいダンジョンは、湧き水がすでに流れ出した状態から始める
     if (!state?.water) {
       for (let i = 0; i < WARMUP_WATER_STEPS; i++) this.waterStep();
-      // 始める前の水の流れで吸い込み穴へ流れた養分は、はじめの量の外とする（はじめの総量はこのあとで測るので、帳簿に数えるとずれる）
+      // 始める前の水の流れで吸い込み穴へ流れた養分は、はじめの量の外とする（はじめの総量はこのあとで測るので、収支に数えるとずれる）
       this.washed = 0;
     }
     this.computeMoist();
@@ -216,7 +216,7 @@ export class World {
     if (state?.eco) this.eco.restore(state.eco);
     else this.eco.seed();
     this.prevPhase = (this.tick % DAY_TICKS) / DAY_TICKS;
-    // 光る苔とキノコの光は状態から決まる。作った直後に一度計算する（保存から読み込んでも同じ光になる）
+    // 光る苔とキノコの光は状態から決まる。作った直後に一度計算する（セーブデータからロードしても同じ光になる）
     this.computeGlow();
   }
 
@@ -244,7 +244,7 @@ export class World {
    * マナ：養分とは別の魔力の流れ（マスごとの量）。深部、地底の裂け目、溶岩のそば、宝物庫から湧き、
    * 開いた床を伝って隣へ少しずつ広がり、正面の入口と開いた地表の横穴から外へ逃げ、どこでもごくわずかずつ薄れて消える。
    * 生き物は体にマナを溜め（ウィスプが土から吸い、食べた者へ受け渡され）、死ぬとその場の土に還る（ecology）。
-   * 帳簿：マナの総量（土＋生き物） ＝ 湧いた − 逃げた − 薄れた
+   * 保存則：マナの総量（土＋生き物） ＝ 湧いた − 逃げた − 薄れた
    */
   mana: Int32Array;
   manaBorn: number;
@@ -252,7 +252,7 @@ export class World {
   manaFaded: number;
   private manaTmp: Int32Array;
 
-  /** マナの湧く所（タイルと、地上の時間で5秒ごとの湧く量） */
+  /** マナの湧く所（タイルと、通常速度で5秒ごとの湧く量） */
   private manaSources(): [number, number][] {
     if (this.manaSrcCache) return this.manaSrcCache;
     const m = this.map;
@@ -275,7 +275,7 @@ export class World {
   }
   private manaSrcCache: [number, number][] | null = null;
 
-  /** マナの刻み（地上の時間で5秒ごと）：湧く、隣へ広がる、外へ逃げる、薄れる */
+  /** マナの更新（通常速度で5秒＝50 tick ごと）：湧く、隣へ広がる、外へ逃げる、薄れる */
   private manaStep(): void {
     const m = this.map;
     const M = this.mana;
@@ -344,7 +344,7 @@ export class World {
       const ty = mo.y === 0 ? 1 : mo.y;
       if (!m.sealed[ty * W + tx]) leak(ty * W + tx);
     }
-    // 薄れる：どこでもごくわずかずつ（地上の1日でおよそ8％。端数は刻みごとの揺らぎで丸める）。湧く量と釣り合う所で落ち着く
+    // 薄れる：どこでもごくわずかずつ（ゲーム内の1日でおよそ8％。端数は更新ごとの揺らぎで丸める）。湧く量と釣り合う所で落ち着く
     {
       const step = (this.tick / 50) | 0;
       for (let k = 0; k < M.length; k++) {
@@ -379,11 +379,11 @@ export class World {
   /** 生まれた養分（光合成、化学合成、岩の風化、湧き水）と、吸い込み穴から流れ出た養分 */
   born = 0;
   washed = 0;
-  /** 瓦礫が風化して土に返った数（岩の帳簿） */
+  /** 瓦礫が風化して土に返った数（岩の保存則の収支） */
   weathered = 0;
 
   /**
-   * 養分の生まれる元（地上の時間で10秒ごと）。どれも頭打ちがあり、吸い込み穴から流れ出る分とつり合う。
+   * 養分の生まれる元（通常速度で10秒＝100 tick ごと）。どれも頭打ちがあり、吸い込み穴から流れ出る分とつり合う。
    * 光合成：昼、光の筋の下の苔のマスで、土が痩せていれば新しい養分が生まれる。
    * 化学合成：熱い所の微生物の膜が育って広がり、厚い膜の下の土に養分が生まれる。
    * 岩の風化：新しく掘った床ほど養分が染み出し、瓦礫はゆっくり崩れて土に返る。
@@ -476,7 +476,7 @@ export class World {
     if (matChanged) this.fieldsDirty = true;
   }
 
-  /** 石畳を敷く（ドワーフの広間）。地形の変化として記録する */
+  /** 石畳を敷く（ドワーフの広間）。地形変更ログ（digs）に記録する */
   pave(k: number): void {
     this.applyPave(k);
     this.terrainDirty = true;
@@ -495,7 +495,7 @@ export class World {
     m.solid[k] = 0;
     m.dug[k] = 1;
     this.weathered++;
-    // 読み込み時の再生では、養分はすでに保存された土の中にある
+    // ロード時の再生では、養分はすでにセーブされた土の中にある
     if (!replay) {
       this.nutr[k] += 15;
       this.born += 15;
@@ -513,7 +513,7 @@ export class World {
 
   // ---------- 岩、瓦礫、閉じた空洞 ----------
 
-  /** はじめの岩の量（岩と瓦礫と掘り出した土と崩落の帳簿の基準） */
+  /** はじめの岩の量（岩と瓦礫と掘り出した土と崩落の保存則の基準） */
   initialRock = 0;
   /** 掘り出して、まだ瓦礫として置いていない土 */
   rockStock = 0;
@@ -546,7 +546,7 @@ export class World {
     this.digs.push(k * 8 + (ceiling ? 2 : 1));
   }
 
-  /** 岩と瓦礫の帳簿：岩＋瓦礫＋掘り出した土−崩落 ＝ はじめの岩 */
+  /** 岩と瓦礫の保存則：岩＋瓦礫＋掘り出した土−崩落 ＝ はじめの岩 */
   rockLedger(): number {
     const m = this.map;
     let n = 0;
@@ -807,8 +807,8 @@ export class World {
   }
 
   /**
-   * 見通しの控え（マスごとに、まわり7×7への見通し。0 未計算 / 1 見える / 2 見えない）。
-   * 見通しは岩だけで決まるので、地形の変化の記録（digs.length）が増えたときだけ捨てる
+   * 見通しのキャッシュ（マスごとに、まわり7×7への見通し。0 未計算 / 1 見える / 2 見えない）。
+   * 見通しは岩だけで決まるので、地形変更ログの長さ（digs.length）が増えたときだけ捨てる
    */
   private losMemo = new Uint8Array(0);
   private losDigs = -1;
@@ -896,7 +896,7 @@ export class World {
     for (const k of this.staleWet) paint(k);
     this.dewAt(0);
     const dew = this.dewMap;
-    // 床でなくなったマス（埋まった所など）に前の値を残さない（読み込み直したときは0から作るので、残すと続きの展開が分かれていた）
+    // 床でなくなったマス（埋まった所など）に前の値を残さない（ロードし直したときは0から作るので、残すと続きの展開が分かれていた）
     this.moist.fill(0);
     for (const k of this.floors) {
       const v = m.humidity[k] + Math.min(150, w[k] * 3) - this.heat[k] + dew[k];
@@ -904,12 +904,12 @@ export class World {
     }
   }
 
-  /** 夜露と雨の湿り気の地図（地上の時間で1分ごと、または地形が変わったときに作り直す） */
+  /** 夜露と雨の湿り気のマップ（通常速度で1分ごと、または地形が変わったときに作り直す） */
   private dewMap = new Uint8Array(0);
   private dewTiles: number[] = [];
   private dewTick = -1e9;
   private dewAt(k: number): number {
-    // 地形が変わったとき（地形の変化の記録が増えたとき）だけ作り直す。読み込み直しても同じ地図になる
+    // 地形が変わったとき（地形変更ログが増えたとき）だけ作り直す。ロードし直しても同じマップになる
     if (this.dewMap.length !== this.map.w * this.map.h || this.dewTick !== this.digs.length) {
       if (this.dewMap.length !== this.map.w * this.map.h) this.dewMap = new Uint8Array(this.map.w * this.map.h);
       for (let q = 0; q < this.dewMap.length; q++) this.dewMap[q] = 0;
@@ -945,7 +945,7 @@ export class World {
     return best;
   }
 
-  // ---------- 時間の刻み ----------
+  // ---------- tick の処理 ----------
 
   /** 光る苔とキノコの光が計算し直された回数（描画側が送り直す合図） */
   glowVersion = 0;
@@ -956,7 +956,7 @@ export class World {
     if (this.tick % 200 === 100) this.checkCollapse();
     if (this.tick % 100 === 50) this.nutrientStep();
     if (this.tick % 50 === 25) this.manaStep();
-    // 光る苔とキノコの光は、決まった刻みごとに計算し直す（速度や画面の更新に左右されないように）
+    // 光る苔とキノコの光は、決まった tick ごとに計算し直す（速度や画面の更新に左右されないように）
     if (this.tick % 200 === 0 && this.glowDirty) {
       this.computeGlow();
       this.glowVersion++;
@@ -985,11 +985,11 @@ export class World {
     return Math.round(SPRING_BASE * (0.35 + 0.65 * tri));
   }
 
-  /** 水のある床マス（floors の並びの番号）。水の刻みは水のあるマスとその隣だけを見る（並びによらない計算なので、全マスを見るのと同じ結果） */
+  /** 水のある床マス（floors の並びの番号）。水の更新は水のあるマスとその隣だけを見る（並びによらない計算なので、全マスを見るのと同じ結果） */
   private wetIdx = new Int32Array(0);
   private wetN = 0;
   private wetValid = false;
-  /** 床でなくなったのに水が残っているマス（水の刻みでは変わらないが、湿り気には効く） */
+  /** 床でなくなったのに水が残っているマス（水の更新では変わらないが、湿り気には効く） */
   private staleWet: number[] = [];
   /** 地図のマス → floors の番号（床でなければ -1） */
   private kToI = new Int32Array(0);
@@ -1036,7 +1036,7 @@ export class World {
     const tl = this.touched;
     const kToI = this.kToI;
     let tn = 0;
-    // 前の刻みで水のあったマスと、湧き水のマスが出発点
+    // 前回の水の更新で水のあったマスと、湧き水のマスが出発点
     for (let j = 0; j < this.wetN; j++) {
       const i = this.wetIdx[j];
       mark[fl[i]] = stamp;
@@ -1366,7 +1366,7 @@ export class World {
   updateSeen(): boolean {
     const d = dayIntensity(this.tick);
     let changed = false;
-    // まだ見ていないマスだけを順に見る（見たマスは見ていない側へ戻らないので、一覧は縮むだけ。控えは保存しない）
+    // まだ見ていないマスだけを順に見る（見たマスは見ていない側へ戻らないので、一覧は縮むだけ。キャッシュはセーブしない）
     if (!this.unseen) {
       const u: number[] = [];
       for (let k = 0; k < this.seen.length; k++) if (!this.seen[k]) u.push(k);

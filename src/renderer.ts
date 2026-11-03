@@ -3,9 +3,9 @@ import type { Atlas } from './atlas';
 import { FS_BLIT, FS_BLUR, FS_BRIGHT, FS_LIGHT, FS_SCENE, FS_SHADOW, FS_SPRITE, MAX_DYN, MAX_LIGHTS, MAX_SHAFTS, VS_FULL, VS_SHADOW, VS_SPRITE } from './shaders';
 
 export interface FrameLights {
-  /** x, y, r, intensity */
+  /** 光源ごとに4つずつ：位置 x, y、半径 r、強さ intensity */
   pos: Float32Array;
-  /** r, g, b, occ */
+  /** 光源ごとに4つずつ：色 r, g, b と、壁で遮られるか occ（1 なら影を落とす） */
   col: Float32Array;
   n: number;
 }

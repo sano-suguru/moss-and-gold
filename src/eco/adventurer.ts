@@ -669,7 +669,7 @@ export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: numbe
     }
   if (best < 0) return;
   p.camp = best;
-  // 夜は長めに休む（地上の夜のあいだ焚き火を囲む）
+  // 夜は長めに休む（ゲーム内の夜のあいだ焚き火を囲む）
   p.campUntil = this.step + (this.isNight() ? 2400 : 1500);
   p.dozeT = 0;
   p.dozeNext = 0;
@@ -698,7 +698,7 @@ export function dropScraps(this: Ecology, p: Party, x: number, y: number, per: n
   }
 }
 
-/** 入口から外へ出ていく：持ち出した金貨と養分を帳簿へ、見たものを噂に */
+/** 入口から外へ出ていく：持ち出した金貨と養分を保存則の収支に計上し、見たものを噂に */
 export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
   if (c.food > 12) {
     c.food -= 2;

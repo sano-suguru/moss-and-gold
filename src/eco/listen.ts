@@ -6,20 +6,20 @@
  *
  * 物音は noises（src/eco/senses.ts の noise。s：0 大きな音、1 足音、2 うなり声）。聞こえる遠さは音の大きさ（r マス）で、
  * 耳のよい盗賊と狩人は1.5倍遠くから聞き取る。灯りの中や明るい所の音（見えている物音）には止まらない。
- * 同じ方角（8方位）の音には地上の時間で約3分（900歩）、どの方角でも約40秒（200歩）あける。
+ * 同じ方角（8方位）の音には通常速度で約3分（生き物の更新900回）、どの方角でも約40秒（200回）あける。
  */
 import { Cr, Ecology, Job, Kind, Party, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
-/** 立ち止まって耳を澄ます長さ（歩） */
+/** 立ち止まって耳を澄ます長さ（生き物の更新の回数） */
 const LISTEN_STEPS = 32;
-/** 前衛が前に出る歩数（立ち止まってすぐの間） */
+/** 前衛が前に出る長さ（生き物の更新の回数。立ち止まってすぐの間） */
 const STEP_OUT = 7;
-/** 同じ方角の音に次に止まれるまで、どの方角でも次に止まれるまで（歩） */
+/** 同じ方角の音に次に止まれるまで、どの方角でも次に止まれるまで（生き物の更新の回数） */
 const SAME_DIR_GAP = 900;
 const ANY_GAP = 200;
 
-/** 一行が物音を聞き取るか（updateParties から、5歩ごと）。聞こえたら立ち止まって音の方を向き、前衛が前に出て構える */
+/** 一行が物音を聞き取るか（updateParties から、生き物の更新5回ごと）。聞こえたら立ち止まって音の方を向き、前衛が前に出て構える */
 export function listenStep(this: Ecology, p: Party, alive: Cr[]): void {
   if (this.step % 5 !== p.id % 5 || !this.noises.length) return;
   if ((p.camp ?? -1) >= 0 || p.engage || (p.braceT ?? 0) > this.step || (p.listenT ?? 0) > this.step) return;
@@ -71,7 +71,7 @@ export function listenStep(this: Ecology, p: Party, alive: Cr[]): void {
   }
 }
 
-/** 耳を澄ましている一行の者（adventurer から。戦う相手がいないとき）：音の方を向いて止まる。前衛は一歩前に出て構える。true ならこの歩はこれで終わり */
+/** 耳を澄ましている一行の者（adventurer から。戦う相手がいないとき）：音の方を向いて止まる。前衛は一歩前に出て構える。true ならこの回の更新はこれで終わり */
 export function listening(this: Ecology, c: Cr, p: Party): boolean {
   if ((p.listenT ?? 0) <= this.step || (p.camp ?? -1) >= 0) return false;
   const lx = p.listenX ?? c.x;

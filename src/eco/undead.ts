@@ -63,7 +63,7 @@ export function spawnGhosts(this: Ecology, day: number): void {
   if (this.counts[Kind.Ghost] >= 3) return;
   const m = this.w.map;
   for (let i = 0; i < this.graveMap.length; i++) {
-    // 死者の多い暗がり（墓：この地上の3日ほどの死）から、ゴーストが生まれる。冒険者の亡骸が多く眠る所では亡霊の騎士
+    // 死者の多い暗がり（墓：ゲーム内のここ3日ほどの死）から、ゴーストが生まれる。冒険者の亡骸が多く眠る所では亡霊の騎士
     if (this.graveMap[i] < 600) continue;
     const cx = i % 24;
     const cy = Math.floor(i / 24);
@@ -243,7 +243,7 @@ export function skeleton(this: Ecology, c: Cr, day: number): void {
     c.body--;
     this.deposit(c.x, c.y, 1);
     if (c.body <= 0) {
-      // 崩れて消えたことも、死として記録に残す（帳簿は土へ返した分で合っている）
+      // 崩れて消えたことも、死として記録に残す（保存則の収支は、土へ返した分で合っている）
       this.record('deaths', { t: this.w.tick, k: c.k, cause: 'crumbled', by: -1, x: Math.round(c.x), y: Math.round(c.y) } as never);
       this.dropBelongings(c);
       this.releaseMana(c);

@@ -109,7 +109,7 @@ export function buildLitMap(this: Ecology): void {
 
 /** その者が明るい所にいるか（目で見る者から見える明るさ） */
 export function isLit(this: Ecology, o: Cr): boolean {
-  // 明るさの地図は、毎刻みの初めに作り直してある（読み込み直しても同じになるように）
+  // 明るさのマップ（litMap）は、生き物の更新の初めに毎回作り直してある（ロードし直しても同じになるように）
   if (this.litMapTick !== this.w.tick) this.buildLitMap();
   const k = this.tileOf(o.x, o.y);
   return k >= 0 && (this.litMap[k] === 1 || this.lit(k, this.day) > 0.35);
@@ -140,7 +140,7 @@ export function canSense(this: Ecology, c: Cr, o: Cr): boolean {
   }
 }
 
-/** 火のある所（焚き火、集落のかがり火、入口のかがり火、鍛冶場、松明、燃えているマス）と、その怖さの届く半径（画素） */
+/** 火のある所（焚き火、集落のかがり火、入口のかがり火、鍛冶場、松明、燃えているマス）と、その怖さの届く半径（px） */
 export function fires(this: Ecology): [number, number, number][] {
   if (this.fireStep === this.step) return this.fireList;
   const m = this.w.map;
@@ -163,7 +163,7 @@ export function fireNearTile(this: Ecology, k: number): boolean {
     this.fnStamp = new Int32Array(m.w * m.h).fill(-1);
     this.fnVal = new Uint8Array(m.w * m.h);
   }
-  // fires() は刻みごとに作り直すので、刻みの番号で控えを見分ける（fires を先に呼んで、その刻みの一覧を確定させる）
+  // 火の一覧（fires()）は生き物の更新ごとに作り直すので、step 番号でキャッシュが有効かを見分ける（先に fires を呼んで、その回の一覧を確定させる）
   const fl = this.fires();
   if (this.fnStamp[k] !== this.step) {
     const x = (k % m.w) * TILE + 8;
@@ -215,7 +215,7 @@ export function fearFire(this: Ecology, c: Cr): boolean {
 /**
  * 光に寄る：狡猾な種（ゴブリン、オーク、コボルト）は、冒険者の松明や焚き火を、見通しが利けば20マス先から見つける。
  * 腹が減っているか、ときどき（宝を狙って）、光の届かない暗がりの縁まで近づいて潜み、
- * 冒険者がはぐれたり眠ったりした隙に襲う。潜むのは地上の時間でおよそ4時間まで
+ * 冒険者がはぐれたり眠ったりした隙に襲う。潜むのはゲーム内の時間でおよそ4時間まで
  */
 export function lurk(this: Ecology, c: Cr): boolean {
   if (c.k !== Kind.Goblin && c.k !== Kind.Orc && c.k !== Kind.Kobold) return false;
@@ -328,7 +328,7 @@ export function lurk(this: Ecology, c: Cr): boolean {
 }
 
 /**
- * 弱い生き物が冒険者やドワーフに与える害（地上の時間で数秒ごとに）：
+ * 弱い生き物が冒険者やドワーフに与える害（通常速度で数秒ごとに）：
  * 大ネズミは眠っている者の荷をあさって食料をかじる、コウモリは眠っている者の血を吸う（小さな傷）、
  * アリは巣に近づいた者に群れで噛みつく、ウィスプは冒険者を誘って一行の行き先を暗がりへ逸らす、
  * マイコニドは胞子で近くの者の足を鈍らせる、サラマンダーは近づいた者に火傷を負わせる。true なら今は害をなしている
@@ -394,7 +394,7 @@ export function pester(this: Ecology, c: Cr): boolean {
       }
       return true;
     case Kind.Myconid:
-      // 胞子：近くの冒険者の足を鈍らせる（地上の時間で1分ほど。ドワーフは眠気として効く）
+      // 胞子：近くの冒険者の足を鈍らせる（通常速度で1分ほど。ドワーフは眠気として効く）
       o.drowsy = Math.max(o.drowsy, o.k === Kind.Adventurer ? 300 : o.drowsy + 200);
       c.act = 2;
       c.actT = 0;
@@ -409,7 +409,7 @@ export function pester(this: Ecology, c: Cr): boolean {
   return false;
 }
 
-/** 倒した獲物の死骸を、数秒かけて食べる（4刻みごとに一口）。襲われたら食べるのをやめる。true なら今は食べている */
+/** 倒した獲物の死骸を、数秒かけて食べる（生き物の更新4回に1回、一口）。襲われたら食べるのをやめる。true なら今は食べている */
 export function feeding(this: Ecology, c: Cr): boolean {
   if (!c.feed) return false;
   const d = this.byId.get(c.feed);
@@ -452,7 +452,7 @@ export function noise(this: Ecology, x: number, y: number, r: number, s = 0): vo
   if (this.noises.length > 64) this.noises.shift();
 }
 
-/** 足音を立てる重い者と、うなる者（8歩ごとに、生き物を順に） */
+/** 足音を立てる重い者と、うなる者（生き物の更新8回ごとに、生き物を順に） */
 const HEAVY = new Set<number>([Kind.Troll, Kind.Minotaur, Kind.Orc, Kind.Basilisk, Kind.Golem, Kind.Worm, Kind.Skeleton, Kind.Zombie, Kind.Lizardman]);
 const GROWL = new Set<number>([Kind.Troll, Kind.Minotaur, Kind.Orc, Kind.Basilisk, Kind.Wyvern, Kind.Dragon, Kind.Lizard, Kind.Zombie, Kind.Vampire]);
 export function creatureSounds(this: Ecology): void {

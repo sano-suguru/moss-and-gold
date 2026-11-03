@@ -4,34 +4,34 @@
  * 見せたい瞬間：夜、焚き火を囲んで休む一行のところへ、ゴブリンが暗がりから忍び寄り、
  * 食べ物か松明を盗んで暗がりへ逃げ帰る。見張りに見つかれば、手ぶらで逃げ帰る。
  *
- * 状態（ゴブリンの st）：15 忍び寄る（lure 狙う冒険者、lureAt 出た刻み、tx/ty 光の縁の潜む所、gait 潜んで待つ残り）、
+ * 状態（ゴブリンの st）：15 忍び寄る（lure 狙う冒険者、lureAt 出た step 番号、tx/ty 光の縁の潜む所、gait 潜んで待つ残り）、
  * 16 逃げ帰る（盗んだ食べ物は袋 units に入れて、集落の蓄えへ）。
  *
  * 通路での掠め取り（ゴブリンの流れを短くする）：暗い通路を行く一行の最後尾に、集落のゴブリンが暗がりから忍び寄り、
  * 荷（食べ物）を掠め取って暗がりへ逃げる。最後尾の冒険者が気づいて「！」、一行は振り返る。
- * 状態：17 つける（lure 最後尾の冒険者、lureAt 出た刻み、gait 0 以上はつけている歩数、-1 駆け寄る）→ 16 逃げ帰る。
+ * 状態：17 つける（lure 最後尾の冒険者、lureAt 出た step 番号、gait 0 以上はつけている更新の回数、-1 駆け寄る）→ 16 逃げ帰る。
  */
 import { Camp, Cr, DAY_TICKS_ECO, Ecology, Job, Kind, Party, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 盗みに出る集落の、蓄えの乏しさ（蓄えの目安に対する割合） */
 const RAID_STORE = 0.7;
-/** 盗みに出る遠さ（集落から焚き火まで、マス）。焚き火の残りの時間で着ける所だけ（1マスあたり約25歩で見積もる） */
+/** 盗みに出る遠さ（集落から焚き火まで、マス）。焚き火の残りの時間で着ける所だけ（1マスあたり生き物の更新約25回で見積もる） */
 const RAID_R = 80;
 /** 通路での掠め取りに出る集落の、蓄えの乏しさ（蓄えの目安に対する割合。目安近くまで蓄えがあれば出ない） */
 const SNATCH_STORE = 0.9;
 /** 通路での掠め取りに出る遠さ（集落から最後尾の冒険者まで、マス） */
 const SNATCH_R = 24;
-/** 掠め取りをあきらめる長さ（つけはじめてからの歩数） */
+/** 掠め取りをあきらめる長さ（つけはじめてからの生き物の更新の回数） */
 const SNATCH_GIVEUP = 1000;
-/** 通り道の脇で待ち伏せる長さ（歩） */
+/** 通り道の脇で待ち伏せる長さ（生き物の更新の回数） */
 const WATCH_STEPS = 2400;
 
 export function isNight(this: Ecology): boolean {
   return this.phaseNow > 0.79 || this.phaseNow < 0.18;
 }
 
-/** 盗みに出る（updateCamps から、地上の5秒ごと）：夜、蓄えの乏しい集落のそば（40マス）で一行が焚き火を囲んでいれば、1〜3匹が忍び出る */
+/** 盗みに出る（updateCamps から、通常速度で5秒ごと）：夜、蓄えの乏しい集落のそば（40マス）で一行が焚き火を囲んでいれば、1〜3匹が忍び出る */
 export function planRaids(this: Ecology): void {
   if (!this.isNight()) return;
   const m = this.w.map;
@@ -93,7 +93,7 @@ export function partyTail(this: Ecology, p: Party): Cr | null {
 }
 
 /**
- * 通路での掠め取りに出る（updateCamps のあと、地上の5秒ごと。昼も夜も）：蓄えが目安に足りない集落から、
+ * 通路での掠め取りに出る（updateCamps のあと、通常速度で5秒ごと。昼も夜も）：蓄えが目安に足りない集落から、
  * 一行が焚き火を囲まずに近く（24マス、歩いて32マス）の暗い所を歩いていれば、1匹（ときどき2匹）が最後尾をつけに出る。
  * 一行が近くにいなければ（ただし50マスの内を歩いていれば）、冒険者の通り道（人の気配の濃い所）の脇の暗がり（道から6〜9マス）へ1匹が待ち伏せに出る
  */
@@ -168,11 +168,11 @@ export function snatchSpot(this: Ecology, cp: Camp): number {
   return best;
 }
 
-/** 待ち伏せに出す（planSnatch から）：1匹が、通り道の脇の暗がりで一行を待つ（地上の時間で約6分の1日） */
+/** 待ち伏せに出す（planSnatch から）：1匹が、通り道の脇の暗がりで一行を待つ（ゲーム内の約6分の1日） */
 export function sendWatchers(this: Ecology, cp: Camp, ready: Cr[]): void {
   const m = this.w.map;
   const k = this.snatchSpot(cp);
-  // 待ち伏せできる所がなければ、しばらく（地上の1/8日）見送る
+  // 待ち伏せできる所がなければ、しばらく（ゲーム内の1/8日）見送る
   cp.snatchT = this.w.tick + DAY_TICKS_ECO / 8;
   if (k < 0) return;
   const x = (k % m.w) * TILE + 8;
@@ -195,9 +195,9 @@ export function sendWatchers(this: Ecology, cp: Camp, ready: Cr[]): void {
 }
 
 /**
- * 通路での掠め取りの最中のゴブリン（st 17。lurk の初めから）。true なら、この歩はこれで終わり。
+ * 通路での掠め取りの最中のゴブリン（st 17。lurk の初めから）。true なら、この回の更新はこれで終わり。
  * 1. 一行の灯りの外（6〜8マス後ろ）を、暗がりを選んでつける。灯りの中に入ってしまったら下がる
- * 2. 一行が歩いているとき、ときどき（つけはじめて30歩より後）最後尾へ駆け寄る
+ * 2. 一行が歩いているとき、ときどき（つけはじめて生き物の更新30回より後）最後尾へ駆け寄る
  * 3. 最後尾の荷から食べ物を掠め取り、暗がりへ逃げ帰る（st 16）。最後尾が気づいて「！」、一行が振り返る
  */
 export function goblinSnatch(this: Ecology, c: Cr): boolean {
@@ -347,7 +347,7 @@ function edgeSpot(eco: Ecology, c: Cr, fx: number, fy: number): [number, number]
   return null;
 }
 
-/** 盗みの最中のゴブリン（lurk の初めから）。true なら、この歩はこれで終わり */
+/** 盗みの最中のゴブリン（lurk の初めから）。true なら、この回の更新はこれで終わり */
 export function goblinRaid(this: Ecology, c: Cr): boolean {
   const s = SPEC[Kind.Goblin];
   const cp = this.campOf(c);
@@ -501,8 +501,8 @@ export function watchDozing(this: Ecology, p: Party): boolean {
 }
 
 /**
- * 焚き火の見張りは、ずっと起きてはいられない：起きている間（地上の時間で約20〜45秒）と、うとうとする間（約10〜20秒）を繰り返す。
- * updateParties から、焚き火を囲んでいる一行について毎歩
+ * 焚き火の見張りは、ずっと起きてはいられない：起きている間（通常速度で約20〜45秒）と、うとうとする間（約10〜20秒）を繰り返す。
+ * updateParties から、焚き火を囲んでいる一行について生き物の更新ごと
  */
 export function watchDoze(this: Ecology, p: Party): void {
   if ((p.dozeNext ?? 0) === 0) p.dozeNext = this.step + 150 + (ih(p.id, this.step, 281) % 250);

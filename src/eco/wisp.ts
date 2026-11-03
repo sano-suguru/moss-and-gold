@@ -76,7 +76,7 @@ export function wisp(this: Ecology, c: Cr, day: number): void {
   }
 }
 
-/** ウィスプがこの1歩では判断しない（間引かれる）か */
+/** ウィスプがこの回の更新では判断しない（間引かれる）か */
 export function wispIdle(this: Ecology, c: Cr): boolean {
   const K = Ecology.WISP_EVERY;
   return K > 1 && this.step % K !== c.id % K;

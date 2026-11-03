@@ -1,13 +1,13 @@
 import { lineOfSight, TILE } from './mapgen';
 import { JOB_NAMES } from './names';
-/** 地上の一日の刻み（world と同じ） */
+/** ゲーム内の1日の tick 数（world.ts の DAY_TICKS と同じ） */
 export const DAY_TICKS_ECO = 14400;
 import type { World } from './world';
 import type { Grave, Hero } from './eco/roster';
 
-/** 生き物を動かす間隔（刻み） */
+/** 生き物を更新する間隔（tick） */
 export const CR_EVERY = 2;
-/** 苔とキノコの刻み（world.ts の MOSS_EVERY ＝ 40 刻みごと）で、一度に進める量の倍率（もとは20刻みごとに1倍。確率と増減を MOSS_R 倍） */
+/** 苔とキノコの更新（world.ts の MOSS_EVERY ＝ 40 tick ごと）1回で進める量の倍率（もとは20 tick ごとに1倍。確率と増減を MOSS_R 倍にする） */
 export const MOSS_R = 2;
 
 export const enum Kind {
@@ -98,7 +98,7 @@ export interface Party {
   /** 見たもの：1 金貨、2 アンデッド、4 大物、8 竜 */
   saw: number;
   targetAt: number;
-  /** 先頭が仲間を待っている刻み */
+  /** 先頭が仲間を待っている長さ（生き物の更新の回数） */
   waitT: number;
   /** 見かけた大物（種と場所） */
   bk: number;
@@ -114,15 +114,15 @@ export interface Party {
   /** 入ってきた口（-1 正面の入口、それ以外は mouths の番号）と、見つけた別の横穴 */
   door?: number;
   mouths?: number[];
-  /** 疲れ、焚き火（タイル、なければ -1）、休み終わる刻み、最後に休んだ刻み */
+  /** 疲れ、焚き火（タイル、なければ -1）、休み終わる step 番号、最後に休んだ step 番号 */
   fatigue?: number;
   camp?: number;
   campUntil?: number;
   lastCamp?: number;
   /**
    * 一行の目標（冒険者の作り直しの一歩目）：0 なし（探索）、1 宝、2 竜、3 大物、4 アンデッド、5 ゴブリン退治。
-   * aimId は目指す相手（竜・大物の生き物、ゴブリンの集落の id。宝なら区画、アンデッドは 0）、aimX/aimY は目指す場所（画素）、
-   * aimKnown は場所を知っているか（0 なら噂の方角＝奥へ向かい、見つけたら 1）、aimAt は着いた刻み（0 まだ）、aimEnd は終わり方（0 まだ、1 果たした、2 あきらめた）
+   * aimId は目指す相手（竜・大物の生き物、ゴブリンの集落の id。宝なら区画、アンデッドは 0）、aimX/aimY は目指す場所（px）、
+   * aimKnown は場所を知っているか（0 なら噂の方角＝奥へ向かい、見つけたら 1）、aimAt は着いた step 番号（0 まだ）、aimEnd は終わり方（0 まだ、1 果たした、2 あきらめた）
    */
   aim?: number;
   aimId?: number;
@@ -143,12 +143,12 @@ export interface Party {
   gobSeen?: number;
   robX?: number;
   robY?: number;
-  /** 身構えて止まっている刻みの終わり、向く先、種類（1 目標に着いて構える、2 住処のそばで身構える） */
+  /** 身構えて止まっている期間の終わり（step 番号）、向く先、種類（1 目標に着いて構える、2 住処のそばで身構える） */
   braceT?: number;
   braceX?: number;
   braceY?: number;
   braceK?: number;
-  /** 聞き耳：見えない所の物音に立ち止まって、音の方を向いている刻みの終わりと、音の場所。前に出て構える前衛。同じ方角（8方位）の音に次に止まれる刻み */
+  /** 聞き耳：見えない所の物音に立ち止まって、音の方を向いている期間の終わり（step 番号）と、音の場所。前に出て構える前衛。方角（8方位）ごとの、次にその方角の音で止まれる step 番号 */
   listenT?: number;
   listenX?: number;
   listenY?: number;
@@ -170,7 +170,7 @@ export interface Party {
   dgvy?: number;
   /** 竜退治：知られた道をたどっている（見えるまでは、道の先＝見た所へ向かう） */
   aimWay?: number;
-  /** 焚き火の見張りのうとうと：うとうとしている刻みの終わり（この刻みまで、見張りは眠りの印を出して、忍び寄る者に気づかない）、次にうとうとしはじめる刻み */
+  /** 焚き火の見張りのうとうと：うとうとしている期間の終わり（step 番号。それまで、見張りは眠りの印を出して、忍び寄る者に気づかない）、次にうとうとしはじめる step 番号 */
   dozeT?: number;
   dozeNext?: number;
   /** 最後に盗みを働いたゴブリンの集落（番号と、その時の場所）。生還者が町に伝える（盗みの噂）。robTold は伝えたか */
@@ -187,8 +187,8 @@ export interface Party {
 }
 
 /**
- * 物資の置き場：深部の探索の一行が、引き返す所に残す木箱と寝具。食料（food）は養分の帳簿に入る。
- * d は入口から歩いた道のり（マス、つながっていなければ -1）、at は置いた刻み、by は置いた一行、rt は最後に魔物に荒らされた刻み
+ * 物資の置き場：深部の探索の一行が、引き返す所に残す木箱と寝具。食料（food）は養分の保存則に含まれる。
+ * d は入口から歩いた道のり（マス、つながっていなければ -1）、at は置いた tick、by は置いた一行、rt は最後に魔物に荒らされた tick
  */
 export interface SupplyCache {
   id: number;
@@ -201,14 +201,14 @@ export interface SupplyCache {
   rt: number;
 }
 
-/** 外の世界の地図：生還者が持ち帰った、探した範囲、宝のあった区画、危ない区画 [区画, 強さ, 刻み] */
+/** 外の世界の地図：生還者が持ち帰った、探した範囲、宝のあった区画、危ない区画 [区画, 強さ, tick] */
 export interface Lore {
   explored: number[];
   gold: number[];
   danger: number[][];
   /** 生還者が見つけた、地表へ通じる別の横穴（mouths の番号） */
   mouths?: number[];
-  /** 竜の寝床への道：[見た者の立っていた所 x, y（画素）, 竜の番号, 持ち帰った刻み]。前の一行が見つけて持ち帰ったときだけ、竜殺しは竜退治を目標にする */
+  /** 竜の寝床への道：[見た者の立っていた所 x, y（px）, 竜の番号, 持ち帰った tick]。前の一行が見つけて持ち帰ったときだけ、竜殺しは竜退治を目標にする */
   dragonWay?: number[];
   /** 生還者が町に伝えた物資の置き場（SupplyCache の番号） */
   caches?: number[];
@@ -304,19 +304,19 @@ export interface Camp {
   dry: number;
   /** かがり火の燃料（枯れたキノコの軸）。0 なら火は消えている */
   fuel?: number;
-  /** ゴブリンの集落（住みつける仕組み）：蓄え（養分の帳簿に入る）、1 なら暗がりに散って潜んでいる、近ごろ襲われた回数、蓄えが尽きた刻み、1匹になった刻み */
+  /** ゴブリンの集落（住みつける仕組み）：蓄え（養分の保存則に含まれる）、1 なら暗がりに散って潜んでいる、近ごろ襲われた回数、蓄えが尽きた tick、1匹になった tick */
   store?: number;
   hide?: number;
   raids?: number;
   empty?: number;
   alone?: number;
-  /** 従っているオークの縄張り（寝床の座標。0,0 なら従っていない）と、次に貢ぎ物を取り立てに来る刻み */
+  /** 従っているオークの縄張り（寝床の座標。0,0 なら従っていない）と、次に貢ぎ物を取り立てに来る tick */
   lx?: number;
   ly?: number;
   tribT?: number;
-  /** 次に盗みに出られる刻み（夜の盗み：src/eco/raid.ts） */
+  /** 次に盗みに出られる tick（夜の盗み：src/eco/raid.ts） */
   raidT?: number;
-  /** 次に通路での掠め取り（つける・待ち伏せ）に出られる刻み。夜の盗みとは別に数える（src/eco/raid.ts） */
+  /** 次に通路での掠め取り（つける・待ち伏せ）に出られる tick。夜の盗みとは別に数える（src/eco/raid.ts） */
   snatchT?: number;
 }
 
@@ -337,7 +337,7 @@ export const JOB_STR = [8, 5, 4, 5, 3, 6, 20];
 export const TIER_MUL = [0.7, 1.1, 1.6];
 /** 運べる金貨の量（盗賊は身軽で多く運べる） */
 export const GOLD_CAP = [30, 20, 60, 25, 20, 25, 40];
-/** 松明一本の燃える長さ（刻み） */
+/** 松明一本の燃える長さ（生き物の更新の回数） */
 export const TORCH_FUEL = 9000;
 
 /** アリの巣（女王は巣の中にいて見えない） */
@@ -370,15 +370,15 @@ export interface Warren {
   door?: number;
   dir?: number;
   tun?: number;
-  /** 蓄え（養分。持ち主のいない食べ物として帳簿に数える） */
+  /** 蓄え（養分。持ち主のいない食べ物として保存則の総量に数える） */
   store?: number;
   /** 1 なら群れは奥に隠れている */
   hide?: number;
   /** 近ごろ襲われた回数（少しずつ薄れる） */
   raids?: number;
-  /** 蓄えが尽きた刻み（尽きていなければ -1） */
+  /** 蓄えが尽きた tick（尽きていなければ -1） */
   empty?: number;
-  /** 1匹になった刻み（2匹以上なら -1） */
+  /** 1匹になった tick（2匹以上なら -1） */
   alone?: number;
 }
 
@@ -479,19 +479,19 @@ export interface Cr {
   /** 冒険者：一行の番号と、松明の残り */
   party: number;
   torch: number;
-  /** 体力（0 で倒れる）、最後に傷を受けた刻み、最後に襲ってきた相手、逃げている残り */
+  /** 体力（0 で倒れる）、最後に傷を受けた tick、最後に襲ってきた相手、逃げている残り */
   hp: number;
   hitAt: number;
   foe: number;
   flee: number;
   /** 歩き方の状態（本能だけの種が壁に引っかかったときの向き直り、ミノタウロスの突進後のよろめき） */
   gait: number;
-  /** 生まれた刻み（中で生まれた子は、しばらく小さな姿） */
+  /** 生まれた tick（中で生まれた子は、しばらく小さな姿） */
   bornAt: number;
   /** 眠り：0 起きている、1 浅い眠り、2 深い眠り、3 半分だけ眠る。眠気（起きている間にたまり、眠ると減る） */
   sleep: number;
   drowsy: number;
-  /** 光に寄る：狙っている冒険者と、潜みはじめた刻み */
+  /** 光に寄る：狙っている冒険者と、潜みはじめた step 番号 */
   lure: number;
   lureAt: number;
   /** 食べている死骸（倒した獲物を数秒かけて食べる） */
@@ -515,16 +515,16 @@ export interface Web {
 export interface Burrow {
   x: number;
   y: number;
-  /** 最後に引っ越しを試みた刻み */
+  /** 最後に引っ越しを試みた tick */
   moved?: number;
-  /** まわり（10マス）の食べられる苔で養える数（土地勘と同じ時機に数え直す。保存する） */
+  /** まわり（10マス）の食べられる苔で養える数（土地勘と同じタイミングで数え直す。セーブに入れる） */
   cap?: number;
   /** 掘り進めている巣穴の先と長さ */
   hk?: number;
   len?: number;
 }
 
-/** 狩りの獲物の種（毎刻み配列を作らないように） */
+/** 狩りの獲物の種（呼ぶたびに配列を作らないように） */
 export const HUNT0: Kind[] = [Kind.Rat, Kind.Ant];
 export const HUNT1: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Adventurer, Kind.Dwarf];
 /** オークの獲物：ゴブリンは従える相手なので獲物にしない */
@@ -534,7 +534,7 @@ export const HUNT3: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, K
 export const HUNT4: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Lizardman, Kind.Orc, Kind.Slime, Kind.Zombie, Kind.Myconid, Kind.Adventurer];
 export const HUNT5: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Ant, Kind.Kobold, Kind.Goblin];
 export const HUNT6: Kind[] = [Kind.Rat];
-/** 上下左右（毎刻み配列を作らないように） */
+/** 上下左右（呼ぶたびに配列を作らないように） */
 export const NB4: readonly (readonly [number, number])[] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 /** 16方向の単位ベクトル（三角関数を使わずに作る） */
 export const DIR16: [number, number][] = [
@@ -571,6 +571,7 @@ export class Ecology {
   imported = 0;
   /** 外へ持ち出された養分の合計 */
   exported = 0;
+  /** 生き物の更新の通し番号（step 番号。CR_EVERY tick ごとに1増える。セーブに入れる） */
   step = 0;
   counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   /** ドワーフの住みか（一つまで）、坑道のランプ、外に伝わった話（1 = ゴーレムの宝物庫は危ない） */
@@ -579,14 +580,14 @@ export class Ecology {
   dwarfLore = 0;
   lastDwarves = -1;
   /**
-   * 分析用の記録（シミュレーションの道具が読んで空にする。ゲームでは古いものから捨てる）。
+   * 分析用の記録（分析ツールが読んで空にする。ゲームでは古いものから捨てる）。
    * deaths：死んだ生き物（死因と、手を下した種）。births：現れた生き物（来た口か、生まれたか）。exits：外へ出ていった生き物
    */
   stats: {
     deaths: { t: number; k: number; cause: string; by: number; x: number; y: number }[];
     births: { t: number; k: number; origin: string; x: number; y: number }[];
     exits: { t: number; k: number; reason: string; x: number; y: number }[];
-    /** 群れの引っ越し（大ネズミの巣穴など）：刻み、種、何匹、元の場所と移った先（画素） */
+    /** 群れの引っ越し（大ネズミの巣穴など）：tick、種、何匹、元の場所と移った先（px） */
     moves: { t: number; k: number; n: number; x: number; y: number; tx: number; ty: number }[];
     /**
      * 住みつく群れの出来事（いまはコボルトの住処）：ev は found 作った（how：arrive 来て / move 移って / split 分かれて）、
@@ -597,13 +598,13 @@ export class Ecology {
   } = { deaths: [], births: [], exits: [], moves: [], settle: [] };
   /** 次に生まれる生き物の由来（spawn の直前に設定し、spawn が読んで戻す） */
   originNext = '';
-  /** 卵（クモの卵嚢、トカゲの卵）：産んだ刻みと、孵る子の数、子の体になる養分 */
+  /** 卵（クモの卵嚢、トカゲの卵）：産んだ tickと、孵る子の数、子の体になる養分 */
   eggs: { id: number; k: number; x: number; y: number; t: number; n: number; units: number }[] = [];
-  /** 入口で食べ残しを落とす一行（入ってきた次の刻みに落とす） */
+  /** 入口で食べ残しを落とす一行（入ってきた次の生き物の更新で落とす） */
   pendingScraps: number[] = [];
   parties: Party[] = [];
   lore: Lore = { explored: [], gold: [], danger: [] };
-  /** 記録：目立つ出来事（刻み、場所、一文。種の名前は {k:番号} で書き、表示のときに照らされたかどうかで置き換える） */
+  /** 記録：目立つ出来事（tick、場所、一文。種の名前は {k:番号} で書き、表示のときに照らされたかどうかで置き換える） */
   events: { t: number; x: number; y: number; m: string }[] = [];
   /** 一度でも光に照らされた種 */
   discovered = new Uint8Array(32);
@@ -629,7 +630,7 @@ export class Ecology {
   roster: Hero[] = [];
   graves: Grave[] = [];
   nextHero = 1;
-  /** 種ごとに、最後に群れが来た刻み（立て続けに来ないように） */
+  /** 種ごとに、最後に群れが来た step 番号（立て続けに来ないように） */
   lastArrival: number[] = [];
   colonies: Colony[] = [];
   warrens: Warren[] = [];
@@ -638,14 +639,14 @@ export class Ecology {
   get mapW(): number {
     return this.w.map.w;
   }
-  /** この刻みまでコボルトは来ない（住処が襲われて捨てられたという外の噂） */
+  /** この tick までコボルトは来ない（住処が襲われて捨てられたという外の噂） */
   koboldShun = 0;
-  /** この刻みまでゴブリンは来ない（集落が襲われて捨てられたという外の噂） */
+  /** この tick までゴブリンは来ない（集落が襲われて捨てられたという外の噂） */
   goblinShun = 0;
   /** 同時にダンジョンの中にいる冒険者の一行の数の上限（切り替えられる。既定 1。段階13までは 2） */
   static ADV_MAX_PARTIES = 2;
   /**
-   * ウィスプ（光の精を除く）が判断して動く間隔（生き物の1歩の何回に1回か）。数が多く（生き物の約6割）、漂うだけなので間引く。
+   * ウィスプ（光の精を除く）が判断して動く間隔（生き物の更新の何回に1回か）。数が多く（生き物の約6割）、漂うだけなので間引く。
    * 動く回に、間引いたぶん（WISP_EVERY 倍）動いて食べる。ほかの回は腹が減るだけ。描画は px から x へ WISP_EVERY 回ぶんの時間をかけて補間する（wispAlpha）
    */
   static WISP_EVERY = 4;
@@ -674,7 +675,7 @@ export class Ecology {
   }
 
   /**
-   * 土地勘：開いた場所にある、豊かな苔とキノコの群落（地上の時間で1分ごとに書き出す）。
+   * 土地勘：開いた場所にある、豊かな苔とキノコの群落（通常速度で1分ごとに書き出す）。
    * 近くで餌が見つからない生き物は、ここから近い群落を目指す
    */
   forage: number[] = [];
@@ -700,7 +701,7 @@ export class Ecology {
   deathMap = new Int32Array(24 * 18);
   /** 長く残る「死者の多さ」（冒険者や大物が倒れた所。ゆっくり薄れる） */
   graveMap = new Int32Array(24 * 18);
-  /** 冒険者の亡骸の墓（区画ごと。地上の約6日残る） */
+  /** 冒険者の亡骸の墓（区画ごと。ゲーム内の約6日残る） */
   advGrave = new Int32Array(24 * 18);
 
   /**
@@ -714,32 +715,32 @@ export class Ecology {
   static ORC_MIN_PREY = 12;
   static ORC_REACH = 100;
 
-  /** 口ごとに、そこからゴブリンが来られるか（コボルトの kobMouthOk と同じ。地上の約2時間ごとに調べ直し、保存する） */
+  /** 口ごとに、そこからゴブリンが来られるか（コボルトの kobMouthOk と同じ。ゲーム内の約2時間ごとに調べ直し、セーブに入れる） */
   gobMouthOk: number[] = [];
 
   pendingDigs: number[] = [];
 
   lastDigCount = -1;
-  /** 崩落の土ぼこり（描画だけに使う、保存しない） */
+  /** 崩落の土ぼこり（描画専用。セーブしない） */
   effects: { x: number; y: number; t: number }[] = [];
 
-  /** 血の跡（描画だけに使う。地上の半日ほどで消える） */
+  /** 血の跡（描画専用。ゲーム内の半日ほどで消える） */
   blood: { x: number; y: number; t: number; c: number; v: number }[] = [];
 
   /**
-   * 群れの一覧（毎刻み、生き物の状態から作り直す。保存しなくても同じものができる）。
-   * 群れの身元は、それぞれの種がもともと持っている仲間の覚え方を使う：
+   * 群れの一覧（生き物の更新ごとに、生き物の状態から作り直す。セーブしなくても同じものが作り直せる）。
+   * 群れの識別は、それぞれの種がもともと持っている仲間の覚え方を使う：
    * 大ネズミとオークは巣の場所、コウモリはねぐら（主のヴァンパイアがいればその群れ）、アリ・コボルト・ゴブリン・リザードマンは所属する巣、
    * 冒険者は一行、ドワーフは住みか、ヴァンパイアは自分が率いる群れ。それ以外の種は群れない。
    * type：0 巣を持つ群れ（集まる場所は巣）、1 旅する群れ（集まる場所は先頭）
    */
   groups = new Map<string, { key: string; k: number; type: number; hx: number; hy: number; members: Cr[] }>();
-  /** 警戒：群れの仲間が襲われた（群れの身元 → 刻み、襲ってきた相手、場所） */
+  /** 警戒：群れの仲間が襲われた（群れの識別キー → step 番号、襲ってきた相手、場所） */
   alarms = new Map<string, { t: number; foe: number; x: number; y: number }>();
 
-  /** 群れの身元の控え（毎刻み、群れの一覧を作るときに作り直す。刻みの途中で変わった者は控えを使わずに求める） */
+  /** 群れの識別キーのキャッシュ（生き物の更新ごとに、群れの一覧を作るときに作り直す。更新の途中で変わった者はキャッシュを使わずに求める） */
   gkCache = new Map<number, string | null>();
-  /** 群れの身元の文字列の控え（種と二つの数が同じなら同じ文字列。作り直しを減らすだけで、値は同じ） */
+  /** 群れの識別キーの文字列のキャッシュ（種と二つの数が同じなら同じ文字列。作り直しを減らすだけで、値は同じ） */
   gkMemo = new Map<number, [string, number, number, string]>();
 
   /** 縄張り：群れない種のうち縄張りを持つものは、同じ種が近づくと、強いほうが威嚇して弱いほうを退かせる（殺し合いにはしない） */
@@ -748,7 +749,7 @@ export class Ecology {
   /**
    * 種ごとの眠り方。kind：none 眠らない、poly 何度も細かく眠る、mono まとまって眠る、half 半分だけ眠る、
    * irreg 不定期に眠る、drift 眠りながらゆっくり動く。when：day 昼、night 夜、any いつでも。
-   * 眠気は起きている間に1刻み1ずつたまり、眠っている間は out ずつ減る。th を超えると眠りたくなる（時間帯の外では2倍まで我慢する）
+   * 眠気は起きている間に生き物の更新1回につき1ずつたまり、眠っている間は out ずつ減る。th を超えると眠りたくなる（時間帯の外では2倍まで我慢する）
    */
   static SLEEP: Record<number, { kind: string; when: string; th: number; out: number }> = {
     [Kind.Rat]: { kind: 'poly', when: 'any', th: 1800, out: 6 },
@@ -769,7 +770,7 @@ export class Ecology {
     [Kind.Vampire]: { kind: 'mono', when: 'day', th: 1500, out: 2 },
   };
 
-  /** 体の大きさ（間合いの目安。画素） */
+  /** 体の大きさ（間合いの目安。px） */
   static bodySize(k: number): number {
     if (k === Kind.Dragon || k === Kind.Worm) return 40;
     if (k === Kind.Golem || k === Kind.Troll || k === Kind.Minotaur || k === Kind.Wyvern) return 18;
@@ -799,7 +800,7 @@ export class Ecology {
     [Kind.Ghost]: 'magic', [Kind.Lich]: 'magic', [Kind.Wisp]: 'magic', [Kind.Gargoyle]: 'magic', [Kind.Golem]: 'magic', [Kind.Skeleton]: 'magic', [Kind.Salamander]: 'magic',
   };
 
-  /** その刻みに明るいマス（光源と、光る生き物の光が届く所。壁の遮りは見ない）。毎刻み作り直す */
+  /** いまの tick に明るいマス（光源と、光る生き物の光が届く所。壁の遮りは見ない）。生き物の更新ごとに作り直す */
   litMap = new Uint8Array(0);
   litMapStep = -1;
   litMarked: number[] = [];
@@ -812,11 +813,11 @@ export class Ecology {
   fireStep = -1;
 
   /** その場所の、いちばん近い火（怖さの届く中にあれば） */
-  /** マスの中心のそばに火があるか（同じ刻みのうちは、マスごとに一度だけ調べる。火の一覧は刻みごとに決まる） */
+  /** マスの中心のそばに火があるか（同じ回の生き物の更新のうちは、マスごとに一度だけ調べる。火の一覧は更新ごとに決まる） */
   fnStamp = new Int32Array(0);
   fnVal = new Uint8Array(0);
 
-  /** 歩いてつながる洞窟のまとまり（地形が変わるたび＝地形の変化の記録が増えるたびに作り直す。保存しなくても同じものができる） */
+  /** 歩いてつながる洞窟の領域（地形が変わるたび＝地形変更ログ digs が増えるたびに作り直す。セーブしなくても同じものが作り直せる） */
   regionMap = new Int32Array(0);
   regionVer = -1;
   mainRegion = -1;
@@ -832,48 +833,48 @@ export class Ecology {
   islandIds = new Set<number>();
 
   /**
-   * 攻撃の演出の記録（描画だけ）。style は技の種類：slash 斬る、jag 荒い振り、stab 突く、smash 殴る、bite 噛む、claw 爪、
+   * 攻撃の演出の記録（描画専用）。style は技の種類：slash 斬る、jag 荒い振り、stab 突く、smash 殴る、bite 噛む、claw 爪、
    * sting 刺す、arrow 矢、orb 魔法の弾、beam 光線、drain 吸う、chill 冷たい手、acid 溶かす、spore 胞子。
    * col は色（0 白、1 金、2 炎、3 毒、4 魔、5 血、6 石、7 霜）、size は大きさ（0〜2）。big は強い一撃、kill はとどめ
    */
   fxAttacks: { t: number; style: string; col: number; size: number; ax: number; ay: number; dx: number; dy: number; did: number; aid: number; big: boolean; kill: boolean }[] = [];
-  /** 強い一撃があった刻み（画面がほんの一瞬「ため」を入れるため。描画だけ） */
+  /** 強い一撃があった tick（画面がほんの一瞬「ため」を入れるため。描画専用） */
   lastBigHit = -1;
 
-  /** 特別な個体の名前と、種類ごとの最後に現れた刻み */
+  /** 特別な個体の名前と、種類ごとの最後に現れた tick */
   names = new Map<number, string>();
   lastElite: number[] = [];
 
-  /** 幼竜が生まれた場所の卵の殻（地上の3日ほど残る） */
+  /** 幼竜が生まれた場所の卵の殻（ゲーム内の3日ほど残る） */
   dragonShell: { x: number; y: number; t: number } | null = null;
 
-  /** 攻撃が当たった所（刻み、場所、打った側の場所） */
+  /** 攻撃が当たった所（tick、場所、打った側の場所） */
   fxHits: { t: number; x: number; y: number; ax: number; ay: number; id: number }[] = [];
   /** 気づいた印：「！」（敵や獲物）か「？」（害のない相手） */
   fxMarks: { t: number; id: number; m: string }[] = [];
-  /** マナから生まれた者（描画だけ：生まれる場所にマナが集まって姿が現れる演出。保存しない。判断に使わない） */
+  /** マナから生まれた者（描画専用：生まれる場所にマナが集まって姿が現れる演出。セーブしない。シミュレーションの判断に使わない） */
   fxManaBorn: { id: number; t: number; k: number; x: number; y: number }[] = [];
-  /** 大ネズミの巣穴の引っ越し（描画だけ：列の先頭が新しい巣穴に着くまで、古い場所に穴を描く。判断に使わない） */
+  /** 大ネズミの巣穴の引っ越し（描画専用：列の先頭が新しい巣穴に着くまで、古い場所に穴を描く。判断に使わない） */
   fxMarch: { t: number; x: number; y: number; tx: number; ty: number }[] = [];
   noticed = new Map<number, number>();
 
   /** デモの組：攻める側と受ける側 */
   demoPairs: [Cr, Cr][] = [];
 
-  /** 物音（戦い、崩落、掘る音）。地上の時間で数秒だけ残る */
+  /** 物音（戦い、崩落、掘る音）。通常速度で数秒だけ残る */
   noises: { x: number; y: number; r: number; t: number; s?: number }[] = [];
 
   /** 職業ごとの道具 */
   static JOB_ITEMS: number[][] = [[ItemKind.Sword, ItemKind.Shield], [ItemKind.Staff], [ItemKind.Dagger], [ItemKind.Mace, ItemKind.Symbol], [ItemKind.Lute], [ItemKind.Bow], [ItemKind.Greatsword]];
 
-  /** 大ネズミが来られる口と天井の裂け目（1 なら来られる。600刻みごとに決まった刻みで調べ直し、保存する） */
+  /** 大ネズミが来られる口と天井の裂け目（1 なら来られる。生き物の更新600回ごとに、決まった回で調べ直し、セーブに入れる） */
   ratMouthOk: number[] = [];
   ratShaftOk: number[] = [];
-  /** 大ネズミの入り直し（七巡目）：地表の横穴が開いたあとでも、中の大ネズミが2匹以下になったら 1（天井の割れ目をまた使える）、3匹を超えたら 0。保存する */
+  /** 大ネズミの入り直し（七巡目）：地表の横穴が開いたあとでも、中の大ネズミが2匹以下になったら 1（天井の割れ目をまた使える）、3匹を超えたら 0。セーブに入れる */
   ratReentry = 0;
-  /** オークが来られる口（1 なら来られる。歩いて行ける範囲に従えられるゴブリンの集落か十分な獲物がある。600刻みごとに調べ直し、保存する） */
+  /** オークが来られる口（1 なら来られる。歩いて行ける範囲に従えられるゴブリンの集落か十分な獲物がある。生き物の更新600回ごとに調べ直し、セーブに入れる） */
   orcMouthOk: number[] = [];
-  /** 大ネズミが入り込む裂け目を、その刻みだけ決めておく（来る群れが同じ裂け目から入るように。保存しない） */
+  /** 大ネズミが入り込む裂け目を、その回の更新の間だけ決めておく（来る群れが同じ裂け目から入るように。セーブしない） */
   forcedCrack: [number, number] | null = null;
   /**
    * 大ネズミが来るかどうかを決める範囲（道のり）。大ネズミが食べずに歩けるのは約20マスなので、それより内側にする
@@ -882,18 +883,18 @@ export class Ecology {
   static RAT_DOOR_REACH = 18;
 
   /** マス k からの歩いた道のり（溶岩、閉じた空洞、岩は通らない。max マスまで。届かなければ -1） */
-  /** walkDist の待ち行列（使い回す） */
+  /** 歩いた道のりを測る探索（walkDist）の待ち行列（毎回確保せずに使い回す） */
   wdQ = new Int32Array(0);
 
   /**
    * 住処の候補のまわりの食べ物：8マス以内の食べられる苔とキノコ（20以上の群落の、根元12を除いた分）と、10マス以内のネズミ1匹あたり100。
-   * 来たばかりの群れ（4〜6匹）が地上の2日ほど食べていける目安が KOBOLD_MIN_FOOD
+   * 来たばかりの群れ（4〜6匹）がゲーム内の2日ほど食べていける目安が KOBOLD_MIN_FOOD
    */
   static KOBOLD_MIN_FOOD = 1500;
 
   /**
    * 口ごとに、そこからコボルトが来られるか（歩いて行ける範囲に、住処の条件を満たし食べ物も足りる場所があるか）。
-   * 地上の約2時間（600刻み）ごとに決まった刻みで調べ直し、保存する
+   * ゲーム内の約2時間（生き物の更新600回）ごとに、決まった回で調べ直し、セーブに入れる
    */
   kobMouthOk: number[] = [];
 

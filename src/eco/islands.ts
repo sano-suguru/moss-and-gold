@@ -106,7 +106,7 @@ export function breakTopWall(this: Ecology): void {
   const due = DAY_TICKS_ECO * 3 + (ih(m.mouths[i].x, 5, 212) % (DAY_TICKS_ECO * 2));
   if (this.w.tick < due) return;
   // 掘った通路の出口が、掘った土（dumpSpoil）で埋まって、横穴が開かないことがある（abc で、冒険者の一行の数を変えると起きた）。
-  // 開くまで地上の時間で1日のあいだ、100歩ごとに掘り直す（それでも開かなければあきらめる）
+  // 開くまでゲーム内の1日のあいだ、生き物の更新100回ごとに掘り直す（それでも開かなければあきらめる）
   if (this.mouthOpen(i) || this.w.tick > due + DAY_TICKS_ECO) {
     this.wallBroken = true;
     return;
