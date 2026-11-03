@@ -212,6 +212,24 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 道が見つからないとき、壁に押しつけて足踏みし続けず、近づけるだけ近づいて立ち止まる（変更前のコードでは4シードの合計で約640回、変更後は約20回）
+    name: '道が見つからないまま壁際で足踏みしない（4シードの合計で40回以下）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.stuck.filter((x) => x.nopath >= 0.5).length);
+      return { ok: sum(n) <= 40, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // 焚き火の席が壁の中に置かれ、休むあいだ席へ向かって足踏みし続けることがない（変更前のコードでは4シードの合計で約110回、変更後は約15回）
+    name: '冒険者が足踏みしない（4シードの合計で40回以下）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.stuck.filter((x) => x.k === 25).length);
+      return { ok: sum(n) <= 40, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
     name: '四つの保存則がずれない',
     ...RUN_A,
     test: (rs) => {

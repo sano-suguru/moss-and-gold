@@ -553,9 +553,32 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     const fx = ((p.camp as number) % m.w) * TILE + 8;
     const fy = Math.floor((p.camp as number) / m.w) * TILE + 8;
     const idx = p.members.indexOf(c.id);
-    const a = (idx / Math.max(1, p.members.length)) * 6.283;
-    const sx = fx + Math.cos(a) * 14;
-    const sy = fy + Math.sin(a) * 10;
+    let a = (idx / Math.max(1, p.members.length)) * 6.283;
+    let sx = fx + Math.cos(a) * 14;
+    let sy = fy + Math.sin(a) * 10;
+    // 席が壁の中や溶岩の上なら、焚き火のまわりを少しずつ回って、座れる床を探す（壁際の焚き火では席の半分が壁にかかる）。
+    // どこにも座れる床がなければ、焚き火のマスのそばに座る
+    if (!this.campSeatOk(c, p.camp as number, sx, sy)) {
+      let found = false;
+      for (let j = 1; j < 24 && !found; j++) {
+        const a2 = a + (j & 1 ? 1 : -1) * Math.ceil(j / 2) * 0.524;
+        for (const r of [1, 0.6]) {
+          const x2 = fx + Math.cos(a2) * 14 * r;
+          const y2 = fy + Math.sin(a2) * 10 * r;
+          if (this.campSeatOk(c, p.camp as number, x2, y2)) {
+            a = a2;
+            sx = x2;
+            sy = y2;
+            found = true;
+            break;
+          }
+        }
+      }
+      if (!found) {
+        sx = fx + (idx % 3) - 1;
+        sy = fy + 5;
+      }
+    }
     c.hx = fx;
     c.hy = fy;
     if (sq(sx - c.x) + sq(sy - c.y) > 8 * 8) {
@@ -674,6 +697,19 @@ export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: numbe
   p.dozeT = 0;
   p.dozeNext = 0;
   this.log((best % m.w) * TILE + 8, Math.floor(best / m.w) * TILE + 8, `冒険者の一行が焚き火を囲んで休みはじめた`);
+}
+
+/** 焚き火のまわりの席 (x, y) に座れるか：立てる床で、焚き火のマスか、その隣のマス（壁を隔てた向こうではない） */
+export function campSeatOk(this: Ecology, c: Cr, fire: number, x: number, y: number): boolean {
+  const k = this.tileOf(x, y);
+  if (k < 0 || !this.tilePassable(c, k)) return false;
+  const m = this.w.map;
+  const dx = (k % m.w) - (fire % m.w);
+  const dy = Math.floor(k / m.w) - Math.floor(fire / m.w);
+  if (Math.abs(dx) > 1 || Math.abs(dy) > 1) return false;
+  // 斜めの隣は、間の二つのマスの少なくとも一つが床でないと、角をはさんで向こう側になる
+  if (dx !== 0 && dy !== 0 && m.solid[fire + dx] && m.solid[fire + dy * m.w]) return false;
+  return true;
 }
 
 export function endCamp(this: Ecology, p: Party): void {
@@ -890,6 +926,7 @@ declare module '../ecology' {
     setExit: typeof setExit;
     startCamp: typeof startCamp;
     endCamp: typeof endCamp;
+    campSeatOk: typeof campSeatOk;
     dropScraps: typeof dropScraps;
     leaveDungeon: typeof leaveDungeon;
     dropBelongings: typeof dropBelongings;
@@ -901,4 +938,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { reputation, maybeParty, partyLights, seenBy, updateParties, cellOf, cellFloor, partyStr, pickTarget, pickTargetRandom, adventurer, setExit, startCamp, endCamp, dropScraps, leaveDungeon, dropBelongings, dropJobItems, dropItem, updateItems, eachLight, lightSources });
+Object.assign(Ecology.prototype, { reputation, maybeParty, partyLights, seenBy, updateParties, cellOf, cellFloor, partyStr, pickTarget, pickTargetRandom, adventurer, setExit, startCamp, endCamp, campSeatOk, dropScraps, leaveDungeon, dropBelongings, dropJobItems, dropItem, updateItems, eachLight, lightSources });
