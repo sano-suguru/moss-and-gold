@@ -1877,6 +1877,17 @@ function heroSprite(job,dir,act,f,torch,look,rank){
  }
  return fr;
 }
+/** 祈りの光：墓標の上に立ちのぼる、光る小さな聖印（f 0〜3 で薄れる） */
+function prayLight(f){
+ const q=mod(f,4),fr=blank(7,9),a=[1,0.85,0.65,0.45][q];
+ const c=[Math.round(255*a),Math.round(236*a),Math.round(160*a)],o=[Math.round(120*a),Math.round(90*a),Math.round(40*a)];
+ const on=(x,y)=>(x===3&&y>=1&&y<=7)||(y===3&&x>=1&&x<=5);
+ for(let y=0;y<9;y++)for(let x=0;x<7;x++){
+  if(on(x,y))setPx(fr,x,y,c,true);
+  else if([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>on(x+dx,y+dy)))setPx(fr,x,y,o,true);
+ }
+ return {...fr,ax:3,ay:8};
+}
 /** 墓標：熟練は木の十字に身につける色の布、歴戦は石の墓標、英雄は石の墓標に剣を立てる。土の盛り上がりつき */
 function graveMarker(rank,color){
  const P=[],W=16,H=18,pc='pc'+Math.min(5,color);
@@ -2939,4 +2950,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { heroSprite, graveMarker, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { heroSprite, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

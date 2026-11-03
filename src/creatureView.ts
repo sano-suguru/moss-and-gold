@@ -577,11 +577,17 @@ export class CreatureView {
       if (!pr) continue;
       const gx = p.braceX ?? pr.x;
       const gy = p.braceY ?? pr.y;
-      for (let i = 0; i < 4; i++) {
-        const ph = (t * 0.6 + i * 0.25) % 1;
-        pushSprite(gx + Math.sin(i * 2.1 + t * 1.3) * 5, gy, 6 + ph * 22, false, A.speck(1, Math.min(3, Math.floor(ph * 4))), 0, 2);
+      pushSprite(gx, gy - 0.05, 4, false, A.halo(1), 0, 2);
+      // 聖印の光が二つ、ずれて立ちのぼって薄れる
+      for (let i = 0; i < 2; i++) {
+        const ph = (t * 0.45 + i * 0.5) % 1;
+        pushSprite(gx + Math.sin(ph * 5 + i) * 2, gy, 18 + ph * 22, false, A.pray(Math.min(3, Math.floor(ph * 4))), 0, 2);
       }
-      pushSprite(pr.x, pr.y, 26 + Math.sin(t * 2) * 1.5, false, A.speck(1, Math.floor(t * 3) & 1), 0, 2);
+      for (let i = 0; i < 5; i++) {
+        const ph = (t * 0.5 + i / 5) % 1;
+        pushSprite(gx + Math.sin(i * 2.1 + t * 1.3) * 6, gy, 4 + ph * 26, false, A.speck(1, Math.min(3, Math.floor(ph * 4))), 0, 2);
+      }
+      pushSprite(pr.x, pr.y, 30 + Math.sin(t * 2) * 1.5, false, A.pray(1), 0, 2);
     }
     // 幼竜が生まれた場所の卵の殻
     if (eco.dragonShell && eco.w.tick - eco.dragonShell.t >= 52 && eco.w.tick - eco.dragonShell.t < 14400 * 3 && inView(eco.dragonShell.x, eco.dragonShell.y, 20)) pushSprite(eco.dragonShell.x, eco.dragonShell.y, 0, false, A.eggShell(), 0, 2);

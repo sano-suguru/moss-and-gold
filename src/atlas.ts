@@ -1,4 +1,4 @@
-import { heroSprite, graveMarker, adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache } from './sprites';
+import { heroSprite, graveMarker, prayLight, adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -98,6 +98,8 @@ export interface Atlas {
    * ます目が埋まったら、いちばん長く使っていないものを描き替える。描画が dirty を見てテクスチャを部分的に送り直す
    */
   hero: (job: number, torch: boolean, look: number, rank: number, dir: number, act: number, f: number) => number;
+  /** 祈りの光（墓標の上に立ちのぼる聖印。f 0〜3 で薄れる） */
+  pray: (f: number) => number;
   /** 墓標（rank 1〜3、身につける色） */
   grave: (rank: number, color: number) => number;
   /** 書き足して、まだテクスチャへ送っていないます目（x, y, w, h） */
@@ -675,6 +677,11 @@ export function buildAtlas(): Atlas {
     return raws.length - 1;
   });
 
+  const prayFrames: number[] = [];
+  for (let f = 0; f < 4; f++) {
+    prayFrames.push(raws.length);
+    raws.push(prayLight(f) as RawFrame);
+  }
   const graveFrames: number[] = [];
   for (let r = 1; r <= 3; r++)
     for (let c = 0; c < 6; c++) {
@@ -819,6 +826,7 @@ export function buildAtlas(): Atlas {
     hut: hutFrame,
     named: (name, d, a, f, v = 0) => named.get(`${name},${d},${a},${f & 3},${v}`) ?? 0,
     hero: (job, torch, look, rank, d, a, f) => heroFrame(job, torch, look, rank, d, a, f),
+    pray: (f) => prayFrames[Math.max(0, Math.min(3, f))],
     grave: (rank, color) => graveFrames[Math.max(0, Math.min(2, rank - 1)) * 6 + Math.max(0, Math.min(5, color))],
     dirty,
     corpse: (sp, st) => corpses.get(`${sp},${st}`) ?? 0,
