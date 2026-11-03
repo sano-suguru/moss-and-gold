@@ -2,8 +2,8 @@
 #
 # - PR（作ったとき・push したとき）：
 #     check   … npm ci → typecheck → npm test → npm run check（失敗すれば PR のチェックが赤）
-#     preview … npm run build → wrangler versions upload（本番には出さない版）→ プレビューの URL を PR にコメント
-#               （同じ PR では一つのコメントを書き換える。URL は版ごとのものと、PR ごとに変わらない pr-<番号> の別名）
+#     preview … npm run build → wrangler versions upload（本番には出さないバージョン）→ プレビューの URL を PR にコメント
+#               （同じ PR では一つのコメントを書き換える。URL はバージョンごとのものと、PR ごとに変わらない pr-<番号> のエイリアス）
 #               フォークからの PR では Secrets を使えないので、プレビューは作らない。
 # - main への push：typecheck → npm test → npm run build → wrangler deploy（本番）
 #
@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 0 # npm run check は前の版（PR の行き先の main）の src を git から取り出す
+          fetch-depth: 0 # npm run check はベース（PR の行き先の main）の src を git から取り出す
       - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
@@ -42,11 +42,11 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - name: main の版の保存庫を取ってくる（あれば。無ければ check が最初から回す）
+      - name: main のシミュレーションのキャッシュを取得する（あれば。無ければ check が0日目から実行する）
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: node tools/analysis/simcache.mjs fetch --ref "$BASE" || true
-      - name: npm run check（前の版＝PR の行き先の 10日目の状態から、いまの版で）
+      - name: npm run check（ベース＝PR の行き先の10日目のスナップショットから、PR のコードで）
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: npm run check -- --base "$BASE"
@@ -72,7 +72,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: プレビューの版を上げる（本番には出さない）
+      - name: プレビューのバージョンをアップロードする（本番には出さない）
         id: up
         if: env.CLOUDFLARE_API_TOKEN != ''
         env:
@@ -103,12 +103,12 @@ jobs:
             const { URL, ALIAS, VERSION, SHA } = process.env;
             const lines = [
               marker,
-              '### 🌿 プレビュー（Cloudflare Workers、本番には出ていない版）',
+              '### 🌿 プレビュー（Cloudflare Workers、本番には出ていないバージョン）',
               '',
               ALIAS ? `- この PR の最新：${ALIAS}` : null,
-              URL ? `- このコミット（\`${SHA.slice(0, 7)}\`）の版：${URL}` : null,
+              URL ? `- このコミット（\`${SHA.slice(0, 7)}\`）のバージョン：${URL}` : null,
               '',
-              `<sub>版 ${VERSION}・${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC に更新。push するたびにこのコメントを書き換えます。末尾に \`#lit\`・\`#clean\`・\`#fxdemo\` なども付けられます。</sub>`,
+              `<sub>バージョン ${VERSION}・${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC に更新。push するたびにこのコメントを書き換えます。末尾に \`#lit\`・\`#clean\`・\`#fxdemo\` なども付けられます。</sub>`,
             ].filter((l) => l !== null);
             const body = lines.join('\n');
             const { owner, repo } = context.repo;

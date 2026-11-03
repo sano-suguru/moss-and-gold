@@ -1,6 +1,6 @@
-# main の版の保存庫（16シード×25日の結果と1日ごとの状態、runs/.cache の一部）を作って、Release「sim-cache」に置く。
-# 新しいセッションは、始まりのフック（.claude/hooks/session-start.sh）でここから取ってくるので、main の版を回し直さずに済む。
-# 置くファイルの名前は、シミュレーションの版と道具の版のハッシュ（tools/analysis/simcache.mjs key）。同じ名前がもうあれば回さない。
+# main のシミュレーションのキャッシュ（16シード×25日の実行結果と日次スナップショット、runs/.cache の一部）を作って、Release「sim-cache」に置く。
+# 新しいセッションは SessionStart フック（.claude/hooks/session-start.sh）でここから取得するので、main を再実行せずに済む。
+# ファイル名は、シミュレーションのソースとツールのハッシュ（tools/analysis/simcache.mjs key）。同じ名前がもうあれば実行しない。
 # 古いものは新しい順に KEEP 個だけ残す。鍵は Actions に最初からある GITHUB_TOKEN だけ（contents: write）。
 name: simcache
 
@@ -47,7 +47,7 @@ jobs:
             echo "have=1" >> "$GITHUB_OUTPUT"
             echo "::notice::$name はもう置いてある（回さない）"
           fi
-      - name: 16シード×25日を回す
+      - name: 16シード×25日を実行する
         if: steps.key.outputs.have != '1'
         run: npm run batch -- --seeds 16 --days 25 --out runs/b16
       - name: 固めて Release に置く
@@ -56,8 +56,8 @@ jobs:
           name='${{ steps.key.outputs.name }}'
           node tools/analysis/simcache.mjs pack "$name"
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --prerelease --title "検証の保存庫（sim-cache）" \
-              --notes "main の版ごとの、16シード×25日の結果と1日ごとの状態（runs/.cache の一部）。tools/analysis/simcache.mjs fetch が取ってくる。Actions の simcache.yml が作り、新しい順に ${KEEP} 個だけ残す。"
+            gh release create "$TAG" --prerelease --title "シミュレーションのキャッシュ（sim-cache）" \
+              --notes "main のバージョンごとの、16シード×25日の実行結果と日次スナップショット（runs/.cache の一部）。tools/analysis/simcache.mjs fetch が取ってくる。Actions の simcache.yml が作り、新しい順に ${KEEP} 個だけ残す。"
           fi
           gh release upload "$TAG" "$name" --clobber
       - name: 古いものを消す
