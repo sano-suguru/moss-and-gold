@@ -163,8 +163,8 @@ export function updateParties(this: Ecology): void {
       }
       // 地上が夜なら、早めに休む（夜は焚き火を囲む）
       // 休むのは、探索中で食料に余裕があるときだけ（帰り道では休まずに出口を目指す。目標に着いて果たすまでの間も休まない）
-      // 置き場へ向かう途中は休まない（置き場に着いてから、木箱のそばで休む。cacheStep）
-      if (p.goal === 0 && foodAvg >= 0.5 && (p.camp ?? -1) < 0 && !(p.aimAt && !p.aimEnd) && !(p.cacheGo && worst >= 0.5) && this.step - (p.lastCamp ?? 0) > 2500 && ((p.fatigue ?? 0) > 3600 || worst < 0.5 || (this.isNight() && (p.fatigue ?? 0) > 1200))) this.startCamp(p, alive[0]);
+      // 置き場へ向かう途中と、場所を知った集落へ退治に向かう途中は休まない（置き場に着いてから、木箱のそばで休む。cacheStep）
+      if (p.goal === 0 && foodAvg >= 0.5 && (p.camp ?? -1) < 0 && !(p.aimAt && !p.aimEnd) && !((p.cacheGo || (p.aim === 5 && p.aimKnown && !p.aimAt && !p.aimEnd)) && worst >= 0.5) && this.step - (p.lastCamp ?? 0) > 2500 && ((p.fatigue ?? 0) > 3600 || worst < 0.5 || (this.isNight() && (p.fatigue ?? 0) > 1200))) this.startCamp(p, alive[0]);
       if ((p.camp ?? -1) >= 0 && (p.goal !== 0 || foodAvg < 0.3)) this.endCamp(p);
       if ((p.camp ?? -1) >= 0 && this.step >= (p.campUntil ?? 0)) this.endCamp(p);
       if ((p.camp ?? -1) >= 0) this.watchDoze(p);
