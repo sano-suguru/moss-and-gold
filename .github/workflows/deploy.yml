@@ -1,21 +1,40 @@
 # 確かめて、Cloudflare Workers（静的アセット）へ公開する。
-# main への push → 本番。ほかのブランチ → ブランチごとのプレビューの URL（マージの前に遊んで確かめる）。
+#
+# - PR（作ったとき・push したとき）：
+#     check   … npm ci → typecheck → npm test → npm run check（失敗すれば PR のチェックが赤）
+#     preview … npm run build → wrangler versions upload（本番には出さない版）→ プレビューの URL を PR にコメント
+#               （同じ PR では一つのコメントを書き換える。URL は版ごとのものと、PR ごとに変わらない pr-<番号> の別名）
+#               フォークからの PR では Secrets を使えないので、プレビューは作らない。
+# - main への push：typecheck → npm test → npm run build → wrangler deploy（本番）
+#
 # 要るもの：リポジトリの Secrets に CLOUDFLARE_API_TOKEN と CLOUDFLARE_ACCOUNT_ID。無ければ公開だけ飛ばす。
+# プレビューの URL は wrangler.jsonc の workers_dev と preview_urls（どちらも true）で有効にしてある。
 name: deploy
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: deploy-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  # ── PR：確かめ ──
+  check:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # npm run check は前の版（PR の行き先の main）の src を git から取り出す
       - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
@@ -23,10 +42,90 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - name: main の版の保存庫を取ってくる（あれば。無ければ check が最初から回す）
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: node tools/analysis/simcache.mjs fetch --ref "$BASE" || true
+      - name: npm run check（前の版＝PR の行き先の 10日目の状態から、いまの版で）
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: npm run check -- --base "$BASE"
 
-  deploy:
-    needs: test
+  # ── PR：プレビュー ──
+  preview:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }} # PR のブランチの先頭（マージ後の姿ではなく、push したもの）
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: プレビューの版を上げる（本番には出さない）
+        id: up
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-out.ndjson
+        run: |
+          npx wrangler versions upload --preview-alias "pr-$PR" --message "PR #$PR ${SHA:0:7}"
+          node -e '
+            const fs = require("fs");
+            const r = fs.readFileSync(process.env.WRANGLER_OUTPUT_FILE_PATH, "utf8").split("\n").filter(Boolean).map(JSON.parse).filter((e) => e.type === "version-upload").pop();
+            if (!r) throw new Error("wrangler の出力に version-upload が無い");
+            const out = [`url=${r.preview_url ?? ""}`, `alias=${r.preview_alias_url ?? ""}`, `version=${r.version_id ?? ""}`];
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, out.join("\n") + "\n");
+            console.log(out.join("\n"));
+          '
+      - name: PR にプレビューの URL を書く（一つのコメントを書き換える）
+        if: steps.up.outcome == 'success'
+        uses: actions/github-script@v7
+        env:
+          URL: ${{ steps.up.outputs.url }}
+          ALIAS: ${{ steps.up.outputs.alias }}
+          VERSION: ${{ steps.up.outputs.version }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        with:
+          script: |
+            const marker = '<!-- moss-and-gold-preview -->';
+            const { URL, ALIAS, VERSION, SHA } = process.env;
+            const lines = [
+              marker,
+              '### 🌿 プレビュー（Cloudflare Workers、本番には出ていない版）',
+              '',
+              ALIAS ? `- この PR の最新：${ALIAS}` : null,
+              URL ? `- このコミット（\`${SHA.slice(0, 7)}\`）の版：${URL}` : null,
+              '',
+              `<sub>版 ${VERSION}・${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC に更新。push するたびにこのコメントを書き換えます。末尾に \`#lit\`・\`#clean\`・\`#fxdemo\` なども付けられます。</sub>`,
+            ].filter((l) => l !== null);
+            const body = lines.join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+            const mine = comments.find((c) => c.user?.type === 'Bot' && c.body?.includes(marker));
+            if (mine) await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body });
+      - name: Secrets が無いのでプレビューを飛ばした
+        if: env.CLOUDFLARE_API_TOKEN == ''
+        run: echo "::notice::CLOUDFLARE_API_TOKEN が無いのでプレビューを飛ばしました（ビルドまでは通っています）"
+
+  # ── main：本番 ──
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -37,24 +136,12 @@ jobs:
           node-version-file: .node-version
           cache: npm
       - run: npm ci
+      - run: npm run typecheck
+      - run: npm test # npm run check は PR で済んでいる
       - run: npm run build
-      - name: 本番へ公開（main）
-        if: github.ref == 'refs/heads/main' && env.CLOUDFLARE_API_TOKEN != ''
+      - name: 本番へ公開
+        if: env.CLOUDFLARE_API_TOKEN != ''
         run: npx wrangler deploy
-      - name: プレビューへ公開（main 以外のブランチ）
-        if: github.ref != 'refs/heads/main' && env.CLOUDFLARE_API_TOKEN != ''
-        run: |
-          alias=$(echo "$GITHUB_REF_NAME" | tr 'A-Z' 'a-z' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//' | cut -c1-40 | sed -E 's/-+$//')
-          # Worker がまだ一度も本番へ公開されていない（main にまだ入っていない）間は、プレビューを作れないので飛ばす
-          if ! out=$(npx wrangler versions upload --preview-alias "$alias" --message "$GITHUB_SHA" 2>&1); then
-            echo "$out"
-            if echo "$out" | grep -q "does not yet exist"; then
-              echo "::notice::本番の Worker がまだ無いので、プレビューを飛ばしました（main に入って本番が一度公開されると、ブランチのプレビューも作られます）"
-              exit 0
-            fi
-            exit 1
-          fi
-          echo "$out"
       - name: Secrets が無いので公開を飛ばした
         if: env.CLOUDFLARE_API_TOKEN == ''
         run: echo "::notice::CLOUDFLARE_API_TOKEN が無いので公開を飛ばしました（ビルドまでは通っています）"
