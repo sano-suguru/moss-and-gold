@@ -17,6 +17,8 @@ export interface Recs {
   exits: any[];
   settle: any[];
   events: any[];
+  /** 足踏み（起きて歩く姿のまま2分以上ほぼ同じ場所にいた。sim.ts の stuck.jsonl） */
+  stuck: any[];
   /** その日の日次スナップショット（ゲームのセーブと同じ形の JSON）。from〜to の整数の日 */
   state: (day: number) => any;
 }
