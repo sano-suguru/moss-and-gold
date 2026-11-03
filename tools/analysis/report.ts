@@ -9,7 +9,7 @@
  *   mana.png      地形の上に、マナの濃さ（紫）を重ねたマップ
  *   births.png    地形の上に、生き物が現れた場所（入口・裂け目・中で生まれた）を重ねたマップ
  */
-import { readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { DAY_TICKS, World } from '../../src/world';
 import { CAUSE_NAMES, KIND_NAMES, ORIGIN_NAMES, encodePng, parseArgs } from './common';
@@ -27,6 +27,8 @@ const deaths = rd('deaths.jsonl');
 const births = rd('births.jsonl');
 const exits = rd('exits.jsonl');
 const events = rd('events.jsonl');
+// 足踏みのログは、記録を始める前のバージョンの実行結果には無い
+const stuck = existsSync(join(run, 'stuck.jsonl')) ? rd('stuck.jsonl') : [];
 const meta = JSON.parse(readFileSync(join(run, 'meta.json'), 'utf8'));
 const cp = JSON.parse(readFileSync(join(run, 'checkpoint.json'), 'utf8'));
 const unb64 = (s: string) => new Uint8Array(Buffer.from(s, 'base64'));
@@ -120,6 +122,23 @@ for (const [c, n] of [...cellCount].sort((a, b) => b[1] - a[1]).slice(0, 10)) {
   if (n / deathsNW.length > 0.15) anomalies.push(`死が一つの区画（${cx}, ${cy}）に集中している（全体の${((n / deaths.length) * 100).toFixed(0)}％）`);
 }
 L.push('');
+
+// ---- 足踏み ----
+// 起きて歩く姿のまま2分以上ほぼ同じ場所にいた（sim.ts の stuck.jsonl）。道が見つからないまま歩いていたもの（壁に押しつけている）は兆候に挙げる
+{
+  const by = new Map<number, { n: number; nopath: number }>();
+  for (const r of stuck) {
+    const b = by.get(r.k) ?? { n: 0, nopath: 0 };
+    b.n++;
+    if (r.nopath >= 0.5) b.nopath++;
+    by.set(r.k, b);
+  }
+  L.push(`## 足踏み（起きて歩く姿のまま、2分以上ほぼ同じ場所にいた。全${stuck.length}回）`, '');
+  if (!stuck.length) L.push('- なし');
+  for (const [k, b] of [...by].sort((a, c) => c[1].n - a[1].n)) L.push(`- ${name(k)}：${b.n}回（うち道が見つからないまま ${b.nopath}回）`);
+  L.push('');
+  for (const [k, b] of by) if (b.nopath >= 3) anomalies.push(`${name(k)}が、道が見つからないまま壁際で足踏みした（${b.nopath}回）`);
+}
 
 // ---- 保存則 ----
 const last = samples[samples.length - 1];
