@@ -11,9 +11,9 @@ import { Camp, Cr, DAY_TICKS_ECO, Ecology, Job, Kind, Party, SPEC, ih, sq } from
 import { TILE } from '../mapgen';
 
 /** 盗みに出る集落の、蓄えの乏しさ（蓄えの目安に対する割合） */
-const RAID_STORE = 0.4;
+const RAID_STORE = 0.7;
 /** 盗みに出る遠さ（集落から焚き火まで、マス）。焚き火の残りの時間で着ける所だけ（1マスあたり約25歩で見積もる） */
-const RAID_R = 50;
+const RAID_R = 80;
 
 export function isNight(this: Ecology): boolean {
   return this.phaseNow > 0.79 || this.phaseNow < 0.18;
@@ -170,7 +170,12 @@ export function goblinRaid(this: Ecology, c: Cr): boolean {
     c.gait--;
     c.act = 0;
     c.dir = Math.abs(fx - c.x) > Math.abs(fy - c.y) ? (fx > c.x ? 2 : 3) : fy > c.y ? 0 : 1;
-    if (c.gait <= 0) c.gait = -1;
+    if (c.gait <= 0) {
+      // 見張りが起きていれば、うとうとするのを待つ（眠りの印が出たら駆け寄る）。せっかちな者（8匹に1匹）と、待ちくたびれた者は待たずに駆け寄る
+      const watcher = this.byId.get(p.members[0]);
+      const patient = ih(c.id, c.lureAt, 274) % 8 !== 0;
+      c.gait = patient && watcher && !watcher.dead && !this.watchDozing(p) && this.step - c.lureAt < 2600 ? 1 : -1;
+    }
     return true;
   }
   // 3. 眠っている者のそばへ駆け寄って、荷物を盗む
@@ -212,13 +217,37 @@ export function goblinSteal(this: Ecology, c: Cr, t: Cr, camp: Camp | undefined,
     tp.robbed = (tp.robbed ?? 0) + 1;
     tp.robX = Math.round(t.x);
     tp.robY = Math.round(t.y);
-    this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: camp?.id ?? -1, ev: 'rob', n: take, how: bag ? 'raid' : 'lurk', to: torch, x: Math.round(t.x), y: Math.round(t.y) } as never);
+    // 盗みを働いた集落（逃げ帰る先）。生きて帰れば、町に「どこの集落のゴブリンか」が伝わる
+    if (camp && camp.id >= 0 && camp.kind === 0) {
+      tp.robCamp = camp.id;
+      tp.robCX = Math.round(camp.x);
+      tp.robCY = Math.round(camp.y);
+    }
+    this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: camp?.id ?? -1, ev: 'rob', n: take, how: bag ? 'raid' : 'lurk', to: torch, doze: this.watchDozing(tp) ? 1 : 0, x: Math.round(t.x), y: Math.round(t.y) } as never);
   }
   if (this.step - (this.lastLogged[997] ?? -99999) > 3000) {
     this.lastLogged[997] = this.step;
     this.log(c.x, c.y, torch ? `{k:${Kind.Goblin}}が冒険者の松明と荷物を盗んで、暗がりへ逃げた` : `{k:${Kind.Goblin}}が冒険者の荷物を盗んで、暗がりへ逃げた`);
   }
   return take;
+}
+
+/** 焚き火の見張りがうとうとしているか（眠りの印が出て、忍び寄る者に気づかない） */
+export function watchDozing(this: Ecology, p: Party): boolean {
+  return (p.camp ?? -1) >= 0 && (p.dozeT ?? 0) > this.step;
+}
+
+/**
+ * 焚き火の見張りは、ずっと起きてはいられない：起きている間（地上の時間で約20〜45秒）と、うとうとする間（約10〜20秒）を繰り返す。
+ * updateParties から、焚き火を囲んでいる一行について毎歩
+ */
+export function watchDoze(this: Ecology, p: Party): void {
+  if ((p.dozeNext ?? 0) === 0) p.dozeNext = this.step + 150 + (ih(p.id, this.step, 281) % 250);
+  if (this.step < (p.dozeNext ?? 0)) return;
+  p.dozeT = this.step + 90 + (ih(p.id, this.step, 282) % 120);
+  p.dozeNext = p.dozeT + 180 + (ih(p.id, this.step, 283) % 260);
+  const lead = this.byId.get(p.members[0]);
+  this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'doze', n: p.dozeT - this.step, x: Math.round(lead?.x ?? 0), y: Math.round(lead?.y ?? 0) } as never);
 }
 
 /** 盗みに出たゴブリンの道筋：明るい所（焚き火や松明の光の中、日の差す所）をできるだけ避ける（出発点と行き先のそばは除く） */
@@ -244,7 +273,9 @@ declare module '../ecology' {
     goblinRaid: typeof goblinRaid;
     goblinSteal: typeof goblinSteal;
     darkPath: typeof darkPath;
+    watchDozing: typeof watchDozing;
+    watchDoze: typeof watchDoze;
   }
 }
 
-Object.assign(Ecology.prototype, { isNight, planRaids, goblinRaid, goblinSteal, darkPath });
+Object.assign(Ecology.prototype, { isNight, planRaids, goblinRaid, goblinSteal, darkPath, watchDozing, watchDoze });

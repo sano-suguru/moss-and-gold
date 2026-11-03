@@ -80,6 +80,8 @@ export function rat(this: Ecology, c: Cr, day: number): void {
     return;
   }
   if (c.st === 1) {
+    // 冒険者の物資の置き場がそばにあれば、木箱の食料をあさる
+    if (this.ratRaidCache(c)) return;
     // 足もとに食べられる苔かキノコがあれば、遠くの目当てまで行かずにここで食べる（目当てに道筋が通らないまま、苔の上で飢えないように）
     const here = this.tileOf(c.x, c.y);
     if (here >= 0 && c.food < s.cap * 0.8 && Math.max(this.w.moss[here], this.w.fungus[here]) >= 20) {
@@ -277,6 +279,11 @@ export function relocateBurrow(this: Ecology, b: Burrow, fromFire = false): bool
     c.sleep = 0;
   });
   if (line.length) this.record('settle', { t: this.w.tick, k: Kind.Rat, id: line[0].id, ev: 'march', n: line.length, x: Math.round(b.x), y: Math.round(b.y), tx: nx, ty: ny } as never);
+  // 描画だけ：列の先頭が新しい巣穴に着くまで、古い場所に穴を描く
+  if (line.length) {
+    this.fxMarch = this.fxMarch.filter((e) => this.w.tick - e.t < DAY_TICKS_ECO / 4);
+    this.fxMarch.push({ t: this.w.tick, x: b.x, y: b.y, tx: nx, ty: ny });
+  }
   this.record('moves', { t: this.w.tick, k: Kind.Rat, n: res.length, x: Math.round(b.x), y: Math.round(b.y), tx: nx, ty: ny } as never);
   b.x = nx;
   b.y = ny;

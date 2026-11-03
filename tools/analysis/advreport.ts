@@ -6,6 +6,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { PAIRED_HEAD, PAIRED_NOTE, paired, pairedRow } from './lib/stats';
+import { countMoments, momentTable } from './lib/moments';
 
 const argv = process.argv.slice(2);
 const opt = (k: string, d = '') => (argv.includes('--' + k) ? argv[argv.indexOf('--' + k) + 1] : d);
@@ -56,6 +57,14 @@ function measure(dir: string): M {
   m['死んだ冒険者'] = de.filter((x) => x.k === K.Adventurer).length;
   m['大ネズミの引っ越し（巣穴を移した）'] = read(join(dir, 'moves.jsonl')).filter((x) => x.k === K.Rat).length;
   m['大ネズミの引っ越しの列'] = ev(K.Rat, 'march').length;
+  // 三歩目：見張りのうとうと、盗みの噂、物資の置き場
+  m['見張りがうとうとした'] = ev(K.Adventurer, 'doze').length;
+  m['盗んだ（見張りがうとうと中）'] = ev(K.Goblin, 'rob').filter((x) => x.doze === 1).length;
+  m['物資の置き場を残した（新しく）'] = ev(K.Adventurer, 'cache').filter((x) => !x.merged).length;
+  m['物資の置き場に荷を足した'] = ev(K.Adventurer, 'cache').filter((x) => x.merged).length;
+  m['置き場の入口からの道のり（最大、マス）'] = Math.max(0, ...ev(K.Adventurer, 'cache').map((x) => x.how ?? 0));
+  m['置き場で補った食料'] = ev(K.Adventurer, 'supply').reduce((a, x) => a + x.n, 0);
+  m['置き場をあさった大ネズミ（回）'] = ev(K.Rat, 'cache').length;
   m['列で歩いた大ネズミ'] = ev(K.Rat, 'march').reduce((a, x) => a + x.n, 0);
   m['引っ越しの途中で死んだ大ネズミ'] = de.filter((x) => x.k === K.Rat && x.march).length;
   return m;
@@ -65,7 +74,7 @@ const seeds = seedsOf(B).filter((x) => seedsOf(A).includes(x));
 const ma = seeds.map((x) => measure(join(A, x)));
 const mb = seeds.map((x) => measure(join(B, x)));
 const keys = [...new Set([...ma, ...mb].flatMap((o) => Object.keys(o)))];
-const lines = [`# 冒険者の目標・ゴブリンの盗み・竜退治・大ネズミの引っ越し（${seeds.length} シード、${A} → ${B}）`, '', PAIRED_NOTE, '', ...PAIRED_HEAD];
+const lines = [`# 冒険者の目標・ゴブリンの盗み・竜退治・大ネズミの引っ越し（${seeds.length} シード、${A} → ${B}）`, '', ...momentTable([A, B], [seeds.map((x) => countMoments(join(A, x))), seeds.map((x) => countMoments(join(B, x)))]), '## 対にした比較', '', PAIRED_NOTE, '', ...PAIRED_HEAD];
 for (const k of keys) lines.push(pairedRow(k, paired(ma.map((o) => o[k] ?? 0), mb.map((o) => o[k] ?? 0), seeds)));
 lines.push('', '## シードごと（いまの版）', '', `| シード | ${keys.join(' | ')} |`, `|---|${keys.map(() => '---:').join('|')}|`);
 seeds.forEach((sd, i) => lines.push(`| ${sd} | ${keys.map((k) => mb[i][k] ?? 0).join(' | ')} |`));

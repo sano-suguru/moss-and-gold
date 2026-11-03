@@ -358,6 +358,8 @@ export function manaBirths(this: Ecology, day: number): void {
         this.originNext = 'mana';
         const c = this.spawn(Kind.Dragon, x, y, got, 60);
         this.imported += 60;
+        // 幼竜が卵を割って出てくると、地の底の揺れと咆哮が町にも伝わる（竜の噂。竜殺しが深部を探りに来る）
+        this.rumors.dragon += 0.6;
         this.takeMana(c, bk, 600, 4);
         c.sp = 0;
         c.st = 0;
@@ -443,6 +445,7 @@ export function heldNutrients(this: Ecology, openOnly = false): number {
   if (this.hold) s += this.hold.store;
   for (const cp of this.camps) if (cp.id >= 0 && ok(cp.x, cp.y)) s += (cp.fuel ?? 0) + (cp.store ?? 0);
   for (const e of this.eggs) if (ok(e.x, e.y)) s += e.units;
+  for (const o of this.caches) if (ok(o.x, o.y)) s += o.food;
   return s;
 }
 

@@ -1,4 +1,4 @@
-import { adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat } from './sprites';
+import { adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -42,6 +42,8 @@ export interface Atlas {
   banner: number;
   /** 蓄えの山（kind 0 コボルト、1 ゴブリン。tier 0〜2） */
   larder: (kind: number, tier: number) => number;
+  /** 物資の置き場：0 空の残骸、1 減った、2 たっぷり */
+  supply: (tier: number) => number;
   furrow: (grown: number) => number;
   eyes: (f: number) => number;
   /** 宝の山（大きさ 0..2、きらめきのコマ） */
@@ -607,6 +609,11 @@ export function buildAtlas(): Atlas {
   raws.push(goblinCamp() as RawFrame);
   const hutFrame = raws.length;
   raws.push(reedHut() as RawFrame);
+  const cacheFrames: number[] = [];
+  for (let tier = 0; tier < 3; tier++) {
+    cacheFrames.push(raws.length);
+    raws.push(supplyCache(tier) as RawFrame);
+  }
   const treasureFrames: number[] = [];
   for (let sz = 0; sz < 3; sz++) for (let f = 0; f < 4; f++) {
     treasureFrames.push(raws.length);
@@ -691,6 +698,7 @@ export function buildAtlas(): Atlas {
     nest: nestFrame,
     banner: bannerFrame,
     larder: (kind, tier) => larderFrames[kind][Math.max(0, Math.min(2, tier))],
+    supply: (tier) => cacheFrames[Math.max(0, Math.min(2, tier))],
     furrow: (g) => furrowFrames[g ? 1 : 0],
     eyes: (f) => eyeFrames[f & 3],
     treasure: (size, f) => treasureFrames[size * 4 + (f & 3)],
