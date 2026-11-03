@@ -1,15 +1,16 @@
 /**
- * 回した結果と途中の状態の保存庫（runs/.cache）。
+ * 実行結果とスナップショットのキャッシュ（runs/.cache）。
  *
- *   runs/.cache/bin/<道具>-<binHash>.js            組み立てた道具（書き換えない）
+ *   runs/.cache/bin/<ツール>-<binHash>.js          ビルドしたツール（書き換えない）
  *   runs/.cache/snap/<simHash>/a<上限>/<シード>/d<日>.json.gz
- *                                                    最初から一つの版で回した（混じりけのない）途中の状態。地上の1日ごと
- *   runs/.cache/run/<binHash>/a<上限>/<シード>/<始まり>/
- *                                                    回した結果（sim の書き出しと同じ形。snap/ に1日ごとの状態）。
- *                                                    始まりは 0（最初から）か f<日>-<simHash>（その版の、その日の状態から続けた）
+ *                                                    0日目から一つのバージョンだけで実行した（ほかのバージョンが混じらない）日次スナップショット
+ *   runs/.cache/run/<binHash>/a<上限>/<シード>/<開始点>/
+ *                                                    実行結果（sim の出力と同じ形。snap/ に日次スナップショット）。
+ *                                                    開始点は 0（0日目から）か f<日>-<simHash>（そのバージョンの、その日のスナップショットから続けた）
+ *   （<上限> は冒険者の一行の上限）
  *
- * 作り直す時機は規則だけで決まる：版（中身のハッシュ）が違えば別の場所なので使わない。同じ版・同じシード・同じ始まりなら、
- * 回した日数が足りなければその続きから回し（--resume、分けても結果は同じ）、足りていればそのまま使う。
+ * キャッシュの無効化は規則だけで決まる：バージョン（中身のハッシュ）が違えば別の場所なので使わない。同じバージョン・同じシード・同じ開始点なら、
+ * 実行した日数が足りなければ続きから再開し（--resume。分けて実行しても結果は同じ）、足りていればそのまま使う。
  */
 import { spawn } from 'child_process';
 import { createHash } from 'crypto';
@@ -22,7 +23,7 @@ export const CACHE = join(process.cwd(), 'runs', '.cache');
 
 export interface Bin { path: string; simHash: string; binHash: string; ref?: string }
 
-/** 組み立てる（bins.mjs を使う。道具の中からも呼べる） */
+/** ツールをビルドする（bins.mjs を使う。ツールの中からも呼べる） */
 export async function getBin(name: string, ref = 'cur'): Promise<Bin> {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const m = await import(join(process.cwd(), 'tools/analysis/lib/bins.mjs'));
@@ -34,7 +35,7 @@ export async function getSimHash(ref = 'cur'): Promise<string> {
   return m.simHash(ref);
 }
 
-/** この道具自身の版（launch.mjs が組み立てたときに入れる。npm run 以外で組み立てたときは '?'） */
+/** このツール自身のバージョン（launch.mjs がビルドしたときに埋め込む。npm run 以外でビルドしたときは '?'） */
 export const SELF_SIM: string = (globalThis as any).__SIM_HASH ?? '?';
 export const SELF_BIN: string = (globalThis as any).__BIN_HASH ?? '?';
 
@@ -43,14 +44,14 @@ export const snapDir = (simHash: string, adv: number, seed: string) => join(CACH
 export const dayName = (d: number) => `d${String(d).padStart(3, '0')}.json.gz`;
 export const runDir = (binHash: string, adv: number, seed: string, start: string) => join(CACHE, 'run', binHash, `a${adv}`, seedKey(seed), start);
 
-/** 保存庫にある、混じりけのない途中の状態の日 */
+/** キャッシュにある、ほかのバージョンが混じらない日次スナップショットの日の一覧 */
 export function snapDays(simHash: string, adv: number, seed: string): number[] {
   const d = snapDir(simHash, adv, seed);
   if (!existsSync(d)) return [];
   return readdirSync(d).map((f) => /^d(\d+)\.json\.gz$/.exec(f)).filter(Boolean).map((m) => +m![1]).sort((a, b) => a - b);
 }
 
-/** 既定の冒険者の一行の上限（いまのソースの Ecology から） */
+/** 既定の冒険者の一行の上限（現在のソースの Ecology から） */
 export function defaultAdv(): number {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   return (require('./engine') as typeof import('./engine')).Ecology.ADV_MAX_PARTIES;
@@ -61,7 +62,7 @@ export const readMeta = (dir: string): Meta | null => (existsSync(join(dir, 'met
 
 export const RECORDS = ['samples', 'deaths', 'births', 'exits', 'moves', 'settle', 'events', 'trace'];
 
-/** jsonl を t（刻み）で切り出して写す */
+/** ログ（jsonl）を t（tick）が maxT 以下の行だけに切り出してコピーする */
 function copyRecords(from: string, to: string, maxT: number) {
   for (const f of RECORDS) {
     const p = join(from, `${f}.jsonl`);
@@ -81,7 +82,7 @@ function linkOrCopy(a: string, b: string) {
   }
 }
 
-/** シードの1日あたりの秒数（保存庫の前の結果から。なければ 4） */
+/** シードのゲーム内1日あたりの実行秒数（キャッシュにある過去の結果から。なければ 4） */
 export function secPerDay(seed: string): number {
   const base = join(CACHE, 'run');
   if (!existsSync(base)) return 4;
@@ -110,7 +111,7 @@ function spawnNode(args: string[], quiet = true): Promise<void> {
   });
 }
 
-/** 同じ結果の場所を二つの仕事が同時に作らないように（同じプロセスの中では約束を共有、別のプロセスとはロックのフォルダで） */
+/** 同じ実行結果のフォルダを二つのジョブが同時に作らないようにする（同じプロセスの中では Promise を共有し、別のプロセスとはロック用のフォルダで排他する） */
 const inflight = new Map<string, Promise<string>>();
 async function withLock<T>(dir: string, f: () => Promise<T>): Promise<T> {
   const lock = dir + '.lock';
@@ -121,12 +122,12 @@ async function withLock<T>(dir: string, f: () => Promise<T>): Promise<T> {
       writeFileSync(join(lock, 'pid'), String(process.pid));
       break;
     } catch {
-      // 持ち主のプロセスがもういなければ外す
+      // ロックを持つプロセスがもういなければ、ロックを外す
       let alive = false;
       try {
         process.kill(+readFileSync(join(lock, 'pid'), 'utf8'), 0);
         alive = true;
-      } catch { /* いない */ }
+      } catch { /* プロセスがない */ }
       if (!alive) rmSync(lock, { recursive: true, force: true });
       else await new Promise((r) => setTimeout(r, 500));
     }
@@ -141,8 +142,8 @@ async function withLock<T>(dir: string, f: () => Promise<T>): Promise<T> {
 export interface RunSpec { seed: string; days: number; adv: number; ver: Bin; fork?: { day: number; base: Bin } }
 
 /**
- * spec の結果がそろった保存庫の場所を返す（なければ回す。足りなければ続きから回す）。
- * fork：base の版で最初から fork.day 日目まで回した状態から、ver の版で続ける（記録は fork.day 日目までが base と同じ）。
+ * spec の実行結果がそろったキャッシュの場所を返す（なければ実行し、日数が足りなければ再開する）。
+ * fork：base のバージョンで0日目から fork.day 日目まで実行したスナップショットから、ver のバージョンで続ける（ログは fork.day 日目までが base と同じ）。
  */
 export function ensureRun(spec: RunSpec, log: Logger = () => {}): Promise<string> {
   const pure = !spec.fork || spec.fork.base.simHash === spec.ver.simHash;
@@ -167,7 +168,7 @@ export function ensureRun(spec: RunSpec, log: Logger = () => {}): Promise<string
         rmSync(dir, { recursive: true, force: true });
         await spawnNode([spec.ver.path, '--seed', spec.seed, '--days', String(spec.days), '--out', dir, '--adv-max', String(spec.adv), '--budget', '1e9']);
       } else {
-        // 分かれ目：base の記録を fork.day 日目まで写し、その日の状態を checkpoint にする
+        // 分岐点：base のログを fork.day 日目までコピーし、その日のスナップショットを checkpoint にする
         const F = spec.fork!.day;
         rmSync(dir, { recursive: true, force: true });
         mkdirSync(join(dir, 'snap'), { recursive: true });
@@ -181,7 +182,7 @@ export function ensureRun(spec: RunSpec, log: Logger = () => {}): Promise<string
         writeFileSync(join(dir, 'meta.json'), JSON.stringify({ ...bm, tick: F * DAY_TICKS, days: F }, null, 1));
         await spawnNode([spec.ver.path, '--resume', dir, '--days', String(spec.days), '--budget', '1e9']);
       }
-      log(`  ${spec.seed}：${from.toFixed(0)}→${spec.days}日（${((Date.now() - t0) / 1000).toFixed(0)}秒）${pure ? '' : `　${spec.fork!.day}日目の前の版の状態から`}`);
+      log(`  ${spec.seed}：${from.toFixed(0)}→${spec.days}日（${((Date.now() - t0) / 1000).toFixed(0)}秒）${pure ? '' : `　ベースの${spec.fork!.day}日目のスナップショットから`}`);
       return dir;
     });
   })();
@@ -189,7 +190,7 @@ export function ensureRun(spec: RunSpec, log: Logger = () => {}): Promise<string
   return p;
 }
 
-/** 保存庫の結果を、days 日目までに切り出して out に置く（batch や compare が読む形） */
+/** キャッシュの実行結果を、days 日目までに切り出して out に置く（batch や compare が読む形） */
 export function materialize(cached: string, out: string, days: number): void {
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
@@ -202,13 +203,13 @@ export function materialize(cached: string, out: string, days: number): void {
   writeFileSync(join(out, 'meta.json'), JSON.stringify({ ...m, tick: T, days, snaps: relative(out, join(cached, 'snap')) }, null, 1));
 }
 
-/** 回した結果のフォルダの、1日ごとの状態の場所（materialize したものは保存庫を指す） */
+/** 実行結果のフォルダの、日次スナップショットの場所（materialize したものはキャッシュを指す） */
 export function snapsOf(run: string): string {
   const m = readMeta(run) as any;
   return m?.snaps ? resolve(run, m.snaps) : join(run, 'snap');
 }
 
-/** 同時に n 個ずつ、重いものから（重さの見積もり：日数） */
+/** タスクを並列数 n で、重いもの（w が大きいもの）から実行する */
 export async function pool<T>(tasks: { w: number; f: () => Promise<T> }[], n: number): Promise<T[]> {
   const order = tasks.map((t, i) => i).sort((a, b) => tasks[b].w - tasks[a].w);
   const res: T[] = new Array(tasks.length);

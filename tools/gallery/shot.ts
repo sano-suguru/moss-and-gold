@@ -1,5 +1,5 @@
 /**
- * 見たいものが出てくるまで時間を進めて、ゲーム画面で撮る（場面探し・保存・カメラ合わせ・印・切り出しを一度に）。
+ * 見たいものが現れるまでシミュレーションを進めて、ゲーム画面でスクリーンショットを撮る（シーンの検索・セーブデータの書き出し・カメラ合わせ・印・切り出しを一度に）。
  *
  *   npm run shot -- --seed かしたれ --find warren
  *   npm run shot -- --seed かしたれ --find hide --zoom 3
@@ -7,10 +7,10 @@
  *   npm run shot -- --seed abc --find xy:120,40 --day 10
  *
  * --find：warren（横穴を掘り終え罠が2つ以上の住処）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、kind:番号（その種の生き物）、xy:マスx,マスy
- * --day 探し始める日（既定 0）、--until 探すのをやめる日（既定 25）、--zoom 拡大率（既定 4）、--lit 確認用の明かり（#lit）、
- * --fog 霧をそのまま（既定は見たマスを地図全体にする）、--name 書き出す名前（既定は find から）、--out 書き出す先（既定 build/shots）
+ * --day 探し始める日（既定 0）、--until 探すのをやめる日（既定 25）、--every 探す間隔（tick、既定 200）、--zoom 拡大率（既定 4）、--lit 確認用の明かり（#lit）、
+ * --fog 霧をそのまま（既定は地図全体を見えたマスにする）、--name 出力の名前（既定は find から）、--out 出力先（既定 build/shots）
  *
- * 書き出すもの：<name>.png（そのまま）、<name>-marked.png（見たいものの位置に枠と名前）、<name>-crop.png（真ん中を切り出してドットのまま3倍）
+ * 出力：<name>.png（そのまま）、<name>-marked.png（見たいものの位置に枠と名前）、<name>-crop.png（中央を切り出して、ドットのまま3倍に拡大）
  */
 import { execFileSync } from 'child_process';
 import { mkdirSync, writeFileSync } from 'fs';
@@ -95,7 +95,7 @@ function look(): Hit | null {
 
 const from = +(opt('day', '0') as string) * DAY_TICKS;
 const until = +(opt('until', '25') as string) * DAY_TICKS;
-// 何刻みごとに探すか（短いあいだしか起きないもの、たとえば隠れているゴブリンは小さくする）
+// 何 tick ごとに探すか（--every。短いあいだしか起きないもの、たとえば隠れているゴブリンを探すときは小さくする）
 const every = +(opt('every', '200') as string);
 while (w.tick < from) { w.step(); if (w.tick % 20 === 0) w.updateSeen(); }
 let hit = look();
@@ -111,5 +111,5 @@ const title = `${hit.title}（${seed}、${(w.tick / DAY_TICKS).toFixed(2)}日目
 const json = join(out, `${name}.json`);
 writeFileSync(json, JSON.stringify({ save: save(w, hit.cam), cam: hit.cam, marks: hit.marks, title, name, out, lit: argv.includes('--lit') }));
 console.log(title);
-// 撮る（Node の Playwright）
+// スクリーンショットを撮る（Node の Playwright）
 execFileSync('node', ['tools/gallery/shot.mjs', json], { stdio: 'inherit' });

@@ -1,13 +1,13 @@
 /**
- * 道具の組み立てと、版の見分け（esbuild の API を使う。Node からそのまま読める JS）。
+ * ツールのビルドと、バージョンの識別（esbuild の API を使う。Node からそのまま読める JS）。
  *
- * - 版（simHash）：シミュレーションを決めるソース（tools/analysis/lib/engine.ts からたどれるファイル）の中身のハッシュ。
- *   中身だけで決まるので、git の参照（コミット）でも作業中のファイルでも、同じ中身なら同じ版になる。
- *   途中の状態の保存庫（runs/.cache/snap）は版ごとに分け、版が違えば使わない。
- * - 道具の版（binHash）：組み立てた道具（記録の仕方も含む）のソースの中身のハッシュ。回した結果の保存庫（runs/.cache/run）はこれで分ける。
- * - 組み立てた道具は runs/.cache/bin/<道具>-<binHash>.js に置き、書き換えない（batch の最中にソースを直しても、回っているものに響かない）。
- * - git の参照（--base HEAD~1 など）は、その版の src/ だけを runs/.cache/src/<コミット>/ に取り出し、いまの道具（記録の仕方）と組み合わせて組み立てる。
- *   前の版といまの版を、同じ記録の仕方で比べるため。
+ * - シミュレーションのバージョン（simHash）：シミュレーションを決めるソース（tools/analysis/lib/engine.ts から import をたどれるファイル）の中身のハッシュ。
+ *   中身だけで決まるので、git の参照（コミット）でも作業ツリーのファイルでも、同じ中身なら同じバージョンになる。
+ *   スナップショットのキャッシュ（runs/.cache/snap）はバージョンごとに分け、バージョンが違えば使わない。
+ * - ツールのバージョン（binHash）：ビルドしたツール（ログの出力の仕方も含む）のソースの中身のハッシュ。実行結果のキャッシュ（runs/.cache/run）はこれで分ける。
+ * - ビルドしたツールは runs/.cache/bin/<ツール>-<binHash>.js に置き、書き換えない（batch の実行中にソースを直しても、実行中のものに影響しない）。
+ * - git の参照（--base HEAD~1 など）は、そのコミットの src/ だけを runs/.cache/src/<コミット>/ に取り出し、作業ツリーのツール（ログの出力の仕方）と組み合わせてビルドする。
+ *   ベースと作業ツリーを、同じログの出力の仕方で比べるため。
  */
 import { build } from 'esbuild';
 import { createHash } from 'crypto';
@@ -20,7 +20,7 @@ export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 export const CACHE = join(ROOT, 'runs', '.cache');
 const SRC = join(ROOT, 'src') + sep;
 
-/** git の参照を、その版の src/ を取り出したフォルダに（作業中のもの＝'cur' なら ROOT） */
+/** git の参照から、そのコミットの src/ を取り出したフォルダを返す（作業ツリー＝'cur' なら ROOT） */
 export function refRoot(ref) {
   if (!ref || ref === 'cur') return ROOT;
   const sha = execFileSync('git', ['rev-parse', `${ref}^{commit}`], { cwd: ROOT }).toString().trim();
@@ -33,7 +33,7 @@ export function refRoot(ref) {
   return dir;
 }
 
-/** src/ への import を、別の版の src/ へ差し替える */
+/** src/ への import を、別のコミットから取り出した src/ へ差し替える（esbuild のプラグイン） */
 function redirect(root) {
   if (root === ROOT) return [];
   const to = join(root, 'src') + sep;
@@ -52,7 +52,7 @@ function redirect(root) {
 }
 
 const h = (s) => createHash('sha256').update(s).digest('hex').slice(0, 12);
-/** 組み立てに入ったファイルの中身のハッシュ（場所は、版のフォルダを除いた名前で） */
+/** ビルドに含まれたファイルの中身のハッシュ（パスは、取り出したコミットのフォルダを除いた相対パスで数える） */
 function inputsHash(meta, root) {
   const strip = (p) => {
     const a = resolve(ROOT, p);
@@ -65,7 +65,7 @@ function inputsHash(meta, root) {
 }
 
 const memo = new Map();
-/** シミュレーションの版（engine.ts からたどれるソースの中身） */
+/** シミュレーションのバージョン（engine.ts から import をたどれるソースの中身のハッシュ） */
 export async function simHash(ref = 'cur') {
   const root = refRoot(ref);
   if (memo.has('sim:' + root)) return memo.get('sim:' + root);
@@ -76,8 +76,8 @@ export async function simHash(ref = 'cur') {
 }
 
 /**
- * 道具を組み立てる（tools/analysis/<name>.ts、ref の版の src/ と組み合わせて）。
- * 返すもの：{ path（組み立てたファイル）, simHash, binHash }。同じ中身なら組み立て直さない。
+ * ツール（tools/analysis/<name>.ts）を、ref（コミット。'cur' なら作業ツリー）の src/ と組み合わせてビルドする。
+ * 返すもの：{ path（ビルドしたファイル）, simHash, binHash }。同じ中身ならビルドし直さない。
  */
 export async function bin(name, ref = 'cur') {
   const root = refRoot(ref);

@@ -1,4 +1,4 @@
-// shot.ts が書き出した場面を、ゲーム画面（dist/index.html）で撮る：そのまま、印つき、真ん中を切り出して3倍
+// shot.ts が書き出したシーンを、ゲーム画面（dist/index.html）でスクリーンショットに撮る：そのまま、印つき、中央を切り出して3倍に拡大
 //   node tools/gallery/shot.mjs build/shots/<name>.json
 import { createRequire } from 'module';
 import { readFileSync } from 'fs';
@@ -14,12 +14,12 @@ const page = await ctx.newPage();
 const errs = [];
 page.on('pageerror', (e) => errs.push(String(e)));
 await page.goto('file://' + root + '/dist/index.html#clean' + (sc.lit ? ',lit' : ''));
-// 決まった時間ではなく、20回描き終わるまで待つ（ページの読み込みのあと0.3秒ほど）
+// 固定の時間ではなく、20フレーム描き終わるまで待つ（ページの読み込みのあと0.3秒ほど）
 await page.waitForFunction(() => (window.__frames ?? 0) >= 20, null, { timeout: 15000 });
 await page.evaluate(() => { window.__hold = true; });
 const base = join(sc.out, sc.name);
 await page.screenshot({ path: base + '.png' });
-// 真ん中（見たいもののまわり）を切り出して、ドットのまま3倍
+// 中央（見たいもののまわり）を切り出して、ドットのまま（補間なしで）3倍に拡大
 const crop = await page.screenshot({ clip: { x: 350, y: 220, width: 300, height: 200 } });
 const big = await page.evaluate(async (b64) => {
   const im = new Image();
@@ -33,7 +33,7 @@ const big = await page.evaluate(async (b64) => {
   return c.toDataURL('image/png').split(',')[1];
 }, crop.toString('base64'));
 (await import('fs')).writeFileSync(base + '-crop.png', Buffer.from(big, 'base64'));
-// 印：世界の座標を画面へ（画面の中央がカメラ、拡大率倍）
+// 印：ワールド座標を画面座標へ変換する（画面の中央がカメラの位置、拡大率を掛ける）
 await page.evaluate(({ marks, cam }) => {
   for (const mk of marks) {
     const sx = (mk.x - cam.x) * cam.zoom + innerWidth / 2;
@@ -46,5 +46,5 @@ await page.evaluate(({ marks, cam }) => {
   }
 }, { marks: sc.marks, cam: sc.cam });
 await page.screenshot({ path: base + '-marked.png' });
-console.log(`撮った：${base}.png、${base}-marked.png、${base}-crop.png${errs.length ? '（ページのエラー：' + errs.join(' / ') + '）' : ''}`);
+console.log(`スクリーンショットを撮った：${base}.png、${base}-marked.png、${base}-crop.png${errs.length ? '（ページのエラー：' + errs.join(' / ') + '）' : ''}`);
 await b.close();

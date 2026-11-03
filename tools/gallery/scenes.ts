@@ -1,14 +1,14 @@
 /**
- * 見た目の確認用の決まった場面を作る（シミュレーションを回して、場面ごとの保存とカメラを書き出す）。
+ * ビジュアル確認用の固定シーンを作る（シミュレーションを実行して、シーンごとのセーブデータとカメラ位置を書き出す）。
  *
- *   npm run gallery            （場面を作り、撮り、一覧画像 build/gallery/sheet.png を作る）
+ *   npm run gallery            （シーンを作り、スクリーンショットを撮り、一覧画像 build/gallery/sheet.png を作る）
  *   npm run gallery -- --label before   （撮った画像を build/gallery/before/ に残す）
- *   npm run gallery -- --compare before （いまの画像と before を左右に並べた比較画像を作る）
+ *   npm run gallery -- --compare before （現在の画像と before を左右に並べた比較画像を作る）
  *
- * 場面は SCENES に並べる。find は、その時刻の世界から見たい場所を探す関数。
+ * シーンは SCENES に並べる。find は、その時刻のワールドから見たい場所を探してカメラ位置を返す関数。
  *
- * 速くするための工夫：シミュレーションのコード（src の world, ecology, mapgen, rng, names）とこのファイルが前回と同じなら、
- * 場面は作り直さない（描画だけ直したときは、撮るだけになる。--fresh で必ず作り直す）。シードごとに別のプロセスで同時に作る。
+ * 高速化：シミュレーションのコード（src の world, ecology, mapgen, rng, names）とこのファイルが前回と同じなら、
+ * シーンは作り直さない（描画だけ直したときは、スクリーンショットを撮るだけになる。--fresh で必ず作り直す）。シードごとに別のプロセスで並列に作る。
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { createHash } from 'crypto';
@@ -45,12 +45,12 @@ const SCENES: Scene[] = [
 
 const b64 = (u: Uint8Array) => Buffer.from(u.buffer, u.byteOffset, u.byteLength).toString('base64');
 const bits = (a: Uint8Array) => { const b = new Uint8Array(Math.ceil(a.length / 8)); for (let i = 0; i < a.length; i++) if (a[i]) b[i >> 3] |= 1 << (i & 7); return b64(b); };
-// マナも保存に入れる（入れないと、読み込んだ場面のマナがすべて0になり、マナの見た目が出ない）
+// マナもセーブデータに入れる（入れないと、ロードしたシーンのマナがすべて0になり、マナの描画が出ない）
 const save = (w: World, cam: Cam) => ({ v: 3, seed: w.map.seed, tick: w.tick, cam, speed: 0, seen: bits(w.seen), water: b64(new Uint8Array(w.water.buffer)), nutr: b64(new Uint8Array(w.nutr.buffer)), moss: b64(w.moss), fungus: b64(w.fungus), burn: b64(w.burn), ash: b64(w.ash), mat: b64(w.mat), mana: b64(new Uint8Array(w.mana.buffer)), manaBorn: w.manaBorn, manaLeaked: w.manaLeaked, manaFaded: w.manaFaded, born: w.born, washed: w.washed, digs: w.digs.slice(), eco: w.eco.serialize() });
 
 mkdirSync('build/gallery/scenes', { recursive: true });
 type Out = { name: string; title: string; device: string; file: string };
-// 同じシードの場面は、時刻の早い順に一つの世界を進めながら作る
+// 同じシードのシーンは、時刻の早い順に、一つのワールドを進めながら作る
 const bySeed = new Map<string, Scene[]>();
 for (const s of SCENES) bySeed.set(s.seed, [...(bySeed.get(s.seed) ?? []), s]);
 const seeds = [...bySeed.keys()];
@@ -69,22 +69,22 @@ function makeSeed(seed: string): Out[] {
       for (let i = 0; i < 100; i++) { w.step(); if (w.tick % 20 === 0) w.updateSeen(); }
       cam = s.find(w);
     }
-    if (!cam) { console.log(`見つからない：${s.title}`); continue; }
+    if (!cam) { console.log(`シーンの場所が見つからない：${s.title}`); continue; }
     const file = `build/gallery/scenes/${s.name}.json`;
     writeFileSync(file, JSON.stringify(save(w, cam)));
     out.push({ name: s.name, title: s.title, device: s.device ?? 'desktop', file });
-    console.log(`場面：${s.title}（${(w.tick / DAY_TICKS).toFixed(2)}日）`);
+    console.log(`シーン：${s.title}（${(w.tick / DAY_TICKS).toFixed(2)}日）`);
   }
   return out;
 }
 
 const argv = process.argv.slice(2);
 if (argv[0] === '--one-seed') {
-  // 子：一つのシードの場面だけを作る
+  // 子プロセス：一つのシードのシーンだけを作る
   const i = +argv[1];
   writeFileSync(`build/gallery/scenes-part${i}.json`, JSON.stringify(makeSeed(seeds[i])));
 } else {
-  // 親：前回と同じなら作り直さない。違えばシードごとに同時に作る
+  // 親プロセス：前回と同じなら作り直さない。違えばシードごとに並列に作る
   const h = createHash('sha1');
   for (const f of ['src/world.ts', 'src/ecology.ts', 'src/mapgen.ts', 'src/rng.ts', 'src/names.ts', 'tools/gallery/scenes.ts']) h.update(readFileSync(f));
   const key = h.digest('hex');
@@ -92,13 +92,13 @@ if (argv[0] === '--one-seed') {
   const prev = existsSync(keyFile) ? readFileSync(keyFile, 'utf8') : '';
   const listed: Out[] = existsSync('build/gallery/scenes.json') ? JSON.parse(readFileSync('build/gallery/scenes.json', 'utf8')) : [];
   if (!argv.includes('--fresh') && prev === key && listed.length && listed.every((o) => existsSync(o.file))) {
-    console.log('場面は前回のまま（シミュレーションのコードと場面の定義が同じ）。作り直すなら --fresh');
+    console.log('シーンは前回のまま（シミュレーションのコードとシーンの定義が同じ）。作り直すなら --fresh');
   } else {
     const runs = seeds.map(
       (_, i) =>
         new Promise<void>((res, rej) => {
           const c = spawn(process.execPath, [process.argv[1], '--one-seed', String(i)], { stdio: 'inherit' });
-          c.on('exit', (code) => (code === 0 ? res() : rej(new Error(`場面づくりに失敗：${seeds[i]}`))));
+          c.on('exit', (code) => (code === 0 ? res() : rej(new Error(`シーンの作成に失敗：${seeds[i]}`))));
         }),
     );
     Promise.all(runs).then(() => {
