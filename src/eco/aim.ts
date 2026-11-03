@@ -466,6 +466,8 @@ export function endAim(this: Ecology, p: Party, lead: Cr, end: number): void {
   if (a === 1 && end === 2 && !(p.goneGold ??= []).includes(p.aimId ?? -1)) p.goneGold.push(p.aimId ?? -1);
   this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'aim', how: a, reason: end, n: p.aimId ?? 0, x: Math.round(lead.x), y: Math.round(lead.y) } as never);
   if (end === 1) {
+    // 倒した目標にちなむ戦利品を担ぐ（src/eco/loot.ts）
+    this.takeTrophy(p, lead);
     if (a !== 6) this.log(lead.x, lead.y, a === 5 ? `${p.name ?? ''}の一行が{k:${Kind.Goblin}}の集落を退治し、引き返した` : `${p.name ?? ''}の一行が目的（${AIM_NAMES[a]}）を果たした`);
     // ゴブリン退治を果たしたら、誇らしく外へ帰る
     if (a === 5 && p.goal === 0) {

@@ -147,6 +147,15 @@ export interface Party {
   braceX?: number;
   braceY?: number;
   braceK?: number;
+  /** 聞き耳：見えない所の物音に立ち止まって、音の方を向いている刻みの終わりと、音の場所。前に出て構える前衛。同じ方角（8方位）の音に次に止まれる刻み */
+  listenT?: number;
+  listenX?: number;
+  listenY?: number;
+  listenBy?: number;
+  heardDir?: number[];
+  /** 担いで持ち帰る戦利品（倒した目標にちなむもの。種の番号、担ぐ者） */
+  trophy?: number;
+  trophyBy?: number;
   /** そばを通って身構えた、目標でない住処・集落・縄張り（同じ所では一度だけ） */
   passed?: number[];
   /** 見かけた竜の場所（生きて帰れば噂になる） */
@@ -217,6 +226,10 @@ export const enum ItemKind {
   Lute = 8,
   Bow = 9,
   Greatsword = 10,
+  /** 倒れた冒険者の荷（背負い袋と寝具。姿だけ） */
+  Pack = 11,
+  /** 全滅した一行の戦利品（fuel に倒した相手の種の番号。姿だけ） */
+  Trophy = 12,
 }
 export interface Item {
   id: number;
@@ -839,7 +852,7 @@ export class Ecology {
   demoPairs: [Cr, Cr][] = [];
 
   /** 物音（戦い、崩落、掘る音）。地上の時間で数秒だけ残る */
-  noises: { x: number; y: number; r: number; t: number }[] = [];
+  noises: { x: number; y: number; r: number; t: number; s?: number }[] = [];
 
   /** 職業ごとの道具 */
   static JOB_ITEMS: number[][] = [[ItemKind.Sword, ItemKind.Shield], [ItemKind.Staff], [ItemKind.Dagger], [ItemKind.Mace, ItemKind.Symbol], [ItemKind.Lute], [ItemKind.Bow], [ItemKind.Greatsword]];

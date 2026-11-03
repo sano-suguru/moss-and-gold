@@ -22,7 +22,7 @@ export function isSentry(this: Ecology, c: Cr, key: string): boolean {
 export function doSleep(this: Ecology, c: Cr, day: number, phase: number): boolean {
   const sp = Ecology.SLEEP[c.k];
   // 盗みに出たゴブリンは眠らない
-  if (!sp || (c.k === Kind.Goblin && (c.st === 15 || c.st === 16)) || (c.k === Kind.Rat && c.st === 11)) {
+  if (!sp || (c.k === Kind.Goblin && (c.st === 15 || c.st === 16 || c.st === 17)) || (c.k === Kind.Rat && c.st === 11)) {
     c.sleep = 0;
     if (c.drowsy > 0) c.drowsy--;
     return false;
@@ -175,7 +175,7 @@ export function personalSpace(this: Ecology): void {
 /** 物音や、すぐそばの気配で目覚める（深い眠りは近い音だけ） */
 export function wakeByNoise(this: Ecology): void {
   for (const n of this.noises) {
-    if (this.step - n.t > 2) continue;
+    if (this.step - n.t > 2 || n.s) continue;
     this.nearby(n.x, n.y, n.r, (c) => {
       if (c.sleep <= 0) return;
       const r = c.sleep === 2 ? n.r * 0.4 : c.sleep === 3 ? n.r * 1.2 : n.r * 0.8;

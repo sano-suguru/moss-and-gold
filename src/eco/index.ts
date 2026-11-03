@@ -34,6 +34,8 @@ import './dragon';
 import './adventurer';
 import './aim';
 import './raid';
+import './listen';
+import './loot';
 import './cache';
 import './dwarf';
 import './arrivals';

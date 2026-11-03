@@ -109,6 +109,8 @@ export function updateParties(this: Ecology): void {
     if (!alive.length && p.members.length) {
       const last = this.byId.get(p.members[p.members.length - 1]);
       if (!(p.saw & 16)) this.log(last?.x ?? 0, last?.y ?? 0, `${p.name ? p.name + 'の' : ''}冒険者の一行が全滅した`);
+      // 担いでいた戦利品は、倒れた所に残る
+      this.dropTrophy(p, last);
       // 一行の終わり：目標、着いたか、果たしたか、生きて帰ったか
       this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'end', how: p.aim ?? 0, reason: p.saw & 16 ? 'returned' : 'wiped', to: p.aimEnd ?? 0, n: p.aimId ?? 0, arrived: p.aimAt ? 1 : 0, x: Math.round(last?.x ?? 0), y: Math.round(last?.y ?? 0) } as never);
     }
@@ -116,6 +118,8 @@ export function updateParties(this: Ecology): void {
     if (!alive.length) continue;
     this.aimStep(p, alive);
     this.cacheStep(p, alive);
+    this.listenStep(p, alive);
+    this.carryTrophy(p, alive);
     if (p.goal !== 0 && (p.camp ?? -1) >= 0) this.endCamp(p);
     if (p.goal === 0) {
       const lights = this.partyLights(p);
@@ -487,6 +491,8 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     this.goTo(c, f.x, f.y, s.speed);
     return;
   }
+  // 見えない所の物音に耳を澄ましている（src/eco/listen.ts）：音の方を向いて止まり、前衛が前に出て構える
+  if (this.listening(c, p)) return;
   // 害のない相手への、職業ごとの関わり方（気づいたら「？」）
   if (this.advInteract(c, p, lights)) return;
   // 金貨を拾う：見えている山（行きだけ）
@@ -707,6 +713,7 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
   c.units = 0;
   this.goldOut += c.gold;
   this.tellCaches(p);
+  this.bringTrophy(c, p);
   // 生きて帰った者が噂を持ち帰る
   const r = this.rumors;
   // 吟遊詩人が生きて帰れば噂は何倍にも広まり、吟遊詩人を失った一行の噂は細る
@@ -786,6 +793,8 @@ export function dropBelongings(this: Ecology, c: Cr): void {
   if (c.torch > 0) this.dropItem(x + 4, y + 2, ItemKind.Torch, c.torch);
   c.torch = 0;
   this.dropJobItems(c);
+  // 背負っていた荷（背負い袋と寝具）も、倒れた所に残る
+  this.dropItem(x - 6, y - 3, ItemKind.Pack, 0);
   c.party = 0;
 }
 

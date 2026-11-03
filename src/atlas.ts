@@ -1,4 +1,4 @@
-import { adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache } from './sprites';
+import { adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -71,6 +71,9 @@ export interface Atlas {
   crown: () => number;
   chiefHelm: () => number;
   sack: () => number;
+  /** 冒険者が担ぐ金貨の袋（0 小〜2 大）と戦利品（絵の種類：fang / club / horn / eye / staff / skull / helm / axe / spear / hide） */
+  goldSack: (size: number) => number;
+  trophy: (type: string) => number;
   /** 攻撃の演出の部品（'arc:大きさ:色:段'、'arrow:向き' など） */
   fx: (key: string) => number;
   /** 気づいた印（'!' か '?'） */
@@ -452,6 +455,18 @@ export function buildAtlas(): Atlas {
   raws.push(chiefHelm() as RawFrame);
   const sackFrame = raws.length;
   raws.push(tributeSack() as RawFrame);
+  const goldSackFrames: number[] = [];
+  for (let z = 0; z < 3; z++) {
+    goldSackFrames.push(raws.length);
+    raws.push(goldSack(z) as RawFrame);
+  }
+  const trophyFrames = new Map<string, number>();
+  for (const ty of ['fang', 'club', 'horn', 'eye', 'staff', 'skull', 'helm', 'axe', 'spear', 'hide']) {
+    trophyFrames.set(ty, raws.length);
+    raws.push(trophyArt(ty) as RawFrame);
+  }
+  const packFrame = raws.length;
+  raws.push(packArt() as RawFrame);
   // ドラゴンの炎の柱（横向きと正面）
   const breathFrames: number[] = [];
   for (let f = 0; f < 4; f++) {
@@ -704,7 +719,7 @@ export function buildAtlas(): Atlas {
     treasure: (size, f) => treasureFrames[size * 4 + (f & 3)],
     wormSeg: (kind) => segFrames[kind],
     breath: (down, f) => breathFrames[(down ? 4 : 0) + (f & 3)],
-    item: (kind, f) => itemFrames[kind * 4 + (f & 3)],
+    item: (kind, f) => (kind === 11 ? packFrame : itemFrames[kind * 4 + (f & 3)] ?? itemFrames[0]),
     dust: (f) => dustFrames[f & 3],
     forge: (f) => forgeFrames[f & 3],
     campfire: (f) => fireFrames[f & 3],
@@ -717,6 +732,8 @@ export function buildAtlas(): Atlas {
     crown: () => crownFrame,
     chiefHelm: () => helmFrame,
     sack: () => sackFrame,
+    goldSack: (z) => goldSackFrames[Math.max(0, Math.min(2, z))],
+    trophy: (ty) => trophyFrames.get(ty) ?? trophyFrames.get('fang')!,
     mark: (k) => markFrames[k] ?? markFrames['!'],
     slash: (f) => slashFrames[Math.min(2, Math.max(0, f))],
     halo: (z) => haloFrames[Math.min(2, Math.max(0, z))],

@@ -221,6 +221,8 @@ export function lurk(this: Ecology, c: Cr): boolean {
   if (c.k !== Kind.Goblin && c.k !== Kind.Orc && c.k !== Kind.Kobold) return false;
   // 夜の盗みに出たゴブリン（src/eco/raid.ts）
   if (c.k === Kind.Goblin && (c.st === 15 || c.st === 16)) return this.goblinRaid(c);
+  // 通路を行く一行の最後尾をつけて、荷を掠め取る（src/eco/raid.ts）
+  if (c.k === Kind.Goblin && c.st === 17) return this.goblinSnatch(c);
   // 住処を持つコボルトの群れは、冒険者の灯りに自分から寄っていかない
   if (c.k === Kind.Kobold && (this.warrenOf(c) || c.st === 10)) {
     c.lure = 0;
@@ -434,16 +436,33 @@ export function feeding(this: Ecology, c: Cr): boolean {
   return true;
 }
 
-export function noise(this: Ecology, x: number, y: number, r: number): void {
+/**
+ * 物音を立てる。s は音の種類：0 大きな音（戦い、崩落、掘る音。獣を呼び、眠りを覚ます）、1 足音、2 うなり声。
+ * 足音とうなり声は、冒険者の聞き耳（listenStep）だけが聞く（獣を呼んだり眠りを覚ましたりはしない）
+ */
+export function noise(this: Ecology, x: number, y: number, r: number, s = 0): void {
   const last = this.noises[this.noises.length - 1];
   // 同じ所の続く音はまとめる
-  if (last && this.step - last.t < 10 && sq(last.x - x) + sq(last.y - y) < 32 * 32) {
+  if (last && (last.s ?? 0) === s && this.step - last.t < 10 && sq(last.x - x) + sq(last.y - y) < 32 * 32) {
     last.t = this.step;
     last.r = Math.max(last.r, r);
     return;
   }
-  this.noises.push({ x: Math.round(x), y: Math.round(y), r, t: this.step });
-  if (this.noises.length > 40) this.noises.shift();
+  this.noises.push(s ? { x: Math.round(x), y: Math.round(y), r, t: this.step, s } : { x: Math.round(x), y: Math.round(y), r, t: this.step });
+  if (this.noises.length > 64) this.noises.shift();
+}
+
+/** 足音を立てる重い者と、うなる者（8歩ごとに、生き物を順に） */
+const HEAVY = new Set<number>([Kind.Troll, Kind.Minotaur, Kind.Orc, Kind.Basilisk, Kind.Golem, Kind.Worm, Kind.Skeleton, Kind.Zombie, Kind.Lizardman]);
+const GROWL = new Set<number>([Kind.Troll, Kind.Minotaur, Kind.Orc, Kind.Basilisk, Kind.Wyvern, Kind.Dragon, Kind.Lizard, Kind.Zombie, Kind.Vampire]);
+export function creatureSounds(this: Ecology): void {
+  if (!this.parties.length) return;
+  for (const c of this.list) {
+    if (c.dead || c.away || c.sleep > 0 || c.k === Kind.Adventurer) continue;
+    const heavy = HEAVY.has(c.k) || (c.k === Kind.Dragon && c.sp >= 1);
+    if (heavy && c.act === 1 && ih(c.id, this.step >> 3, 300) % 3 === 0) this.noise(c.x, c.y, c.k === Kind.Skeleton || c.k === Kind.Zombie || c.k === Kind.Lizardman ? 7 : 9, 1);
+    else if (GROWL.has(c.k) && (c.hungry > 0 || this.w.tick - c.hitAt < 150) && ih(c.id, this.step >> 3, 301) % 8 === 0) this.noise(c.x, c.y, c.k === Kind.Dragon || c.k === Kind.Troll || c.k === Kind.Minotaur ? 12 : 9, 2);
+  }
 }
 
 /**
@@ -458,7 +477,7 @@ export function hear(this: Ecology, c: Cr): boolean {
   let best: { x: number; y: number; r: number; t: number } | null = null;
   let bd = 1e18;
   for (const n of this.noises) {
-    if (this.step - n.t > 40) continue;
+    if (this.step - n.t > 40 || n.s) continue;
     const d = sq(n.x - c.x) + sq(n.y - c.y);
     if (d > sq(n.r * TILE) || d >= bd) continue;
     bd = d;
@@ -497,8 +516,9 @@ declare module '../ecology' {
     pester: typeof pester;
     feeding: typeof feeding;
     noise: typeof noise;
+    creatureSounds: typeof creatureSounds;
     hear: typeof hear;
   }
 }
 
-Object.assign(Ecology.prototype, { updatePresenceBase, updatePresenceTrace, presenceAt, shyOfPeople, buildLitMap, isLit, canSense, fires, fireNearTile, fireNear, fearFire, lurk, pester, feeding, noise, hear });
+Object.assign(Ecology.prototype, { updatePresenceBase, updatePresenceTrace, presenceAt, shyOfPeople, buildLitMap, isLit, canSense, fires, fireNearTile, fireNear, fearFire, lurk, pester, feeding, noise, creatureSounds, hear });

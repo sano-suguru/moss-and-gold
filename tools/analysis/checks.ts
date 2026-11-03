@@ -81,6 +81,35 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // ゴブリンの流れを短くする：通り道の脇の暗がりで待ち伏せ、通路を行く一行の最後尾から荷を掠め取る
+    name: 'ゴブリンが通路を行く一行の最後尾から荷を掠め取る（4シードで1回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const st = rs.map((r) => r.settle.filter((x) => x.k === 12 && x.ev === 'stalk').length);
+      const rob = rs.map((r) => r.settle.filter((x) => x.k === 12 && x.ev === 'rob' && x.how === 'snatch').length);
+      return { ok: sum(rob) >= 1, value: rs.map((r, i) => `${r.seed} ${rob[i]}（つけた ${st[i]}）`).join('、') };
+    },
+  },
+  {
+    // 見えないけれど聞こえる：暗がりの物音に、一行が立ち止まって耳を澄ます
+    name: '冒険者の一行が暗がりの物音に立ち止まる（4シードそれぞれで1回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'hear').length);
+      return { ok: n.every((v) => v >= 1), value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // 戦利品を担いで帰る：目標を果たした一行が、倒した相手にちなむ戦利品を手に入れる
+    name: '目標を果たした一行が戦利品を手に入れる（4シードで1回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const take = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'trophy' && x.how === 'take').length);
+      const home = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'trophy' && x.how === 'home').length);
+      return { ok: sum(take) >= 1, value: rs.map((r, i) => `${r.seed} ${take[i]}（持ち帰った ${home[i]}）`).join('、') };
+    },
+  },
+  {
     // 大ネズミの巣穴の引っ越しは、群れが一列になって歩いていく
     name: '大ネズミが一列になって巣穴を引っ越す（4シードで1回以上）',
     ...RUN_A,

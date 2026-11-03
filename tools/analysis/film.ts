@@ -8,7 +8,7 @@
  * --at 始める日（小数可）か --tick 刻み、--frames こまの数（既定 6）、--every こまの間（刻み、既定 40）、
  * --follow party:<一行の id>（先頭にカメラを合わせ続ける）か id:<生き物の id>、--xy 画素x,画素y（カメラを止める）、--zoom 拡大率（既定 3）、
  * --ticks 刻み,刻み,...（こまの刻みを並べて指定。--tick/--at はその最初の刻み以下にする）、
- * --run <回したフォルダ>（その回の1日ごとの状態から始める）、--name 書き出す名前、--title 見出し、--out 書き出す先（既定 docs/img）、--lit 確認用の明かり、--cols 一行のこま数（既定 3）
+ * --dy カメラを縦にずらす画素（負で上。寄って撮るとき体の真ん中へ）、--run <回したフォルダ>（その回の1日ごとの状態から始める）、--name 書き出す名前、--title 見出し、--out 書き出す先（既定 docs/img）、--lit 確認用の明かり、--cols 一行のこま数（既定 3）
  */
 import { mkdirSync, writeFileSync } from 'fs';
 import { execFileSync } from 'child_process';
@@ -29,6 +29,8 @@ const out = opt('out', 'docs/img') as string;
 const follow = opt('follow', '') as string;
 const xy = opt('xy', '');
 const title = opt('title', name) as string;
+/** カメラを縦にずらす（画素。寄って撮るとき、足もとに合ったカメラを体の真ん中へ。負で上） */
+const dy = +(opt('dy', '0') as string);
 mkdirSync('build/film', { recursive: true });
 mkdirSync(out, { recursive: true });
 
@@ -78,7 +80,7 @@ for (let i = 0; i < n; i++) {
     const mk = marks[0];
     if (p && mk && (mk.x - p.x) ** 2 + (mk.y - p.y) ** 2 < (12 * 16) ** 2) p = { x: (p.x + mk.x) / 2, y: (p.y + mk.y) / 2 };
   }
-  if (p) cam = { x: Math.round(p.x), y: Math.round(p.y), zoom };
+  if (p) cam = { x: Math.round(p.x), y: Math.round(p.y) + dy, zoom };
   w.seen.set(all);
   // その場で写し取る（保存の形には生きたオブジェクト（一行の PT2 など）がそのまま入っているので、あとで書き出すと後の刻みの値になる）
   const save = JSON.parse(JSON.stringify(encodeState(w))) as any;

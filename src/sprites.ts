@@ -2643,6 +2643,84 @@ function tributeSack(){
  return {...fr,ax:4,ay:8};
 }
 
+/** 描いた形のまわりに濃い縁取りをつける（小さな持ち物を背景から浮かせる） */
+/** 縁取りのために、まわりに1画素の余白をつけて縁取る */
+function pad1(fr){const W=fr.W+2,H=fr.H+2,o=blank(W,H);for(let y=0;y<fr.H;y++)for(let x=0;x<fr.W;x++){const p=y*fr.W+x,q=(y+1)*W+x+1;for(let i=0;i<4;i++)o.px[q*4+i]=fr.px[p*4+i];o.mat[q]=fr.mat[p]}return outline(o)}
+/** 画素を2倍に（戦利品は大きく描いて、遠くからでも見分けられるように） */
+function x2(fr){const W=fr.W*2,H=fr.H*2,o=blank(W,H);for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=(y>>1)*fr.W+(x>>1),q=y*W+x;for(let i=0;i<4;i++)o.px[q*4+i]=fr.px[p*4+i];o.mat[q]=fr.mat[p]}return o}
+function outline(fr){
+ const {W,H,px}=fr,add=[];
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=y*W+x;if(px[p*4+3])continue;
+  for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=W||yy>=H)continue;if(px[(yy*W+xx)*4+3]&&fr.mat[yy*W+xx]!=='ol'){add.push(p);break}}}
+ for(const p of add){px[p*4]=22;px[p*4+1]=14;px[p*4+2]=12;px[p*4+3]=255;fr.mat[p]='ol'}
+ return fr;
+}
+
+/** 金貨の袋：冒険者が背に担ぐ、口から金貨ののぞく革袋（size 0 小、1 中、2 大） */
+function goldSack(size){
+ const R=[3,4,5][size],W=R*2+3,H=R*2+3,fr=blank(W,H),L=RAMP.leather,G=RAMP.gold,cx=R+1,cy=R+2;
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const dx=(x-cx)/R,dy=(y-cy)/(R*0.92);const d=dx*dx+dy*dy;if(d>1||y<2)continue;setPx(fr,x,y,d>0.72?L[1]:dx<-0.2||dy<-0.3?L[4]:L[3],false)}
+ // 縛った口と、のぞく金貨
+ for(let x=cx-1;x<=cx+1;x++)setPx(fr,x,2,L[0],false);
+ setPx(fr,cx-1,1,G[3],false);setPx(fr,cx,1,G[4],false);setPx(fr,cx+1,1,G[2],false);setPx(fr,cx,0,G[3],false);
+ if(size>=1){setPx(fr,cx-2,1,G[2],false);setPx(fr,cx+2,1,G[3],false)}
+ if(size>=2){setPx(fr,cx-1,0,G[4],false);setPx(fr,cx+1,0,G[2],false)}
+ const gp=1*W+cx;fr.mat[gp]='glint';
+ return {...pad1(fr),ax:cx+1,ay:H};
+}
+
+/** 戦利品の絵（担ぐ姿と、床に残ったもの）：fang 牙、club 棍棒、horn 角、eye 眼、staff 杖、skull 骨の冠、helm 角兜、axe 斧、spear 槍、hide 皮 */
+function trophyArt(type){
+ if(type==='helm')return {...pad1(x2(chiefHelm())),ax:14,ay:14};
+ const W=15,H=11,fr=blank(W,H),B=RAMP.bone,Wd=RAMP.wood,I=RAMP.iron,Hn=RAMP.horn;
+ const put=(x,y,c,e)=>setPx(fr,x,y,c,e);
+ if(type==='fang'){
+  // 大きく反った牙（根元は太く黄ばみ、先は細く白い）
+  const pts=[[1,7],[2,7],[3,7],[4,6],[5,6],[6,5],[7,5],[8,4],[9,3],[10,2],[11,2],[12,1],[13,0]];
+  pts.forEach(([x,y],i)=>{const w=i<4?3:i<8?2:1;for(let k=0;k<=w;k++)put(x,y+k,k===0?(i<8?B[4]:B[3]):k===w?B[1]:i<5?B[2]:B[3])});
+  put(0,8,RAMP.leather[2]);put(0,9,RAMP.leather[1]);put(1,10,RAMP.leather[1]);
+ }else if(type==='club'){
+  for(let i=0;i<10;i++){const x=2+i,y=8-Math.floor(i*0.6);const r=i<4?0:i<7?1:2;for(let k=-r;k<=r;k++)put(x,y+k,k===-r?Wd[3]:k===r?Wd[1]:Wd[2])}
+  for(const [x,y] of [[9,3],[11,6],[12,4]])put(x,y,Wd[0]);
+  for(const [x,y] of [[10,2],[12,3],[11,7]])put(x,y,B[3]);
+ }else if(type==='horn'){
+  const pts=[[2,9],[3,8],[4,8],[5,7],[6,7],[7,6],[8,6],[9,5],[10,4],[11,3],[11,2],[12,1]];
+  pts.forEach(([x,y],i)=>{put(x,y,i<4?Hn[1]:i<8?Hn[2]:Hn[4]);if(i<7){put(x,y+1,Hn[0]);put(x,y-1,Hn[3])}});
+ }else if(type==='eye'){
+  const C=[[255,240,120],[230,200,60],[150,110,20],[60,40,10]];
+  for(let y=1;y<10;y++)for(let x=3;x<12;x++){const d=((x-7)**2+(y-5)**2);if(d>17)continue;put(x,y,d>12?C[3]:d>6?C[2]:d>2?C[1]:C[0],d<=6)}
+  put(7,4,[20,10,10]);put(7,5,[20,10,10]);put(7,6,[20,10,10]);
+ }else if(type==='staff'){
+  for(let i=0;i<11;i++)put(1+i,10-Math.floor(i*0.8),Wd[i%3===0?1:2]);
+  for(const [x,y,c] of [[12,2,[220,160,255]],[13,2,[180,110,240]],[12,1,[250,220,255]],[13,1,[200,140,255]],[12,3,[120,70,190]],[13,3,[150,90,210]]])put(x,y,c,true);
+ }else if(type==='skull'){
+  for(let y=3;y<9;y++)for(let x=4;x<11;x++){const d=((x-7)/3.4)**2+((y-5.5)/3)**2;if(d>1)continue;put(x,y,d>0.7?B[1]:B[3])}
+  put(6,5,B[0]);put(5,5,B[0]);put(8,5,B[0]);put(9,5,B[0]);put(7,7,B[0]);put(6,8,B[2]);put(8,8,B[2]);
+  for(const x of [4,7,10]){put(x,2,RAMP.gold[3]);put(x,1,RAMP.gold[4])}for(let x=4;x<11;x++)put(x,3,RAMP.gold[2]);
+ }else if(type==='axe'){
+  for(let i=0;i<11;i++)put(1+i,10-Math.floor(i*0.8),Wd[2]);
+  for(let y=0;y<6;y++)for(let x=9;x<14;x++){if(Math.abs(x-11)+Math.abs(y-2.5)>3.2)continue;put(x,y,x>=12?I[4]:I[2])}
+ }else if(type==='spear'){
+  for(let i=0;i<12;i++)put(1+i,10-Math.floor(i*0.75),Wd[2]);
+  put(13,1,I[4]);put(14,0,I[4]);put(12,2,I[3]);put(13,2,I[2]);put(12,1,I[3]);
+ }else{
+  // 皮：巻いた鱗の皮
+  const L=RAMP.liz;for(let y=3;y<9;y++)for(let x=2;x<13;x++){const e=(y===3||y===8);put(x,y,e?L[1]:(x+y)%3===0?L[4]:L[2])}
+  for(let y=4;y<8;y++){put(2,y,L[0]);put(12,y,L[3])}
+ }
+ return {...pad1(x2(fr)),ax:15,ay:20};
+}
+
+/** 倒れた冒険者の荷：背負い袋と巻いた寝具 */
+function packArt(){
+ const W=14,H=11,fr=blank(W,H),L=RAMP.leather,C=RAMP.cloth;
+ for(let y=3;y<10;y++)for(let x=2;x<9;x++)setPx(fr,x,y,x===2||y===9?L[1]:x===8?L[2]:L[3],false);
+ for(let x=3;x<8;x++)setPx(fr,x,2,L[2],false);setPx(fr,5,5,L[0],false);setPx(fr,5,6,RAMP.iron[3],false);
+ for(let y=6;y<10;y++)for(let x=8;x<13;x++){const d=((x-10.5)/2.4)**2+((y-8)/2)**2;if(d<=1)setPx(fr,x,y,d>0.6?C[1]:C[3],false)}
+ setPx(fr,10,8,C[0],false);
+ return {...fr,ax:7,ay:9};
+}
+
 function chiefHelm(){
  const fr=blank(13,7),I=RAMP.iron,B=RAMP.bone;
  for(let x=3;x<10;x++){setPx(fr,x,5,I[1],false);setPx(fr,x,4,I[2],false);setPx(fr,x,3,x<6?I[3]:I[2],false)}
@@ -2694,4 +2772,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
