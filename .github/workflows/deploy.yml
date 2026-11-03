@@ -91,7 +91,7 @@ jobs:
           '
       - name: PR にプレビューの URL を書く（一つのコメントを書き換える）
         if: steps.up.outcome == 'success'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           URL: ${{ steps.up.outputs.url }}
           ALIAS: ${{ steps.up.outputs.alias }}
