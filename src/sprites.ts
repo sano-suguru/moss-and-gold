@@ -2643,6 +2643,19 @@ function tributeSack(){
  return {...fr,ax:4,ay:8};
 }
 
+/** 描いた形のまわりに濃い縁取りをつける（小さな持ち物を背景から浮かせる） */
+/** 縁取りのために、まわりに1画素の余白をつけて縁取る */
+function pad1(fr){const W=fr.W+2,H=fr.H+2,o=blank(W,H);for(let y=0;y<fr.H;y++)for(let x=0;x<fr.W;x++){const p=y*fr.W+x,q=(y+1)*W+x+1;for(let i=0;i<4;i++)o.px[q*4+i]=fr.px[p*4+i];o.mat[q]=fr.mat[p]}return outline(o)}
+/** 画素を2倍に（戦利品は大きく描いて、遠くからでも見分けられるように） */
+function x2(fr){const W=fr.W*2,H=fr.H*2,o=blank(W,H);for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=(y>>1)*fr.W+(x>>1),q=y*W+x;for(let i=0;i<4;i++)o.px[q*4+i]=fr.px[p*4+i];o.mat[q]=fr.mat[p]}return o}
+function outline(fr){
+ const {W,H,px}=fr,add=[];
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=y*W+x;if(px[p*4+3])continue;
+  for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=W||yy>=H)continue;if(px[(yy*W+xx)*4+3]&&fr.mat[yy*W+xx]!=='ol'){add.push(p);break}}}
+ for(const p of add){px[p*4]=22;px[p*4+1]=14;px[p*4+2]=12;px[p*4+3]=255;fr.mat[p]='ol'}
+ return fr;
+}
+
 /** 金貨の袋：冒険者が背に担ぐ、口から金貨ののぞく革袋（size 0 小、1 中、2 大） */
 function goldSack(size){
  const R=[3,4,5][size],W=R*2+3,H=R*2+3,fr=blank(W,H),L=RAMP.leather,G=RAMP.gold,cx=R+1,cy=R+2;
@@ -2653,19 +2666,19 @@ function goldSack(size){
  if(size>=1){setPx(fr,cx-2,1,G[2],false);setPx(fr,cx+2,1,G[3],false)}
  if(size>=2){setPx(fr,cx-1,0,G[4],false);setPx(fr,cx+1,0,G[2],false)}
  const gp=1*W+cx;fr.mat[gp]='glint';
- return {...fr,ax:cx,ay:H-1};
+ return {...pad1(fr),ax:cx+1,ay:H};
 }
 
 /** 戦利品の絵（担ぐ姿と、床に残ったもの）：fang 牙、club 棍棒、horn 角、eye 眼、staff 杖、skull 骨の冠、helm 角兜、axe 斧、spear 槍、hide 皮 */
 function trophyArt(type){
- if(type==='helm')return chiefHelm();
+ if(type==='helm')return {...pad1(x2(chiefHelm())),ax:14,ay:14};
  const W=15,H=11,fr=blank(W,H),B=RAMP.bone,Wd=RAMP.wood,I=RAMP.iron,Hn=RAMP.horn;
  const put=(x,y,c,e)=>setPx(fr,x,y,c,e);
  if(type==='fang'){
-  // 大きく反った牙（根元は黄ばみ、先は白い）
-  const pts=[[2,8],[3,8],[4,7],[5,7],[6,6],[7,6],[8,5],[9,4],[10,3],[11,2],[12,1],[13,1]];
-  pts.forEach(([x,y],i)=>{const c=i<3?B[2]:i<8?B[3]:B[4];put(x,y,c);put(x,y+1,i<3?B[1]:B[2]);if(i<6)put(x,y+2,B[1])});
-  put(1,9,B[0]);put(2,10,B[0]);put(3,10,B[0]);
+  // 大きく反った牙（根元は太く黄ばみ、先は細く白い）
+  const pts=[[1,7],[2,7],[3,7],[4,6],[5,6],[6,5],[7,5],[8,4],[9,3],[10,2],[11,2],[12,1],[13,0]];
+  pts.forEach(([x,y],i)=>{const w=i<4?3:i<8?2:1;for(let k=0;k<=w;k++)put(x,y+k,k===0?(i<8?B[4]:B[3]):k===w?B[1]:i<5?B[2]:B[3])});
+  put(0,8,RAMP.leather[2]);put(0,9,RAMP.leather[1]);put(1,10,RAMP.leather[1]);
  }else if(type==='club'){
   for(let i=0;i<10;i++){const x=2+i,y=8-Math.floor(i*0.6);const r=i<4?0:i<7?1:2;for(let k=-r;k<=r;k++)put(x,y+k,k===-r?Wd[3]:k===r?Wd[1]:Wd[2])}
   for(const [x,y] of [[9,3],[11,6],[12,4]])put(x,y,Wd[0]);
@@ -2695,7 +2708,7 @@ function trophyArt(type){
   const L=RAMP.liz;for(let y=3;y<9;y++)for(let x=2;x<13;x++){const e=(y===3||y===8);put(x,y,e?L[1]:(x+y)%3===0?L[4]:L[2])}
   for(let y=4;y<8;y++){put(2,y,L[0]);put(12,y,L[3])}
  }
- return {...fr,ax:7,ay:9};
+ return {...pad1(x2(fr)),ax:15,ay:20};
 }
 
 /** 倒れた冒険者の荷：背負い袋と巻いた寝具 */

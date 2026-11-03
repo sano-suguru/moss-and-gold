@@ -799,7 +799,8 @@ export class CreatureView {
           pushSprite(x + (flip ? 5 : -5), yy + 0.05, lift + 9 + z, flip, A.goldSack(z), 0, 2);
         }
         const tp = trophyOf.get(c.id);
-        if (tp) pushSprite(x + (flip ? -4 : 4), yy + 0.06, lift + 15, flip, A.trophy(TROPHY[tp]?.[1] ?? 'fang'), 0, 2);
+        // 戦利品は背に担ぐ（体の輪郭の外へ突き出して、兜や武器と重ならないように）
+        if (tp) pushSprite(x + (flip ? 12 : -12), yy + 0.06, lift + 12, !flip, A.trophy(TROPHY[tp]?.[1] ?? 'fang'), 0, 2);
       }
       // 傷を受けた瞬間は白く光る
       const flash = !isCorpse && eco.w.tick - c.hitAt < 2 ? 20 : 0;
