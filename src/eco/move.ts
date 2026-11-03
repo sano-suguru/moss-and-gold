@@ -191,11 +191,14 @@ export function spawn(this: Ecology, k: Kind, x: number, y: number, body: number
   this.record('births', { t: this.w ? this.w.tick : 0, k, origin: this.originNext || 'born', x: Math.round(x), y: Math.round(y) } as never);
   // マナから生まれた者は、描画で出現の演出をする（描画専用の印）
   const fromMana = this.originNext === 'mana';
+  // 中で生まれた者（来た場所の指定がない、または 'born'）は、いまを生まれた時刻にする。
+  // 外から来た者とマナから生まれた者は −1e9 のまま（外から来た大ネズミとゴブリンは、arrivals.ts で来たときの年を入れる）
+  const bornHere = !this.originNext || this.originNext === 'born';
   this.originNext = '';
   const c: Cr = {
     id: this.nextId++, k, x, y, px: x, py: y, vx: 0, vy: 0, dir: 0, act: 0, actT: 0,
     body, food, glow: 0, hungry: 0, sinceMeal: 0, st: 0, hx: x, hy: y, tx: x, ty: y,
-    dead: 0, units: 0, away: false, caught: false, ref: 0, sp: k, init: 0, ref2: 0, gold: 0, party: 0, torch: 0, hp: 0, hitAt: -99, foe: 0, flee: 0, gait: 0, bornAt: -1e9, sleep: 0, drowsy: 0, lure: 0, lureAt: 0, feed: 0, mana: 0, elite: 0,
+    dead: 0, units: 0, away: false, caught: false, ref: 0, sp: k, init: 0, ref2: 0, gold: 0, party: 0, torch: 0, hp: 0, hitAt: -99, foe: 0, flee: 0, gait: 0, bornAt: bornHere && this.w ? this.w.tick : -1e9, sleep: 0, drowsy: 0, lure: 0, lureAt: 0, feed: 0, mana: 0, elite: 0,
   };
   this.list.push(c);
   this.byId.set(c.id, c);

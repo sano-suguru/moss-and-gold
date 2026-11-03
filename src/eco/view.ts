@@ -167,8 +167,11 @@ export function nameOf(this: Ecology, c: Cr): string {
 
 /**
  * 個体が育って特別になる（通常速度で1分ごとに見る）：
- * 大ネズミの王 … 6匹以上の巣穴の群れで、王のいない群れの、生まれて4日以上たったいちばん年長の大ネズミ。
- * ゴブリンの頭 … 5匹以上の集落で、頭のいない集落の、来て4日以上たったいちばん年長のゴブリン。
+ * 大ネズミの王 … 8匹以上の巣穴の群れで、王のいない群れの、生まれて2日以上たったいちばん年長の大ネズミ。
+ * ゴブリンの頭 … 5匹以上の集落で、頭のいない集落の、生まれて1.25日以上たったいちばん年長のゴブリン。
+ * 外から来た者は、来たときに1日たっていたものとして数える（arrivals.ts）ので、王は来てから1日、頭は来てから1/4日たつと条件を満たす。
+ * ゴブリンの集落は長く続かないことが多いので、日数は短めにしてある。16シード×25日で、5日だと頭の出るシードが4つ、王3日・頭2日だと7つ、
+ * いまの値で9つ（王は11）。王の出るシードの数は、日数より「8匹以上の群れ」の条件で決まっている。
  */
 export function riseLeaders(this: Ecology): void {
   for (const [key, g] of this.groups) {
@@ -180,7 +183,8 @@ export function riseLeaders(this: Ecology): void {
     if (g.members.length < need || this.list.some((o) => o.elite === el && !o.dead)) continue;
     if (this.w.tick - (this.lastElite[el] ?? -1e9) < DAY_TICKS_ECO * 2) continue;
     let old: Cr | null = null;
-    for (const o of g.members) if (!o.dead && this.w.tick - o.bornAt > DAY_TICKS_ECO * 5 && (!old || o.bornAt < old.bornAt)) old = o;
+    const age = k0 === Kind.Rat ? 2 : 1.25;
+    for (const o of g.members) if (!o.dead && this.w.tick - o.bornAt > DAY_TICKS_ECO * age && (!old || o.bornAt < old.bornAt)) old = o;
     if (!old) continue;
     const c = old as Cr;
     c.elite = el;

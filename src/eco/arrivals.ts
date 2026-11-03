@@ -175,6 +175,10 @@ export function arrivals(this: Ecology, day: number): void {
     const kind = door < 0 ? -1 : m.mouths[door].kind;
     this.originNext = door === -2 ? 'shaft' : ['mouth', 'fissure', 'river'][kind];
     const c = this.spawn(k, x + (this.list.length % 5) - 2, y, body, food);
+    // 外から来た大ネズミとゴブリンは、来たときにはもう1日たっていた大人として、生まれた時刻を入れる。
+    // こうしないと生まれた時刻が初期値（−1e9）のままで、群れの王や集落の頭になる条件（生まれて5日以上）を、来たその日に満たしてしまう。
+    // 1日にしておけば、殖えられる（生まれて半日以上）のも、名前に「（子）」が付かないのも、これまでどおり
+    if (k === Kind.Rat || k === Kind.Goblin) c.bornAt = this.w.tick - DAY_TICKS_ECO;
     if ([Kind.Orc, Kind.Minotaur, Kind.Troll, Kind.Basilisk, Kind.Vampire, Kind.Lizardman, Kind.Goblin, Kind.Kobold, Kind.Salamander].includes(k) && this.step - (this.lastLogged[k] ?? -99999) > 3000) {
       this.lastLogged[k] = this.step;
       this.log(c.x, c.y, kind < 0 ? `{k:${k}}が天井の割れ目から入り込んだ` : kind === 0 ? `{k:${k}}が地表の横穴から入ってきた` : kind === 1 ? `{k:${k}}が地底の裂け目から現れた` : `{k:${k}}が川の口から上がってきた`);
