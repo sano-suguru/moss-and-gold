@@ -230,6 +230,15 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 掘り出した土の瓦礫を生き物のいるマスに置かない。それでも壁や瓦礫に埋まった生き物は、安全策で床へ出る（その回数が少ないこと）
+    name: '壁や瓦礫に埋まる生き物がほとんどいない（4シードの合計で床へ出たのが10回以下）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.ev === 'unbury').length);
+      return { ok: sum(n) <= 10, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
     name: '四つの保存則がずれない',
     ...RUN_A,
     test: (rs) => {

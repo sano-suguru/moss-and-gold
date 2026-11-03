@@ -291,6 +291,75 @@ export function nearestFloor(this: Ecology, x: number, y: number): number {
   return m.entrance.x;
 }
 
+/** 壁や瓦礫の中にいても構わない種（壁を通り抜ける、飛んで越える、天井にぶら下がる） */
+export function wallWalker(this: Ecology, c: Cr): boolean {
+  return c.k === Kind.Worm || c.k === Kind.Wisp || c.k === Kind.Bat || c.k === Kind.Ghost || c.k === Kind.Wyvern || (c.k === Kind.Gargoyle && c.act !== 0) || (c.k === Kind.Dragon && c.st === 2);
+}
+
+/**
+ * 瓦礫を置いてはいけないマスの集合：生き物（壁の中にいても構わない種を除く）のいるマスと、生きている生き物の住みかの印（hx, hy）のマス、大ネズミの巣穴。
+ * 住みかを埋めると、帰る先が壁の中になって、そのそばで立ち尽くす（巣穴は行き止まりの窪みにあり、瓦礫を置く先も行き止まりの窪みなので、よく重なる）
+ */
+export function occupiedTiles(this: Ecology): Set<number> {
+  const s = new Set<number>();
+  for (const c of this.list) {
+    if (c.dead) continue;
+    if (!c.away && !this.wallWalker(c)) {
+      const k = this.tileOf(c.x, c.y);
+      if (k >= 0) s.add(k);
+    }
+    if (c.hx || c.hy) {
+      const h = this.tileOf(c.hx, c.hy);
+      if (h >= 0) s.add(h);
+    }
+  }
+  for (const b of this.burrows) {
+    const k = this.tileOf(b.x, b.y);
+    if (k >= 0) s.add(k);
+  }
+  return s;
+}
+
+/**
+ * 安全策：壁や瓦礫のマスの中にいる生き物（壁の中にいても構わない種を除く）を、いちばん近い立てる床へ移す。
+ * 埋まった生き物は、どちらへ動こうとしても行き先が壁の中なので、歩く姿のまま身動きできなくなる。移したら true
+ */
+export function unbury(this: Ecology, c: Cr): boolean {
+  const m = this.w.map;
+  const k0 = this.tileOf(c.x, c.y);
+  if (k0 < 0 || !m.solid[k0] || this.wallWalker(c)) return false;
+  const tx = k0 % m.w;
+  const ty = Math.floor(k0 / m.w);
+  let best = -1;
+  let bd = 1e18;
+  for (let r = 1; r <= 8 && best < 0; r++)
+    for (let dy = -r; dy <= r; dy++)
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = tx + dx;
+        const y = ty + dy;
+        if (x < 0 || y < 0 || x >= m.w || y >= m.h) continue;
+        const k = y * m.w + x;
+        if (!this.tilePassable(c, k)) continue;
+        const d = sq(x * TILE + 8 - c.x) + sq(y * TILE + 8 - c.y);
+        if (d < bd) {
+          bd = d;
+          best = k;
+        }
+      }
+  if (best < 0) return false;
+  c.x = (best % m.w) * TILE + 8;
+  c.y = Math.floor(best / m.w) * TILE + 8;
+  this.paths.delete(c.id);
+  // ガーゴイルは止まり木（hx, hy）へ戻ってうずくまるので、止まり木が壁の中なら、出た先を新しい止まり木にする
+  if (c.k === Kind.Gargoyle && this.tileOf(c.hx, c.hy) >= 0 && m.solid[this.tileOf(c.hx, c.hy)]) {
+    c.hx = c.x;
+    c.hy = c.y;
+  }
+  this.record('settle', { t: this.w.tick, k: c.k, id: c.id, ev: 'unbury', x: Math.round(c.x), y: Math.round(c.y) } as never);
+  return true;
+}
+
 export function setDir(this: Ecology, c: Cr, dx: number, dy: number): void {
   if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) return;
   c.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 2 : 3) : dy > 0 ? 0 : 1;
@@ -763,6 +832,9 @@ declare module '../ecology' {
     findPath: typeof findPath;
     findPathAvoid: typeof findPathAvoid;
     searchLimit: typeof searchLimit;
+    wallWalker: typeof wallWalker;
+    occupiedTiles: typeof occupiedTiles;
+    unbury: typeof unbury;
     nearPath: typeof nearPath;
     unreachable: typeof unreachable;
     goTo: typeof goTo;
@@ -789,4 +861,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { record, tilePassable, findPath, searchLimit, nearPath, unreachable, findPathAvoid, goTo, tileOf, ratOnDry, passable, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, tryMove, findMoss, updateForage, nearestForage, eatMoss, eat, die, rebuildGrid, nearby });
+Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, unbury, searchLimit, nearPath, unreachable, findPathAvoid, goTo, tileOf, ratOnDry, passable, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, tryMove, findMoss, updateForage, nearestForage, eatMoss, eat, die, rebuildGrid, nearby });

@@ -140,6 +140,18 @@ L.push('');
   for (const [k, b] of by) if (b.nopath >= 3) anomalies.push(`${name(k)}が、道が見つからないまま壁際で足踏みした（${b.nopath}回）`);
 }
 
+// ---- 埋まった生き物 ----
+// 壁や瓦礫のマスの中に埋まっていて、安全策で床へ出た（settle.jsonl の unbury）。瓦礫を置く処理が生き物のいるマスを避けていれば、ほとんど起きないはず
+{
+  const U = rd('settle.jsonl').filter((x) => x.ev === 'unbury');
+  if (U.length) {
+    const by = new Map<number, number>();
+    for (const u of U) by.set(u.k, (by.get(u.k) ?? 0) + 1);
+    L.push(`## 壁や瓦礫に埋まっていて床へ出た（全${U.length}回）`, '', ...[...by].sort((a, b) => b[1] - a[1]).map(([k, n]) => `- ${name(k)}：${n}回`), '');
+    if (U.length >= 5) anomalies.push(`壁や瓦礫に埋まった生き物が${U.length}回、安全策で床へ出た（埋まる道筋が残っている）`);
+  }
+}
+
 // ---- 保存則 ----
 const last = samples[samples.length - 1];
 const drifts = samples.filter((s) => s.nutrientDrift !== 0 || s.goldDrift !== 0 || s.rockDrift !== 0 || (s.manaDrift ?? 0) !== 0);
