@@ -85,7 +85,12 @@ export function maybeParty(this: Ecology): void {
   this.packForCaches(party);
   const names = heroes.map((h) => `${JOB_NAMES[h.job]}${h.name}${h.trips > 1 ? `（${RANK_NAMES[h.rank]}、${h.trips}度目）` : ''}`).join('・');
   const aim = this.aimPhrase(party);
-  const who = `${heroTitle(heroes[0])}の一行（${names}）が、${aim ? aim + '、' : ''}`;
+  // 引退の前の最後の遠征：英雄が見習いを連れて入る
+  const old = heroes.find((h) => h.last && h.rank >= 3);
+  const ap = old ? heroes.find((h) => h.rank === 0 && h.trips === 1) : undefined;
+  const farewell = old ? `英雄${old.name}の最後の遠征${ap ? `、見習いの${JOB_NAMES[ap.job]}${ap.name}を連れて` : ''}。` : '';
+  if (old) this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: pid, ev: 'farewell', n: old.id, how: ap ? ap.id : 0, x: 0, y: 0 } as never);
+  const who = `${farewell}${heroTitle(heroes[0])}の一行（${names}）が、${aim ? aim + '、' : ''}`;
   this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: pid, ev: 'enter', how: party.aim ?? 0, n: party.aimId ?? 0, to: party.aimKnown ?? 0, x: 0, y: 0 } as never);
   // 入口で身支度をして、食べ残しを少し落としていく
   if (door < 0) this.pendingScraps.push(pid);
@@ -443,7 +448,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   // 一行で向かっている手強い敵がいれば、まずそれ
   if (p.engage) {
     const e = this.byId.get(p.engage);
-    const runner = e && e.flee > 0 && STR[e.k] <= 3 && !(e.id === c.foe && this.w.tick - c.hitAt < 150);
+    const runner = e && ((e.flee > 0 && STR[e.k] <= 3) || this.orcYields(p, e)) && !(e.id === c.foe && this.w.tick - c.hitAt < 150);
     if (e && !e.dead && !e.away && !runner && sq(e.x - c.x) + sq(e.y - c.y) < 10 * TILE * 10 * TILE && c.sp !== Job.Bard && c.sp !== Job.Thief) foe = e;
     else if (!e || e.dead || e.away || runner) p.engage = 0;
   }
@@ -452,7 +457,8 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       if (o.dead || o.away) return;
       const attacked = o.id === c.foe && this.w.tick - c.hitAt < 150;
       // 目標でない住民（住処・集落・村・縄張りの者）には、自分たちから戦いを始めない
-      const enemy = (ENEMY.includes(o.k) && !this.spareResident(p, c, o)) || (o.k === Kind.Gargoyle && o.act !== 0) || (o.k === Kind.Mimic && c.sp === Job.Thief) || (c.sp === Job.Hunter && o.k === this.rumors.beastKind);
+      // 威嚇して退くオーク（src/eco/orc.ts の orcWary）も追わない
+      const enemy = (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)) || (o.k === Kind.Gargoyle && o.act !== 0) || (o.k === Kind.Mimic && c.sp === Job.Thief) || (c.sp === Job.Hunter && o.k === this.rumors.beastKind);
       const minor = MINOR.includes(o.k) && (o.k !== Kind.Bat || o.st === 0 || o.foe === c.id);
       if (!enemy && !minor && !attacked) return;
       if (!attacked && (c.sp === Job.Bard || (c.sp === Job.Thief && o.k !== Kind.Mimic))) return;

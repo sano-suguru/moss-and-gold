@@ -31,6 +31,12 @@ export interface Hero {
   trips: number;
   /** いま中にいれば、その生き物の番号（いなければ 0） */
   cid: number;
+  /** 最後の遠征（引退の前の遠征。見習いを連れて入る）なら 1 */
+  last?: number;
+  /** この遠征でいちばん減ったときの体力（上限に対する百分率。帰ったとき2割を切っていれば傷が残る） */
+  low?: number;
+  /** 傷が癒えるまで遠征に出ない刻み（この刻みより前は選ばない） */
+  rest?: number;
 }
 
 /** 墓標 */
@@ -57,16 +63,32 @@ export const RANK_AT = [0, 2, 4, 7];
 export const RANK_MUL = [1, 1.07, 1.14, 1.2];
 /** はじめの名簿の職業（戦士3、魔法使い2、盗賊2、僧侶2、吟遊詩人、狩人、竜殺し） */
 const START_JOBS = [Job.Warrior, Job.Warrior, Job.Warrior, Job.Wizard, Job.Wizard, Job.Thief, Job.Thief, Job.Priest, Job.Priest, Job.Bard, Job.Hunter, Job.Slayer];
+/** 引退：英雄になってからこの回数の遠征を終えて帰ると引退する（帰還 RANK_AT[3] + RETIRE_AFTER 回）。最後の遠征は見習いを一人連れて入る */
+export const RETIRE_AFTER = 3;
+export const RETIRE_RET = RANK_AT[3] + RETIRE_AFTER;
+/** 傷：体力が上限のこの割合を切って生還すると（目安の2割では、帰還の約0.7％しか当たらず25日にほとんど見えないので半分に。帰還の93％は無傷）、眼帯か包帯の姿が残り、しばらく遠征に出ない */
+export const SCAR_AT = 0.5;
+export const SCAR_REST = 14400 * 1.5;
+/** 頭の飾りの種類（src/sprites.ts の CREST_NAMES。名簿は引退の前に13人になることがあるので13種） */
+export const CREST_KINDS = 13;
 /** 墓標で立ち止まる長さ（歩）と、気づく遠さ（マス） */
 const GRAVE_STOP = 60;
 const GRAVE_R = 6;
 
-/** 姿の値：髪 0〜5、肌 0〜3、身につける色 0〜5、体つき 0〜2、頭の形 0〜1 */
-export function packLook(hair: number, skin: number, color: number, build: number, head: number): number {
-  return hair | (skin << 3) | (color << 5) | (build << 8) | (head << 10);
+/** 姿の値：髪 0〜5、肌 0〜3、身につける色 0〜5、体つき 0〜2、頭の形 0〜1、頭の飾り（+1 して 1〜13、0 はまだない）、傷（1 眼帯、2 頭の包帯） */
+export function packLook(hair: number, skin: number, color: number, build: number, head: number, crest = -1, scar = 0): number {
+  return hair | (skin << 3) | (color << 5) | (build << 8) | (head << 10) | ((crest + 1) << 11) | (scar << 15);
 }
-export function unpackLook(v: number): { hair: number; skin: number; color: number; build: number; head: number } {
-  return { hair: v & 7, skin: (v >> 3) & 3, color: (v >> 5) & 7, build: (v >> 8) & 3, head: (v >> 10) & 1 };
+export function unpackLook(v: number): { hair: number; skin: number; color: number; build: number; head: number; crest: number; scar: number } {
+  return { hair: v & 7, skin: (v >> 3) & 3, color: (v >> 5) & 7, build: (v >> 8) & 3, head: (v >> 10) & 1, crest: ((v >> 11) & 15) - 1, scar: (v >> 15) & 3 };
+}
+/** 名簿の中で使われていない頭の飾りを選んで付ける（名簿の中で重ならない） */
+function giveCrest(roster: Hero[], h: Hero): void {
+  const used = new Set(roster.filter((o) => o !== h).map((o) => unpackLook(o.look).crest));
+  const s = ih(h.id, 11, 304) % CREST_KINDS;
+  let c = s;
+  for (let i = 0; i < CREST_KINDS; i++) if (!used.has((s + i) % CREST_KINDS)) { c = (s + i) % CREST_KINDS; break; }
+  h.look = (h.look & ~(15 << 11)) | ((c + 1) << 11);
 }
 
 export function rankFor(ret: number): number {
@@ -91,7 +113,8 @@ export function recruit(this: Ecology, job: number): Hero {
     const L = unpackLook(look);
     if (!this.roster.some((o) => o.job === job && (unpackLook(o.look).color === L.color || unpackLook(o.look).hair === L.hair))) break;
   }
-  const hero: Hero = { id, name, job, look, rank: 0, ret: 0, trips: 0, cid: 0 };
+  const hero: Hero = { id, name, job, look, rank: 0, ret: 0, trips: 0, cid: 0, last: 0, low: 100, rest: 0 };
+  giveCrest(this.roster, hero);
   this.roster.push(hero);
   return hero;
 }
@@ -123,7 +146,8 @@ export function rankMul(this: Ecology, c: Cr): number {
 export function pickHeroes(this: Ecology, jobs: number[], salt: number): Hero[] | null {
   this.fillRoster();
   const out: Hero[] = [];
-  const free = (h: Hero) => h.cid === 0 && !out.includes(h);
+  const tick = this.w.tick;
+  const free = (h: Hero) => h.cid === 0 && !out.includes(h) && (h.rest ?? 0) <= tick;
   const choose = (cands: Hero[], i: number) => cands[ih(salt, i, 303) % cands.length];
   for (let i = 0; i < jobs.length; i++) {
     let c = this.roster.filter((h) => h.job === jobs[i] && free(h));
@@ -144,13 +168,42 @@ export function pickHeroes(this: Ecology, jobs: number[], salt: number): Hero[] 
     if (!c.length) return null;
     out[out.length - 1] = choose(c, 99);
   }
+  // 引退の前の最後の遠征：英雄は、同じ職業の見習い（後を継ぐ新人。名簿が一時13人になる）を連れて入る
+  const old = out.find((h) => h.rank >= 3 && h.ret >= RETIRE_RET - 1);
+  if (old && !old.last && this.roster.length <= ROSTER_SIZE) {
+    old.last = 1;
+    const ap = this.recruit(old.job);
+    this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: 0, ev: 'recruit', n: ap.id, how: ap.job, to: 1, x: 0, y: 0 } as never);
+    if (out.length < 5) out.push(ap);
+    else {
+      // 英雄でも、灯りを持つ最後の一人でもない者と入れ替える
+      const light = (j: number) => j === Job.Wizard || j === Job.Priest || j === Job.Warrior;
+      let i = out.length - 1;
+      while (i > 0 && (out[i] === old || (light(out[i].job) && out.filter((h) => light(h.job)).length <= 1))) i--;
+      out[i > 0 ? i : out.length - 1] = ap;
+    }
+  }
   return out;
+}
+
+/** 名簿の者に頭の飾りがなければ付ける（飾りのない古い保存から読み込んだとき） */
+export function ensureCrests(this: Ecology): void {
+  for (const h of this.roster) if (unpackLook(h.look).crest < 0) giveCrest(this.roster, h);
+}
+
+/** 打たれた冒険者：この遠征でいちばん減った体力を覚える（傷が残るかの判断。strike から） */
+export function heroHurt(this: Ecology, c: Cr): void {
+  const h = this.heroOf(c);
+  if (!h) return;
+  const f = Math.max(0, Math.round((c.hp / this.maxHp(c)) * 100));
+  if (f < (h.low ?? 100)) h.low = f;
 }
 
 /** 一行に入った冒険者を名簿に結ぶ */
 export function heroEnter(this: Ecology, h: Hero, c: Cr, p: Party): void {
   h.cid = c.id;
   h.trips++;
+  h.low = 100;
   this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'hero', n: h.id, how: h.trips, to: h.rank, x: 0, y: 0 } as never);
 }
 
@@ -166,6 +219,29 @@ export function heroHome(this: Ecology, c: Cr, returned: boolean): void {
   h.cid = 0;
   if (!returned) return;
   h.ret++;
+  this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: c.party, ev: 'home', n: h.id, how: h.rank, to: h.low ?? 100, x: 0, y: 0 } as never);
+  // 傷：深手を負って生きて帰った者には、眼帯か頭の包帯が残る（重ねて負えば両方）。しばらく遠征に出ない
+  if ((h.low ?? 100) < SCAR_AT * 100) {
+    const L = unpackLook(h.look);
+    const add = L.scar === 0 ? 1 + (ih(h.id, h.trips, 305) & 1) : 3;
+    h.look = (h.look & ~(3 << 15)) | ((L.scar | add) << 15);
+    h.rest = this.w.tick + SCAR_REST;
+    this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: c.party, ev: 'scar', n: h.id, how: h.look >> 15, to: h.low ?? 0, x: Math.round(c.x), y: Math.round(c.y) } as never);
+    this.log(c.x, c.y, `${heroTitle(h)}が深い傷を負って帰った（${(h.look >> 15) === 1 ? '片目を失い、眼帯をつけた' : (h.look >> 15) === 2 ? '頭に包帯を巻いた' : '眼帯と包帯の姿になった'}）`);
+  }
+  h.low = 100;
+  // 引退：英雄が最後の遠征から生きて帰った。名簿から外れ、それきり来ない（連れてきた見習いが後を継ぐ）
+  if (h.last && h.rank >= 3) {
+    const i = this.roster.indexOf(h);
+    if (i >= 0) this.roster.splice(i, 1);
+    this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: c.party, ev: 'retire', n: h.id, how: h.job, to: h.ret, x: Math.round(c.x), y: Math.round(c.y) } as never);
+    this.log(c.x, c.y, `英雄${h.name}（${JOB_NAMES[h.job]}、帰還${h.ret}回）が引退した`);
+    if (this.roster.length < ROSTER_SIZE) {
+      const nh = this.recruit(h.job);
+      this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: 0, ev: 'recruit', n: nh.id, how: nh.job, x: 0, y: 0 } as never);
+    }
+    return;
+  }
   const r = rankFor(h.ret);
   if (r > h.rank) {
     h.rank = r;
@@ -178,6 +254,7 @@ export function heroHome(this: Ecology, c: Cr, returned: boolean): void {
  * 名簿の見直し（updateParties の初め、毎歩）：中にいるはずの者が倒れていれば、名簿から外して新人を加え、熟練以上なら倒れた所に墓標を立てる
  */
 export function rosterStep(this: Ecology): void {
+  this.ensureCrests();
   for (let i = this.roster.length - 1; i >= 0; i--) {
     const h = this.roster[i];
     if (!h.cid) continue;
@@ -186,6 +263,8 @@ export function rosterStep(this: Ecology): void {
     this.roster.splice(i, 1);
     this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: c?.party ?? 0, ev: 'fallen', n: h.id, how: h.rank, to: h.ret, x: Math.round(c?.x ?? 0), y: Math.round(c?.y ?? 0) } as never);
     if (c && h.rank >= 1) this.raiseGrave(h, c.x, c.y);
+    // 引退の前で名簿が13人のときは、倒れても新人は加わらない（12人に戻るだけ）
+    if (this.roster.length >= ROSTER_SIZE) continue;
     const nh = this.recruit(h.job);
     this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: 0, ev: 'recruit', n: nh.id, how: nh.job, x: 0, y: 0 } as never);
   }
@@ -270,7 +349,9 @@ declare module '../ecology' {
     raiseGrave: typeof raiseGrave;
     graveBrace: typeof graveBrace;
     pickGrave: typeof pickGrave;
+    ensureCrests: typeof ensureCrests;
+    heroHurt: typeof heroHurt;
   }
 }
 
-Object.assign(Ecology.prototype, { recruit, fillRoster, heroOf, rankMul, pickHeroes, heroEnter, heroHome, rosterStep, raiseGrave, graveBrace, pickGrave });
+Object.assign(Ecology.prototype, { recruit, fillRoster, heroOf, rankMul, pickHeroes, heroEnter, heroHome, rosterStep, raiseGrave, graveBrace, pickGrave, ensureCrests, heroHurt });

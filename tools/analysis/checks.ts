@@ -131,6 +131,26 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 六歩目：英雄は見習いを連れた最後の遠征から帰ると引退する。深手を負って帰った者には傷が残る
+    name: '英雄が見習いを連れた最後の遠征から帰って引退する（4シードの合計で1回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const fw = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'farewell').length);
+      const rt = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'retire').length);
+      const sc = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'scar').length);
+      return { ok: sum(rt) >= 1, value: rs.map((r, i) => `${r.seed} 最後の遠征 ${fw[i]}・引退 ${rt[i]}・傷 ${sc[i]}`).join('、') };
+    },
+  },
+  {
+    // 六歩目：オークは勝ち目のない一行には威嚇して退く
+    name: 'オークが強い一行に威嚇して退く（かしたれ・seed27 で1回以上）',
+    ...RUN_ORC,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'bluff').length);
+      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
     name: 'オークが貢ぎ物を取り立てる（かしたれ・seed27 で1回以上）',
     ...RUN_ORC,
     test: (rs) => {
