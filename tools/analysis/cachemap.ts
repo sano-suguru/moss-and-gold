@@ -1,7 +1,7 @@
 /**
  * 物資の置き場が奥へ伸びていく様子（冒険者の作り直しの三歩目）を、ログから表に並べ、マップに描く。
  *
- *   node tools/analysis/launch.mjs cachemap --runs runs/ab-x/new [--seeds abc,seed5] [--png docs/img/cache-chain]
+ *   node tools/analysis/launch.mjs cachemap --runs runs/ab-x/new [--seeds abc,seed5] [--png build/img/cache-chain]
  *
  * 表：シードごとに、遠征（深部の探索・竜退治の一行）の順に、入った日、目標、たどった置き場、補った量、残した置き場の入口からの道のり、終わり方。
  * --png を付けると、シードごとにマップ（岩・床、入口、ドラゴン、置き場を残した順の番号）を <png>-<シード>.png に描く（SVG を Playwright でスクリーンショットする）。

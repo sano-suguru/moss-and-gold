@@ -1,6 +1,6 @@
 /**
  * 冒険者の目標と、ゴブリンの盗み・退治、竜退治、大ネズミの引っ越しの列を、二つの実行結果（ab の base と new など）で数えて A/B 比較する。
- *   npm run advreport -- --runs runs/ab-x/base,runs/ab-x/new [--out docs/x.md]
+ *   npm run advreport -- --runs runs/ab-x/base,runs/ab-x/new [--out runs/x.md]
  * ログ（settle.jsonl・deaths.jsonl）だけを読む（再実行しない）。
  */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';

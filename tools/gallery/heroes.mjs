@@ -1,6 +1,6 @@
 /**
- * 名簿の冒険者の、位ごとの姿の一覧画像（見習い・熟練・歴戦・英雄を、職業ごとに並べる）を作る → docs/img/hero-ranks.png
- *   node tools/gallery/heroes.mjs [--out docs/img/hero-ranks.png] [--scale 4]
+ * 名簿の冒険者の、位ごとの姿の一覧画像（見習い・熟練・歴戦・英雄を、職業ごとに並べる）を作る → build/img/hero-ranks.png
+ *   node tools/gallery/heroes.mjs [--out build/img/hero-ranks.png] [--scale 4]
  * 色はスプライトそのもの（ゲームのライティングは当てない）。姿は職業ごとに固定の二人分（外見のビット `look`）を、正面・横・後ろで並べる。墓標も添える。
  */
 import { buildSync } from 'esbuild';
@@ -9,9 +9,9 @@ import { mkdirSync, writeFileSync } from 'fs';
 const require = createRequire(import.meta.url);
 const argv = process.argv.slice(2);
 const opt = (k, d) => (argv.includes('--' + k) ? argv[argv.indexOf('--' + k) + 1] : d);
-const out = opt('out', 'docs/img/hero-ranks.png');
+const out = opt('out', 'build/img/hero-ranks.png');
 const S = +opt('scale', '4');
-mkdirSync('build', { recursive: true });
+mkdirSync('build/img', { recursive: true });
 buildSync({ entryPoints: ['src/sprites.ts'], bundle: true, format: 'cjs', outfile: 'build/sprites-heroes.cjs', platform: 'node', logLevel: 'silent' });
 const SP = require(process.cwd() + '/build/sprites-heroes.cjs');
 const JOBS = [['warrior', '戦士'], ['wizard', '魔法使い'], ['thief', '盗賊'], ['priest', '僧侶'], ['bard', '吟遊詩人'], ['hunter', '狩人'], ['slayer', '竜殺し']];
