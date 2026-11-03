@@ -1,7 +1,7 @@
 // 同じシードから同じダンジョンと同じ展開が得られることを確かめる
-// 互いに独立な部分（地形の検査、1日半の通し二回、保存からの再現の二つ）を、別々の Node の子プロセスで同時に回す（CPU の数だけ速くなる）。
-// 保存からの再現は、決まった途中の状態（test/fixtures/kashitare-d5.json.gz：かしたれの5日目）から始める。
-// TEST_FULL=1 npm test なら、もとのとおり0日目から6日回してから確かめる（約30秒）。
+// 互いに独立な部分（地形の検査、1日半の通しの実行二回、セーブからの再現性の確認二つ）を、別々の Node の子プロセスで並列に実行する（CPU の数だけ速くなる）。
+// セーブからの再現性の確認は、決まった途中のスナップショット（test/fixtures/kashitare-d5.json.gz：かしたれの5日目）から始める。
+// TEST_FULL=1 npm test なら、もとのとおり0日目から6日実行してから確かめる（約30秒）。
 // 子は `node build/test.js <部分>` で、親は結果を集めて、もとと同じ順に表示する。
 import { spawn } from 'child_process';
 import { generate, MAP_W, MAP_H } from '../src/mapgen';
@@ -99,7 +99,7 @@ const run = () => {
 };
 
 function partSave() {
-// 保存して読み込み直しても、続きの展開が変わらない（0日目から6日回してから。TEST_FULL=1 のとき）
+// セーブしてロードし直しても、その後の展開が変わらない（0日目から6日実行してから。TEST_FULL=1 のとき）
 {
   const a = new World('かしたれ');
   for (let i = 0; i < DAY_TICKS * 6.0; i++) a.step();
@@ -112,10 +112,10 @@ function partSave() {
 }
 
 /**
- * 保存からの再現（速い版）：決まった5日目の状態から0.5日進めて（読み込んだ直後の控えが、進めるうちに作り直される）、
+ * セーブからの再現性の確認（速い版）：決まった5日目のスナップショットから0.5日進めて（ロード直後のキャッシュが、進めるうちに作り直される）、
  *   A：そのまま0.5日進める
- *   B：そこで保存して読み込み直し、0.5日進める
- * を別々のプロセスで回し、終わりの状態のハッシュを比べる。
+ *   B：そこでセーブしてロードし直し、0.5日進める
+ * を別々のプロセスで実行し、終わりの状態のハッシュを比べる。
  */
 function partSaveHalf(reload: boolean) {
   let w = decodeState(readState(join(__dirname, '..', 'test', 'fixtures', 'kashitare-d5.json.gz')));
@@ -153,7 +153,7 @@ else if (part === 'run') {
 else if (part === 'saveA') partSaveHalf(false);
 else if (part === 'saveB') partSaveHalf(true);
 else {
-  // 親：四つの部分を同時に回す
+  // 親プロセス：四つの部分を並列に実行する
   const child = (p: string) =>
     new Promise<{ out: string; code: number }>((res) => {
       const c = spawn(process.execPath, [process.argv[1], p], { stdio: ['ignore', 'pipe', 'inherit'] });

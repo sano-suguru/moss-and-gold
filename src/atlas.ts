@@ -4,7 +4,7 @@ import { heroSprite, heroBed, graveMarker, prayLight, adventurer, adventurer2, s
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
 export const DIRS = ['down', 'up', 'side'] as const;
 export const ACTS = ['idle', 'move', 'attack', 'death'] as const;
-/** 名簿の冒険者のます目の大きさ（画素）と、区画の行数 */
+/** 名簿の冒険者のます目の大きさ（px）と、区画の行数 */
 const HERO_CELL = 48;
 const HERO_ROWS = 12;
 
@@ -231,7 +231,7 @@ const FURROW = [
     5,
   ),
 ];
-// 蓄えの山（描画だけ。蓄えの目安に対する割合で三段階）：コボルトはキノコの傘を積んだ山、ゴブリンは肉の塊と骨とキノコ。縁を暗くして床から浮かせる
+// 蓄えの山（描画専用。蓄えの目安に対する割合で三段階）：コボルトはキノコの傘を積んだ山、ゴブリンは肉の塊と骨とキノコ。縁を暗くして床から浮かせる
 const LARDER_COL: Record<string, number[]> = { c: [150, 120, 186], C: [222, 204, 244], s: [214, 198, 166], m: [150, 44, 38], M: [214, 92, 74], b: [236, 228, 204], k: [30, 22, 22], d: [60, 42, 32] };
 function heap(W: number, H: number, kind: number): RawFrame {
   const inside = (x: number, y: number) => {
@@ -264,7 +264,7 @@ function heap(W: number, H: number, kind: number): RawFrame {
   return pattern(rows, LARDER_COL, Math.floor(W / 2), H - 1);
 }
 const LARDER = [0, 1].map((kind) => [heap(10, 6, kind), heap(15, 8, kind), heap(21, 10, kind)]);
-// オークに従う集落の印：竿に下げた赤い布と、白い牙の印（描画だけ。集落の小屋の後ろから突き出す）
+// オークに従う集落の印：竿に下げた赤い布と、白い牙の印（描画専用。集落の小屋の後ろから突き出す）
 const BANNER = pattern(
   ['.w.......', 'wwwwwwww.', '.wRRRRRRk', '.wRbRRbRk', '.wRbRRbRk', '.wRRbbRRk', '.wRRRRRRk', '.wRR.RR.k', '.wR...R..', '.w.......', '.w.......', '.w.......', '.w.......', '.w.......', '.w.......', '.w.......', '.w.......', '.w.......', 'www......'],
   { w: [118, 82, 50], R: [176, 40, 34], b: [240, 232, 206], k: [70, 20, 18] },
@@ -370,7 +370,7 @@ export function buildAtlas(): Atlas {
       named.set(`dragon,${d},2,${f},1`, raws.length);
       raws.push(dragon(DIRS[d], 'fly', f) as RawFrame);
     }
-  // 幼竜と若い竜：成竜の絵を、ドット絵らしさを保つ縮め方で縮める（小さくした一画素ごとに、もとの絵で一番多い色を選ぶ。縁取りの暗い色は残しやすく）
+  // 幼竜と若い竜：成竜の絵を、ドット絵らしさを保つ縮め方で縮める（縮めたあとの1ピクセルごとに、もとの絵で一番多い色を選ぶ。縁取りの暗い色は残しやすく）
   const shrink = (fr: RawFrame, sc: number): RawFrame => {
     const W = Math.max(1, Math.round(fr.W * sc));
     const H = Math.max(1, Math.round(fr.H * sc));

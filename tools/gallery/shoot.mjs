@@ -1,13 +1,13 @@
-// 場面を撮って一覧画像を作る（Node の Playwright。Python は要らない）。比較のときは、いまの画像と以前の画像を左右に並べる。
+// シーンのスクリーンショットを撮って一覧画像を作る（Node の Playwright。Python は要らない）。比較のときは、現在の画像と以前の画像を左右に並べる。
 //
-//   node tools/gallery/shoot.mjs                    撮って build/gallery/sheet.png
-//   node tools/gallery/shoot.mjs --only dragon,camp 場面を選んで撮り直す
+//   node tools/gallery/shoot.mjs                    スクリーンショットを撮って build/gallery/sheet.png を作る
+//   node tools/gallery/shoot.mjs --only dragon,camp 一部のシーンだけ撮り直す
 //   node tools/gallery/shoot.mjs --label before     撮った画像を build/gallery/before/ に残す
-//   node tools/gallery/shoot.mjs --compare before   いまの画像と before を左右に並べた build/gallery/compare-before.png
+//   node tools/gallery/shoot.mjs --compare before   現在の画像と before を左右に並べた build/gallery/compare-before.png を作る
 //   node tools/gallery/shoot.mjs --light            確認用の明かり（#lit：全体を明るく照らす）をつけて撮る（暗さと絵の出来を分けて見る）
-//   node tools/gallery/shoot.mjs --no-shoot         撮らずに一覧だけ作り直す
-//   node tools/gallery/shoot.mjs --fresh            場面をかならず作り直す（ふだんはシミュレーションのコードが同じなら前回の場面を使う）
-//   場面づくり（build/scenes.js）は、ここから呼ぶ（npm run gallery -- の後ろの指定がここに届くように）
+//   node tools/gallery/shoot.mjs --no-shoot         撮らずに一覧画像だけ作り直す
+//   node tools/gallery/shoot.mjs --fresh            シーンを必ず作り直す（通常はシミュレーションのコードが同じなら前回のシーンを使う）
+//   シーンの作成（build/scenes.js）は、ここから呼ぶ（npm run gallery -- の後ろのオプションがここに届くように）
 import { createRequire } from 'module';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { execFileSync } from 'child_process';
@@ -29,11 +29,11 @@ const light = args.includes('--light');
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 
 if (!args.includes('--no-shoot')) {
-  // 同時に2つのページで撮る。ページは場面ごとに読み込み直さず、window.__openScene で場面だけを入れ替える
-  // （絵の部品と WebGL を作り直さないので、1枚あたり約1.5秒）。スマホの場面は画面の大きさが違うので別のページで撮る。
+  // 2つのページで並列に撮る。ページはシーンごとにリロードせず、window.__openScene でシーンだけを入れ替える
+  // （テクスチャアトラスと WebGL を作り直さないので、1枚あたり約1.5秒）。スマホのシーンはビューポートの大きさが違うので別のページで撮る。
   const hash = (phone) => [phone ? '' : 'clean', light ? 'lit' : ''].filter(Boolean).join(',');
   const url = (phone) => 'file://' + join(ROOT, 'dist', 'index.html') + (hash(phone) ? '#' + hash(phone) : '');
-  // 20回描き終わるまで待ち、描くのを止める（止めると撮るのが速い）
+  // 20フレーム描き終わるまで待ち、描画を止める（止めるとスクリーンショットが速い）
   const waitFrames = async (page) => {
     await page.waitForFunction(() => (window.__frames ?? 0) >= 20, null, { timeout: 15000 });
     await page.evaluate(() => { window.__hold = true; });
@@ -78,10 +78,10 @@ if (opt('--label')) {
   for (const s of scenes) if (existsSync(join(G, s.name + '.png'))) copyFileSync(join(G, s.name + '.png'), join(d, s.name + '.png'));
 }
 
-/** 一覧（dirs が1つなら2列の一覧、2つなら左右の比較）を、ブラウザの canvas で組む */
+/** 一覧画像（dirs が1つなら2列の一覧、2つなら左右に並べた比較）を、ブラウザの canvas で合成する */
 async function sheet(dirs, out) {
   const rows = scenes.map((s) => ({
-    title: s.title + (dirs.length === 2 ? '　（左：以前　右：いま）' : ''),
+    title: s.title + (dirs.length === 2 ? '　（左：以前　右：現在）' : ''),
     imgs: dirs.map((d) => {
       const f = join(d, s.name + '.png');
       return existsSync(f) ? 'data:image/png;base64,' + readFileSync(f).toString('base64') : null;
@@ -132,7 +132,7 @@ async function sheet(dirs, out) {
     { rows, cols: dirs.length === 2 ? 1 : 2 },
   );
   writeFileSync(out, Buffer.from(png, 'base64'));
-  console.log('一覧：', out);
+  console.log('一覧画像：', out);
   await page.close();
 }
 

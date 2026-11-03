@@ -1,4 +1,4 @@
-/** Ecology のメソッド：1歩（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+/** Ecology のメソッド：生き物の更新1回（step。src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
@@ -45,7 +45,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
     }
     if (c.k === Kind.Minotaur && c.gait > 0) c.gait--;
     if (c.sleep > 0 && this.alarms.size && this.alarms.has(this.groupKey(c) ?? '')) c.sleep = 0;
-    // ウィスプは土からマナを吸う（4刻みごとに少しずつ、体に40まで）
+    // ウィスプは土からマナを吸う（生き物の更新4回に1回、少しずつ。体に40まで）
     if (c.k === Kind.Wisp && this.step % 4 === c.id % 4 && c.mana < 40) {
       const k = this.tileOf(c.x, c.y);
       if (k >= 0 && this.w.mana[k] >= 3) {
@@ -181,7 +181,7 @@ export function metabolism(this: Ecology, c: Cr): void {
     return;
   }
   if (c.glow > 0) c.glow = Math.max(0, c.glow - s.glowDecay);
-  // 眠っている間は腹が減りにくい（二刻みに一度だけ）
+  // 眠っている間は腹が減りにくい（生き物の更新2回に1回だけ）
   if (c.sleep > 0 && this.step % 2 === 0) return;
   c.sinceMeal++;
   // ねぐらで眠るコウモリは代謝を落とす
@@ -235,7 +235,7 @@ export function decay(this: Ecology, c: Cr): void {
     }
   }
   // 暗く湿った所で、スライムに見つからずに残った死骸は、ゾンビとして起き上がることがある（リッチのそばではずっと起き上がりやすい）
-  // 骨の竜：成竜の亡骸が、マナの濃い暗がりで地上の半日ほど眠ったあと、骨の竜として起き上がる
+  // 骨の竜：成竜の亡骸が、マナの濃い暗がりでゲーム内の半日ほど眠ったあと、骨の竜として起き上がる
   if (c.k === Kind.Dragon && c.sp >= 2 && c.elite !== 8 && c.actT > DAY_TICKS_ECO / 4 && this.step % 50 === c.id % 50) {
     const k = this.tileOf(c.x, c.y);
     if (k >= 0 && this.manaAround(k) >= 25 && this.lit(k, this.day) < 0.2) {

@@ -1,4 +1,4 @@
-// tools/analysis/film.ts が書き出したこまを、ゲーム画面（dist/index.html）で撮り、一枚に並べる（こまの下に日と先頭の札）
+// tools/analysis/film.ts が書き出したフレームを、ゲーム画面（dist/index.html）でスクリーンショットに撮り、一枚に並べる（各フレームの下に、日と、先頭の生き物の情報パネルの内容）
 //   node tools/gallery/film.mjs build/film/<name>.json
 import { createRequire } from 'module';
 import { readFileSync, writeFileSync } from 'fs';
@@ -24,7 +24,7 @@ for (let i = 0; i < sc.frames.length; i++) {
     await page.waitForFunction(() => (window.__frames ?? 0) >= 20, null, { timeout: 20000 });
   }
   await page.evaluate(() => { window.__hold = true; });
-  // 印（目標、身構えた住みか）を重ねる：世界の座標を画面へ（画面の中央がカメラ）
+  // 印（目標、身構えた住みか）を重ねる：ワールド座標を画面座標へ変換する（画面の中央がカメラの位置）
   await page.evaluate(({ marks, cam }) => {
     for (const mk of marks ?? []) {
       const sx = (mk.x - cam.x) * cam.zoom + innerWidth / 2;
@@ -66,7 +66,7 @@ const strip = await page.evaluate(async ({ shots, labels, title, cols, W, H }) =
     g.fillStyle = '#ddd';
     g.font = '11px sans-serif';
     const words = labels[i];
-    // 長い札は二行に
+    // 長いラベルは二行に折り返す
     const cut = words.length > 44 ? words.lastIndexOf(' / ', 60) : -1;
     g.fillText(cut > 0 ? words.slice(0, cut) : words, x + 2, y + H + 14);
     if (cut > 0) g.fillText(words.slice(cut + 3), x + 2, y + H + 28);
@@ -75,5 +75,5 @@ const strip = await page.evaluate(async ({ shots, labels, title, cols, W, H }) =
 }, { shots, labels: sc.frames.map((f) => f.label), title: sc.title, cols, W, H });
 const path = join(sc.out, `${sc.name}.png`);
 writeFileSync(path, Buffer.from(strip, 'base64'));
-console.log(`撮った：${path}（${shots.length}こま）${errs.length ? '（ページのエラー：' + errs.join(' / ') + '）' : ''}`);
+console.log(`スクリーンショットを撮った：${path}（${shots.length}フレーム）${errs.length ? '（ページのエラー：' + errs.join(' / ') + '）' : ''}`);
 await b.close();

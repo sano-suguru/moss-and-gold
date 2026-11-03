@@ -5,8 +5,8 @@
  * 次の一行はそこで食料を補ってさらに奥へ進み、新しい置き場を残す。遠征を重ねるたびに置き場が奥へ伸び、
  * ついに竜退治の一行が置き場をたどって寝床に着く。置き場は大ネズミにあさられることがあり、空になった木箱は残骸として残る。
  *
- * 状態：Ecology.caches（SupplyCache、保存は SC）、町の知識 Lore.caches、一行の cacheKnown / cacheVis / cacheD / cacheGo / cacheMine。
- * 深部の探索の一行の者は、置き場に残す食料の荷（Cr.units）を背負って入ってくる（入るときに imported に足す。養分の帳簿に入る）。
+ * 状態：Ecology.caches（SupplyCache。セーブデータでは SC）、町の知識 Lore.caches、一行の cacheKnown / cacheVis / cacheD / cacheGo / cacheMine。
+ * 深部の探索の一行の者は、置き場に残す食料の荷（Cr.units）を背負って入ってくる（入るときに imported に足す。養分の保存則に含まれる）。
  */
 import { Cr, Ecology, Kind, Party, SPEC, SupplyCache, sq } from '../ecology';
 import { TILE } from '../mapgen';
@@ -17,7 +17,7 @@ export const CACHE_PACK = 60;
 const CACHE_MIN_D = 30;
 /** 置き場の数の上限（超えたら、古い空の置き場から片づける） */
 const CACHE_MAX = 14;
-/** 置き場で食料を補う間合い（画素） */
+/** 置き場で食料を補う間合い（px） */
 const CACHE_R = 3.5 * TILE;
 
 /** 置き場をたどる一行：深部の探索と竜退治 */

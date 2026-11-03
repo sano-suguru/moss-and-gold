@@ -1,4 +1,4 @@
-/** Ecology のメソッド：保存（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+/** Ecology のメソッド：セーブとロード（シリアライズと復元。src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
@@ -60,7 +60,7 @@ export function restore(this: Ecology, o: any): void {
   this.lamps = o.LP || [];
   this.eggs = o.EG ? JSON.parse(JSON.stringify(o.EG)) : [];
   this.dragonShell = o.DSH ? { ...o.DSH } : null;
-  // 見た目のための印（描画だけ）
+  // 見た目のための印（描画専用）
   if (o.FX) {
     this.fxHits = JSON.parse(JSON.stringify(o.FX[0]));
     this.fxMarks = JSON.parse(JSON.stringify(o.FX[1]));

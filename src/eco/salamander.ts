@@ -226,7 +226,7 @@ export function seed(this: Ecology): void {
   }
 }
 
-/** 苔からウィスプが生まれる（苔の刻みから呼ばれる） */
+/** 苔からウィスプが生まれる（苔の更新から呼ばれる） */
 export function maybeSpawnWisp(this: Ecology, k: number, step: number): void {
   if (this.counts[Kind.Wisp] >= MAX_WISPS) return;
   if (this.w.moss[k] < 200 || ih(k, step, 99) % 45 >= MOSS_R || this.w.mana[k] < 2) return;
@@ -306,7 +306,7 @@ export function takeNutrients(this: Ecology, k: number, want: number, r = 3): nu
 }
 
 /**
- * マナから上位の魔物が生まれる（地上の時間で5秒ごと）：開いた床を数十か所見て、まわりのマナが濃く、条件の揃った所から、
+ * マナから上位の魔物が生まれる（通常速度で5秒ごと）：開いた床を数十か所見て、まわりのマナが濃く、条件の揃った所から、
  * トロール（60〜、暗がり）、ミノタウロス（50〜、迷路）、バジリスク（80〜、暗がり、人の気配が薄い）、
  * ドラゴンの幼子（120〜、ダンジョンにドラゴンがいない）が生まれる。生まれるとき、まわりのマナと土の養分を使う
  */
@@ -314,7 +314,7 @@ export function manaBirths(this: Ecology, day: number): void {
   const m = this.w.map;
   const n = this.counts;
   const dragons = this.list.some((c) => c.k === Kind.Dragon && !c.dead);
-  // 水の精：深い水とマナが重なる所から（地上の1分ごとに数か所を見る。ダンジョンに一体まで）
+  // 水の精：深い水とマナが重なる所から（通常速度で1分ごとに数か所を見る。ダンジョンに一体まで）
   if (this.step % 600 === 223 && !this.list.some((o) => o.elite === 6 && !o.dead) && this.w.tick - (this.lastElite[6] ?? -1e9) > DAY_TICKS_ECO * 2) {
     for (let i = 0; i < 80; i++) {
       const k = ih(this.step, i, 306) % (m.w * m.h);
@@ -333,7 +333,7 @@ export function manaBirths(this: Ecology, day: number): void {
       break;
     }
   }
-  // ドラゴンの幼子：ダンジョンにドラゴンがいなければ、6日目以降、深部のまわり（20マス）でいちばん濃い所を探し、70以上なら生まれる（地上の1分ごと）
+  // ドラゴンの幼子：ダンジョンにドラゴンがいなければ、6日目以降、深部のまわり（20マス）でいちばん濃い所を探し、70以上なら生まれる（通常速度で1分ごと）
   if (!dragons && this.step % 600 === 113 && this.w.tick > DAY_TICKS_ECO * 6 && this.w.tick - (this.lastArrival[Kind.Dragon] ?? -1e9) * 2 > DAY_TICKS_ECO * 2) {
     let bk = -1;
     let bv = 0;

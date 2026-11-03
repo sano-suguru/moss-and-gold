@@ -1,4 +1,4 @@
-/** 一行の様子を刻みごとに見る（三歩目の調べ物）。node tools/analysis/launch.mjs partydbg --run <回> --seed s --at 日 --ticks n */
+/** 一行の様子を tick ごとに表示する（三歩目の調査）。node tools/analysis/launch.mjs partydbg --run <実行結果のフォルダ> --seed s --at 日 --ticks n */
 import { DAY_TICKS, tick } from './lib/engine';
 import { openAt } from './lib/open';
 const argv = process.argv.slice(2);

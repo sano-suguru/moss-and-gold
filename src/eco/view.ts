@@ -1,4 +1,4 @@
-/** Ecology のメソッド：生き物の様子（画面の札のため。シミュレーションには関わらない）、見た目のための印（描画だけに使う。シミュレーションの判断には使わない）、演出のデモ（#fxdemo。シミュレーションは回さない）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+/** Ecology のメソッド：生き物の様子（情報パネルのため。シミュレーションには関わらない）、見た目のための印（描画専用。シミュレーションの判断には使わない）、演出のデモ（#fxdemo。シミュレーションは実行しない）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
@@ -166,7 +166,7 @@ export function nameOf(this: Ecology, c: Cr): string {
 }
 
 /**
- * 個体が育って特別になる（地上の1分ごとに見る）：
+ * 個体が育って特別になる（通常速度で1分ごとに見る）：
  * 大ネズミの王 … 6匹以上の巣穴の群れで、王のいない群れの、生まれて4日以上たったいちばん年長の大ネズミ。
  * ゴブリンの頭 … 5匹以上の集落で、頭のいない集落の、来て4日以上たったいちばん年長のゴブリン。
  */
@@ -176,7 +176,7 @@ export function riseLeaders(this: Ecology): void {
     if (k0 !== Kind.Rat && k0 !== Kind.Goblin) continue;
     const need = k0 === Kind.Rat ? 8 : 5;
     const el = k0 === Kind.Rat ? 4 : 5;
-    // ダンジョン全体で同時に一体まで。前の王（頭）が現れてから地上の2日はあける
+    // ダンジョン全体で同時に一体まで。前の王（頭）が現れてからゲーム内の2日はあける
     if (g.members.length < need || this.list.some((o) => o.elite === el && !o.dead)) continue;
     if (this.w.tick - (this.lastElite[el] ?? -1e9) < DAY_TICKS_ECO * 2) continue;
     let old: Cr | null = null;
@@ -245,7 +245,7 @@ export function advInteract(this: Ecology, c: Cr, p: Party, lights: Cr[]): boole
   c.dir = Math.abs(t.x - c.x) > Math.abs(t.y - c.y) ? (t.x > c.x ? 2 : 3) : t.y > c.y ? 0 : 1;
   const close = bd < 14 * 14;
   if (c.sp === Job.Bard) {
-    // 歌でなだめる：まわりの獣は吟遊詩人から離れて道を開ける（次に歌うまで、地上の時間で40秒あける）
+    // 歌でなだめる：まわりの獣は吟遊詩人から離れて道を開ける（次に歌うまで、通常速度で40秒あける）
     c.lureAt = this.step;
     c.act = 2;
     c.actT = 0;
@@ -298,7 +298,7 @@ export function advInteract(this: Ecology, c: Cr, p: Party, lights: Cr[]): boole
 export function demoSetup(this: Ecology, cx: number, cy: number): void {
   for (const c of this.list) if (Math.abs(c.x - cx) < 200 && Math.abs(c.y - cy) < 120) c.dead = 2;
   const pairs: [Kind, number, Kind, number, number][] = [
-    // 攻める種、職業、受ける種、職業、間合い（画素）
+    // 攻める種、職業、受ける種、職業、間合い（px）
     [Kind.Adventurer, 0, Kind.Goblin, 0, 18],
     [Kind.Adventurer, 5, Kind.Rat, 0, 70],
     [Kind.Adventurer, 1, Kind.Orc, 0, 70],
@@ -332,7 +332,7 @@ export function demoSetup(this: Ecology, cx: number, cy: number): void {
   });
 }
 
-/** デモの1刻み：組ごとに順番に技を出す（傷は与えない。4回に1回は強い一撃、6回に1回はとどめの見せ方） */
+/** デモの1 tick：組ごとに順番に技を出す（傷は与えない。4回に1回は強い一撃、6回に1回はとどめの見せ方） */
 export function demoTick(this: Ecology): void {
   const t = this.w.tick;
   this.demoPairs.forEach(([a, d], i) => {
@@ -349,7 +349,7 @@ export function demoTick(this: Ecology): void {
   });
 }
 
-/** 墓標の札：そこに眠る者の名前と位 */
+/** 墓標の情報パネル：そこに眠る者の名前と位 */
 export function describeGrave(this: Ecology, g: { name: string; job: number; rank: number; ret: number; t: number }): { title: string; lines: string[] } {
   return { title: '墓標', lines: [`${heroTitle(g)}がここに眠る`, `帰還${g.ret}回。${(g.t / DAY_TICKS_ECO).toFixed(1)}日目に倒れた`] };
 }

@@ -1,5 +1,5 @@
 /**
- * シードの組を回して（保存庫を使い回して）、out/<番号>-<シード>/ に置く。batch と ab が使う。
+ * 複数のシードを実行して（キャッシュにあれば再利用して）、結果を out/<番号>-<シード>/ に置く。batch と ab が使う。
  */
 import { cpus } from 'os';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
@@ -12,13 +12,13 @@ export const dirName = (seeds: string[], i: number) => `${String(i + 1).padStart
 
 export interface SetSpec { seeds: string[]; days: number; adv: number; ver: Bin; fork?: { day: number; base: Bin }; out: string }
 
-/** かかる時間の見積もり（保存庫の前の結果の1日あたりの秒数 × 残りの日数。重いものから先に回すため） */
+/** 実行時間の見積もり（キャッシュにある過去の結果の1日あたりの秒数 × 残りの日数。重いものから先に実行するため） */
 function weight(spec: SetSpec, seed: string): number {
   const from = spec.fork && spec.fork.base.simHash !== spec.ver.simHash ? spec.fork.day : 0;
   return (spec.days - from) * secPerDay(seed);
 }
 
-/** 複数の組をまとめて回す（同時に jobs 個。組をまたいで重いものから） */
+/** 複数のシードの組をまとめて実行する（並列数は jobs。組をまたいで重いものから） */
 export async function runSets(sets: SetSpec[], jobs = cpus().length, log: (s: string) => void = console.log): Promise<void> {
   const tasks = sets.flatMap((spec) =>
     spec.seeds.map((seed, i) => ({
@@ -36,7 +36,7 @@ export async function runSets(sets: SetSpec[], jobs = cpus().length, log: (s: st
   await pool(tasks, jobs);
 }
 
-/** 各シードの report.md を作る（同時に jobs 個） */
+/** 各シードの report.md を作る（並列数は jobs） */
 export async function reports(out: string, seeds: string[], jobs = cpus().length): Promise<void> {
   const rep = await getBin('report');
   await pool(seeds.map((_, i) => ({

@@ -1,8 +1,8 @@
 /**
- * 同じ冒険者を、遠征ごとに並べて撮る（頭の飾りで同じ人と分かるかの確かめ）。一行が一つの遠征、左が松明の灯りの下、右が暗がり。
- *   node build.mjs && node tools/analysis/launch.mjs samehero --seed seed27 --from 10 --to 18 [--hero <名簿の番号>] [--run <回したフォルダ>] [--name same-hero] [--max 4]
+ * 同じ冒険者を、遠征ごとに並べて撮る（頭の飾りで同じ人と分かるかの確認）。1行が一つの遠征、左が松明の灯りの下、右が暗がり。
+ *   node build.mjs && node tools/analysis/launch.mjs samehero --seed seed27 --from 10 --to 18 [--hero <名簿の番号>] [--run <実行結果のフォルダ>] [--name same-hero] [--max 4]
  * 名簿の番号を省くと、その間にいちばん多く遠征に出た者（灯りを持たない職業を先に）を選ぶ。
- * --one で遠征ごとに一こま（灯りの下）だけ（傷の姿など）。
+ * --one で遠征ごとに1フレーム（灯りの下）だけ（傷の姿など）。
  * 灯りの下：いちばん近い灯り（松明・光の呪文）から1.5マスの内。暗がり：3.5マスより遠く、日の光や光る苔にも照らされていない。
  */
 import { mkdirSync, writeFileSync } from 'fs';
@@ -20,7 +20,7 @@ const to = Math.round(+(opt('to', '18') as string) * DAY_TICKS);
 const name = opt('name', 'same-hero') as string;
 const maxTrips = +(opt('max', '4') as string);
 const zoom = +(opt('zoom', '4') as string);
-/** --one：遠征ごとに一こま（灯りの下）だけ。傷の姿のように、遠征をまたいだ変わり方を見るとき */
+/** --one：遠征ごとに1フレーム（灯りの下）だけ。傷の姿のように、遠征をまたいだ変わり方を見るとき */
 const one = argv.includes('--one');
 const JOBS = ['戦士', '魔法使い', '盗賊', '僧侶', '吟遊詩人', '狩人', '竜殺し'];
 const RANKS = ['見習い', '熟練', '歴戦', '英雄'];
@@ -82,7 +82,7 @@ async function main(): Promise<void> {
       continue;
     }
     if (h.cid && h.cid !== cid) {
-      // 新しい遠征：前の遠征の二こまがそろっていれば残す
+      // 新しい遠征：前の遠征の2フレームがそろっていれば残す
       if (got[0] && (got[1] || one)) frames.push(...(one ? [shots[0]] : shots));
       if (cid) console.log(`  遠征 ${trip + 1}：灯りの下 ${got[0] ? '○' : '×'}、暗がり ${got[1] ? '○' : '×'}（いちばん近い灯り ${(minDl / T).toFixed(1)}〜${(maxDl / T).toFixed(1)}マス）`);
       minDl = 1e9;
@@ -115,13 +115,13 @@ async function main(): Promise<void> {
   }
   if (got[0] && (got[1] || one)) frames.push(...(one ? [shots[0]] : shots));
   if (!frames.length) {
-    console.log('撮れるこまがなかった');
+    console.log('撮れるフレームがなかった');
     return;
   }
   mkdirSync('build/film', { recursive: true });
   const json = join('build/film', `${name}.json`);
   writeFileSync(json, JSON.stringify({ frames, name, out: opt('out', 'docs/img'), title: `同じ冒険者の遠征ごとの姿：${title}（${seed}、${src}）`, cols: one ? 3 : 2 }));
-  console.log(`こま ${frames.length}（遠征 ${one ? frames.length : frames.length / 2} 回）→ ${json}`);
+  console.log(`フレーム ${frames.length}（遠征 ${one ? frames.length : frames.length / 2} 回）→ ${json}`);
   execFileSync('node', ['tools/gallery/film.mjs', json], { stdio: 'inherit' });
 }
 main();

@@ -1,4 +1,4 @@
-/** 群れの仲間どうしが、どれくらい重なって見えるかを数える（中心が4画素以内なら重なり） */
+/** 群れの仲間どうしが、どれくらい重なって見えるかを数える（中心が4px以内なら重なり） */
 import { DAY_TICKS, World } from '../../src/world';
 import { KIND_NAMES } from './common';
 const w = new World('abc'); const e = w.eco as any;

@@ -4,7 +4,7 @@
  *   npm run autopsy -- --seed seed7 --days 25 --kind 2 --cause starve       0〜25日目
  *   npm run autopsy -- --seed seed7 --from 18 --to 20 --kind 2 --cause starve
  *
- * 途中の状態の保存庫から始める（lib/open.ts）。詳しくは probe.ts。
+ * キャッシュにあるスナップショットから始める（lib/open.ts）。詳しくは probe.ts。
  */
 import { main } from './probe';
 const argv = process.argv.slice(2);

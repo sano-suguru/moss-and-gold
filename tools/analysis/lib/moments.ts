@@ -1,6 +1,6 @@
 /**
- * 見せたい瞬間の回数（見える相互作用の決まり：25日に一度も起きない場面は、眺める人にとって存在しないのと同じ）。
- * 回の記録（settle / births / deaths / exits）から、シードごとに数える。compare と advreport が表にする。
+ * 見せたい場面の発生回数（CLAUDE.md の「画面に見えること」：25日に一度も起きない場面は、見る人にとって存在しないのと同じ）。
+ * 各実行のログ（settle / births / deaths / exits）から、シードごとに数える。compare と advreport が表にする。
  *
  * 目安：たいていのシード（4分の3以上。16シードなら12以上）で、25日に1回以上（できれば数回）。
  */
@@ -14,7 +14,7 @@ export interface Moment {
   label: string;
 }
 
-/** 数える瞬間（並べる順） */
+/** 数える場面（表に並べる順） */
 export const MOMENTS: Moment[] = [
   { key: 'snatch', label: '通路での掠め取り：盗んだ' },
   { key: 'stalk', label: '通路での掠め取り：つけた' },
@@ -61,7 +61,7 @@ const read = (dir: string, f: string, since: number) =>
         .filter((r) => !(typeof r.t === 'number' && r.t <= since))
     : [];
 
-/** その回（1シード）の、瞬間ごとの回数。since（刻み）より後の記録だけ */
+/** 1回の実行（1シード）のログから、場面ごとの発生回数を数える。since（tick）より後のログだけ */
 export function countMoments(dir: string, since = -1): Record<string, number> {
   const s = read(dir, 'settle.jsonl', since);
   const b = read(dir, 'births.jsonl', since);
@@ -107,7 +107,7 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
   };
 }
 
-/** 回の組（シードごとの回数）の表の1行：起きたシード（目安に届けば ✅）、合計、シードごとの中央値 */
+/** 表の1セル（シードごとの回数から）：起きたシードの数（目安に届けば ✅）、合計、シードごとの中央値 */
 export function momentCell(vals: number[]): string {
   const n = vals.length;
   const hit = vals.filter((v) => v > 0).length;
@@ -117,7 +117,7 @@ export function momentCell(vals: number[]): string {
   return `${ok ? '✅' : '❌'} ${hit}/${n}（計 ${vals.reduce((a, v) => a + v, 0)}、中央値 ${med}）`;
 }
 
-/** 見せたい瞬間の表（いくつかの回を並べる）。runs[i][j] は回 i のシード j の数え */
+/** 見せたい場面の表（複数の実行の組を列に並べる）。runs[i][j] は組 i のシード j の回数 */
 export function momentTable(names: string[], runs: Record<string, number>[][]): string[] {
   const L = [
     '## 見せたい瞬間の回数',

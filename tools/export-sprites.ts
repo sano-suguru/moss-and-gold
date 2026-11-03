@@ -1,4 +1,4 @@
-// 生き物のドット絵を PNG のスプライトシートと、コマの位置を書いた JSON に書き出す。
+// 生き物のドット絵を PNG のスプライトシートと、各フレームの位置を書いた JSON に書き出す。
 // 使い方: npx esbuild tools/export-sprites.ts --bundle --platform=node --outfile=build/export.js && node build/export.js
 // 書き出した PNG はドット絵ツールで手直しできる（アルファ 255 は体、254 は輪郭や目、253 はそれ自体が光る部分）。
 import { mkdirSync, writeFileSync } from 'fs';

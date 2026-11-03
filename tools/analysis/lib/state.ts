@@ -1,5 +1,5 @@
 /**
- * 状態（ゲームの保存と同じ形の JSON）の書き出しと読み込み。checkpoint.json と、途中の状態の保存庫（*.json.gz）で使う。
+ * 状態（ゲームのセーブデータと同じ形の JSON）のシリアライズと読み書き。checkpoint.json と、スナップショットのキャッシュ（*.json.gz）で使う。
  */
 import { gunzipSync, gzipSync } from 'zlib';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
@@ -23,7 +23,7 @@ const i32 = (s: string) => {
   return new Int32Array(u.buffer, u.byteOffset, u.byteLength / 4).slice();
 };
 
-/** 保存の形（JSON にできるもの） */
+/** セーブデータの形（JSON にできるもの） */
 export type Saved = Record<string, any> & { seed: string; tick: number; n: number };
 
 export function encodeState(w: World): Saved {
@@ -48,7 +48,7 @@ export function readState(path: string): Saved {
   return JSON.parse((path.endsWith('.gz') ? gunzipSync(b) : b).toString('utf8'));
 }
 
-/** 書く（途中で止まっても壊れたファイルが残らないよう、別名で書いてから名前を変える） */
+/** 状態を書き出す（途中で止まっても壊れたファイルが残らないよう、一時ファイルに書いてからリネームする） */
 export function writeState(path: string, s: Saved | string): void {
   const txt = typeof s === 'string' ? s : JSON.stringify(s);
   const tmp = `${path}.${process.pid}.tmp`;

@@ -73,9 +73,9 @@ export function orc(this: Ecology, c: Cr): void {
 /**
  * オークの見極め（威嚇して退く）：冒険者の一行に気づき（7マス、見通しが利く）、一行の強さ（英雄のいる一行はそれだけ強く見積もる）が
  * 自分たち（6マスの内のオーク）よりはっきり上（1.5倍）なら、襲わずにその場で唸って武器を打ち鳴らし（st 20：一行の方を向いて
- * 武器を振る動きを3回、ORC_BLUFF 歩）、縄張りの奥へ退く（st 21：住みかの印 hx, hy へ。住みかがなければ一行から離れる方へ）。
+ * 武器を振る動きを3回、ORC_BLUFF 回の更新）、縄張りの奥へ退く（st 21：住みかの印 hx, hy へ。住みかがなければ一行から離れる方へ）。
  * 勝ち目があれば今までどおり。退いているオークを、目標でない一行は追わない（orcYields）。
- * 状態は st と ref（一行）と lureAt（始めた歩）。step.ts の判断のはじめ（潜む・縄張り・狩りより先）に呼ぶ
+ * 状態は st と ref（一行）と lureAt（始めた step 番号）。step.ts の判断のはじめ（潜む・縄張り・狩りより先）に呼ぶ
  */
 export const ORC_BLUFF = 24;
 const ORC_WITHDRAW = 600;
@@ -103,9 +103,9 @@ export function orcWary(this: Ecology, c: Cr): boolean {
     }
     const el = this.step - c.lureAt;
     if (c.st === 20) {
-      // 唸って武器を打ち鳴らす：一行の方を向き、武器を振る動きを8歩ごとに
+      // 唸って武器を打ち鳴らす：一行の方を向き、武器を振る動きを生き物の更新8回ごとに
       if (near) c.dir = Math.abs(near.x - c.x) > Math.abs(near.y - c.y) ? (near.x > c.x ? 2 : 3) : near.y > c.y ? 0 : 1;
-      // 威嚇の間は武器を振る動きを続け（8歩ごとに振り直す）、唸り声を上げる。頭の上の「！」は描画（creatureView）が st 20 を見て出す
+      // 威嚇の間は武器を振る動きを続け（生き物の更新8回ごとに振り直す）、唸り声を上げる。頭の上の「！」は描画（creatureView）が st 20 を見て出す
       c.act = 2;
       if (el % 8 === 0) {
         c.actT = 0;
@@ -302,7 +302,7 @@ export function collectTribute(this: Ecology, c: Cr): void {
 
 /**
  * 従う集落：オークの縄張り（寝床）から20マス以内のゴブリンの集落は、いちばん近い縄張りのオークに従う。
- * そのオークは、腹を空かせたら取り立てに来る（goCollect。同じ集落へは地上の1/3日あける）
+ * そのオークは、腹を空かせたら取り立てに来る（goCollect。同じ集落へはゲーム内の1/3日あける）
  */
 export function updateVassals(this: Ecology): void {
   for (const cp of this.camps) {
@@ -332,7 +332,7 @@ export function updateVassals(this: Ecology): void {
 }
 
 /**
- * 腹を空かせたオーク c を、従う集落のうち、取り立てから地上の1/3日たち蓄えのあるいちばん近い所へ送る（七巡目）。
+ * 腹を空かせたオーク c を、従う集落のうち、取り立てからゲーム内の1/3日たち蓄えのあるいちばん近い所へ送る（七巡目）。
  * 送ったら true（同じ集落へは tribT まで行かない）
  */
 export function goCollect(this: Ecology, c: Cr): boolean {

@@ -228,7 +228,7 @@ export function abandonCamp(this: Ecology, cp: Camp, reason: number): boolean {
 }
 
 /**
- * 集落の見張り（10刻みごと）：冒険者の一行、若い竜と成竜、トロール、ミノタウロスが近づくと、
+ * 集落の見張り（生き物の更新10回ごと）：冒険者の一行、若い竜と成竜、トロール、ミノタウロスが近づくと、
  * 群れより明らかに強ければ暗がりに散って隠れ（hide 1）、一行が弱ければ暗がりで待ち伏せる（hide 2）。
  * 隠れているのを見つかったり、待ち伏せで負けそうになったら、皆で深い方へ逃げ散る（一行が去れば戻る）
  */
@@ -625,13 +625,13 @@ export function updateCamps(this: Ecology): void {
       let dragonNear = false;
       for (const o of this.list) if (o.k === Kind.Dragon && !o.dead && o.sp >= 1 && sq((o.hx || o.x) - cp.x) + sq((o.hy || o.y) - cp.y) < 30 * TILE * 30 * TILE) dragonNear = true;
       const lonely = members.length < 2 && this.w.tick - (cp.alone as number) > DAY_TICKS_ECO;
-      // 蓄えが残っているうちは、食べ物のことでは捨てない。尽きて地上の1/3日たち、皆が腹を空かせているか、飢え死にしかけている者がいるとき
-      // （ゴブリンは腹を空かせてから地上の約0.4日で飢え死にするので、コボルトのように1日は待てない）
+      // 蓄えが残っているうちは、食べ物のことでは捨てない。尽きてゲーム内の1/3日たち、皆が腹を空かせているか、飢え死にしかけている者がいるとき
+      // （ゴブリンは腹を空かせてからゲーム内の約0.4日で飢え死にするので、コボルトのように1日は待てない）
       const starving = members.every((c) => c.hungry > 0 || c.food < 10) || members.some((c) => c.hungry > SPEC[Kind.Goblin].starve * 0.5);
       const reason = (cp.raids ?? 0) >= 4 ? 1 : dragonNear ? 3 : lonely ? 2 : (cp.empty ?? -1) >= 0 && this.w.tick - (cp.empty as number) > DAY_TICKS_ECO / 3 && starving ? 0 : -1;
       if (reason >= 0 && cp.hide !== 1 && this.abandonCamp(cp, reason)) continue;
     }
-    // かがり火：まわりの枯れかけたキノコの軸を集めて燃やし続ける。燃えた分は灰になって土に返る（地上の時間で20秒ごと）
+    // かがり火：まわりの枯れかけたキノコの軸を集めて燃やし続ける。燃えた分は灰になって土に返る（通常速度で20秒ごと）
     if (this.step % 100 === 65) {
       if ((cp.fuel ?? 0) < 12) {
         const m = this.w.map;

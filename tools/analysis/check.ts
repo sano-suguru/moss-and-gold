@@ -1,11 +1,11 @@
 /**
- * 早めの確かめ：大きな batch の前に、決まった途中の状態から2〜4シードを短く回して、新しい流れが実際に起きるかを見る（1〜2分）。
+ * 短時間のチェック：大きな batch の前に、固定のスナップショットから2〜4シードを短く実行して、新しい挙動が実際に起きるかを見る（1〜2分）。
  *
- *   npm run check                     checks.ts の確かめをすべて
+ *   npm run check                     checks.ts のチェックをすべて
  *   npm run check -- --only 貢ぎ物     名前に「貢ぎ物」を含むものだけ
- *   npm run check -- --base HEAD~2    出発点の状態を作る版（既定 HEAD。その版で最初から from 日目まで回した状態）
+ *   npm run check -- --base HEAD~2    出発点のスナップショットを作るベース（既定 HEAD。そのコミットで0日目から from 日目まで実行した状態）
  *
- * 確かめの中身は tools/analysis/checks.ts。届かないものがあれば終わりの値を 1 にする。
+ * チェックの中身は tools/analysis/checks.ts。目安に届かないものがあれば終了コードを 1 にする。
  */
 import { cpus } from 'os';
 import { existsSync, readFileSync } from 'fs';
@@ -31,7 +31,7 @@ async function main() {
   const adv = defaultAdv();
   const jobsMap = new Map<string, { seed: string; from: number; to: number }>();
   for (const c of checks) for (const s of c.seeds) jobsMap.set(`${s}|${c.from}|${c.to}`, { seed: s, from: c.from, to: c.to });
-  console.log(`確かめ ${checks.length} 件、回すもの ${jobsMap.size}（前の版 ${a.base || 'HEAD'}：${base.simHash}、いまの版：${ver.simHash}）`);
+  console.log(`チェック ${checks.length} 件、実行するもの ${jobsMap.size}（ベース ${a.base || 'HEAD'}：${base.simHash}、作業ツリー：${ver.simHash}）`);
   const dirs = new Map<string, string>();
   await pool([...jobsMap].map(([k, j]) => ({ w: j.to - j.from, f: async () => {
     dirs.set(k, await ensureRun({ seed: j.seed, days: j.to, adv, ver, fork: { day: j.from, base } }, (s) => console.log(s)));

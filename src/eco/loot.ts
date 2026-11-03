@@ -6,7 +6,7 @@
  *
  * 目標（竜、大物、アンデッド、ゴブリン退治）を果たした一行は、戦利品を一つ担ぐ（Party.trophy は種の番号、trophyBy は担ぐ者）。
  * 担ぐ者が倒れれば仲間が担ぎ直し、全滅すれば倒れた所に残る（床の道具 ItemKind.Trophy。fuel に種の番号）。
- * 生きて帰れば記録に「〜の一行が竜の牙を持ち帰った」。戦利品は帳簿に入らない（姿と記録だけ）。
+ * 生きて帰れば記録に「〜の一行が竜の牙を持ち帰った」。戦利品は保存則の対象外（姿と記録だけ）。
  */
 import { Cr, Ecology, ItemKind, Job, Kind, Party, sq } from '../ecology';
 import { TILE } from '../mapgen';
@@ -64,7 +64,7 @@ export function trophyBearer(this: Ecology, alive: Cr[]): Cr | null {
   return alive.find((c) => c.sp === Job.Slayer) ?? alive.find((c) => c.sp === Job.Warrior) ?? alive[0] ?? null;
 }
 
-/** 担ぐ者が倒れたら、仲間が担ぎ直す（updateParties から、毎歩） */
+/** 担ぐ者が倒れたら、仲間が担ぎ直す（updateParties から、生き物の更新ごと） */
 export function carryTrophy(this: Ecology, p: Party, alive: Cr[]): void {
   if (!p.trophy) return;
   const by = this.byId.get(p.trophyBy ?? 0);

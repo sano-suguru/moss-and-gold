@@ -39,7 +39,7 @@ export interface MapData {
   humidity: Uint8Array;
   /** 1 = 溶岩 */
   lava: Uint8Array;
-  /** 湧き水（phase は水量の波の位相、刻み） */
+  /** 湧き水（phase は水量の波の位相。単位は tick） */
   springs: { x: number; y: number; phase: number }[];
   /** 吸い込み穴（地下へ水が抜ける） */
   sinks: { x: number; y: number }[];

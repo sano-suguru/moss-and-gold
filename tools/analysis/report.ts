@@ -1,12 +1,13 @@
 /**
- * sim の記録から、報告（report.md）と地図の画像を作る。
+ * sim のログから、レポート（report.md）とマップの画像を作る。
  *
  *   npm run report -- --run runs/kashitare
  *
  * 作るもの（同じフォルダ）：
- *   report.md     種ごとの数の移り変わり、死因と手を下した種、生き物の由来、死に場所の偏り、帳簿、おかしな兆候
- *   deaths.png    地形の上に、死んだ場所の濃さ（赤）を重ねた地図（1マス3画素）
- *   births.png    地形の上に、生き物が現れた場所（入口・裂け目・中で生まれた）を重ねた地図
+ *   report.md     種ごとの数の移り変わり、死因と手を下した種、生き物の由来、死に場所の偏り、保存則、おかしな兆候
+ *   deaths.png    地形の上に、死んだ場所の濃さ（赤）を重ねたマップ（1マス3px）
+ *   mana.png      地形の上に、マナの濃さ（紫）を重ねたマップ
+ *   births.png    地形の上に、生き物が現れた場所（入口・裂け目・中で生まれた）を重ねたマップ
  */
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -34,7 +35,7 @@ const m = w.map;
 const name = (k: number) => (k >= 0 ? KIND_NAMES[k] ?? `種${k}` : '—');
 const days = samples.length ? samples[samples.length - 1].day : 0;
 const L: string[] = [];
-L.push(`# シミュレーションの報告：シード「${meta.seed}」、${days.toFixed(2)}日`, '');
+L.push(`# シミュレーションのレポート：シード「${meta.seed}」、${days.toFixed(2)}日`, '');
 
 // ---- 種ごとの数 ----
 const kinds = new Set<number>();
@@ -108,7 +109,7 @@ for (const d of deathsNW) {
   cellCount.set(c, (cellCount.get(c) ?? 0) + 1);
 }
 const nearEntrance = deaths.filter((d) => Math.abs(d.x / 16 - m.entrance.x) + d.y / 16 < 16).length;
-L.push('## 死に場所の偏り（ウィスプを除く）', '', `入口から16マス以内で死んだ割合：${((nearEntrance / Math.max(1, deaths.length)) * 100).toFixed(1)}％（入口のまわりは地図の約${((16 * 16 * 2) / (m.w * m.h) * 100).toFixed(1)}％）`, '', '| 区画（x, y マス） | 死んだ数 | 割合 | 多い種と死因 |', '|---|---:|---:|---|');
+L.push('## 死に場所の偏り（ウィスプを除く）', '', `入口から16マス以内で死んだ割合：${((nearEntrance / Math.max(1, deaths.length)) * 100).toFixed(1)}％（入口のまわりはマップの約${((16 * 16 * 2) / (m.w * m.h) * 100).toFixed(1)}％）`, '', '| 区画（x, y マス） | 死んだ数 | 割合 | 多い種と死因 |', '|---|---:|---:|---|');
 for (const [c, n] of [...cellCount].sort((a, b) => b[1] - a[1]).slice(0, 10)) {
   const cx = (c % cw) * CELL;
   const cy = Math.floor(c / cw) * CELL;
@@ -120,14 +121,14 @@ for (const [c, n] of [...cellCount].sort((a, b) => b[1] - a[1]).slice(0, 10)) {
 }
 L.push('');
 
-// ---- 帳簿 ----
+// ---- 保存則 ----
 const last = samples[samples.length - 1];
 const drifts = samples.filter((s) => s.nutrientDrift !== 0 || s.goldDrift !== 0 || s.rockDrift !== 0 || (s.manaDrift ?? 0) !== 0);
-if (drifts.length) anomalies.push(`帳簿がずれた（最初は${drifts[0].day}日目：養分${drifts[0].nutrientDrift}、金貨${drifts[0].goldDrift}、岩${drifts[0].rockDrift}）`);
-L.push('## 帳簿と環境', '', `- 養分：総量 ${last.total}、生き物が使える量 ${last.available}（はじめ ${samples[0].available}）、ずれ ${last.nutrientDrift}`, `- 金貨：${last.gold}、ずれ ${last.goldDrift}`, `- マナ：土 ${last.mana ?? '-'}、生き物 ${last.manaHeld ?? '-'}、ずれ ${last.manaDrift ?? '-'}`, `- 岩：ずれ ${last.rockDrift}、瓦礫 ${last.rubble}マス、開いた床 ${last.open}マス（はじめ ${samples[0].open}）`, `- 死骸：${last.corpses}`, `- 噂：${last.rumors}、外の世界の地図：${last.lore}区画`, '');
+if (drifts.length) anomalies.push(`保存則がずれた（最初は${drifts[0].day}日目：養分${drifts[0].nutrientDrift}、金貨${drifts[0].goldDrift}、岩${drifts[0].rockDrift}）`);
+L.push('## 保存則と環境', '', `- 養分：総量 ${last.total}、生き物が使える量 ${last.available}（はじめ ${samples[0].available}）、ずれ ${last.nutrientDrift}`, `- 金貨：${last.gold}、ずれ ${last.goldDrift}`, `- マナ：土 ${last.mana ?? '-'}、生き物 ${last.manaHeld ?? '-'}、ずれ ${last.manaDrift ?? '-'}`, `- 岩：ずれ ${last.rockDrift}、瓦礫 ${last.rubble}マス、開いた床 ${last.open}マス（はじめ ${samples[0].open}）`, `- 死骸：${last.corpses}`, `- 噂：${last.rumors}、外の世界の地図：${last.lore}区画`, '');
 
-// ---- 出来事 ----
-L.push(`## 出来事（全${events.length}件、種類ごとの数）`, '');
+// ---- 出来事（ゲーム内ログ） ----
+L.push(`## 出来事（ゲーム内ログ。全${events.length}件、種類ごとの数）`, '');
 const evc = new Map<string, number>();
 for (const e of events) {
   const key = String(e.m).replace(/\{k:(\d+)\}/g, (_: string, n: string) => name(+n)).replace(/（.*?）/g, '').replace(/\d+/g, 'N');
@@ -178,7 +179,7 @@ function dot(img: Uint8Array, x: number, y: number, col: number[], a: number) {
 const di = baseMap();
 for (const d of deaths) dot(di, d.x, d.y, [255, 40, 40], 0.35);
 writeFileSync(join(run, 'deaths.png'), encodePng(m.w * S, m.h * S, di));
-// マナの濃さの地図（紫）
+// マナの濃さのマップ（紫）
 const mi = baseMap();
 for (let k = 0; k < w.mana.length; k++) {
   const v = Math.min(1, w.mana[k] / 60);
@@ -189,4 +190,4 @@ writeFileSync(join(run, 'mana.png'), encodePng(m.w * S, m.h * S, mi));
 const bi = baseMap();
 for (const b of births) if (b.k !== 0) dot(bi, b.x, b.y, b.origin === 'entrance' || b.origin === 'mouth' ? [255, 140, 40] : b.origin === 'shaft' ? [255, 230, 80] : b.origin === 'fissure' ? [190, 110, 255] : b.origin === 'river' ? [90, 170, 255] : [80, 220, 120], 0.35);
 writeFileSync(join(run, 'births.png'), encodePng(m.w * S, m.h * S, bi));
-console.log(`報告を書きました：${join(run, 'report.md')}（${days.toFixed(2)}日、死んだ ${deaths.length}、現れた ${births.length}、兆候 ${anomalies.length}）`);
+console.log(`レポートを書きました：${join(run, 'report.md')}（${days.toFixed(2)}日、死んだ ${deaths.length}、現れた ${births.length}、兆候 ${anomalies.length}）`);

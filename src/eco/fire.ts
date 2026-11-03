@@ -5,7 +5,7 @@ import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
 
-/** マスに火をつける（燃えている刻み数） */
+/** マスに火をつける（dur は燃え続ける長さ。生き物の更新の回数） */
 export function ignite(this: Ecology, k: number, dur: number): void {
   const m = this.w.map;
   if (k < 0 || k >= m.solid.length || m.solid[k]) return;

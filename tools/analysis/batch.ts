@@ -1,15 +1,15 @@
 /**
- * 多くのシードの試運転を並べて回し、シードを横に並べた比較の表を作る。
+ * 多くのシードを並列に実行し、シードを横に並べた比較の表を作る。
  *
  *   npm run batch -- --seeds "abc,かしたれ,はじまりの洞窟,seed4" --days 25
- *   npm run batch -- --seeds 16 --days 25 --out runs/b16          （--seeds 8 / 16 は決まったシードの組。lib/seeds.ts）
- *   npm run batch -- --seeds 8 --days 18 --fork 10 --base HEAD     （前の版の10日目の状態から、いまの版で18日目まで）
- *   npm run batch -- --seeds 8 --days 25 --ref HEAD~1              （前の版で回す）
- *   npm run batch -- --out runs/batch-mine --summary               （回さずに表だけ作り直す）
+ *   npm run batch -- --seeds 16 --days 25 --out runs/b16          （--seeds 8 / 16 は固定のシードの組。lib/seeds.ts）
+ *   npm run batch -- --seeds 8 --days 18 --fork 10 --base HEAD     （HEAD の10日目のスナップショットから、作業ツリーで18日目まで）
+ *   npm run batch -- --seeds 8 --days 25 --ref HEAD~1              （HEAD~1 のコードで実行する）
+ *   npm run batch -- --out runs/batch-mine --summary               （実行せずに表だけ作り直す）
  *
- * 回した結果は版ごとの保存庫（runs/.cache/run、lib/runs.ts）に置き、<out>/<番号>-<シード>/ にはそこから切り出して写す。
- * 同じ版・同じシードを前に回していれば回さずに使い、日数が足りなければ続きから回す（分けても結果は同じ）。
- * 同時に --jobs（既定は CPU の数）個、かかる時間の長いシードから回す。終わったら各フォルダに report.md を作り、<out>/summary.md を書く。
+ * 実行結果はシミュレーションのソースのハッシュごとのキャッシュ（runs/.cache/run、lib/runs.ts）に置き、<out>/<番号>-<シード>/ にはそこから切り出してコピーする。
+ * 同じソース・同じシードを前に実行していれば再実行せずに使い、日数が足りなければ再開して続きを実行する（分けて実行しても結果は同じ）。
+ * 並列に --jobs（既定は CPU の数）個、時間のかかるシードから実行する。終わったら各フォルダに report.md を作り、<out>/summary.md を書く。
  */
 import { cpus } from 'os';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
@@ -45,9 +45,9 @@ async function runAll() {
   const ver = await getBin('sim', cfg.ref || 'cur');
   const base = cfg.fork ? await getBin('sim', cfg.fork.ref || 'HEAD') : undefined;
   const adv = cfg.advMax ?? defaultAdv();
-  console.log(`${cfg.seeds.length} シード × ${cfg.days} 日${cfg.fork ? `（${cfg.fork.ref} の ${cfg.fork.day} 日目の状態から）` : ''}、版 ${ver.simHash}、同時に ${jobs}（${out}）`);
+  console.log(`${cfg.seeds.length} シード × ${cfg.days} 日${cfg.fork ? `（${cfg.fork.ref} の ${cfg.fork.day} 日目のスナップショットから）` : ''}、バージョン ${ver.simHash}、並列 ${jobs}（${out}）`);
   await runSets([{ seeds: cfg.seeds, days: cfg.days, adv, ver, fork: cfg.fork && base ? { day: cfg.fork.day, base } : undefined, out }], jobs);
-  console.log(`回し終わり（${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
+  console.log(`実行終わり（${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
 }
 
 // ---------------- 比較の表 ----------------
@@ -81,7 +81,7 @@ interface SeedSum {
   born: Map<number, number>;
   exits: Map<number, Map<string, number>>;
   deaths: Map<number, Map<string, number>>;
-  /** 種ごとの、冒険者に倒された数、ドラゴンに焼かれた数 */
+  /** 種ごとの、冒険者に倒された数と、ドラゴンに焼かれた数 */
   byAdv: Map<number, number>;
   byDragonFire: Map<number, number>;
   series: Map<number, number[]>;
@@ -166,7 +166,7 @@ function summarizeSeed(i: number): SeedSum | null {
   return s;
 }
 
-/** 口の種類（地形はシードだけで決まるので作って読む） */
+/** 口の種類（地形はシードだけで決まるので、地形を生成して読む） */
 function readMouthKinds(seed: string): number[] {
   return generate(seed).mouths.map((m) => m.kind);
 }
@@ -187,8 +187,8 @@ function writeSummary() {
   const row = (label: string, f: (s: SeedSum) => string | number) => `| ${label} | ${sums.map((s) => String(f(s))).join(' | ')} |`;
   L.push(`# 比較の表：${sums.length} シード × ${cfg.days} 日${cfg.advMax !== undefined ? `（冒険者の一行の上限 ${cfg.advMax}）` : ''}`, '', `作った日時：${new Date().toISOString()}。各シードの詳しい報告は ${out}/<番号>-<シード>/report.md。`, '');
 
-  L.push('## 概要と帳簿', '', ...head('項目'));
-  L.push(row('回した日数', (s) => fx(s.days, 2)));
+  L.push('## 概要と保存則', '', ...head('項目'));
+  L.push(row('実行した日数', (s) => fx(s.days, 2)));
   L.push(row('最後の生き物の数', (s) => s.alive));
   L.push(row('養分のずれ（最大）', (s) => s.drift.nutr));
   L.push(row('金貨のずれ（最大）', (s) => s.drift.gold));
@@ -205,7 +205,7 @@ function writeSummary() {
   const elKinds = [...new Set(sums.flatMap((s) => [...s.elites.keys()]))].sort((a, b) => a - b);
   for (const el of elKinds) L.push(row(`特別な個体：${ELITE_NAMES[el] ?? `特別${el}`}`, (s) => s.elites.get(el) ?? 0));
   if (!elKinds.length) L.push(row('特別な個体', () => 0));
-  L.push('', '（日付は地上の1/4日ごとの記録で最初に見えた日。特別な個体は、記録に一度でも生きて現れた数）', '');
+  L.push('', '（日付はゲーム内の1/4日ごとのサンプルで最初に見えた日。特別な個体は、サンプルに一度でも生きて現れた数）', '');
 
   L.push('## 自然の口から来た種', '', '来た＝地表の横穴・地底の裂け目・川の口・天井の裂け目から現れた数。去った・死んだはその種のすべて（中で生まれた個体を含む）。', '');
   for (const k of NATURAL) {
@@ -241,7 +241,7 @@ function writeSummary() {
     L.push('');
   }
 
-  L.push('## 住みついた群れが続いた日数', '', 'できた数 / 続いた日数の中央値・最長 / 最後に残っていた数。続いた日数は、地上の1/4日ごとの記録で見えた最初から最後まで（最後まで残ったものは打ち切り）。', '', ...head('群れ'));
+  L.push('## 住みついた群れが続いた日数', '', 'できた数 / 続いた日数の中央値・最長 / 最後に残っていた数。続いた日数は、ゲーム内の1/4日ごとのサンプルで見えた最初から最後まで（最後まで残ったものは打ち切り）。', '', ...head('群れ'));
   for (const [key, label] of SETTLE_NAMES)
     L.push(row(label, (s) => {
       const st = s.settle.get(key);

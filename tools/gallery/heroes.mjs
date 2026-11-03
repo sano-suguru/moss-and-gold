@@ -1,7 +1,7 @@
 /**
- * 名簿の冒険者の、位ごとの姿の一覧（見習い・熟練・歴戦・英雄を、職業ごとに並べる）を撮る → docs/img/hero-ranks.png
+ * 名簿の冒険者の、位ごとの姿の一覧画像（見習い・熟練・歴戦・英雄を、職業ごとに並べる）を作る → docs/img/hero-ranks.png
  *   node tools/gallery/heroes.mjs [--out docs/img/hero-ranks.png] [--scale 4]
- * 色は絵そのもの（ゲームの明かりは当てない）。姿は職業ごとに決まった二人分（look）を、正面・横・後ろで並べる。墓標も添える。
+ * 色はスプライトそのもの（ゲームのライティングは当てない）。姿は職業ごとに固定の二人分（外見のビット `look`）を、正面・横・後ろで並べる。墓標も添える。
  */
 import { buildSync } from 'esbuild';
 import { createRequire } from 'module';
@@ -41,4 +41,4 @@ const pg = await b.newPage({ viewport: { width: 1800, height: 900 } });
 await pg.goto('file://' + process.cwd() + '/build/hero-ranks.html');
 await pg.screenshot({ path: out, fullPage: true });
 await b.close();
-console.log('撮った：' + out);
+console.log('スクリーンショットを撮った：' + out);

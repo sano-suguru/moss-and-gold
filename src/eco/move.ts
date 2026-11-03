@@ -1,4 +1,4 @@
-/** Ecology のメソッド：小道具、生き物の格子（近くの相手を探す）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+/** Ecology のメソッド：ユーティリティ、生き物の空間グリッド（近くの相手を探す）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
@@ -189,7 +189,7 @@ export function lit(this: Ecology, k: number, day: number): number {
 
 export function spawn(this: Ecology, k: Kind, x: number, y: number, body: number, food: number): Cr {
   this.record('births', { t: this.w ? this.w.tick : 0, k, origin: this.originNext || 'born', x: Math.round(x), y: Math.round(y) } as never);
-  // マナから生まれた者は、描画で出現の演出をする（描画だけの印）
+  // マナから生まれた者は、描画で出現の演出をする（描画専用の印）
   const fromMana = this.originNext === 'mana';
   this.originNext = '';
   const c: Cr = {
@@ -433,7 +433,7 @@ export function updateForage(this: Ecology): void {
   this.openMoss = mo;
   this.openFungus = fu;
   this.edibleMoss = ed;
-  // 巣穴ごとの養える数も、同じ時機に数え直す（読み込み直しても同じ値になるように、決まった刻みで）
+  // 巣穴ごとの養える数も、同じ時機に数え直す（ロードし直しても同じ値になるように、決まったタイミングで）
   for (const b of this.burrows) b.cap = this.burrowCap(b);
   // 畑の外のキノコ（ゴブリンは、コボルトの畑に引き寄せられては来ない）
   let farm = 0;
@@ -601,7 +601,7 @@ export function die(this: Ecology, c: Cr, cause = '', by = -1): void {
     // 仲間がゴーレムに倒されるのを見た一団は、宝物庫を避ける
     if (this.list.some((o) => o.k === Kind.Dwarf && !o.dead && o !== c)) this.hold.golem = 1;
   }
-  // 倒れた者の道筋の記憶は捨てる（保存されないので、起き上がったときに保存の前後で食い違わないように）
+  // 倒れた者の道筋の記憶は捨てる（paths はセーブされないので、起き上がったときにセーブ／ロードの前後で食い違わないように）
   this.paths.delete(c.id);
   this.dropBelongings(c);
   if (c.gold > 0) {

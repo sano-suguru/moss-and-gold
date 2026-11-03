@@ -1,7 +1,7 @@
 /**
  * 生き物たち（Ecology）のメソッドを、種・仕組みごとのファイルから集める。
- * クラスの本体（状態と保存しない控え）は src/ecology.ts、メソッドは src/eco/*.ts にあり、ここで読み込むと prototype に足される。
- * Ecology を作る前に、かならずここを読み込む（world.ts が読み込む）。
+ * クラスの本体（状態のフィールドと、セーブしないキャッシュ）は src/ecology.ts、メソッドは src/eco/*.ts にあり、ここで import すると prototype に足される。
+ * Ecology を作る前に、かならずここを import する（world.ts が import している）。
  */
 export * from '../ecology';
 import './move';

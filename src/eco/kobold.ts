@@ -266,7 +266,7 @@ export function kobold(this: Ecology, c: Cr): void {
     if (c.st === 4 || c.st === 13) c.st = 0;
     return;
   }
-  // 腹いっぱいの者は、蓄えが足りなければ住処へ持ち帰る（集めに出た者が腹を満たしたあとも。以前は1歩だけ住処へ向かって、そのまま忘れていた）
+  // 腹いっぱいの者は、蓄えが足りなければ住処へ持ち帰る（集めに出た者が腹を満たしたあとも。以前は1回の更新だけ住処へ向かって、そのまま忘れていた）
   // 持ち帰る道中（st 13）は、歩くうちに腹がこなれても、半分を超えて残っていれば運び込む
   if (wr && !c.hungry && c.food > s.cap * (c.st === 13 ? 0.55 : 0.75) && home < 30 * TILE * 30 * TILE && (wr.store ?? 0) < this.storeGoal(wr) && (c.st === 0 || c.st === 4 || c.st === 13)) {
     c.st = 13;
@@ -447,7 +447,7 @@ export function leaveWithGroup(this: Ecology, c: Cr): void {
   if (this.goTo(c, ex, ey, s.speed) || sq(ex - c.x) + sq(ey - c.y) < 30 * 30) this.exitCreature(c, 'abandoned');
 }
 
-/** 生きたまま外へ出ていく（帳簿と記録） */
+/** 生きたまま外へ出ていく（保存則の収支に計上し、stats の exits に記録する） */
 export function exitCreature(this: Ecology, c: Cr, reason: string): void {
   this.record('exits', { t: this.w.tick, k: c.k, reason, x: Math.round(c.x), y: Math.round(c.y) } as never);
   this.w.manaLeaked += c.mana;
@@ -579,7 +579,7 @@ export function updateWarrens(this: Ecology): void {
     for (const o of this.list) if (o.k === Kind.Dragon && !o.dead && o.sp >= 1 && sq((o.hx || o.x) - wr.x) + sq((o.hy || o.y) - wr.y) < 30 * TILE * 30 * TILE) dragonNear = true;
     if (members.length >= 2) wr.alone = -1;
     else if ((wr.alone ?? -1) < 0) wr.alone = this.w.tick;
-    // 1匹になっても、地上の1日は新しく来る仲間を待つ（来る者はいちばん小さな住処に加わる）
+    // 1匹になっても、ゲーム内の1日は新しく来る仲間を待つ（来る者はいちばん小さな住処に加わる）
     const lonely = members.length < 2 && this.w.tick - (wr.alone as number) > DAY_TICKS_ECO;
     const reason = (wr.raids ?? 0) >= 4 ? 1 : dragonNear ? 3 : lonely ? 2 : (wr.empty ?? -1) >= 0 && this.w.tick - (wr.empty as number) > DAY_TICKS_ECO && members.every((c) => c.hungry > 0 || c.food < 10) ? 0 : -1;
     if (reason >= 0 && wr.hide !== 1 && this.abandonWarren(wr, reason)) continue;
@@ -765,7 +765,7 @@ export function placeTrap(this: Ecology, wr: Warren): void {
   }
 }
 
-/** 罠：冒険者が踏むと傷を負い、罠は消える（毎刻み） */
+/** 罠：冒険者が踏むと傷を負い、罠は消える（生き物の更新ごと） */
 export function checkTraps(this: Ecology): void {
   if (!this.traps.length) return;
   const m = this.w.map;
@@ -795,7 +795,7 @@ export function checkTraps(this: Ecology): void {
 }
 
 /**
- * 住処の見張り（10刻みごと）：冒険者の一行が近づき、群れより明らかに強ければ奥に隠れる。
+ * 住処の見張り（生き物の更新10回ごと）：冒険者の一行が近づき、群れより明らかに強ければ奥に隠れる。
  * 隠れているところを見つかったら（入口に踏み込まれたら）、皆で深い方へ逃げる。一行が離れたら隠れるのをやめる
  */
 export function watchWarrens(this: Ecology): void {

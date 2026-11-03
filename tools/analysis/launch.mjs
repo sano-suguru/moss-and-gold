@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * 分析の道具を組み立てて回す：node tools/analysis/launch.mjs <道具> [引数...]
+ * 分析ツールをビルドして実行する：node tools/analysis/launch.mjs <ツール名> [引数...]
  * （npm run sim / batch / probe などはこれを通る）。
- * 組み立てたものは runs/.cache/bin/<道具>-<中身のハッシュ>.js に置き、中身が同じなら組み立て直さない。
- * --ref <git の参照> を最初に置くと、その版の src/ で組み立てる（記録の仕方はいまのもの）。
+ * ビルドしたものは runs/.cache/bin/<ツール名>-<中身のハッシュ>.js に置き、中身が同じなら再ビルドしない。
+ * --ref <git の参照> を最初に置くと、そのコミットの src/ でビルドする（ログの出し方は作業ツリーのツールのもの）。
  */
 import { spawn } from 'child_process';
 import { bin } from './lib/bins.mjs';

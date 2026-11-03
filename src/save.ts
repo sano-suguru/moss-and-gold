@@ -78,14 +78,14 @@ export function unpackU8(s: string | undefined, n: number): Uint8Array | undefin
   return b && b.length === n ? b : undefined;
 }
 
-/** 保存を読む。段階1の保存しかない場合は、シードとカメラだけを引き継ぐ */
+/** セーブデータを読む。段階1のセーブデータしかない場合は、シードとカメラだけを引き継ぐ */
 export function load(): SaveData | undefined {
   try {
     const s = localStorage.getItem(KEY);
     if (s) {
       const d = JSON.parse(s) as SaveData;
       if (d && (d as { v: number }).v === 3 && typeof d.seed === 'string' && typeof d.tick === 'number') return d;
-      // 段階7a までの保存は、地形の作り方が変わったので、同じ言葉から新しいダンジョンとして始める
+      // 段階7a までのセーブデータは、地形の作り方が変わったので、同じ言葉から新しいダンジョンとして始める
       if (d && (d as { v: number }).v === 2 && typeof d.seed === 'string') return { v: 3, seed: d.seed, tick: 0, cam: d.cam, speed: d.speed ?? 1, seen: '' };
     }
     const o = localStorage.getItem(OLD_KEY);
@@ -103,6 +103,6 @@ export function save(d: SaveData): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(d));
   } catch {
-    /* 保存できない環境では何もしない */
+    /* セーブできない環境（localStorage が使えないなど）では何もしない */
   }
 }

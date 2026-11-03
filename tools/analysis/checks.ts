@@ -1,11 +1,11 @@
 /**
- * 早めの確かめ（npm run check）の中身。大きな batch の前に、決まった途中の状態から短く回して、新しい流れが実際に起きるかを見る。
+ * 短時間のチェック（npm run check）の項目。大きな batch の前に、固定のスナップショットから短く実行して、新しい挙動が実際に起きるかを見る。
  *
- * 一つの確かめ：seeds のそれぞれを、前の版（--base、既定 HEAD）の from 日目の状態から、いまの版で to 日目まで回し、
- * test に記録（from 日目より後のもの）を渡す。同じ (シード, from, to) の回は確かめどうしで共有し、保存庫（runs/.cache/run）にも残る。
- * いまの版を変えていなければ、2回目からは回さずに結果を使う。
+ * 一つのチェック：seeds のそれぞれを、ベース（--base、既定 HEAD）の from 日目のスナップショットから、作業ツリーで to 日目まで実行し、
+ * test にログ（from 日目より後のもの）を渡す。同じ (シード, from, to) の実行はチェック同士で共有し、キャッシュ（runs/.cache/run）にも残る。
+ * 作業ツリーのシミュレーションのソースを変えていなければ、2回目からは再実行せずに結果を使う。
  *
- * 確かめを足すときは、起きることがわかっているシードと日を、前の batch の settle.jsonl などから選ぶ（例：かしたれは10日目ごろに貢ぎ物）。
+ * チェックを足すときは、起きることがわかっているシードと日を、前の batch の settle.jsonl などから選ぶ（例：かしたれは10日目ごろに貢ぎ物）。
  */
 export interface Recs {
   seed: string;
@@ -17,7 +17,7 @@ export interface Recs {
   exits: any[];
   settle: any[];
   events: any[];
-  /** その日の状態（ゲームの保存と同じ形の JSON）。from〜to の整数の日 */
+  /** その日の日次スナップショット（ゲームのセーブと同じ形の JSON）。from〜to の整数の日 */
   state: (day: number) => any;
 }
 export interface Check {
@@ -25,7 +25,7 @@ export interface Check {
   seeds: string[];
   from: number;
   to: number;
-  /** シードごとの記録を受け取り、届いたかどうかと、表に出す値 */
+  /** シードごとのログを受け取り、目安に届いたかどうかと、表に出す値を返す */
   test: (r: Recs[]) => { ok: boolean; value: string };
 }
 
@@ -159,17 +159,17 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'ゴブリンの集落の蓄えが0でない時がある（集落のあった記録の1割以上）',
+    name: 'ゴブリンの集落の蓄えが0でない時がある（集落のあったサンプルの1割以上）',
     ...RUN_A,
     test: (rs) => {
       const v = rs.flatMap((r) => r.samples.filter((s) => (s.settle?.campStore ?? []).length).map((s) => sum(s.settle.campStore)));
       const pos = v.filter((x) => x > 0).length;
-      return { ok: v.length > 0 && pos >= 0.1 * v.length, value: `${pos}/${v.length} 記録` };
+      return { ok: v.length > 0 && pos >= 0.1 * v.length, value: `${pos}/${v.length} サンプル` };
     },
   },
   {
     // PR #2 のあと、この4シードでは10〜18日に新しい住処ができない（abc と seed7 は10日目より前からの住処が続く）。住処があるかで見る
-    name: 'コボルトの住処がある（4シードの記録の合計の1割以上）',
+    name: 'コボルトの住処がある（4シードのサンプルの合計の1割以上）',
     ...RUN_A,
     test: (rs) => {
       const n = rs.map((r) => r.samples.filter((s) => (s.settle?.warren ?? []).length).length);
@@ -178,7 +178,7 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 大ネズミは天井の裂け目や横穴から少しずつ来ては去るので、ある刻みに0匹でも絶えたとは限らない（前の版でも abc は0匹と数匹を行き来する）。来つづけるかで見る
+    // 大ネズミは天井の裂け目や横穴から少しずつ来ては去るので、ある tick に0匹でも絶えたとは限らない（変更前のコードでも abc は0匹と数匹を行き来する）。来つづけるかで見る
     name: '大ネズミが来つづける（4シードの合計で10匹以上来た）',
     ...RUN_A,
     test: (rs) => {
@@ -187,7 +187,7 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 七巡目：地表の横穴が開いたあとでも、絶えかけたら天井の割れ目から入り直す（abc と seed7 は前の版で0匹の日が続く）
+    // 七巡目：地表の横穴が開いたあとでも、絶えかけたら天井の割れ目から入り直す（abc と seed7 は変更前のコードで0匹の日が続く）
     name: '大ネズミが割れ目から入り直す（4シードで1回以上）',
     ...RUN_A,
     test: (rs) => {
@@ -196,7 +196,7 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 七巡目：取り立ては腹を空かせたときに、要る分（腹の空き＝120まで）を、蓄えの半分まで。空振り（0）は記録しない
+    // 七巡目：取り立ては腹を空かせたときに、要る分（腹の空き＝120まで）を、蓄えの半分まで。空振り（0）はログに残さない
     name: 'オークの取り立ては1回につき1〜120',
     ...RUN_ORC,
     test: (rs) => {
@@ -206,7 +206,7 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: '四つの帳簿がずれない',
+    name: '四つの保存則がずれない',
     ...RUN_A,
     test: (rs) => {
       const d = Math.max(0, ...rs.flatMap((r) => r.samples.map((s) => Math.max(Math.abs(s.nutrientDrift), Math.abs(s.goldDrift), Math.abs(s.rockDrift), Math.abs(s.manaDrift ?? 0)))));

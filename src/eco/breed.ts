@@ -7,7 +7,7 @@ import type { World } from '../world';
 
 /**
  * 大ネズミは巣穴で子を産み（親の蓄えから子の体を作る）、クモは巣に卵嚢を、トカゲは暖かい所に卵を残す。
- * 卵は地上の半日ほどで孵る。数は、これまでの上限（餌の量で決まる）を超えない
+ * 卵はゲーム内の半日ほどで孵る。数は、これまでの上限（餌の量で決まる）を超えない
  */
 export function breed(this: Ecology): void {
   const m = this.w.map;
@@ -19,7 +19,7 @@ export function breed(this: Ecology): void {
     let litters = 0;
     for (const b of this.burrows) {
       if (litters >= 1) break;
-      // 一つの巣穴が子を産むのは、地上の約4時間に1回まで（食べ物が豊かでも、一気には増えない）
+      // 一つの巣穴が子を産むのは、ゲーム内の約4時間に1回まで（食べ物が豊かでも、一気には増えない）
       if (ih(b.x, b.y * 7 + Math.floor(this.step / 300), 304) % 4 !== 0) continue;
       const res = this.list.filter((c) => c.k === Kind.Rat && !c.dead && c.hx === b.x && c.hy === b.y);
       // 巣穴のまわりで養える数を超えるなら産まない（移った先で殖えすぎてまた飢えないように）
@@ -68,7 +68,7 @@ export function breed(this: Ecology): void {
       this.eggs.push({ id: this.nextId++, k: Kind.Lizard, x: (spot % m.w) * TILE + 8, y: Math.floor(spot / m.w) * TILE + 9, t: this.w.tick, n: 2, units: 40 });
     }
   }
-  // 孵る（地上の半日ほど）
+  // 孵る（ゲーム内の半日ほど）
   for (let i = this.eggs.length - 1; i >= 0; i--) {
     const e = this.eggs[i];
     if (this.w.tick - e.t < DAY_TICKS_ECO / 2) continue;
@@ -118,7 +118,7 @@ export function updateDigging(this: Ecology): void {
     }
   }
   // 掘り当てた空洞と崩落を記録に残す。崩落の下にいた生き物は押しつぶされる
-  // 掘る音：この刻みに掘られたマス
+  // 掘る音：前回の生き物の更新から新しく掘られたマス（地形変更ログ digs の増えた分）
   for (let i = Math.max(0, this.lastDigCount); i < this.w.digs.length; i++) {
     const op = this.w.digs[i];
     if ((op & 7) !== 0) continue;

@@ -49,7 +49,7 @@ export function buildGroups(this: Ecology): void {
   for (const c of this.list) {
     if (c.dead || c.away) continue;
     const key = this.groupKeyRaw(c);
-    // 群れない種（groupKeyRaw がいつも null）は控えなくても groupKey が同じ null を返す
+    // 群れない種（groupKeyRaw がいつも null）はキャッシュしなくても groupKey が同じ null を返す
     if (key || GROUPED[c.k]) this.gkCache.set(c.id, key);
     if (!key) continue;
     let g = this.groups.get(key);
@@ -107,7 +107,7 @@ export function heedAlarm(this: Ecology, c: Cr): boolean {
   return true;
 }
 
-/** 群れの分家と合流（地上の時間で1分ごと） */
+/** 群れの分家と合流（通常速度で1分ごと） */
 export function tendGroups(this: Ecology): void {
   const m = this.w.map;
   // 大ネズミ：巣穴が8匹を超えたら、若い3匹が新しい巣穴へ分かれる
