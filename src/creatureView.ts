@@ -570,6 +570,12 @@ export class CreatureView {
         if (mk.m === '?' && listening.has(c.id)) continue;
         pushSprite(c.x + 5, c.y, 22 + pop + Ecology.bodySize(c.k) * 0.6, false, A.mark(mk.m), 0, 2);
       }
+      // オークの威嚇（src/eco/orc.ts の orcWary、st 20）：唸って武器を打ち鳴らしているあいだずっと、頭の上に「！」が跳ねる
+      for (const c of eco.list) {
+        if (c.k !== Kind.Orc || c.st !== 20 || c.dead || !inView(c.x, c.y, 20)) continue;
+        const hop = Math.abs(Math.sin(t * 9 + c.id)) * 2.5;
+        pushSprite(c.x + 5, c.y, 24 + hop + Ecology.bodySize(c.k) * 0.6, false, A.mark('!'), 0, 2);
+      }
       // 聞き耳の「？」：立ち止まって耳を澄ませているあいだずっと、皆の頭の上に（前は出た瞬間の2秒だけで、見落としやすかった）
       for (const id of listening) {
         const c = byId.get(id);

@@ -105,14 +105,38 @@ export function orcWary(this: Ecology, c: Cr): boolean {
     if (c.st === 20) {
       // 唸って武器を打ち鳴らす：一行の方を向き、武器を振る動きを8歩ごとに
       if (near) c.dir = Math.abs(near.x - c.x) > Math.abs(near.y - c.y) ? (near.x > c.x ? 2 : 3) : near.y > c.y ? 0 : 1;
+      // 威嚇の間は武器を振る動きを続け（8歩ごとに振り直す）、唸り声を上げる。頭の上の「！」は描画（creatureView）が st 20 を見て出す
+      c.act = 2;
       if (el % 8 === 0) {
-        c.act = 2;
         c.actT = 0;
         this.noise(c.x, c.y, 7);
-      } else if (c.actT >= 4) c.act = 0;
+      }
       if (el >= ORC_BLUFF) {
         c.st = 21;
         c.lureAt = this.step;
+        // 退く先：見通しの利く6マス先（16方向）のうち、一行からいちばん遠い所（tx, ty）。まずそこまで下がる
+        c.tx = c.x;
+        c.ty = c.y;
+        let best = -1;
+        for (const [ux, uy] of DIR16) {
+          for (const r of [6, 4, 2.5]) {
+            const x = c.x + ux * r * TILE;
+            const y = c.y + uy * r * TILE;
+            const k = this.tileOf(x, y);
+            if (k < 0 || this.w.map.solid[k] || this.w.map.lava[k] || this.w.water[k] > 20 || !lineOfSight(this.w.map, c.x, c.y, x, y)) continue;
+            let dmin = 1e18;
+            for (const id of p.members) {
+              const o = this.byId.get(id);
+              if (o && !o.dead) dmin = Math.min(dmin, sq(o.x - x) + sq(o.y - y));
+            }
+            if (dmin > best) {
+              best = dmin;
+              c.tx = x;
+              c.ty = y;
+            }
+            break;
+          }
+        }
       }
       return true;
     }
@@ -125,7 +149,10 @@ export function orcWary(this: Ecology, c: Cr): boolean {
       return false;
     }
     c.act = 1;
-    if (home && sq(c.hx - c.x) + sq(c.hy - c.y) >= 2 * TILE * 2 * TILE) this.goTo(c, c.hx, c.hy, s.speed * 1.1);
+    // 一行が近いうちは、まず一行から離れる方（tx, ty）へ下がる。離れたら縄張りの奥（住みかの印）へ
+    const back = !far && bd < 9 * TILE * 9 * TILE && sq(c.tx - c.x) + sq(c.ty - c.y) > TILE * TILE;
+    if (back) this.goTo(c, c.tx, c.ty, s.speed * 1.1);
+    else if (home && sq(c.hx - c.x) + sq(c.hy - c.y) >= 2 * TILE * 2 * TILE && (far || bd >= 9 * TILE * 9 * TILE)) this.goTo(c, c.hx, c.hy, s.speed * 1.1);
     else if (near) {
       const dx = c.x - near.x;
       const dy = c.y - near.y;

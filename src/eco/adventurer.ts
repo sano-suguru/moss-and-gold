@@ -87,7 +87,7 @@ export function maybeParty(this: Ecology): void {
   const aim = this.aimPhrase(party);
   // 引退の前の最後の遠征：英雄が見習いを連れて入る
   const old = heroes.find((h) => h.last && h.rank >= 3);
-  const ap = old ? heroes.find((h) => h.rank === 0 && h.trips === 1) : undefined;
+  const ap = old ? (heroes.find((h) => h.rank === 0 && h.trips === 1 && h.job === old.job) ?? heroes.find((h) => h.rank === 0 && h.trips === 1)) : undefined;
   const farewell = old ? `英雄${old.name}の最後の遠征${ap ? `、見習いの${JOB_NAMES[ap.job]}${ap.name}を連れて` : ''}。` : '';
   if (old) this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: pid, ev: 'farewell', n: old.id, how: ap ? ap.id : 0, x: 0, y: 0 } as never);
   const who = `${farewell}${heroTitle(heroes[0])}の一行（${names}）が、${aim ? aim + '、' : ''}`;
