@@ -87,7 +87,7 @@ export function doSleep(this: Ecology, c: Cr, day: number, phase: number): boole
 
 /**
  * もとから眠りにあたる状態を持つ種の眠りを、眠りの印として揃える（見た目と、寝込みを襲われることのため）：
- * 宝の上のドラゴン、目覚める前のワーム、ねぐらのコウモリ、焚き火を囲む冒険者（見張りを除く）は深い眠り
+ * 宝の上のドラゴン、目覚める前のワーム、ねぐらのコウモリ、焚き火を囲む冒険者（見張りと、手当て中の僧侶を除く）は深い眠り
  */
 export function syncLongSleep(this: Ecology): void {
   for (const c of this.list) {
@@ -98,9 +98,11 @@ export function syncLongSleep(this: Ecology): void {
     else if (c.k === Kind.Bat && c.st === 0 && !c.away) z = 2;
     else if (c.k === Kind.Adventurer) {
       const p = this.parties.find((q) => q.id === c.party);
-      if (p && (p.camp ?? -1) >= 0 && p.members[0] !== c.id && c.act === 0) z = 2;
+      // 僧侶は、傷ついた仲間を癒やしている間は起きている（癒やす動作のたびに起きたり寝たりして見えないように）
+      const tending = c.sp === Job.Priest && !!p && this.campWounded(p);
+      if (p && (p.camp ?? -1) >= 0 && p.members[0] !== c.id && c.act === 0 && !tending) z = 2;
       // 焚き火の見張りがうとうとしている間は、浅い眠り（小さな z）
-      else if (p && p.members[0] === c.id && c.act === 0 && this.watchDozing(p)) z = 1;
+      else if (p && p.members[0] === c.id && c.act === 0 && this.watchDozing(p) && !tending) z = 1;
     }
     c.sleep = z;
   }
