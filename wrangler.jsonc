@@ -1,5 +1,5 @@
 // Cloudflare Workers の静的アセットとして dist/ を公開する（Worker のコードは無い）。
-// 公開は GitHub Actions（.github/workflows/deploy.yml）から：main は本番、ほかのブランチはプレビューの URL。
+// 公開は GitHub Actions（.github/workflows/deploy.yml）から：main は本番、PR は本番に出さないプレビューの版（pr-<番号> の別名の URL を PR にコメント）。
 {
   "name": "moss-and-gold",
   "compatibility_date": "2026-10-01",

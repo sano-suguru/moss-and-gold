@@ -110,7 +110,13 @@ npm run shot -- --seed かしたれ --find warren         # 見たいもの（wa
 
 ## 公開（Cloudflare Workers の静的アセット）
 
-設定はすべてリポジトリの中：`wrangler.jsonc`（`dist/` をそのまま公開。Worker のコードは無い）と `.github/workflows/deploy.yml`。push するたびに GitHub Actions が `npm run typecheck` と `npm test` を通し、`npm run build` してから公開する。main は本番（`npx wrangler deploy`）、ほかのブランチ（`claude/…` など）はブランチ名のプレビューの URL（`wrangler versions upload --preview-alias`。マージの前に遊んで確かめられる）。Node の版は `.node-version`、wrangler は devDependencies。リポジトリの Secrets に `CLOUDFLARE_API_TOKEN` と `CLOUDFLARE_ACCOUNT_ID` が無ければ、公開だけ飛ばす。
+設定はすべてリポジトリの中：`wrangler.jsonc`（`dist/` をそのまま公開。Worker のコードは無い。`workers_dev` と `preview_urls` は true）と `.github/workflows/deploy.yml`。Node の版は `.node-version`、wrangler は devDependencies。
+
+- **PR**（作ったとき・push したとき）：`check` のジョブが `npm ci`・`npm run typecheck`・`npm test`・`npm run check`（前の版＝PR の行き先の main の10日目の状態から。main の保存庫が Release にあれば取ってくる）を回す（失敗すれば PR のチェックが赤）。`preview` のジョブが `npm run build` して `wrangler versions upload --preview-alias pr-<番号>`（本番には出さない版）を上げ、プレビューの URL を PR にコメントする（同じ PR では一つのコメントを書き換える。PR ごとに変わらない `pr-<番号>` の別名の URL と、コミットごとの URL）。フォークからの PR ではプレビューを作らない。
+- **main への push**：`npm run typecheck`・`npm test`・`npm run build` のあと本番へ（`npx wrangler deploy`）。
+- リポジトリの Secrets に `CLOUDFLARE_API_TOKEN` と `CLOUDFLARE_ACCOUNT_ID` が無ければ、公開だけ飛ばす。
+
+**dist はコミットしない**（`.gitignore` のとおり。`npm run build` で手元に作る）。PR には Actions がプレビューの URL を付けるので、遊んでの確かめや見た目の確かめはその URL でもできる（末尾に `#lit`・`#clean`・`#fxdemo` なども付けられる）。
 
 Cloudflare のスキルと MCP サーバー（プラグイン `cloudflare@cloudflare`、マーケットプレイスは `cloudflare/skills`）は `.claude/settings.json` で有効にしてあり、クラウドのセッションでも毎回入る。MCP は初めて使うときに OAuth で許可を求める。
 
