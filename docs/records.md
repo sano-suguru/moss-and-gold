@@ -1,21 +1,18 @@
-# 回した結果の記録の中身（runs/<名前>/）
+# 実行ログの形式（runs/<名前>/）
 
-`npm run sim` / `batch` / `ab` が書き出すファイル。数え方を変えたら、ここと sim.ts を合わせる。
-
+`npm run sim` / `batch` / `ab` が書き出すファイル。どのファイルも、`t` は tick、`k` は種の番号（`src/names.ts`）、`x, y` は px 単位の位置。出力の内容を変えたら、このページと tools/analysis/sim.ts をあわせて直す。
 
 | ファイル | 中身 |
 |---|---|
-| settle.jsonl | `{t, k, id, ev, how, reason, to, n, x, y}`。住みつく群れの出来事（k 10 コボルトの住処、k 12 ゴブリンの集落）：ev は found（how：arrive / move / split）、abandon（reason：food / raids / alone / dragon、to：leave / move）、empty |
-| samples.jsonl | 地上の1/4日ごと：シードの豊かさ（rich：開いた地表の横穴から道のり100マスで行ける床1マスあたりの、食べられる苔とキノコ）、種ごとの数（`counts` のキーは種の番号）、死骸、開いた床、瓦礫、使える養分、総量、帳簿のずれ（nutrientDrift / goldDrift / rockDrift）、噂、一行の数、外の世界の地図の区画数、ドワーフの住みかの段階 |
-| deaths.jsonl | `{t, k, cause, by, x, y, near?}`（near：飢え死にした大ネズミの、食べられる苔・キノコまでの歩いた道のり。60マスまで、なければ -1）。cause：eaten 食べられた / fight 打ち合い / starve 飢え / burned 焼けた / crushed 崩落 / petrified 石化 / killed 襲われた（ゾンビなど）/ dried 干からびた（スライム）/ faded ゴーストが消えた / planted マイコニドがキノコになった / crumbled スケルトンが崩れて消えた / other。by は手を下した種（なければ −1） |
-| births.jsonl | `{t, k, origin, x, y}`。origin：entrance 正面の入口 / mouth 地表の横穴 / fissure 地底の裂け目 / river 川の口 / shaft 天井の裂け目 / mana マナから / born 中で生まれた |
-| moves.jsonl | `{t, k, n, x, y, tx, ty}`。群れの引っ越し（大ネズミの巣穴）：何匹が、元の場所（x, y）から移った先（tx, ty）へ（画素） |
-| exits.jsonl | `{t, k, reason}`。starving 飢えて去った（住処のないコボルト、大物など） / returned 生還した冒険者 / home 満ちて巣へ帰った（ワイバーン） / abandoned 住処を捨てて群れで去った（コボルト） / dispersed 腹を空かせて群れで出ていった（大ネズミ） |
-| events.jsonl | ゲームの「記録」に出る出来事（`{k:番号}` は種の名前） |
-| checkpoint.json | ゲームの保存と同じ形。ブラウザの localStorage（キーは save.ts の KEY）に入れれば、その場面をゲームで開ける |
-| snap/dNNN.json.gz | 地上の1日ごとの状態（checkpoint と同じ形を gzip）。batch や ab の出力では meta.json の `snaps` が保存庫の場所を指す |
-| meta.json | シード、日数、刻み、冒険者の上限、版の系譜 `lineage`（どの版がどの刻みから回したか）、かかった秒数 |
+| settle.jsonl | `{t, k, id, ev, how, reason, to, n, x, y}`。定住する群れの出来事（k 10 コボルトの住処、k 12 ゴブリンの集落）。ev は found（住みついた。how：arrive 外から来た / move 引っ越した / split 分かれた）、abandon（捨てた。reason：food 食べ物が尽きた / raids 襲われすぎた / alone 1匹になった / dragon 竜が近くに来た。to：leave 外へ去った / move 中で移った）、empty（誰もいなくなった） |
+| samples.jsonl | ゲーム内の1/4日ごとのサンプル。シードの豊かさ（rich：開いた地表の横穴から歩いて100タイル以内の床1タイルあたりの、食べられる苔とキノコの量）、種ごとの数（`counts`、キーは種の番号）、死骸、開いた床、瓦礫、使える養分とその総量、保存則のずれ（nutrientDrift / goldDrift / rockDrift）、噂、冒険者パーティの数、外の世界の地図の区画数、ドワーフの拠点の発展段階 |
+| deaths.jsonl | `{t, k, cause, by, x, y, near?}`。cause は死因：eaten 食べられた / fight 戦って倒れた / starve 飢え / burned 焼死 / crushed 崩落 / petrified 石化 / killed 襲われた（ゾンビなど）/ dried 干からびた（スライム）/ faded ゴーストが消えた / planted マイコニドがキノコになった / crumbled スケルトンが崩れた / other。by は手を下した種（なければ −1）。near は飢え死にした大ネズミについてだけ、食べられる苔・キノコまでの歩いての距離（60タイルまで、なければ −1） |
+| births.jsonl | `{t, k, origin, x, y}`。origin は出現の経路：entrance 正面の入口 / mouth 地表の横穴 / fissure 地底の裂け目 / river 川の出口 / shaft 天井の裂け目 / mana マナから生まれた / born ダンジョンの中で生まれた |
+| moves.jsonl | `{t, k, n, x, y, tx, ty}`。大ネズミの巣穴の引っ越し：n 匹が、元の場所（x, y）から移った先（tx, ty）へ |
+| exits.jsonl | `{t, k, reason}`。ダンジョンから外へ出ていった理由：starving 飢えて去った（住処のないコボルト、大型の獣など） / returned 冒険者の生還 / home 満腹になって巣へ帰った（ワイバーン） / abandoned 住処を捨てて群れで去った（コボルト） / dispersed 空腹で群れごと出ていった（大ネズミ） |
+| events.jsonl | ゲーム内ログに表示される出来事（`{k:番号}` の所に種の名前が入る） |
+| checkpoint.json | ゲームのセーブデータと同じ形式。ブラウザの localStorage（キーは src/save.ts の `KEY`）に入れると、その場面をゲームで開ける |
+| snap/dNNN.json.gz | ゲーム内の1日ごとのスナップショット（checkpoint.json と同じ形式を gzip で圧縮）。batch や ab の出力では、meta.json の `snaps` がキャッシュ内の場所を指す |
+| meta.json | シード、日数、tick 数、冒険者パーティの上限、実行の来歴 `lineage`（どのバージョンのソースが、どの tick から実行したか）、実行にかかった秒数 |
 
-samples.jsonl は、刻みが `DAY_TICKS/4` の倍数のときに記録する（続きから回しても同じ刻み）。
-
-種の番号と名前は `src/names.ts`、賢さの段階は `TIER`、強さは `STR`（ecology.ts）。
+samples.jsonl は tick が `DAY_TICKS/4` の倍数のときに書く（中断・再開しても同じ tick で書かれる）。

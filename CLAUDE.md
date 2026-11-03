@@ -1,18 +1,29 @@
-# Moss & Gold（苔と金貨）：開発と分析の手引き（Claude Code 向け）
+# Moss & Gold（苔と金貨）：開発と分析のガイド（Claude Code 向け）
 
-見下ろし2Dのダンジョン生態系アクアリウム。WebGL2 で描き、シミュレーションは CPU 上で決定的に動く。プレイヤーは眺めるだけ（介入なし）。設計の原則は「いくつもの遊びが互いに意味を与え合う構造」。
-旧称「ダンジョン・アクアリウム」が保存のキー（save.ts の KEY）などに残っているが、保存データの互換のため変えない。
+見下ろし2Dのダンジョン生態系アクアリウム。描画は WebGL2、シミュレーションは CPU 上で決定的に動く。プレイヤーは眺めるだけで介入しない。設計の原則は「いくつもの遊びが互いに意味を与え合う構造」。
+旧称「ダンジョン・アクアリウム」が localStorage のキー（src/save.ts の `KEY`）などに残っているが、セーブデータの互換のため変えない。
 
-仕組みの詳しい説明（仕様書）は README.md（段階ごと）、各巡・各歩の狙いと結果は docs/（settling-*、adventurer-*）。種の番号と名前は `src/names.ts`。
+仕様（仕組みの詳しい説明）は README.md に段階ごとにまとまっている。各改修の狙いと結果は docs/（settling-*、adventurer-*）。種の番号と名前の対応は `src/names.ts`。
 
-## 見える相互作用の決まり
+## 文章の書き方
 
-眺めるゲームなので、内部の仕組みは画面の中で目に見える相互作用（生き物の動き、姿、場面の変化）として現れて初めて意味がある。記録の文章や生き物の札は補い。
+コメント、docs、コミットメッセージ、PR、報告に共通。
 
-- **見えることから決める**：新しい仕組みは、まず「画面で何が見えるか」を決め、それを起こすのに要る分だけ内部を作る。
-- **撮って添える**：作業の終わりに、その瞬間を撮って docs/img/ に置き、報告に添える（動きなら `npm run film` で数こまの連続）。撮れないときは理由を書く。
-- **起きる回数を確かめる**：25日に一度も起きない場面は無いのと同じ。見せたい瞬間のシードごとの回数（compare.md と advreport の表、数え方は tools/analysis/lib/moments.ts）を比べるときの標準の指標にする。目安は「16シードのうち12以上で、25日に1回以上、できれば数回」。めったに起きない特別な出来事（骨の竜など）は対象外。新しい瞬間を作ったら moments.ts に数え方を足す。
-- **見えない所を見つけたら**：小さな手直しで見せられるものはその場で直し、大きなものは報告に「見えない所」として挙げる（これまでの点検は docs/visibility-audit.md）。
+- **標準的な開発用語はそのまま使う**：tick、キャッシュ、スナップショット、チェックポイント、シード、ビルド、コミット、ハッシュ、invariant、A/B 比較など。直訳や言い換え（「刻み」「控え」「保存庫」「版」「回す」など）はしない。
+- **コードの中身は、何をするものかを言葉で書く**。関数名や変数名だけで説明を済ませない（名前は参照用に括弧で添える）。
+  - ×「`kobMouthOk` を600 tick ごとに更新」
+  - ○「コボルトがその横穴から入ってこられるか（近くに住める場所と食べ物があるか）の判定を、600 tick ごとに更新する（`kobMouthOk`）」
+- ゲームの中の名前（UI の表示、種や個体の名前、場所の名前）は日本語のまま。
+- 既存の文章は、触ったついでにこの書き方へ直す。
+
+## 「画面に見えること」を先に決める
+
+眺めるゲームなので、内部の仕組みは、画面の中の生き物の動き・姿・場面の変化として見えて初めて意味がある。ゲーム内ログの文章や生き物の情報パネルは補助。
+
+- **見えることから設計する**：新しい仕組みは、まず「画面で何が見えるか」を決め、それに要る分だけ内部を作る。
+- **スクリーンショットを添える**：作業の終わりに、その瞬間のスクリーンショットを docs/img/ に置いて報告に添える（動きなら `npm run film` で連続フレーム）。撮れないときは理由を書く。
+- **発生回数を確かめる**：25日に一度も起きない場面は、見る人にとって存在しないのと同じ。見せたい場面がシードごとに何回起きたか（compare.md と advreport の表。数え方は tools/analysis/lib/moments.ts）を、A/B 比較の標準の指標にする。目安は「16シード中12シード以上で、25日に1回以上、できれば数回」。ごくまれな特別イベント（骨の竜など）は対象外。新しい場面を作ったら moments.ts に数え方を足す。
+- **画面に出ない仕組みを見つけたら**：小さな修正で見せられるものはその場で直し、大きなものは報告に挙げる（これまでの点検結果は docs/visibility-audit.md）。
 
 ```bash
 npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 --name adv-enter   # → docs/img/<name>.png
@@ -20,81 +31,84 @@ npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 
 
 ## 最初に知っておくこと
 
-- **決定的**：同じシードからは同じ展開になる。乱数は `ih(a, b, salt)` などのハッシュで、`Math.random` は描画用だけ。
-- **保存からの再現**：保存して読み込み直しても続きが一致しなければならない。新しい状態は必ず `Ecology.serialize/restore`（または `WorldState`）に入れる。保存しない状態（描画だけのもの：血の跡、土ぼこり、演出など）はシミュレーションの判断に使わない。
-- **帳簿（保存則）**：次の四つは常に成り立つ。崩れたら不具合。
-  - 養分：`totalNutrients() − はじめ − imported + exported − born + washed = 0`
-  - 金貨：`totalGold() − はじめ − goldIn + goldOut = 0`
+- **決定性**：同じシードからは必ず同じ展開になる。乱数はハッシュ関数（`ih(a, b, salt)` など）で作り、`Math.random` は描画にだけ使う。
+- **セーブ／ロード後の再現性**：セーブしてロードし直しても、その後の展開が一致しなければならない。シミュレーションの状態を足したら、必ずシリアライズに入れる（`Ecology.serialize/restore` または `WorldState`）。セーブしない描画専用の状態（血の跡、土ぼこり、演出など）を、シミュレーションの判断に使ってはいけない。
+- **保存則（invariant）**：次の四つは常に成り立つ。崩れたらバグ。
+  - 養分：`totalNutrients() − 初期値 − imported + exported − born + washed = 0`
+  - 金貨：`totalGold() − 初期値 − goldIn + goldOut = 0`
   - 岩：`rockLedger() === initialRock`
-  - マナ：`totalMana() − manaBorn + manaLeaked + manaFaded = 0`（土の `world.mana` と、生き物の `Cr.mana`）
-- **キャッシュの作り直しの時機**：保存しない控え（`litMap`、`regionMap`、`dewMap`、`gkCache` など）は、刻みの番号か地形の変化の記録（`digs.length`）だけで作り直す時機を決める。「最後に作った刻みからの経過」で決めると、読み込み直したときにずれる（実際に何度も起きた）。
-- 時間：`TICKS_PER_SEC = 10`、地上の1日 `DAY_TICKS = 14400` 刻み。生き物は `CR_EVERY = 2` 刻みごとに動く。地図：192×144 マス、1マス16画素（`MapData`、mapgen.ts）。
+  - マナ：`totalMana() − manaBorn + manaLeaked + manaFaded = 0`（地面のマナ `world.mana` と、生き物が持つマナ `Cr.mana` の合計）
+- **キャッシュの無効化の条件**：セーブしないキャッシュ（明るさのマップ `litMap`、つながった洞窟の領域 `regionMap`、夜露のマップ `dewMap`、群れの識別 `gkCache` など）は、tick 番号か地形変更ログの長さ（`digs.length`）だけで作り直しを決める。「最後に作ってから何 tick たったか」で決めると、ロードし直したときに結果がずれる（実際に何度も起きた）。
+- 時間：`TICKS_PER_SEC = 10`。ゲーム内の1日は `DAY_TICKS = 14400` tick（通常速度で24分）。生き物は `CR_EVERY = 2` tick ごとに更新する。マップ：192×144 タイル、1タイル16px（src/mapgen.ts の `MapData`）。
 
 ## コマンドと分析の流れ
 
-道具はすべて `node tools/analysis/launch.mjs <道具>` を通る（npm run が呼ぶ）。**各道具の使い方は、そのファイルの先頭のコメント**（tools/analysis/*.ts）にある。
-回した結果と1日ごとの状態は、版（シミュレーションのソースの中身のハッシュ）ごとの保存庫 `runs/.cache/` に残り、同じ版・同じシードなら使い回す（しくみは docs/rework-tools.md。大きくなったら消してよい）。main の版の保存庫は、クラウドのセッションでは始まりのフックが Release「sim-cache」から裏で取ってくる（様子は runs/.cache/fetched/log.txt。マージ直後で無ければ手元で回る）。
+分析ツールはすべて `node tools/analysis/launch.mjs <ツール名>` から起動する（npm run も同じ）。**各ツールの使い方は、そのファイルの先頭のコメント**（tools/analysis/*.ts）にある。
+実行結果と日次スナップショットは、シミュレーションのソースのハッシュごとのキャッシュ `runs/.cache/` に残り、ソースとシードが同じならどのツールからも再利用される（しくみは docs/rework-tools.md。大きくなったら消してよい）。クラウドのセッションでは、SessionStart フックが main のキャッシュを GitHub Release「sim-cache」からバックグラウンドで取得する（ログは runs/.cache/fetched/log.txt。マージ直後で Actions が終わっていなければ取得できないので、手元で実行される）。
 
 ```bash
-npm install                       # 初回（クラウドのセッションでは始まりのフックが入れる）
-npm test                          # 決定性・帳簿・保存からの再現など（約12秒。TEST_FULL=1 で0日目から）
+npm install                       # 初回のみ（クラウドのセッションでは SessionStart フックが入れる）
+npm test                          # 決定性・保存則・ロード後の再現性など（約10秒。TEST_FULL=1 で0日目から）
 npm run typecheck
 npm run build                     # dist/index.html（外部依存なしの1ファイル。dist はコミットしない）
 ```
 
-ふだんの一巡：
+通常の作業の流れ：
 
-1. 手直しをしたら `npm test` と `npm run check`（決まった途中の状態から、新しい流れが実際に起きるか。約1分。中身は tools/analysis/checks.ts）。新しい流れを足したら、その確かめを checks.ts に足す。
-2. `npm run ab -- --preset quick`：8シード、前の版（HEAD）の10日目の状態から前の版といまの版で18日目まで続けて、対にして比べる（compare.md）。**「はっきり」の行だけを効き目とみなす**（「ばらつきの内」はシードごとの揺れで説明できる差。「1シードの寄与」の列も見る）。1シードでは効き目は分からない。
-3. 気になるものは `npm run probe -- deaths|life|calls|look|stuck`（途中の状態から数秒で始まる）で追う。使い捨てのスクリプトを書く前に probe と `--expr` で足りないか見る。自前のスクリプトなら `lib/open.ts` の `openAt(シード, 刻み)`。記録に無い値は `npm run metric`（1日ごとの状態から計算）で足りるか見て、足りなければ sim.ts の記録に足す。
-4. 区切りがついたら `npm run ab -- --preset final`（16シード×25日、最初から）で最終確認し、report.md の「おかしな兆候」と帳簿を見る。
-5. 帳簿のずれは `tools/analysis/drift.ts`、`manacheck.ts`、`goldcheck.ts` で、ずれた刻みとその刻みに変わった生き物を突き止める。
-
-```bash
-npm run ab -- --base HEAD~1 --seeds abc,かしたれ,seed4,seed7 --days 10   # 展開を変えないはずの整理：1バイトも違わないか（違えば終わりの値が 1）
-npm run ab -- --resume-check 7 --seeds かしたれ --days 10              # 途中で分けて回しても通しと一致するか
-npm run bench -- --repeat 3                                            # 速さ。手直しの前後は続けて測る
-```
-
-コードを直した直後は、いまの版の状態はまだないので、probe などは前の版（HEAD）の状態から、いまの版で続けて回す（何日目から分かれたかを表示する）。
-`sim` を直接回すと `--budget 秒`（既定270）で途中の状態を書き出して止まる（`--resume` で続ける）。batch・ab・check は止まらない。
-記録のファイル（settle.jsonl、samples.jsonl、deaths.jsonl など）の中身は docs/records.md。
-
-## 見た目の確認
+1. 変更したら `npm test` と `npm run check`。check は、固定のスナップショットから実行して、新しい挙動が実際に起きるかを確かめる短いテスト（約1分。項目は tools/analysis/checks.ts）。新しい挙動を足したら、その項目を checks.ts に足す。
+2. `npm run ab -- --preset quick`：8シードについて、HEAD の10日目のスナップショットから、HEAD と作業ツリーのそれぞれで18日目まで実行し、同じシード同士で比べる（結果は compare.md）。**判定が「はっきり」の行だけを効果とみなす**。「ばらつきの内」は、シードごとの展開のばらつきで説明できる程度の差という意味。1シードの出来事に引っ張られていないか「1シードの寄与」の列も見る。1シードだけでは効果は判断できない。
+3. 気になるものは `npm run probe -- deaths|life|calls|look|stuck` で調べる（スナップショットから始めるので数秒で動き出す）。使い捨てのスクリプトを書く前に、probe の `--expr` で足りないか見る。スクリプトが要るなら、`lib/open.ts` の `openAt(シード, tick)` でその時点の状態を取得する。ログに無い値は、まず `npm run metric`（日次スナップショットから計算する）で足りるか見て、足りなければ sim.ts のログ出力に足す。
+4. 区切りがついたら `npm run ab -- --preset final`（16シード×25日、0日目から）で最終確認し、report.md の「おかしな兆候」と保存則のずれを見る。
+5. 保存則がずれたら、`tools/analysis/drift.ts`・`manacheck.ts`・`goldcheck.ts` で、ずれた tick と、その tick に変化した生き物を特定する。
 
 ```bash
-npm run gallery -- --label before    # 直す前に撮って build/gallery/before/ に残す
-npm run gallery -- --compare before  # 直したあと、before と左右に並べた build/gallery/compare-before.png
-node tools/gallery/shoot.mjs --only dragon,camp     # 場面を選んで撮り直す（node build.mjs を先に）
-npm run shot -- --seed かしたれ --find warren         # 見たいものが出るまで進めて撮る（build/shots/）
+npm run ab -- --base HEAD~1 --seeds abc,かしたれ,seed4,seed7 --days 10   # 挙動を変えないはずのリファクタリング：出力が1バイトも違わないか（違えば終了コード 1）
+npm run ab -- --resume-check 7 --seeds かしたれ --days 10              # 7日目で中断・再開しても、通しで実行したときと一致するか
+npm run bench -- --repeat 3                                            # 実行速度。変更の前後は続けて測る
 ```
 
-場面は `tools/gallery/scenes.ts` の `SCENES`。数値では測れないので、必ず画像を見て判断する（一箇所を直すと別の場面が崩れることがある）。古い dist で撮らないよう `node build.mjs` を忘れない。
-URL の末尾に `#lit`（全体を明るく）、`#albedo`（地形の色だけ）、`#clean`（画面の部品を隠す）、`#fxdemo`（攻撃の演出の見本）を付けられる（`#clean,lit` のように並べてもよい）。
+コードを変更した直後は、作業ツリー用のスナップショットはまだ無い。probe などは HEAD のスナップショットから始めて、作業ツリーのコードで続きを実行する（何日目から分岐したかが表示される）。
+`sim` を直接実行すると、`--budget 秒`（既定270）を超えそうなときにチェックポイントを書き出して止まる（`--resume` で再開）。batch・ab・check は止まらない。
+ログファイル（settle.jsonl、samples.jsonl、deaths.jsonl など）の形式は docs/records.md。
 
-## 公開（Cloudflare Workers の静的アセット）
+## ビジュアルの確認
 
-`wrangler.jsonc`（`dist/` をそのまま公開）と `.github/workflows/deploy.yml`。PR では typecheck・test・check（main の10日目の状態から）が回り、プレビューの URL（`pr-<番号>`）が PR にコメントされる。main への push で本番へ。Secrets（`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`）が無ければ公開だけ飛ばす。設定の確かめは `npm run build && npx wrangler deploy --dry-run`。
+```bash
+npm run gallery -- --label before    # 変更前に撮って build/gallery/before/ に残す
+npm run gallery -- --compare before  # 変更後、before と左右に並べた build/gallery/compare-before.png を作る
+node tools/gallery/shoot.mjs --only dragon,camp     # 一部のシーンだけ撮り直す（先に node build.mjs）
+npm run shot -- --seed かしたれ --find warren         # 見たいものが現れるまで進めて撮る（build/shots/）
+```
 
-## ソースの地図
+シーンの定義は `tools/gallery/scenes.ts` の `SCENES`。見た目は数値では測れないので、必ず画像を見て判断する（一か所を直すと別のシーンが崩れることがある）。古い dist で撮らないよう、`node build.mjs` を忘れない。
+URL の末尾に `#lit`（全体を明るくする）、`#albedo`（地形の色だけ）、`#clean`（UI を隠す）、`#fxdemo`（攻撃エフェクトの見本）を付けられる。`#clean,lit` のように組み合わせてもよい。
+
+## デプロイ（Cloudflare Workers の静的アセット）
+
+設定は `wrangler.jsonc`（`dist/` をそのまま配信）と `.github/workflows/deploy.yml`。PR では typecheck・test・check（main の10日目のスナップショットから）が走り、プレビュー URL（エイリアス `pr-<番号>`）が PR にコメントされる。main への push で本番にデプロイする。Secrets（`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`）が無ければデプロイだけスキップする。設定の確認は `npm run build && npx wrangler deploy --dry-run`。
+
+## ソースの構成
 
 | ファイル | 中身 |
 |---|---|
 | src/mapgen.ts | 地形の生成（洞窟、迷路、水路、溶岩、苔、養分、宝物庫、深部、閉じた空洞） |
-| src/world.ts | 世界の1刻み（水、養分、熱、苔、キノコ、光、掘削、瓦礫、崩落、マナ `manaStep`）、地形の変化の記録 `digs`（`k*8+種類`、0 掘る / 1 瓦礫 / 2 崩落 / 3 風化 / 4 石畳） |
-| src/ecology.ts | Ecology のクラスの本体：状態、保存しない控え、定数（SPEC、STR、TIER など）、型。メソッドは無い |
-| src/eco/*.ts | Ecology のメソッドを種・仕組みごとに（rat、kobold、goblin、orc、adventurer、aim、raid、cache、listen、loot、roster、dwarf、dragon、step、move、senses、groups、sleep、combat、arrivals、save など）。index.ts がすべてを読み込む |
-| src/sprites.ts, atlas.ts | ドット絵の部品と、それを詰めた画像 |
+| src/world.ts | 世界の1 tick の更新（水、養分、熱、苔、キノコ、光、掘削、瓦礫、崩落、マナの流れ `manaStep`）。地形変更ログ `digs`（値は `k*8+種類`。種類は 0 掘削 / 1 瓦礫 / 2 崩落 / 3 風化 / 4 石畳） |
+| src/ecology.ts | 生き物全体を持つクラス Ecology の本体：状態のフィールド、セーブしないキャッシュ、定数（種ごとの性質 `SPEC`、強さ `STR`、賢さの段階 `TIER` など）、型。メソッドはここには無い |
+| src/eco/*.ts | Ecology のメソッドを、種や仕組みごとに分けたもの（rat、kobold、goblin、orc、adventurer、aim、raid、cache、listen、loot、roster、dwarf、dragon、step、move、senses、groups、sleep、combat、arrivals、save など）。src/eco/index.ts がすべてを読み込む |
+| src/sprites.ts, atlas.ts | ドット絵のパーツと、それをまとめたテクスチャアトラス |
 | src/creatureView.ts, renderer.ts, shaders.ts | 描画 |
-| src/main.ts | ループ、画面の部品、保存 |
+| src/main.ts | メインループ、UI、セーブ |
 | test/*.ts | テスト |
-| tools/gallery/ | 見た目の確認（scenes.ts・shoot.mjs：決まった場面の一覧、shot.ts：探して撮る、film.mjs：数こまの連続） |
-| tools/analysis/ | 分析の道具（入口は launch.mjs）。共通部品は lib/（engine.ts 進め方、state.ts 状態の読み書き、runs.ts 保存庫、open.ts 途中の状態、stats.ts 対にした比較の目安、seeds.ts シードの組、moments.ts 見せたい瞬間の数え方） |
+| tools/gallery/ | ビジュアル確認（scenes.ts・shoot.mjs：固定シーンの一覧、shot.ts：探して撮る、film.mjs：連続フレーム） |
+| tools/analysis/ | 分析ツール（入口は launch.mjs）。共通部品は lib/（engine.ts 実行、state.ts 状態の読み書き、runs.ts キャッシュ、open.ts スナップショットの取得、stats.ts A/B 比較の判定、seeds.ts 固定のシードの組、moments.ts 見せたい場面の数え方） |
 
 ## 変更するときの注意
 
-- 生き物の行動を変えたら、`npm test` と `npm run check` に加えて `npm run ab -- --preset quick` で兆候と帳簿を確かめる。テストは短いので、長く回して初めて出る不具合がある（例：ドワーフがあきらめて去るとき食料が帳簿から消えていた）。
-- 新しい「消える」「現れる」経路を足したら、帳簿（imported / exported / born / washed / goldIn / goldOut / 岩）と `stats`（deaths / births / exits）の両方に記録する。
-- Ecology にメソッドを足すときは、合う src/eco/*.ts に `export function 名前(this: Ecology, …)` で書き、そのファイルの末尾の `declare module` と `Object.assign` に名前を足す。新しいファイルなら src/eco/index.ts に import を足す。
-- 速さのための間引き：ウィスプ（光の精を除く）は生き物の1歩の4回に1回だけ判断する（`WISP_EVERY`。間引いた回は代謝だけ、`px` は動いた回の前の位置のまま残して描画の補間に使う）。苔とキノコは40刻みごとに2回ぶん進めるので、確率や増減を足すときは `MOSS_R` 倍にする。画面なしでは見たマスの更新が200刻みごとなので、見たマスを判断に使わない。
-- `false &&` で古い処理を止めると、型の絞り込みで別の所が型エラーになることがある。止めるなら処理ごと消す。
+- 生き物の行動を変えたら、`npm test` と `npm run check` に加えて `npm run ab -- --preset quick` で、異常の兆候と保存則を確かめる。テストは1日半しか実行しないので、長く実行して初めて出るバグがある（例：ドワーフがあきらめて去るとき、持っていた食料が養分の収支から消えていた）。
+- 生き物や物が「消える」「現れる」経路を足したら、保存則の出入り（imported / exported / born / washed / goldIn / goldOut / 岩）と、統計（`stats` の deaths / births / exits）の両方に記録する。
+- Ecology にメソッドを足すときは、種や仕組みに合う src/eco/*.ts に `export function 名前(this: Ecology, …)` で書き、そのファイルの末尾の `declare module` と `Object.assign` に名前を足す。新しいファイルなら src/eco/index.ts に import を足す。
+- 速度のための間引き：
+  - ウィスプ（光の精を除く）は、4回の更新に1回だけ行動を決め、その回にまとめて4回分動く（`WISP_EVERY`）。残りの3回は代謝だけ。`px` は動く前の位置のまま残し、描画の補間に使う。
+  - 苔とキノコは40 tick ごとに2回分まとめて進める。確率や増減を足すときは `MOSS_R` 倍にする。
+  - 画面なしの実行では、プレイヤーに見えたタイルの更新が200 tick ごとになる。なので、見えたタイルを生き物の判断に使わない。
+- `false &&` で古い処理を止めると、TypeScript の型の絞り込みで別の箇所が型エラーになることがある。止めるなら処理ごと消す。
