@@ -3,6 +3,7 @@ import { JOB_NAMES } from './names';
 /** 地上の一日の刻み（world と同じ） */
 export const DAY_TICKS_ECO = 14400;
 import type { World } from './world';
+import type { Grave, Hero } from './eco/roster';
 
 /** 生き物を動かす間隔（刻み） */
 export const CR_EVERY = 2;
@@ -158,6 +159,8 @@ export interface Party {
   trophyBy?: number;
   /** そばを通って身構えた、目標でない住処・集落・縄張り（同じ所では一度だけ） */
   passed?: number[];
+  /** 立ち止まった墓標（同じ墓標では一度だけ。src/eco/roster.ts） */
+  mourned?: number[];
   /** 見かけた竜の場所（生きて帰れば噂になる） */
   dgx?: number;
   dgy?: number;
@@ -622,6 +625,10 @@ export class Ecology {
   camps: Camp[] = [];
   /** 物資の置き場（深部の探索の一行が残す） */
   caches: SupplyCache[] = [];
+  /** 町の冒険者の名簿（12人）と、熟練以上の冒険者の墓標、名簿と墓標の番号の続き（src/eco/roster.ts） */
+  roster: Hero[] = [];
+  graves: Grave[] = [];
+  nextHero = 1;
   /** 種ごとに、最後に群れが来た刻み（立て続けに来ないように） */
   lastArrival: number[] = [];
   colonies: Colony[] = [];

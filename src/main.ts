@@ -181,8 +181,10 @@ function boot(): void {
     clearTimeout(tapTimer);
     tapTimer = window.setTimeout(() => {
       const c = world.eco.pick(wx, wy);
-      if (c) {
-        selected = c.id;
+      // 生き物がいなければ、墓標（番号を負にして選ぶ）
+      const g = c ? null : world.eco.pickGrave(wx, wy);
+      if (c || g) {
+        selected = c ? c.id : -(g as { id: number }).id;
         card.hidden = false;
         cardAt = 0;
       } else closeCard();
@@ -198,7 +200,8 @@ function boot(): void {
   });
   function updateCard(now: number) {
     if (!selected) return;
-    const c = world.eco.list.find((o) => o.id === selected);
+    const grave = selected < 0 ? world.eco.graves.find((o) => o.id === -selected) : undefined;
+    const c = grave ? { x: grave.x, y: grave.y + 8, dead: 0, away: false } : world.eco.list.find((o) => o.id === selected);
     if (!c || c.dead || c.away) {
       closeCard();
       return;
@@ -208,7 +211,7 @@ function boot(): void {
     cam.y += (c.y - 10 - cam.y) * 0.12;
     if (now - cardAt > 300) {
       cardAt = now;
-      const d = world.eco.describe(c, NAMES, JOB_NAMES);
+      const d = grave ? world.eco.describeGrave(grave) : world.eco.describe(c as Parameters<typeof world.eco.describe>[0], NAMES, JOB_NAMES);
       cardTitle.textContent = d.title;
       cardLines.textContent = '';
       for (const l of d.lines) {
@@ -583,6 +586,7 @@ function boot(): void {
 
     const alpha = Math.min(1, ((world.tick % CR_EVERY) + acc) / CR_EVERY);
     const cf = view.build(world.eco, { x0: ox, y0: oy, x1: ox + artW, y1: oy + artH }, t, alpha, dayIntensity(world.tick) <= 0);
+    renderer.flushAtlas(atlas);
     renderer.render({ originX: ox, originY: oy, artW, artH, scale, time: t, lights, halos, shafts, nShafts: ns, debug: DEBUG, ...cf });
 
     viewRect = { x0: ox, y0: oy, x1: ox + artW, y1: oy + artH };

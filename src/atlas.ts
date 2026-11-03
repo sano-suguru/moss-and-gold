@@ -1,9 +1,12 @@
-import { adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache } from './sprites';
+import { heroSprite, heroBed, graveMarker, prayLight, adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
 export const DIRS = ['down', 'up', 'side'] as const;
 export const ACTS = ['idle', 'move', 'attack', 'death'] as const;
+/** 名簿の冒険者のます目の大きさ（画素）と、区画の行数 */
+const HERO_CELL = 48;
+const HERO_ROWS = 12;
 
 export interface FrameInfo {
   x: number;
@@ -90,6 +93,19 @@ export interface Atlas {
   hut: number;
   /** 段階4以降の生き物（名前、向き、動作、コマ、段階）からコマ番号を引く */
   named: (name: string, dir: number, act: number, f: number, v?: number) => number;
+  /**
+   * 名簿の冒険者のコマ（姿と位ごと）。はじめて要るときに作って、絵の下の決まった区画（HERO_CELL 四方のます目）に描き、dirty に書き足す。
+   * ます目が埋まったら、いちばん長く使っていないものを描き替える。描画が dirty を見てテクスチャを部分的に送り直す
+   */
+  hero: (job: number, torch: boolean, look: number, rank: number, dir: number, act: number, f: number) => number;
+  /** 名簿の冒険者の寝具（身につける色の毛布） */
+  heroBed: (job: number, look: number, rank: number, f: number) => number;
+  /** 祈りの光（墓標の上に立ちのぼる聖印。f 0〜3 で薄れる） */
+  pray: (f: number) => number;
+  /** 墓標（rank 1〜3、身につける色） */
+  grave: (rank: number, color: number) => number;
+  /** 書き足して、まだテクスチャへ送っていないます目（x, y, w, h） */
+  dirty: [number, number, number, number][];
   /** 死骸（種の番号と段階 0 新しい、1 腐りかけ、2 骨） */
   corpse: (species: number, stage: number) => number;
 }
@@ -663,6 +679,17 @@ export function buildAtlas(): Atlas {
     return raws.length - 1;
   });
 
+  const prayFrames: number[] = [];
+  for (let f = 0; f < 4; f++) {
+    prayFrames.push(raws.length);
+    raws.push(prayLight(f) as RawFrame);
+  }
+  const graveFrames: number[] = [];
+  for (let r = 1; r <= 3; r++)
+    for (let c = 0; c < 6; c++) {
+      graveFrames.push(raws.length);
+      raws.push(graveMarker(r, c) as RawFrame);
+    }
   // 棚詰め
   // 高さの順に棚へ詰める（コマの番号はそのまま）
   const width = 2048;
@@ -682,8 +709,9 @@ export function buildAtlas(): Atlas {
     x += r.W + 1;
     rowH = Math.max(rowH, r.H);
   }
-  let height = 1;
-  while (height < y + rowH + 1) height *= 2;
+  // 名簿の冒険者のます目の区画（絵の下）
+  const heroY0 = y + rowH + 1;
+  const height = heroY0 + HERO_ROWS * HERO_CELL;
   const data = new Uint8Array(width * height * 4);
   raws.forEach((r, i) => {
     const fr = frames[i];
@@ -699,6 +727,61 @@ export function buildAtlas(): Atlas {
         data[q + 3] = m === 'wisp' ? 253 : m === 'glw' ? 252 : m === 'ghost' ? 251 : m === 'glint' ? 250 : m && m !== 'ol' ? 255 : 254;
       }
   });
+  // 名簿の冒険者のコマ：ます目に作って描く（いちばん長く使っていないます目から描き替える）
+  const dirty: [number, number, number, number][] = [];
+  const cols = Math.floor(width / HERO_CELL);
+  const nCells = cols * HERO_ROWS;
+  const cellKey: string[] = new Array(nCells).fill('');
+  const cellUsed = new Float64Array(nCells);
+  const cellFrame = new Int32Array(nCells).fill(-1);
+  const heroKeys = new Map<string, number>();
+  let useT = 0;
+  const JOBS = ['warrior', 'wizard', 'thief', 'priest', 'bard', 'hunter', 'slayer'];
+  const heroFrame = (job: number, torch: boolean, look: number, rank: number, d: number, a: number, f: number): number => {
+    const key = `${job},${torch ? 1 : 0},${look},${rank},${d},${a},${f & 3}`;
+    useT++;
+    const hit = heroKeys.get(key);
+    if (hit !== undefined) {
+      cellUsed[hit] = useT;
+      return cellFrame[hit];
+    }
+    let cell = 0;
+    for (let i = 1; i < nCells; i++) if (cellUsed[i] < cellUsed[cell]) cell = i;
+    if (cellKey[cell]) heroKeys.delete(cellKey[cell]);
+    const r = (a === 4 ? heroBed(JOBS[job] ?? 'warrior', look, rank, f & 3) : heroSprite(JOBS[job] ?? 'warrior', DIRS[d], ACTS[a], f & 3, torch, look, rank)) as RawFrame;
+    const x0 = (cell % cols) * HERO_CELL;
+    const y0 = heroY0 + Math.floor(cell / cols) * HERO_CELL;
+    const W = Math.min(r.W, HERO_CELL);
+    const H = Math.min(r.H, HERO_CELL);
+    for (let yy = 0; yy < HERO_CELL; yy++)
+      for (let xx = 0; xx < HERO_CELL; xx++) {
+        const q = ((y0 + yy) * width + x0 + xx) * 4;
+        if (xx >= W || yy >= H) {
+          data[q + 3] = 0;
+          continue;
+        }
+        const p = yy * r.W + xx;
+        if (!r.px[p * 4 + 3]) {
+          data[q + 3] = 0;
+          continue;
+        }
+        data[q] = r.px[p * 4];
+        data[q + 1] = r.px[p * 4 + 1];
+        data[q + 2] = r.px[p * 4 + 2];
+        const m = r.mat[p];
+        data[q + 3] = m === 'wisp' ? 253 : m === 'glw' ? 252 : m === 'ghost' ? 251 : m === 'glint' ? 250 : m && m !== 'ol' ? 255 : 254;
+      }
+    const info = { x: x0, y: y0, w: W, h: H, ax: r.ax, ay: r.ay };
+    if (cellFrame[cell] < 0) {
+      cellFrame[cell] = frames.length;
+      frames.push(info);
+    } else frames[cellFrame[cell]] = info;
+    cellKey[cell] = key;
+    cellUsed[cell] = useT;
+    heroKeys.set(key, cell);
+    dirty.push([x0, y0, HERO_CELL, HERO_CELL]);
+    return cellFrame[cell];
+  };
   return {
     width,
     height,
@@ -744,6 +827,11 @@ export function buildAtlas(): Atlas {
     camp: campFrame,
     hut: hutFrame,
     named: (name, d, a, f, v = 0) => named.get(`${name},${d},${a},${f & 3},${v}`) ?? 0,
+    hero: (job, torch, look, rank, d, a, f) => heroFrame(job, torch, look, rank, d, a, f),
+    heroBed: (job, look, rank, f) => heroFrame(job, false, look, rank, 0, 4, f),
+    pray: (f) => prayFrames[Math.max(0, Math.min(3, f))],
+    grave: (rank, color) => graveFrames[Math.max(0, Math.min(2, rank - 1)) * 6 + Math.max(0, Math.min(5, color))],
+    dirty,
     corpse: (sp, st) => corpses.get(`${sp},${st}`) ?? 0,
   };
 }

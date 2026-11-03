@@ -1,0 +1,37 @@
+/**
+ * 名簿の冒険者の、位ごとの姿の一覧（見習い・熟練・歴戦・英雄を、職業ごとに並べる）を撮る → docs/img/hero-ranks.png
+ *   node tools/gallery/heroes.mjs [--out docs/img/hero-ranks.png] [--scale 4]
+ * 色は絵そのもの（ゲームの明かりは当てない）。姿は職業ごとに決まった二人分（look）を、正面・横・後ろで並べる。墓標も添える。
+ */
+import { buildSync } from 'esbuild';
+import { createRequire } from 'module';
+import { mkdirSync, writeFileSync } from 'fs';
+const require = createRequire(import.meta.url);
+const argv = process.argv.slice(2);
+const opt = (k, d) => (argv.includes('--' + k) ? argv[argv.indexOf('--' + k) + 1] : d);
+const out = opt('out', 'docs/img/hero-ranks.png');
+const S = +opt('scale', '4');
+mkdirSync('build', { recursive: true });
+buildSync({ entryPoints: ['src/sprites.ts'], bundle: true, format: 'cjs', outfile: 'build/sprites-heroes.cjs', platform: 'node', logLevel: 'silent' });
+const SP = require(process.cwd() + '/build/sprites-heroes.cjs');
+const JOBS = [['warrior', '戦士'], ['wizard', '魔法使い'], ['thief', '盗賊'], ['priest', '僧侶'], ['bard', '吟遊詩人'], ['hunter', '狩人'], ['slayer', '竜殺し']];
+const RANKS = ['見習い', '熟練', '歴戦', '英雄'];
+const look = (hair, skin, color, build, head) => hair | (skin << 3) | (color << 5) | (build << 8) | (head << 10);
+const LOOKS = [look(1, 1, 0, 1, 0), look(3, 2, 1, 2, 1)];
+const toData = (fr) => ({ W: fr.W, H: fr.H, px: Array.from(fr.px), glow: fr.mat.map((m) => (m === 'wisp' ? 1 : 0)) });
+const rows = JOBS.map(([j, jn]) => ({ jn, cells: RANKS.map((rn, r) => ({ rn, figs: LOOKS.flatMap((lk) => [['down', 0], ['side', 0], ['up', 0]].map(([d]) => toData(SP.heroSprite(j, d, 'idle', 0, false, lk, r)))) })) }));
+const graves = [1, 2, 3].map((r) => toData(SP.graveMarker(r, 2)));
+const html = `<!doctype html><meta charset=utf-8><style>body{margin:0;background:#22252b;color:#ddd;font:14px sans-serif;padding:12px}table{border-collapse:collapse}td,th{padding:4px 10px;border-bottom:1px solid #333;vertical-align:bottom}th{color:#e8d8a0}canvas{image-rendering:pixelated;margin-right:2px;background:#3a3f47}.g{margin-top:10px}</style>
+<table><tr><th></th>${RANKS.map((r) => `<th>${r}</th>`).join('')}</tr>${rows.map((row, i) => `<tr><th>${row.jn}</th>${row.cells.map((c, k) => `<td>${c.figs.map((_, n) => `<canvas id="c${i}_${k}_${n}"></canvas>`).join('')}</td>`).join('')}</tr>`).join('')}</table>
+<div class=g>墓標（熟練・歴戦・英雄）：${graves.map((_, i) => `<canvas id="g${i}"></canvas>`).join('')}</div>
+<script>const D=${JSON.stringify({ rows, graves })};const S=${S};
+function draw(id,fr){const c=document.getElementById(id);c.width=fr.W*S;c.height=fr.H*S;const x=c.getContext('2d');for(let y=0;y<fr.H;y++)for(let X=0;X<fr.W;X++){const p=y*fr.W+X;if(!fr.px[p*4+3])continue;x.fillStyle='rgb('+fr.px[p*4]+','+fr.px[p*4+1]+','+fr.px[p*4+2]+')';x.fillRect(X*S,y*S,S,S)}}
+D.rows.forEach((r,i)=>r.cells.forEach((c,k)=>c.figs.forEach((f,n)=>draw('c'+i+'_'+k+'_'+n,f))));D.graves.forEach((g,i)=>draw('g'+i,g));</script>`;
+writeFileSync('build/hero-ranks.html', html);
+const { chromium } = require('playwright');
+const b = await chromium.launch();
+const pg = await b.newPage({ viewport: { width: 1800, height: 900 } });
+await pg.goto('file://' + process.cwd() + '/build/hero-ranks.html');
+await pg.screenshot({ path: out, fullPage: true });
+await b.close();
+console.log('撮った：' + out);

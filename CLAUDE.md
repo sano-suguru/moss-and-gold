@@ -213,6 +213,7 @@ samples.jsonl は、刻みが `DAY_TICKS/4` の倍数のときに記録する（
   **戦利品**：目標（竜・大物・アンデッド・ゴブリン退治）を果たすと、倒した相手にちなむ戦利品（`Party.trophy` 種の番号、`trophyBy` 担ぐ者。名前は loot.ts の `TROPHY`）を担ぎ、生きて帰れば記録に「〜の一行が竜の牙を持ち帰った」。全滅すれば倒れた所に残る（床の道具 `ItemKind.Trophy`、fuel に種）。倒れた冒険者は荷（`ItemKind.Pack`）を残す。金貨を持つ者は量に応じた袋を担ぐ（描画だけ）。`{k:25, ev:'trophy', how:'take' / 'home' / 'lost'}`
 - 上の横穴の岩壁が崩れる（`breakTopWall`、3〜5日目）：掘った通路が掘った土で埋まって横穴が開かないことがあったので、開くまで1日のあいだ掘り直す（開いたときだけ記録に出す）
 - 頭の上の印（「！」「？」「z」）は暗い縁取りの吹き出しに光る太い字。聞き耳の「？」は立ち止まっている間ずっと出す（描画だけ）
+- 冒険者の作り直しの五歩目（docs/adventurer-step5-20261114.md、src/eco/roster.ts）：**町の名簿**（`Ecology.roster`、12人。名前・職業・姿 `look`・位・帰還の回数）から一行を組み、倒れた者は外れて同じ職業の新人が加わる。位は帰還2/4/7回で熟練/歴戦/英雄（`RANK_MUL`）。絵は一人ひとりの姿と位の装備（src/sprites.ts の `heroSprite`、はじめて要るときに作って atlas の下のます目へ。`Atlas.hero`・`Renderer.flushAtlas`）。熟練以上が倒れた所に**墓標**（`Ecology.graves`、20まで）、のちの一行が一度立ち止まる（`brace` kind 4、僧侶は祈る）。名簿の推移は `node tools/analysis/rosterlog.mjs`、位の一覧は `node tools/gallery/heroes.mjs`
 - 速さのための間引き（docs/speed-experiments）：ウィスプ（光の精を除く）は生き物の1歩の4回に1回だけ判断し、その回に4回ぶん動いて食べる（`Ecology.WISP_EVERY`、`wispIdle`。描画は `moveAlpha` で4回ぶんの時間をかけて補間）。苔とキノコは40刻みごとに2回ぶん進める（`MOSS_EVERY`、`MOSS_R`）。画面なしでは見たマスの更新を200刻みごと（lib/engine.ts。見たマスは生き物の判断に使わない）
 - 描画だけ：攻撃の技の演出（`fxAttacks`、`creatureView.drawAttacks`）、気づいた印、のけぞり、飛び散る粒。見本は `dist/index.html#fxdemo`。画面の部品を隠すのは `#clean`。
 

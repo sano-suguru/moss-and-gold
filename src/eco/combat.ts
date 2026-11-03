@@ -8,7 +8,7 @@ import type { World } from '../world';
 /** 攻める側の勝つ確率は、近くの仲間を含めた強さの比で決まる。負けた側は死ぬことがある */
 /** 強さ：冒険者は職業と一行の格で決まる */
 export function str(this: Ecology, c: Cr): number {
-  if (c.k === Kind.Adventurer) return JOB_STR[c.sp] * TIER_MUL[c.init] * (c.sp === Job.Thief && c.act === 2 ? 1.6 : 1);
+  if (c.k === Kind.Adventurer) return JOB_STR[c.sp] * TIER_MUL[c.init] * this.rankMul(c) * (c.sp === Job.Thief && c.act === 2 ? 1.6 : 1);
   // スケルトンは生前の装備で強さが決まる。武器を拾ったゴブリンとオークは強くなる
   if (c.k === Kind.Skeleton) return c.init ? JOB_STR[c.sp] * 1.2 : 3;
   if (c.k === Kind.Dwarf) return DWARF_STR[c.sp];
@@ -79,6 +79,7 @@ export function leaveIfStarving(this: Ecology, c: Cr): boolean {
     }
   }
   if (this.goTo(c, ex, ey, s.speed) || sq(ex - c.x) + sq(ey - c.y) < 30 * 30) {
+    if (c.k === Kind.Adventurer) this.heroHome(c, false);
     this.record('exits', { t: this.w.tick, k: c.k, reason: 'starving', x: Math.round(c.x), y: Math.round(c.y) } as never);
     this.w.manaLeaked += c.mana;
     c.mana = 0;

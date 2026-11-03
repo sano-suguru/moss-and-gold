@@ -3,6 +3,7 @@
 import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
+import { RANK_NAMES, heroTitle } from './roster';
 import type { World } from '../world';
 
 /** 噂の総量（評判） */
@@ -17,14 +18,14 @@ export function maybeParty(this: Ecology): void {
   if (ih(this.step, 201, 7) % 1000 >= chance) return;
   const m = this.w.map;
   const r = this.rumors;
-  const size = Math.min(5, 2 + (ih(this.step, 202, 7) % 3) + (rep > 3 ? 1 : 0));
+  const want = Math.min(5, 2 + (ih(this.step, 202, 7) % 3) + (rep > 3 ? 1 : 0));
   const tier = rep < 2 ? 0 : rep < 6 ? 1 : 2;
   // ゴブリンの盗みの噂が溜まっていれば、ゴブリン退治の一行（戦士が多い）
   const gobHunt = this.goblinHuntReady();
   // 噂の中身で顔ぶれが変わる：金貨なら盗賊、アンデッドなら僧侶、大物や竜なら戦士
   const wts = [3 + 3 * (r.beast + r.dragon) + (gobHunt ? 6 : 0), 2, 1 + 3 * r.gold, 2 + 3 * r.undead, 1, r.beastKind ? 3 * r.beast : 0, 0];
   const jobs: number[] = [];
-  for (let i = 0; i < size; i++) {
+  for (let i = 0; i < want; i++) {
     const tot = wts.reduce((a, b) => a + b, 0);
     let v = (ih(this.step, 203 + i, 7) % 1000) / 1000 * tot;
     let j = 0;
@@ -36,6 +37,12 @@ export function maybeParty(this: Ecology): void {
   if (gobHunt) jobs[0] = Job.Warrior;
   // 光がなければ進めない：魔法使いも僧侶もいなければ、戦士が一人松明を持つ。戦士もいなければ一人を戦士に
   if (!jobs.includes(Job.Wizard) && !jobs.includes(Job.Priest) && !jobs.includes(Job.Warrior)) jobs[jobs.length - 1] = Job.Warrior;
+  // 顔ぶれは町の名簿から（中にいる者は選ばない。その職業がいなければ別の職業の者で埋める。src/eco/roster.ts）
+  const heroes = this.pickHeroes(jobs, this.step);
+  if (!heroes) return;
+  jobs.length = heroes.length;
+  heroes.forEach((h, i) => (jobs[i] = h.job));
+  const size = heroes.length;
   const pid = this.nextId++;
   // 入る口：正面の入口か、外の世界の地図に載った地表の横穴（開いているもの）
   const known = (this.lore.mouths ?? []).filter((i) => this.mouthOpen(i));
@@ -68,15 +75,17 @@ export function maybeParty(this: Ecology): void {
     }
     party.members.push(c.id);
     this.counts[Kind.Adventurer]++;
+    this.heroEnter(heroes[i], c, party);
   }
+  party.name = heroes[0].name;
   this.parties.push(party);
   // 目標を一つ決める（噂と職業の役目から）
   this.chooseAim(party, jobs, gobHunt);
   // 町の知っている物資の置き場を覚え、深部の探索なら置き場に残す荷を背負う
   this.packForCaches(party);
-  const names = jobs.map((j) => JOB_NAMES[j]).join('・');
+  const names = heroes.map((h) => `${JOB_NAMES[h.job]}${h.name}${h.trips > 1 ? `（${RANK_NAMES[h.rank]}、${h.trips}度目）` : ''}`).join('・');
   const aim = this.aimPhrase(party);
-  const who = `${JOB_NAMES[jobs[0]]}${party.name}の一行（${names}）が、${aim ? aim + '、' : ''}`;
+  const who = `${heroTitle(heroes[0])}の一行（${names}）が、${aim ? aim + '、' : ''}`;
   this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: pid, ev: 'enter', how: party.aim ?? 0, n: party.aimId ?? 0, to: party.aimKnown ?? 0, x: 0, y: 0 } as never);
   // 入口で身支度をして、食べ残しを少し落としていく
   if (door < 0) this.pendingScraps.push(pid);
@@ -104,6 +113,7 @@ export function seenBy(this: Ecology, c: Cr, lights: Cr[], o: Cr): boolean {
 
 export function updateParties(this: Ecology): void {
   const m = this.w.map;
+  this.rosterStep();
   for (const p of this.parties) {
     const alive = p.members.map((id) => this.byId.get(id)).filter((c): c is Cr => !!c && !c.dead);
     if (!alive.length && p.members.length) {
@@ -689,6 +699,7 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
     this.deposit(c.x, c.y + 10, 2);
   }
   this.record('exits', { t: this.w.tick, k: c.k, reason: 'returned', x: Math.round(c.x), y: Math.round(c.y) } as never);
+  this.heroHome(c, true);
   this.w.manaLeaked += c.mana;
   c.mana = 0;
   // 生きて帰った者が、探した範囲と宝と危ない場所を、外の世界の地図に加える

@@ -36,6 +36,7 @@ import './aim';
 import './raid';
 import './listen';
 import './loot';
+import './roster';
 import './cache';
 import './dwarf';
 import './arrivals';

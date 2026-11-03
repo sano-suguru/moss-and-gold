@@ -1725,6 +1725,281 @@ function adventurer2(job,dir,act,f,torch){
  glowFlame(fr);
  return fr;
 }
+// ===== 町の名簿の冒険者（冒険者の作り直しの五歩目）：一人ひとりの姿と、位ごとの装備 =====
+// 姿（look）：髪の色、肌の色、身につける色（首の布、兜の飾り、マント）、体つき、頭の形（髭・羽根飾り・長い髪など）。
+// 位（rank）：0 見習い、1 熟練（盾や胸に紋章）、2 歴戦（身につける色のマント。ローブの者は肩掛け）、3 英雄（武器がほのかに光る。マントに金の縁）
+const HERO_PC=[[176,40,48],[48,90,196],[44,146,74],[136,64,178],[226,136,34],[36,156,156]];
+const HERO_HAIR=[[38,30,30],[92,58,34],[164,66,34],[226,194,100],[204,204,212],[134,88,50]];
+const HERO_SKIN=[[246,216,192],[228,182,142],[188,132,92],[122,82,58]];
+const ramp5=(c)=>[0.3,0.55,0.78,1,1.16].map(f=>c.map(v=>Math.max(0,Math.min(255,Math.round(v*f)))));
+HERO_PC.forEach((c,i)=>{RAMP['pc'+i]=ramp5(c)});
+HERO_HAIR.forEach((c,i)=>{RAMP['hair'+i]=ramp5(c)});
+HERO_SKIN.forEach((c,i)=>{RAMP['skin'+i]=ramp5(c)});
+// 位ごとの布と鎧の色：見習いはくすんだ古着（drab）と革、英雄は白金の鎧（regal）と深い色の衣（royal）
+RAMP.drab=[[30,26,22],[58,50,42],[88,78,64],[114,102,84],[136,124,104]];
+RAMP.drabG=[[24,30,22],[46,56,40],[70,82,58],[94,106,76],[116,128,96]];
+RAMP.regal=[[74,56,22],[146,116,58],[210,184,116],[240,224,172],[254,248,224]];
+RAMP.royal=[[28,14,46],[60,26,94],[96,46,146],[134,78,192],[174,122,224]];
+/** 身につける色のマント（歴戦から）。trim は英雄の金の縁。英雄のマントは止まっていてもはためく */
+function heroCape(mat,trim,flutter){return(dir,P,cx,sh,hip,feet,q,mv,k)=>{
+ const sw=mv?[-1,0,1,0][q]:flutter?[0,0.6,1,0.6][q]:0;
+ if(dir==='side'){
+  P.push(PL([[cx-1.4*k,sh-0.6*k],[cx+0.8*k,sh-0.6*k],[cx-1.4*k-sw*0.5,feet-1.4*k],[cx-4.6*k-sw*0.9,feet-2*k]],mat,2,{ol:1}));
+  if(trim)P.push(LN(cx-4.6*k-sw*0.9,feet-2*k,cx-1.4*k-sw*0.5,feet-1.4*k,trim,3,{no:1}));
+  return;
+ }
+ const w=4.4*k;
+ P.push(PL([[cx-w+0.4*k,sh-0.8*k],[cx+w-0.4*k,sh-0.8*k],[cx+w+1.6*k+sw*0.3,feet-1*k],[cx-w-1.6*k-sw*0.3,feet-1*k]],mat,2,{ol:1}));
+ if(dir==='up'){P.push(LN(cx,sh,cx+sw*0.3,feet-2*k,mat,1,{no:1}));if(trim){P.push(E(cx,sh+3.6*k,1.6*k,1.8*k,trim,{ol:1}),E(cx,sh+3.6*k,0.8*k,0.9*k,mat,{flat:3}))}}
+ if(trim)P.push(LN(cx-w-1.6*k,feet-1.2*k,cx+w+1.6*k,feet-1.2*k,trim,3,{no:1}),LN(cx-w-1.6*k,feet-1.2*k,cx-w+0.4*k,sh-0.8*k,trim,3,{no:1}),LN(cx+w+1.6*k,feet-1.2*k,cx+w-0.4*k,sh-0.8*k,trim,3,{no:1}));
+}}
+/** 盾：見習いは小さな木の盾、熟練からは身につける色に金の十字、英雄は白金の縁 */
+function heroShield(pc,rank){return(dir,P,x,y,k,q)=>{
+ const s=rank===0?0.78:rank>=2?1.1:1,rim=rank>=3?'regal':'goldT';
+ if(dir==='up'){P.push(E(x,y,3.6*k*s,4*k*s,'wood',{ol:1}),C(x-3*k*s,y,x+3*k*s,y,0.5*k,'iron',{flat:2}),E(x,y,1.2*k,1.2*k,'iron',{flat:3}));return}
+ if(dir==='side'){P.push(E(x-0.6*k,y,1.8*k*s,4*k*s,rank?pc:'wood',{ol:1}),LN(x-0.6*k,y-3.6*k*s,x-0.6*k,y+3.6*k*s,rank?rim:'wood',2,{no:1}));return}
+ if(!rank){P.push(E(x,y,3*k,3.2*k,'wood',{ol:1}),LN(x-2.2*k,y-0.6*k,x+2.2*k,y-0.6*k,'wood',1,{no:1}),LN(x-2*k,y+1.2*k,x+2*k,y+1.2*k,'wood',1,{no:1}),E(x,y,0.8*k,0.8*k,'iron',{flat:3}));return}
+ P.push(E(x,y,3.6*k*s,4*k*s,rank>=3?rim:pc,{ol:1}),E(x,y,(3.6*s-1)*k,(4*s-1)*k,pc,{flat:3}));
+ P.push(LN(x,y-3*k*s,x,y+3*k*s,'goldT',3,{no:1}),LN(x-2.2*k*s,y-0.6*k,x+2.2*k*s,y-0.6*k,'goldT',3,{no:1}),E(x,y-0.6*k,0.9*k,0.9*k,'goldT',{flat:4}));
+}}
+/** 見習いの棍棒（剣の代わり） */
+function noviceClub(dir,P,hx,hy,sw,rest,k){
+ let tx,ty;
+ if(rest){tx=hx+(dir==='side'?1:0.6)*k;ty=hy-6*k}else{tx=hx+(dir==='side'?(1+sw*3)*k:0.6*k);ty=hy-(7-Math.abs(sw)*1.6)*k}
+ P.push(LN(hx,hy+1,tx,ty,'wood',2,{no:1}),C((hx+tx*2)/3,(hy+ty*2)/3,tx,ty,1.1*k,'wood'));
+}
+/** 武器を大きく持つ（歴戦から） */
+const bigTool=(t,m)=>t&&((dir,P,hx,hy,sw,rest,k)=>t(dir,P,hx,hy,sw,rest,k*m));
+/** 冒険者の基本の組み立て（adventurer と adventurer2 と同じ。熟練の姿） */
+function heroBase(job,act,torch){
+ let o;
+ if(job==='bard')o={s:1.4,leg:5,bw:3,bh:3.3,hh:9.2,skin:'bardR',skinD:'bardR',cloth:'bardR',hand:'hskin',boot:'boot',head:headBard,tool:null,off:luteOff,offFront:true,decor:bardDecor};
+ else if(job==='hunter')o={s:1.4,leg:5.2,bw:3,bh:3.3,hh:9.2,skin:'forest',skinD:'forest',cloth:'leather',hand:'leather',boot:'boot',head:headHunter,tool:null,off:bowOff,offFront:true,decor:quiver};
+ else if(job==='slayer')o={s:1.55,leg:5,bw:3.8,bh:3.6,hh:9.4,limb:1.25,skin:'plate',skinD:'plate',cloth:'plate',hand:'plate',boot:'plate',pad:'plate',head:headSlayer,tool:greatsword,decor:slayerDecor};
+ else{
+  o={s:1.4,leg:5,bw:3.2,bh:3.4,hh:9.2,decor:DECOR[job]};
+  if(job==='warrior')Object.assign(o,{skin:'mail',skinD:'mail',cloth:'mail',hand:'leather',boot:'boot',pad:'iron',head:humanHead('helm'),tool:sword,off:torch?torchHeld:shieldOff,offFront:torch,bw:3.6,limb:1.1});
+  else if(job==='wizard')Object.assign(o,{skin:'robeB',skinD:'robeB',cloth:'robeB',hand:'hskin',head:humanHead('hat'),tool:staffOf(),cape:robeCape('robeB','goldT'),off:torch?torchHeld:null,offFront:torch});
+  else if(job==='thief')Object.assign(o,{skin:'hood',skinD:'hood',cloth:'leather',hand:'boot',boot:'boot',head:humanHead('hood'),tool:dagger,leg:5,bw:2.9});
+  else Object.assign(o,{skin:'robeW',skinD:'robeW',cloth:'robeW',hand:'hskin',head:humanHead('plain'),tool:mace,cape:robeCape('robeW','goldT'),off:torch?torchHeld:symbolOff,offFront:torch});
+ }
+ if(job==='hunter'&&act==='attack'){o.tool=bow;o.off=null}
+ return o;
+}
+/** 見習いの頭：革の帽子（戦士・竜殺し）、粗末な頭巾（魔法使い） */
+function noviceHead(kind){return(dir,P,x,y,dead,open,k)=>{
+ const side=dir==='side',back=dir==='up',K=k;
+ if(kind==='hood'){
+  P.push(E(x+(side?0.5*K:0),y+0.4*K,3.2*K,3.4*K,'hskin',{ol:1}));
+  P.push(PL([[x-3.8*K,y+2*K],[x-3.6*K,y-2.4*K],[x-0.6*K,y-4.6*K],[x+2.2*K,y-4.2*K],[x+3.8*K,y-2.4*K],[x+3.8*K,y+(side?0:2)*K],[x+(side?2.4:2.6)*K,y-1.2*K],[x-2.6*K,y-1*K]],'drab',2,{ol:1}));
+  if(back)return;
+  const ec=dead?RAMP.hskin[1]:COL.K;
+  if(side)P.push(D(x+1.6*K,y+0.4*K,ec));else P.push(D(x-1.3*K,y+0.4*K,ec),D(x+1.3*K,y+0.4*K,ec));
+  return;
+ }
+ humanHead('plain')(dir,P,x,y,dead,open,k);
+ // 革の帽子（頭の上半分を覆う丸い帽子と、縫い目）
+ P.push(PL([[x-3.6*K,y-0.6*K],[x-3.4*K,y-3.2*K],[x,y-4.6*K],[x+3.4*K,y-3.2*K],[x+3.6*K,y-0.6*K]],'leather',2,{ol:1}),LN(x-3.4*K,y-1*K,x+3.4*K,y-1*K,'leather',1,{no:1}));
+}}
+/** 英雄の頭飾り：戦士・竜殺しは翼の冠、僧侶は高い司教冠、ほかは額の金の冠 */
+function heroCrown(job,dir,P,x,y,K){
+ const side=dir==='side';
+ if(job==='priest'){
+  P.push(PL([[x-2.8*K,y-2.6*K],[x+2.8*K,y-2.6*K],[x+2.2*K,y-7*K],[x,y-9*K],[x-2.2*K,y-7*K]],'robeW',2,{ol:1}),LN(x,y-8.4*K,x,y-3*K,'goldT',3,{no:1}),LN(x-2.4*K,y-3.2*K,x+2.4*K,y-3.2*K,'goldT',3,{no:1}),D(x,y-6*K,RAMP.gemR[3]));
+  return;
+ }
+ if(job==='warrior'||job==='slayer'){
+  const top=y-(job==='slayer'?4:4.6)*K;
+  if(side)P.push(PL([[x-0.6*K,top+0.6*K],[x-4.4*K,top-2.8*K],[x-1.2*K,top-1.2*K]],'regal',2,{ol:1}));
+  else P.push(PL([[x-1.2*K,top+0.6*K],[x-4.6*K,top-2.6*K],[x-2.2*K,top-0.6*K]],'regal',2,{ol:1}),PL([[x+1.2*K,top+0.6*K],[x+4.6*K,top-2.6*K],[x+2.2*K,top-0.6*K]],'regal',2,{ol:1}));
+  P.push(D(x,top-0.4*K,RAMP.gemR[3]));
+  return;
+ }
+ // 額の冠（魔法使いは帽子の帯の上）
+ const cy=job==='wizard'?y-3.4*K:y-3.6*K;
+ P.push(LN(x-3*K,cy,x+3*K,cy,'goldT',3,{no:1}),D(x,cy-1,RAMP.goldT[4]),D(x-2*K,cy-1,RAMP.goldT[3]),D(x+2*K,cy-1,RAMP.goldT[3]),D(x,cy,RAMP.gemR[3]));
+}
+/**
+ * 名簿の冒険者の絵。job: warrior|wizard|thief|priest|bard|hunter|slayer、look は src/eco/roster.ts の packLook、rank 0〜3。
+ * 輪郭と色の面で位が読めるように：
+ *  見習い：鎧を着ない古着（くすんだ布、継ぎ当て）、革の帽子と棍棒（戦士）、粗末な頭巾（魔法使い）、金の飾りなし、少し猫背。
+ *  熟練：職業らしい姿（鎖かたびら、星の帽子、白い法衣など）に紋章。
+ *  歴戦：身につける色の肩当てと幅広のマント（ローブの者は肩掛け）、ひと回り大きな武器。
+ *  英雄：白金の鎧と深い色の衣、翼の冠・司教冠・金の冠、金縁のマント（止まっていてもはためく）、光る武器、体のまわりのほのかな金の光。
+ */
+function heroSprite(job,dir,act,f,torch,look,rank){
+ const L={hair:look&7,skin:(look>>3)&3,color:(look>>5)&7,build:(look>>8)&3,head:(look>>10)&1};
+ const pc='pc'+Math.min(5,L.color),hairM='hair'+Math.min(5,L.hair);
+ const o=heroBase(job,act,torch);
+ const bk=[0.88,1,1.14][Math.min(2,L.build)];
+ o.bw=(o.bw||3.3)*bk;o.bh=(o.bh||3.6)*(0.96+0.04*Math.min(2,L.build));
+ // ---- 見習い：鎧と飾りを外して古着に ----
+ if(rank===0){
+  o.hunch=0.5;
+  if(job==='warrior'){Object.assign(o,{skin:'leather',skinD:'leather',cloth:'leather',pad:null,head:noviceHead('cap'),tool:noviceClub,limb:1});o.decor=(v,P,cx,hip,sh,bw,bh,k)=>{if(v!=='up')P.push(LN(cx-bw,hip-0.6*k,cx+bw,hip-0.6*k,'boot',2,{no:1}),LN(cx-bw*0.8,sh+0.6*k,cx+bw*0.6,hip-0.8*k,'drab',1,{no:1}))}}
+  else if(job==='wizard'){Object.assign(o,{skin:'drab',skinD:'drab',cloth:'drab',head:noviceHead('hood'),cape:robeCape('drab','drab')});o.decor=(v,P,cx,hip,sh,bw,bh,k)=>{P.push(LN(cx-bw*0.9,hip-1.2*k,cx+bw*0.9,hip-1.2*k,'wood',2,{no:1}))}}
+  else if(job==='priest'){Object.assign(o,{skin:'drab',skinD:'drab',cloth:'drab',cape:robeCape('drab','drab')});o.decor=(v,P,cx,hip,sh,bw,bh,k)=>{P.push(LN(cx-bw,hip-0.8*k,cx+bw,hip-0.8*k,'wood',1,{no:1}),LN(cx+0.6*k,hip-0.8*k,cx+1*k,hip+2.2*k,'wood',1,{no:1}))}}
+  else if(job==='slayer'){Object.assign(o,{skin:'leather',skinD:'leather',cloth:'leather',hand:'leather',boot:'boot',head:noviceHead('cap'),s:1.48,bw:o.bw*0.92});o.decor=(v,P,cx,hip,sh,bw,bh,k)=>{if(v!=='up')P.push(LN(cx-bw,hip-0.6*k,cx+bw,hip-0.6*k,'boot',2,{no:1}))}}
+ }
+ if(job==='warrior'&&!torch)o.off=heroShield(pc,rank);
+ // ---- 歴戦から：ひと回り大きな武器、身につける色のマント ----
+ if(rank>=2){o.tool=bigTool(o.tool,1.15);if((job==='bard'||job==='hunter')&&o.off){const off0=o.off;o.off=(d,P,x,y,k,q)=>off0(d,P,x,y,k*1.1,q)}}
+ if(rank>=2&&job!=='wizard'&&job!=='priest')o.cape=heroCape(pc,rank>=3?'goldT':null,rank>=3);
+ // ---- 英雄：深い色の衣 ----
+ if(rank>=3&&job==='wizard'){Object.assign(o,{skin:'royal',skinD:'royal',cloth:'royal',cape:robeCape('royal','goldT')})}
+ // 頭：髭・羽根飾り・長い髪・帽子の帯・肩当て・冠
+ const head0=o.head;
+ o.head=(d,P,x,y,dead,open,k)=>{
+  const side=d==='side',back=d==='up',K=k;
+  if(job==='priest'&&L.head===1&&!dead){
+   if(side)P.push(C(x-2.4*K,y-1*K,x-2.8*K,y+4.4*K,1.6*K,hairM));
+   else P.push(C(x-3*K,y-1*K,x-3.4*K,y+4.2*K,1.3*K,hairM),C(x+3*K,y-1*K,x+3.4*K,y+4.2*K,1.3*K,hairM));
+  }
+  if(rank>=2&&(job==='wizard'||job==='priest')&&!dead){
+   const sh=y+o.hh*K-o.bh*K*1.15,bw=o.bw*K;
+   if(side)P.push(PL([[x-2.8*K,sh-0.8*K],[x+2.4*K,sh-0.8*K],[x+2.8*K,sh+3.2*K],[x-3.2*K,sh+3.6*K]],pc,2,{ol:1}));
+   else P.push(PL([[x-bw-1.2*K,sh-0.6*K],[x+bw+1.2*K,sh-0.6*K],[x+bw+1*K,sh+3.4*K],[x,sh+4.4*K],[x-bw-1*K,sh+3.4*K]],pc,2,{ol:1}));
+   if(rank>=3&&!side)P.push(LN(x-bw-1*K,sh+3.4*K,x,sh+4.4*K,'goldT',3,{no:1}),LN(x,sh+4.4*K,x+bw+1*K,sh+3.4*K,'goldT',3,{no:1}));
+   if(rank>=3&&side)P.push(LN(x-3.2*K,sh+3.6*K,x+2.8*K,sh+3.2*K,'goldT',3,{no:1}));
+  }
+  if(rank>=2&&!dead&&(rank>=3||(job!=='wizard'&&job!=='priest'))){
+   const sh=y+o.hh*K-o.bh*K*1.15,bw=o.bw*K,m=rank>=3?'regal':pc,r=rank>=3?1.15:1;
+   if(side)P.push(E(x-0.2*K,sh+0.6*K,2.2*K*r,1.8*K*r,m,{ol:1}));
+   else P.push(E(x-bw-0.2*K,sh+0.4*K,2*K*r,1.7*K*r,m,{ol:1}),E(x+bw+0.2*K,sh+0.4*K,2*K*r,1.7*K*r,m,{ol:1}));
+  }
+  head0(d,P,x,y,dead,open,k);
+  if(dead)return;
+  // 羽根飾り：戦士・竜殺し（見習いはなし、歴戦から大きく）
+  if((job==='warrior'||job==='slayer')&&L.head===0&&rank>=1){
+   const top=job==='slayer'?y-4.2*K:y-4.6*K,pl=rank>=2?1.35:1;
+   if(side)P.push(C(x-0.2*K,top,x-3.8*K*pl,top-1.6*K*pl,0.9*K*pl,pc),C(x-3.8*K*pl,top-1.6*K*pl,x-5*K*pl,top+0.6*K,0.7*K*pl,pc));
+   else P.push(C(x,top,x,top-2.6*K*pl,0.9*K*pl,pc),C(x,top-2.6*K*pl,x+(back?0:1.2)*K*pl,top-3.6*K*pl,0.7*K*pl,pc));
+  }
+  if(L.head===1&&!back&&(job==='warrior'||job==='bard'||job==='hunter')){
+   if(side)P.push(E(x+1.8*K,y+2.6*K,1.5*K,1.3*K,hairM,{ol:1}));
+   else P.push(E(x,y+2.8*K,2.4*K,1.4*K,hairM,{ol:1}));
+  }
+  if(job==='wizard'&&L.head===1&&rank>=1)P.push(LN(x-3*K,y-3*K,x+2.6*K,y-3*K,pc,3,{no:1}),LN(x-3*K,y-3.6*K,x+2.6*K,y-3.6*K,pc,2,{no:1}));
+  if(job==='bard'&&rank>=1)P.push(C(x+(side?-2:2)*K,y-4.6*K,x+(side?-6:5.4)*K,y-8.4*K,0.7*K,pc));
+  if(job==='hunter'&&!back&&rank>=1)P.push(C(x+(side?-1.6:2)*K,y-3.6*K,x+(side?-4.8:4.6)*K,y-7*K,0.6*K,pc));
+  if(rank>=3)heroCrown(job,d,P,x,y,K);
+ };
+ // 胴：首の布（身につける色）、熟練の紋章
+ const decor0=o.decor;
+ o.decor=(v,P,cx,hip,sh,bw,bh,k,q,mv)=>{
+  if(decor0)decor0(v,P,cx,hip,sh,bw,bh,k,q,mv);
+  if(v==='side')P.push(E(cx+0.6*k,sh+0.2*k,1.7*k,0.9*k,pc,{ol:1}));
+  else P.push(E(cx,sh+0.1*k,bw*0.72,0.95*k,pc,{ol:1}));
+  if(rank>=1&&job!=='warrior'&&v!=='up'){
+   const bx=v==='side'?cx+0.8*k:cx-bw*0.45,by=sh+(v==='side'?0.6:1.8)*k;
+   P.push(E(bx,by,1.6*k,1.6*k,'goldT',{ol:1}),E(bx,by,0.8*k,0.8*k,pc,{flat:3}));
+  }
+ };
+ const fr=humanoid(dir,act,f,o);
+ if(job==='warrior'&&rank>=1)weave(fr,'mail',0);
+ if(job==='thief')weave(fr,'leather',1);
+ if(job==='slayer'&&rank>=1)weave(fr,'plate',3);
+ // 英雄の武器：武器を持たずに描いた絵と比べて、違う画素（武器）を光らせる
+ if(rank>=3&&act!=='death'){
+  const o2={...o};
+  if(job==='bard')o2.off=null;
+  else if(job==='hunter'){o2.tool=null;o2.off=null}
+  else o2.tool=null;
+  const bare=humanoid(dir,act,f,o2);
+  if(bare.W===fr.W&&bare.H===fr.H){
+   for(let p=0;p<fr.W*fr.H;p++){
+    if(!fr.px[p*4+3])continue;
+    if(bare.px[p*4+3]&&bare.px[p*4]===fr.px[p*4]&&bare.px[p*4+1]===fr.px[p*4+1]&&bare.px[p*4+2]===fr.px[p*4+2])continue;
+    if(fr.mat[p]==='ol')continue;
+    for(let c=0;c<3;c++)fr.px[p*4+c]=Math.round(fr.px[p*4+c]*0.55+[255,236,170][c]*0.45);
+    fr.mat[p]='wisp';
+   }
+  }
+ }
+ const {W,H,px,mat}=fr;
+ const remap=(from,to,shift=0)=>{const A=RAMP[from],B=RAMP[to];for(let p=0;p<W*H;p++){if(mat[p]!==from)continue;const i=A.findIndex(c=>c[0]===px[p*4]&&c[1]===px[p*4+1]&&c[2]===px[p*4+2]);if(i<0)continue;const b=B[Math.max(0,Math.min(4,i+shift))];px[p*4]=b[0];px[p*4+1]=b[1];px[p*4+2]=b[2];mat[p]=to}};
+ // 髪と肌（魔法使いの髭も髪の色に）
+ remap('hskin','skin'+Math.min(3,L.skin));
+ remap('hair',hairM);
+ if(job==='wizard')remap('beard',hairM);
+ // 盗賊の頭の形 1 は、頭巾と外套が身につける色に染まる（暗めに）
+ if(job==='thief'&&L.head===1&&rank>=1)remap('hood',pc,-1);
+ if(rank===0){
+  // 見習い：金は木に、色の布はくすんだ古着に。布に継ぎ当て（少し暗い四角）
+  remap('goldT','wood',-1);
+  remap('bardY','drab');
+  for(const m of ['hood','bardR','tabard','stole','forest','robeW','robeB'])remap(m,m==='forest'?'drabG':'drab');
+  remap('plate','iron',-1);
+  for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const p=y*W+x;if((mat[p]==='drab'||mat[p]==='leather'||mat[p]==='drabG')&&hz(x>>1,y>>1,77)<0.11&&hz(x,y,78)<0.67){for(let c=0;c<3;c++)px[p*4+c]=Math.round(px[p*4+c]*0.72)}}
+ }
+ if(rank>=3){
+  // 英雄：鎧は白金、衣は深い色に金、金の飾りは光を受けてきらめく
+  for(const m of ['mail','plate','iron'])remap(m,'regal');
+  if(job==='thief')remap('hood','royal',-1);
+  if(job==='bard')remap('bardR','royal');
+  if(job==='priest')remap('stole',pc);
+  for(let p=0;p<W*H;p++)if(mat[p]==='goldT'||mat[p]==='regal')mat[p]=mat[p]==='goldT'?'glw':'regal';
+ }
+ // 炎と宝玉の光、盗賊の目の光（adventurer と同じ）
+ for(let p=0;p<W*H;p++){
+  const r=px[p*4],g=px[p*4+1],b=px[p*4+2];
+  if(FLAME.some(c=>c[0]===r&&c[1]===g&&c[2]===b))mat[p]='wisp';
+  const isOrb=r===ORB[0]&&g===ORB[1]&&b===ORB[2],isOrb2=r===ORB2[0]&&g===ORB2[1]&&b===ORB2[2];
+  if(isOrb||isOrb2){mat[p]='wisp';if(act==='attack'&&mod(f,4)>0){const c=isOrb?FLAME[0]:FLAME[2];px[p*4]=c[0];px[p*4+1]=c[1];px[p*4+2]=c[2]}}
+  if(job==='thief'&&r===230&&g===230&&b===200)mat[p]='wisp';
+ }
+ // 英雄：体のまわりのほのかな金の光（一画素おきの縁。暗がりでも光る）
+ if(rank>=3&&act!=='death'){
+  const on=(x,y)=>x>=0&&y>=0&&x<W&&y<H&&px[(y*W+x)*4+3]&&mat[y*W+x]!=='aura';
+  const add=[];
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(px[(y*W+x)*4+3])continue;if(((x+y+mod(f,4))&1)===0)continue;if(on(x+1,y)||on(x-1,y)||on(x,y+1)||on(x,y-1))add.push(y*W+x)}
+  for(const p of add){px[p*4]=170;px[p*4+1]=134;px[p*4+2]=56;px[p*4+3]=255;mat[p]='wisp'}
+ }
+ return fr;
+}
+/** 名簿の冒険者の寝具：身につける色の毛布（見習いはくすんだ古い毛布、英雄は金の縁）、髪と肌の色 */
+function heroBed(job,look,rank,f){
+ const L={hair:look&7,skin:(look>>3)&3,color:(look>>5)&7};
+ const q=mod(f,4),W=26,H=14,P=[],pc=rank===0?'drab':'pc'+Math.min(5,L.color),hairM='hair'+Math.min(5,L.hair);
+ const br=q===1||q===2?0.5:0;
+ P.push(E(14,8,10+br,4.4+br*0.5,pc,{ol:1}),LN(6,6,22,6,pc,1,{no:1}),LN(8,10,21,10,pc,1,{no:1}));
+ if(rank===0)P.push(E(17,7,2,1.6,'leather',{flat:2}));
+ if(rank>=3)P.push(LN(5,11.6,23,11.6,'goldT',3,{no:1}),LN(4.6,5.2,22,5.2,'goldT',3,{no:1}));
+ P.push(E(4,7,3.2,3.2,'skin'+Math.min(3,L.skin),{ol:1}));
+ if(job==='warrior'&&rank>=1)P.push(E(4,5.6,3.2,2,rank>=3?'regal':'mail',{ol:1}));
+ else if(job==='wizard'&&rank>=1)P.push(PL([[1,6],[7,6],[3,1]],rank>=3?'royal':'robeB',2,{ol:1}));
+ else if(job==='thief')P.push(E(4,6,3.4,3.2,rank===0?'drab':'hood',{ol:1}));
+ else P.push(E(4,5.4,3,1.8,hairM,{ol:1}));
+ const fr=raster(W,H,P);
+ setPx(fr,3,7,[60,40,36],false);setPx(fr,5,7,[60,40,36],false);
+ return {...fr,ax:13,ay:11};
+}
+/** 祈りの光：墓標の上に立ちのぼる、光る小さな聖印（f 0〜3 で薄れる） */
+function prayLight(f){
+ const q=mod(f,4),fr=blank(7,9),a=[1,0.85,0.65,0.45][q];
+ const c=[Math.round(255*a),Math.round(236*a),Math.round(160*a)],o=[Math.round(120*a),Math.round(90*a),Math.round(40*a)];
+ const on=(x,y)=>(x===3&&y>=1&&y<=7)||(y===3&&x>=1&&x<=5);
+ for(let y=0;y<9;y++)for(let x=0;x<7;x++){
+  if(on(x,y))setPx(fr,x,y,c,true);
+  else if([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>on(x+dx,y+dy)))setPx(fr,x,y,o,true);
+ }
+ return {...fr,ax:3,ay:8};
+}
+/** 墓標：熟練は木の十字に身につける色の布、歴戦は石の墓標、英雄は石の墓標に剣を立てる。土の盛り上がりつき */
+function graveMarker(rank,color){
+ const P=[],W=16,H=18,pc='pc'+Math.min(5,color);
+ P.push(E(8,15.4,6,2.2,'soil',{ol:1}),E(8,15,4,1.2,'soil',{flat:3}));
+ if(rank<=1){
+  P.push(LN(8,4,8,15,'wood',2,{no:1}),C(8,4,8,15,0.9,'wood'),C(4.6,7.4,11.4,7.4,0.8,'wood'));
+  P.push(C(7,8.6,9,8.6,0.8,pc),C(9,8.6,10.4,11.6,0.6,pc));
+ }else{
+  P.push(PL([[4.4,15],[4.4,6.4],[5.6,4.4],[8,3.4],[10.4,4.4],[11.6,6.4],[11.6,15]],'stone',2,{ol:1}));
+  P.push(LN(8,6,8,11,'stone',1,{no:1}),LN(6.4,7.6,9.6,7.6,'stone',1,{no:1}),C(5,13.6,11,13.6,0.7,pc));
+  if(rank>=3)P.push(LN(13.4,2,13.4,15,'mail',4,{no:1}),LN(12,5,14.8,5,'goldT',3,{no:1}),D(13.4,1.6,RAMP.goldT[4]));
+ }
+ const fr=raster(W,H,P);
+ return {...fr,ax:8,ay:15};
+}
 /** スケルトン：骨の体に、拾った生前の装備。gear: none|warrior|thief|priest|hunter|bard|slayer */
 function skelHead(helm){return(dir,P,x,y,dead,open,k)=>{
  const side=dir==='side',back=dir==='up',K=k;
@@ -2787,4 +3062,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { heroSprite, heroBed, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
