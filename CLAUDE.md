@@ -119,6 +119,7 @@ npm run shot -- --seed かしたれ --find warren         # 見たいもの（wa
 **dist はコミットしない**（`.gitignore` のとおり。`npm run build` で手元に作る）。PR には Actions がプレビューの URL を付けるので、遊んでの確かめや見た目の確かめはその URL でもできる（末尾に `#lit`・`#clean`・`#fxdemo` なども付けられる）。
 
 Cloudflare のスキルと MCP サーバー（プラグイン `cloudflare@cloudflare`、マーケットプレイスは `cloudflare/skills`）は `.claude/settings.json` で有効にしてあり、クラウドのセッションでも毎回入る。MCP は初めて使うときに OAuth で許可を求める。
+CLAUDE.md の手入れのプラグイン（`claude-md-management@claude-plugins-official`、マーケットプレイスは `anthropics/claude-plugins-official`）も同じく `.claude/settings.json` で有効にしてある：スキル `claude-md-improver`（この手引きの点検と直し案）と `/revise-claude-md`（作業でわかったことを書き足す）。
 
 ```bash
 npm run build && npx wrangler deploy --dry-run     # 設定の確かめ（アカウントは要らない）
