@@ -33,6 +33,10 @@ const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 const RUN_A = { seeds: ['かしたれ', 'seed8', 'abc', 'seed7'], from: 10, to: 18 };
 /** オークの取り立て：縄張りが長く続くシード（オークのいる日数が上限1でも2でも16日ほど） */
 const RUN_ORC = { seeds: ['かしたれ', 'seed27'], from: 10, to: 18 };
+// オークの取り立ては、従う集落に蓄えがたまったときだけ起きるまれな出来事（16シード×25日で約25回、起きるのは6シードほど）。
+// いまのコードで10〜18日目に起きているシードを選ぶ（main の16シード×25日の結果で abc 11.0日目、seed41 13.6・14.2日目、seed18 12.8日目）。
+// 以前の かしたれ・seed27 は、六歩目（#16）のあと18日目までに起きなくなった
+const RUN_TRIB = { seeds: ['abc', 'seed41', 'seed18'], from: 10, to: 18 };
 
 export const CHECKS: Check[] = [
   {
@@ -151,8 +155,8 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'オークが貢ぎ物を取り立てる（かしたれ・seed27 で1回以上）',
-    ...RUN_ORC,
+    name: 'オークが貢ぎ物を取り立てる（abc・seed41・seed18 で1回以上）',
+    ...RUN_TRIB,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'tribute').length);
       return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
@@ -198,7 +202,7 @@ export const CHECKS: Check[] = [
   {
     // 七巡目：取り立ては腹を空かせたときに、要る分（腹の空き＝120まで）を、蓄えの半分まで。空振り（0）はログに残さない
     name: 'オークの取り立ては1回につき1〜120',
-    ...RUN_ORC,
+    ...RUN_TRIB,
     test: (rs) => {
       const t = rs.flatMap((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'tribute'));
       const v = t.length ? sum(t.map((x) => x.n ?? 0)) / t.length : 0;
