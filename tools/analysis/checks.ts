@@ -17,6 +17,8 @@ export interface Recs {
   exits: any[];
   settle: any[];
   events: any[];
+  /** 足踏み（起きて歩く姿のまま2分以上ほぼ同じ場所にいた。sim.ts の stuck.jsonl） */
+  stuck: any[];
   /** その日の日次スナップショット（ゲームのセーブと同じ形の JSON）。from〜to の整数の日 */
   state: (day: number) => any;
 }
@@ -207,6 +209,33 @@ export const CHECKS: Check[] = [
       const t = rs.flatMap((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'tribute'));
       const v = t.length ? sum(t.map((x) => x.n ?? 0)) / t.length : 0;
       return { ok: t.length > 0 && t.every((x) => x.n >= 1 && x.n <= 120), value: `${t.length} 回、平均 ${v.toFixed(0)}` };
+    },
+  },
+  {
+    // 道が見つからないとき、壁に押しつけて足踏みし続けず、近づけるだけ近づいて立ち止まる（変更前のコードでは4シードの合計で約640回、変更後は約20回）
+    name: '道が見つからないまま壁際で足踏みしない（4シードの合計で40回以下）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.stuck.filter((x) => x.nopath >= 0.5).length);
+      return { ok: sum(n) <= 40, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // 焚き火の席が壁の中に置かれ、休むあいだ席へ向かって足踏みし続けることがない（変更前のコードでは4シードの合計で約110回、変更後は約15回）
+    name: '冒険者が足踏みしない（4シードの合計で40回以下）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.stuck.filter((x) => x.k === 25).length);
+      return { ok: sum(n) <= 40, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // 掘り出した土の瓦礫を生き物のいるマスに置かない。それでも壁や瓦礫に埋まった生き物は、安全策で床へ出る（その回数が少ないこと）
+    name: '壁や瓦礫に埋まる生き物がほとんどいない（4シードの合計で床へ出たのが10回以下）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.ev === 'unbury').length);
+      return { ok: sum(n) <= 10, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },
   {

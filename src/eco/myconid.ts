@@ -22,6 +22,9 @@ export function maybeSpawnMyconid(this: Ecology, k: number, step: number): void 
   }
 }
 
+/** マイコニドが目的地を決めてから根を下ろすまでの、生き物の更新の回数の下限（着いたあとは佇んで待つ） */
+const MYC_LINGER = 1500;
+
 export function myconid(this: Ecology, c: Cr): void {
   const m = this.w.map;
   const s = SPEC[Kind.Myconid];
@@ -31,13 +34,15 @@ export function myconid(this: Ecology, c: Cr): void {
     const y0 = Math.floor(c.y / TILE);
     let best = -1;
     let bv = -1;
+    // 壁で隔てられた別の洞窟は選ばない（たどり着けない場所へ向かって、壁際で足踏みし続けないように）
+    const home = this.regionOf(this.tileOf(c.x, c.y));
     for (let i = 0; i < 40; i++) {
       const h = ih(c.id, this.step, 62 + i);
       const x = x0 + ((h & 255) % 41) - 20;
       const y = y0 + (((h >>> 8) & 255) % 41) - 20;
       if (x < 1 || y < 1 || x >= m.w - 1 || y >= m.h - 1) continue;
       const k = y * m.w + x;
-      if (m.solid[k] || m.lava[k] || this.w.fungus[k] || this.w.lightBase[k] > 80 || this.w.moist[k] < 80) continue;
+      if (m.solid[k] || m.lava[k] || this.w.fungus[k] || this.w.lightBase[k] > 80 || this.w.moist[k] < 80 || this.regionOf(k) !== home) continue;
       const d = Math.abs(x - x0) + Math.abs(y - y0);
       if (d < 8) continue;
       const v = this.w.nutr[k] + this.w.moist[k] - d;
@@ -54,9 +59,21 @@ export function myconid(this: Ecology, c: Cr): void {
     c.tx = (best % m.w) * TILE + 8;
     c.ty = Math.floor(best / m.w) * TILE + 8;
     c.actT = 0;
+    // ref 1：着いて佇んでいる
+    c.ref = 0;
+  }
+  // 着いたら（または、溶岩や水にはばまれて近づけるだけ近づいたら）、その場に佇み、目的地を決めてから生き物の更新 MYC_LINGER 回たってから根を下ろす。
+  // 着くまでの道のりの長さにかかわらず、一生の長さがおおよそそろう（すぐ根を下ろすと、生まれては根を下ろすのが倍ほど速くなり、キノコと養分の巡りが変わる）
+  if (c.ref === 1 || c.actT > 2400) {
+    c.act = 0;
+    if (c.actT > MYC_LINGER) this.plant(c);
+    return;
   }
   c.act = 1;
-  if (this.goTo(c, c.tx, c.ty, s.speed) || c.actT > 2400) this.plant(c);
+  if (this.goTo(c, c.tx, c.ty, s.speed) || this.unreachable(c) >= 2) {
+    c.ref = 1;
+    c.act = 0;
+  }
 }
 
 /** 座り込んで、体をそのまま新しいキノコの群落にする */

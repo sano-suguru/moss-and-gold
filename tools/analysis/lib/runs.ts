@@ -60,7 +60,7 @@ export function defaultAdv(): number {
 export interface Meta { seed: string; days: number; tick: number; total0: number; gold0: number; trace: number; advMax?: number; lineage?: { sim: string; from: number }[]; bin?: string }
 export const readMeta = (dir: string): Meta | null => (existsSync(join(dir, 'meta.json')) ? JSON.parse(readFileSync(join(dir, 'meta.json'), 'utf8')) : null);
 
-export const RECORDS = ['samples', 'deaths', 'births', 'exits', 'moves', 'settle', 'events', 'trace'];
+export const RECORDS = ['samples', 'deaths', 'births', 'exits', 'moves', 'settle', 'events', 'trace', 'stuck'];
 
 /** ログ（jsonl）を t（tick）が maxT 以下の行だけに切り出してコピーする */
 function copyRecords(from: string, to: string, maxT: number) {

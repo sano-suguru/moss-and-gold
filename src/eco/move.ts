@@ -49,6 +49,61 @@ export function findPath(this: Ecology, c: Cr, from: number, to: number): number
   return this.findPathAvoid(c, from, to, null);
 }
 
+/**
+ * 道を探す広さの上限（調べるマスの数）。届かない目的地のために地図じゅうを探さない。
+ * 冒険者は入口から深部まで歩くので、冒険者とドラゴンとドワーフ、外へ去ろうとしている者は、地図全体を探す
+ */
+export function searchLimit(this: Ecology, c: Cr): number {
+  return c.k === Kind.Adventurer || c.k === Kind.Dragon || c.k === Kind.Dwarf || c.st === 9 || (c.k === Kind.Kobold && c.st === 10) || (c.k === Kind.Rat && c.st === 8) || (c.k === Kind.Goblin && c.st >= 15) ? 40000 : c.k === Kind.Rat || c.k === Kind.Kobold ? 15000 : 6000;
+}
+
+/**
+ * 目的地へ道がないときの代わりの道筋：探した範囲のうち、目的地にいちばん近い（まっすぐ測って）マスまでの道。
+ * 自分のいるマスがいちばん近ければ空の道を返す。目的地が壁の中でも、壁の向こうでも使える
+ */
+export function nearPath(this: Ecology, c: Cr, from: number, to: number): number[] {
+  const m = this.w.map;
+  if (from < 0 || to < 0) return [];
+  const tx = to % m.w;
+  const ty = (to / m.w) | 0;
+  const g = ++this.bgen;
+  const q = this.bq;
+  let qh = 0;
+  let qt = 0;
+  q[qt++] = from;
+  this.bmark[from] = g;
+  this.bprev[from] = -1;
+  let best = from;
+  let bd = sq((from % m.w) - tx) + sq(((from / m.w) | 0) - ty);
+  const limit = this.searchLimit(c);
+  while (qh < qt && qh < limit) {
+    const cur = q[qh++];
+    const x = cur % m.w;
+    const y = (cur / m.w) | 0;
+    const d0 = sq(x - tx) + sq(y - ty);
+    if (d0 < bd) {
+      bd = d0;
+      best = cur;
+    }
+    for (let d = 0; d < 4; d++) {
+      const n = d === 0 ? (x + 1 < m.w ? cur + 1 : -1) : d === 1 ? (x > 0 ? cur - 1 : -1) : d === 2 ? (y + 1 < m.h ? cur + m.w : -1) : y > 0 ? cur - m.w : -1;
+      if (n < 0 || this.bmark[n] === g || !this.tilePassable(c, n)) continue;
+      this.bmark[n] = g;
+      this.bprev[n] = cur;
+      q[qt++] = n;
+    }
+  }
+  const path: number[] = [];
+  for (let k = best; k !== -1 && k !== from; k = this.bprev[k]) path.push(k);
+  path.reverse();
+  return path;
+}
+
+/** 今の目的地への道が見つからない探索が、何回続いているか（0 なら道がある。goTo で歩いている者だけ） */
+export function unreachable(this: Ecology, c: Cr): number {
+  return this.paths.get(c.id)?.miss ?? 0;
+}
+
 export function findPathAvoid(this: Ecology, c: Cr, from: number, to: number, avoid: ((k: number) => boolean) | null): number[] | null {
   const m = this.w.map;
   if (from < 0 || to < 0 || !this.tilePassable(c, to)) return null;
@@ -59,10 +114,7 @@ export function findPathAvoid(this: Ecology, c: Cr, from: number, to: number, av
   q[qt++] = from;
   this.bmark[from] = g;
   this.bprev[from] = -1;
-  // 探す広さに上限をつける（届かない目的地のために地図じゅうを探さない）
-  // 冒険者は入口から深部まで歩くので、地図全体を探せるようにする
-  // 冒険者とドラゴンとドワーフ、外へ去ろうとしている者は、地図全体を探す
-  const limit = c.k === Kind.Adventurer || c.k === Kind.Dragon || c.k === Kind.Dwarf || c.st === 9 || (c.k === Kind.Kobold && c.st === 10) || (c.k === Kind.Rat && c.st === 8) || (c.k === Kind.Goblin && c.st >= 15) ? 40000 : c.k === Kind.Rat || c.k === Kind.Kobold ? 15000 : 6000;
+  const limit = this.searchLimit(c);
   while (qh < qt && qh < limit) {
     const cur = q[qh++];
     if (cur === to) break;
@@ -110,20 +162,27 @@ export function goTo(this: Ecology, c: Cr, tx: number, ty: number, speed: number
     this.paths.delete(c.id);
     return true;
   }
-  // 近ければ道筋を探さずにまっすぐ向かう
-  if (sq(tx - c.x) + sq(ty - c.y) < 24 * 24) return this.moveToward(c, tx, ty, speed);
   let p = this.paths.get(c.id);
   const gk = this.tileOf(tx, ty);
-  // 目的地のマスが変わったとき、または行き詰まったときだけ探し直す（動く獲物を追うたびに探さない）
-  if (!p || (p.gk !== gk && (p.path.length === 0 || this.step - p.at > 8)) || p.stall > 60) {
-    if (p && p.path.length === 0 && p.gk === gk && this.step - p.at < 40) return this.moveToward(c, tx, ty, speed);
-    const path = this.findPath(c, this.tileOf(c.x, c.y), gk);
+  // 近ければ道筋を探さずにまっすぐ向かう。ただし目的地のマスが壁の中など、立てない所なら、下の探索で近づけるだけ近づいて立ち止まる
+  if (sq(tx - c.x) + sq(ty - c.y) < 24 * 24 && (gk < 0 || this.tilePassable(c, gk))) return this.moveToward(c, tx, ty, speed);
+  // 目的地のマスが変わったとき、または行き詰まったときだけ探し直す（動く獲物を追うたびに探さない）。
+  // 道が見つからなかった目的地は、生き物の更新40回ごとに探し直す（掘られて道ができているかもしれない）
+  if (!p || (p.gk !== gk && ((p.path.length === 0 && p.miss === 0) || this.step - p.at > 8)) || p.stall > 60 || (p.miss > 0 && this.step - p.at >= 40)) {
+    const from = this.tileOf(c.x, c.y);
+    const path = this.findPath(c, from, gk);
     if (!path) {
-      this.paths.set(c.id, { gx: tx, gy: ty, gk, at: this.step, path: [], pi: 0, stall: 0 });
-      return this.moveToward(c, tx, ty, speed);
+      // 道がない：壁に押しつけて足踏みし続けないよう、目的地にいちばん近づけるマスまで歩いて、そこで立ち止まる
+      p = { gx: tx, gy: ty, gk, at: this.step, path: this.nearPath(c, from, gk), pi: 0, stall: 0, miss: (p?.miss ?? 0) + 1 };
+      this.paths.set(c.id, p);
+    } else {
+      p = { gx: tx, gy: ty, gk, at: this.step, path, pi: 0, stall: 0, miss: 0 };
+      this.paths.set(c.id, p);
     }
-    p = { gx: tx, gy: ty, gk, at: this.step, path, pi: 0, stall: 0 };
-    this.paths.set(c.id, p);
+  }
+  if (p.miss > 0 && p.pi >= p.path.length) {
+    if (c.act === 1) c.act = 0;
+    return false;
   }
   if (p.path.length === 0) return this.moveToward(c, tx, ty, speed);
   if (p.pi >= p.path.length) return this.moveToward(c, tx, ty, speed);
@@ -230,6 +289,75 @@ export function nearestFloor(this: Ecology, x: number, y: number): number {
         if (!m.solid[k]) return k;
       }
   return m.entrance.x;
+}
+
+/** 壁や瓦礫の中にいても構わない種（壁を通り抜ける、飛んで越える、天井にぶら下がる） */
+export function wallWalker(this: Ecology, c: Cr): boolean {
+  return c.k === Kind.Worm || c.k === Kind.Wisp || c.k === Kind.Bat || c.k === Kind.Ghost || c.k === Kind.Wyvern || (c.k === Kind.Gargoyle && c.act !== 0) || (c.k === Kind.Dragon && c.st === 2);
+}
+
+/**
+ * 瓦礫を置いてはいけないマスの集合：生き物（壁の中にいても構わない種を除く）のいるマスと、生きている生き物の住みかの印（hx, hy）のマス、大ネズミの巣穴。
+ * 住みかを埋めると、帰る先が壁の中になって、そのそばで立ち尽くす（巣穴は行き止まりの窪みにあり、瓦礫を置く先も行き止まりの窪みなので、よく重なる）
+ */
+export function occupiedTiles(this: Ecology): Set<number> {
+  const s = new Set<number>();
+  for (const c of this.list) {
+    if (c.dead) continue;
+    if (!c.away && !this.wallWalker(c)) {
+      const k = this.tileOf(c.x, c.y);
+      if (k >= 0) s.add(k);
+    }
+    if (c.hx || c.hy) {
+      const h = this.tileOf(c.hx, c.hy);
+      if (h >= 0) s.add(h);
+    }
+  }
+  for (const b of this.burrows) {
+    const k = this.tileOf(b.x, b.y);
+    if (k >= 0) s.add(k);
+  }
+  return s;
+}
+
+/**
+ * 安全策：壁や瓦礫のマスの中にいる生き物（壁の中にいても構わない種を除く）を、いちばん近い立てる床へ移す。
+ * 埋まった生き物は、どちらへ動こうとしても行き先が壁の中なので、歩く姿のまま身動きできなくなる。移したら true
+ */
+export function unbury(this: Ecology, c: Cr): boolean {
+  const m = this.w.map;
+  const k0 = this.tileOf(c.x, c.y);
+  if (k0 < 0 || !m.solid[k0] || this.wallWalker(c)) return false;
+  const tx = k0 % m.w;
+  const ty = Math.floor(k0 / m.w);
+  let best = -1;
+  let bd = 1e18;
+  for (let r = 1; r <= 8 && best < 0; r++)
+    for (let dy = -r; dy <= r; dy++)
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = tx + dx;
+        const y = ty + dy;
+        if (x < 0 || y < 0 || x >= m.w || y >= m.h) continue;
+        const k = y * m.w + x;
+        if (!this.tilePassable(c, k)) continue;
+        const d = sq(x * TILE + 8 - c.x) + sq(y * TILE + 8 - c.y);
+        if (d < bd) {
+          bd = d;
+          best = k;
+        }
+      }
+  if (best < 0) return false;
+  c.x = (best % m.w) * TILE + 8;
+  c.y = Math.floor(best / m.w) * TILE + 8;
+  this.paths.delete(c.id);
+  // ガーゴイルは止まり木（hx, hy）へ戻ってうずくまるので、止まり木が壁の中なら、出た先を新しい止まり木にする
+  if (c.k === Kind.Gargoyle && this.tileOf(c.hx, c.hy) >= 0 && m.solid[this.tileOf(c.hx, c.hy)]) {
+    c.hx = c.x;
+    c.hy = c.y;
+  }
+  this.record('settle', { t: this.w.tick, k: c.k, id: c.id, ev: 'unbury', x: Math.round(c.x), y: Math.round(c.y) } as never);
+  return true;
 }
 
 export function setDir(this: Ecology, c: Cr, dx: number, dy: number): void {
@@ -703,6 +831,12 @@ declare module '../ecology' {
     tilePassable: typeof tilePassable;
     findPath: typeof findPath;
     findPathAvoid: typeof findPathAvoid;
+    searchLimit: typeof searchLimit;
+    wallWalker: typeof wallWalker;
+    occupiedTiles: typeof occupiedTiles;
+    unbury: typeof unbury;
+    nearPath: typeof nearPath;
+    unreachable: typeof unreachable;
     goTo: typeof goTo;
     tileOf: typeof tileOf;
     ratOnDry: typeof ratOnDry;
@@ -727,4 +861,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { record, tilePassable, findPath, findPathAvoid, goTo, tileOf, ratOnDry, passable, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, tryMove, findMoss, updateForage, nearestForage, eatMoss, eat, die, rebuildGrid, nearby });
+Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, unbury, searchLimit, nearPath, unreachable, findPathAvoid, goTo, tileOf, ratOnDry, passable, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, tryMove, findMoss, updateForage, nearestForage, eatMoss, eat, die, rebuildGrid, nearby });

@@ -659,8 +659,8 @@ export class Ecology {
   head: Int32Array;
   next: Int32Array = new Int32Array(0);
   items: Cr[] = [];
-  /** 道筋（遠くへ行くとき） */
-  paths = new Map<number, { gx: number; gy: number; gk: number; at: number; path: number[]; pi: number; stall: number }>();
+  /** 道筋（遠くへ行くとき）。miss は、目的地への道が見つからなかった探索が何回続いたか（0 なら道は見つかっている。そのときの path は、目的地にいちばん近づけるマスまでの道） */
+  paths = new Map<number, { gx: number; gy: number; gk: number; at: number; path: number[]; pi: number; stall: number; miss: number }>();
   bq: Int32Array;
   bprev: Int32Array;
   bmark: Int32Array;

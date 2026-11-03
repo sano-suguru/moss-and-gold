@@ -106,7 +106,8 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
     }
     let toy: Cr | null = null;
     this.nearby(c.x, c.y, 6, (o) => {
-      if (!toy && !o.dead && (o.k === Kind.Wisp || (o.k === Kind.Bat && o.st !== 0)) && sq(o.x - c.x) + sq(o.y - c.y) < 6 * TILE * 6 * TILE) toy = o;
+      // 壁の中や壁の向こうを飛ぶ相手は追わない（追えば壁に鼻先を押しつけたまま足踏みすることになる）
+      if (!toy && !o.dead && (o.k === Kind.Wisp || (o.k === Kind.Bat && o.st !== 0)) && sq(o.x - c.x) + sq(o.y - c.y) < 6 * TILE * 6 * TILE && this.tilePassable(c, this.tileOf(o.x, o.y)) && lineOfSight(m, c.x, c.y, o.x, o.y)) toy = o;
     });
     if (toy && sq(c.hx - c.x) + sq(c.hy - c.y) < 10 * TILE * 10 * TILE) {
       c.act = 1;

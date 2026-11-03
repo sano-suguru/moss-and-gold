@@ -33,6 +33,8 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       this.decay(c);
       continue;
     }
+    // 壁や瓦礫の中に埋まっていたら、いちばん近い床へ出る
+    if (!c.away) this.unbury(c);
     if (c.caught) {
       c.act = 1;
       if (ih(c.id, this.step, 41) % (c.k === Kind.Bat ? 70 : 160) === 0) c.caught = false;

@@ -18,6 +18,7 @@
  *   settle.jsonl     住みつく群れの出来事（コボルトの住処とゴブリンの集落を作った・捨てた・消えた、従えた、取り立て）
  *   events.jsonl     ゲーム内ログ（画面の「記録」）に出る出来事
  *   trace.jsonl      --trace で指定した生き物の毎 tick の状態
+ *   stuck.jsonl      足踏み：起きて歩く姿のまま、ゲーム内の2分（1200 tick）以上ほぼ同じ場所（12px 以内）にいた生き物（そうなった時点で1回記録）
  *   snap/dNNN.json.gz 日次スナップショット（ゲームのセーブと同じ形。調査と、後から値を計算するのに使う）
  *   checkpoint.json  再開するためのチェックポイント（ゲームのセーブと同じ形）
  * 0日目から一つのバージョンだけで実行したもの（pure）は、日次スナップショットを runs/.cache/snap/<バージョン>/ にも置く（probe などが再利用する）。
@@ -55,7 +56,7 @@ if (args.resume && existsSync(join(out, 'checkpoint.json'))) {
   meta = { seed, days: +(args.days || 10), tick: 0, total0: 0, gold0: 0, trace: +(args.trace || 0), advMax: Ecology.ADV_MAX_PARTIES, lineage: [{ sim: SELF_SIM, from: 0 }] };
   meta.total0 = w.totalNutrients();
   meta.gold0 = w.eco.totalGold();
-  for (const f of ['samples', 'deaths', 'births', 'exits', 'moves', 'settle', 'events', 'trace']) writeFileSync(join(out, `${f}.jsonl`), '');
+  for (const f of ['samples', 'deaths', 'births', 'exits', 'moves', 'settle', 'events', 'trace', 'stuck']) writeFileSync(join(out, `${f}.jsonl`), '');
   console.log(`新しく：シード「${seed}」を ${meta.days} 日`);
 }
 meta.bin = SELF_BIN;
@@ -116,6 +117,40 @@ function richness(): number | null {
   return n ? +(f / n).toFixed(2) : null;
 }
 
+/**
+ * 足踏みを見つける：20 tick ごとに、生きている生き物が最初に見た位置から 12px 以上離れたかを見て、離れなかったまま 1200 tick たったら、
+ * その間の半分以上で歩く姿（act 1）、眠りが半分未満なら記録する。壁に押しつけて歩き続ける、たどり着けない席へ向かい続けるなど、画面で引っかかって見える場面。
+ * 読むだけで展開は変えない。状態はセーブしないので、再開した直後の 1200 tick は数え始めからやり直す
+ */
+const STUCK_T = 1200;
+const still = new Map<number, { x: number; y: number; t0: number; n: number; walk: number; sleep: number; miss: number; done: boolean }>();
+function watchStuck(): unknown[] {
+  const e = w.eco;
+  const rows: unknown[] = [];
+  const seen = new Set<number>();
+  for (const c of e.list) {
+    if (c.dead || c.away) continue;
+    seen.add(c.id);
+    let r = still.get(c.id);
+    if (!r || (c.x - r.x) ** 2 + (c.y - r.y) ** 2 > 144) {
+      r = { x: c.x, y: c.y, t0: w.tick, n: 0, walk: 0, sleep: 0, miss: 0, done: false };
+      still.set(c.id, r);
+    }
+    r.n++;
+    if (c.act === 1) r.walk++;
+    if (c.sleep > 0) r.sleep++;
+    // 道が見つからないまま歩いているか（道筋の記録に miss が無い古いバージョンでは、空の道筋で見る）
+    const pp = e.paths.get(c.id) as { path: number[]; miss?: number } | undefined;
+    if (pp && (pp.miss ?? (pp.path.length === 0 ? 1 : 0)) > 0) r.miss++;
+    if (!r.done && w.tick - r.t0 >= STUCK_T) {
+      r.done = true;
+      if (r.walk * 2 >= r.n && r.sleep * 2 < r.n) rows.push({ t: w.tick, k: c.k, id: c.id, st: c.st, x: Math.round(c.x), y: Math.round(c.y), nopath: +(r.miss / r.n).toFixed(2) });
+    }
+  }
+  for (const id of still.keys()) if (!seen.has(id)) still.delete(id);
+  return rows;
+}
+
 function sample() {
   const e = w.eco;
   const m = w.map;
@@ -173,12 +208,14 @@ const startTick = w.tick;
 const target = meta.days * DAY_TICKS;
 const Q = DAY_TICKS / 4;
 let stopped = false;
+const stuckRows: unknown[] = [];
 while (w.tick < target) {
   const traceId = meta.trace;
   // ゲーム内の 1/4 日の区切り（tick が Q の倍数）まで進める。再開しても同じ区切りで記録する
   const until = Math.min(target, (Math.floor(w.tick / Q) + 1) * Q);
   while (w.tick < until) {
     tick(w);
+    if (w.tick % 20 === 0) stuckRows.push(...watchStuck());
     if (traceId) {
       const c = w.eco.list.find((o) => o.id === traceId);
       if (c && w.tick % 2 === 0) append('trace', [{ t: w.tick, k: c.k, x: +c.x.toFixed(1), y: +c.y.toFixed(1), act: c.act, st: c.st, hp: +c.hp.toFixed(1), food: c.food, flee: c.flee, dead: c.dead }]);
@@ -192,6 +229,7 @@ while (w.tick < target) {
   append('settle', st.settle.splice(0));
   append('events', w.eco.events.filter((ev) => ev.t > lastEventT));
   if (w.eco.events.length) lastEventT = Math.max(lastEventT, w.eco.events[w.eco.events.length - 1].t);
+  append('stuck', stuckRows.splice(0));
   append('samples', [sample()]);
   if (w.tick % DAY_TICKS === 0) snapshot(JSON.stringify(encodeState(w)), w.tick / DAY_TICKS);
   process.stdout.write(`\r${(w.tick / DAY_TICKS).toFixed(2)}日目  生き物${w.eco.list.filter((c) => !c.dead).length}  ${((Date.now() - started) / 1000).toFixed(0)}秒   `);

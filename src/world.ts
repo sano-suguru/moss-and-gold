@@ -574,6 +574,8 @@ export class World {
   private dumpSpoil(near: number): void {
     const m = this.map;
     if (this.rockStock <= 0) return;
+    // 生き物のいるマスには置かない（置くと、その生き物が瓦礫に埋まって身動きできなくなる）
+    const occupied = this.eco.occupiedTiles();
     const x0 = near % m.w;
     const y0 = (near / m.w) | 0;
     for (let r = 2; r <= 4 && this.rockStock > 0; r++)
@@ -584,7 +586,7 @@ export class World {
           const y = y0 + dy;
           if (x < 3 || y < 4 || x >= m.w - 3 || y >= m.h - 3) continue;
           const k = y * m.w + x;
-          if (m.solid[k] || m.lava[k] || this.water[k] > 20 || m.paved[k]) continue;
+          if (m.solid[k] || m.lava[k] || this.water[k] > 20 || m.paved[k] || occupied.has(k)) continue;
           // コボルトの住処の横穴（入口から奥まで）は行き止まりでも埋めない（以前は掘り出した土で自分たちの住処の奥を埋めていた）
           if (this.eco.inWarrenTunnel(k)) continue;
           const o = [k - m.w, k + 1, k + m.w, k - 1].map((q) => !m.solid[q]);

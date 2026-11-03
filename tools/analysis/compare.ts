@@ -31,7 +31,7 @@ const median = (a: number[]) => {
 };
 const f1 = (v: number) => (isFinite(v) ? v.toFixed(1) : '—');
 
-interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number; orcStarveExit: number; storeMean: number; storeMax: number; storePos: number; storeKnown: boolean; ratReenter: number; ratZero: number; splitDur: number[]; splitStore: number; mo: Record<string, number> }
+interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number; orcStarveExit: number; storeMean: number; storeMax: number; storePos: number; storeKnown: boolean; ratReenter: number; ratZero: number; splitDur: number[]; splitStore: number; stuck: number; stuckNoPath: number; stuckAdv: number; unbury: number; mo: Record<string, number> }
 function measure(dir: string): M {
   const S = rd(dir, 'samples.jsonl');
   const D = rd(dir, 'deaths.jsonl');
@@ -133,6 +133,13 @@ function measure(dir: string): M {
           const v = S.filter((x) => (x.settle?.campStore ?? []).length).map((x) => (x.settle.campStore as number[]).reduce((a, b) => a + b, 0));
           return { storeKnown: S.some((x) => x.settle?.campStore), storeMean: v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0, storeMax: Math.max(0, ...v), storePos: v.length ? (100 * v.filter((x) => x > 0).length) / v.length : 0 };
         })(),
+        // 足踏み（sim.ts の stuck.jsonl）：起きて歩く姿のまま2分以上ほぼ同じ場所にいた回数、そのうち道が見つからないまま（壁に押しつけて）、冒険者
+        ...(() => {
+          const T = rd(dir, 'stuck.jsonl');
+          // 壁や瓦礫に埋まっていて、安全策で床へ出た回数（settle.jsonl の unbury）
+          const U = rd(dir, 'settle.jsonl').filter((x) => x.ev === 'unbury').length;
+          return { stuck: T.length, stuckNoPath: T.filter((x) => x.nopath >= 0.5).length, stuckAdv: T.filter((x) => x.k === 25).length, unbury: U };
+        })(),
         // 見せたい瞬間の回数（lib/moments.ts）
         mo: countMoments(dir, sinceT),
         advDeaths: cnt(D, 25), gobStarveExit: cnt(X, 12, (x) => x.reason === 'starving'), gobAbandonExit: cnt(X, 12, (x) => x.reason === 'abandoned'), gobStarveDeath: cnt(D, 12, (d) => d.cause === 'starve'),
@@ -232,6 +239,7 @@ if (args.paired && all.length >= 2) {
     ['オーク：縄張りの日数の中央値', (m) => md(m.lairDur)], ['ゴブリン：5日以上続いた集落の割合（％）', (m) => (m.camps ? (100 * m.campDur.filter((d) => d >= 5).length) / m.camps : NaN)],
     ['ゴブリン：分かれてできた集落', (m) => m.splitDur.length], ['ゴブリン：分かれた集落の日数の中央値', (m) => md(m.splitDur)], ['ゴブリン：絶えた（1）', (m) => (m.gobGone ? 1 : 0)],
     ['ゴブリン：オークに倒された', (m) => m.gobByOrc], ['ゴブリン：コボルト・冒険者・オーク以外に倒された', (m) => m.gobByOther],
+    ['足踏み：起きて歩く姿のまま2分以上ほぼ動かない（全種）', (m) => m.stuck], ['足踏み：そのうち道が見つからないまま', (m) => m.stuckNoPath], ['足踏み：冒険者', (m) => m.stuckAdv], ['壁や瓦礫に埋まっていて床へ出た', (m) => m.unbury],
     ['冒険者：死んだ', (m) => m.advDeaths], ['ゴブリンに倒されたコボルト', (m) => m.kobByGob], ['コボルトに倒されたゴブリン', (m) => m.gobByKob],
   ];
   for (const mo of MOMENTS) P.push([`瞬間：${mo.label}`, (m) => m.mo[mo.key] ?? 0]);
