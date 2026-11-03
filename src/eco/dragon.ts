@@ -278,7 +278,8 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
   }
   // 起きている：炎を吐いている途中
   if (c.act === 2 && c.ref2 > 0) {
-    const t = 12 - c.ref2;
+    // 炎は口元から順に先へ燃え広がる（t は 0 から。若い竜は吐く時間が短いぶん、届く先も短い）
+    const t = Math.max(0, (c.sp === 1 ? 7 : 12) - c.ref2);
     this.breathe(c, c.tx, c.ty, t);
     c.ref2--;
     if (c.ref2 === 0) c.actT = 0;

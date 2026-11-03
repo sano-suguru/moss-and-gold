@@ -37,7 +37,7 @@ export function updateFire(this: Ecology): void {
       const y = Math.floor(k / m.w) * TILE + 8;
       this.nearby(x, y, 1, (o) => {
         if (o.dead || o.away || [Kind.Dragon, Kind.Golem, Kind.Worm, Kind.Ghost, Kind.Salamander].includes(o.k)) return;
-        if ((o.k === Kind.Bat || o.k === Kind.Wyvern || o.k === Kind.Wisp) && o.st !== 0) return;
+        if (this.airborne(o)) return;
         if (Math.abs(o.x - x) < 9 && Math.abs(o.y - y) < 9) this.die(o, 'burned', Kind.Dragon);
       });
       this.webs = this.webs.filter((wb) => Math.abs(wb.x - x) > 10 || Math.abs(wb.y - y) > 10);
@@ -60,9 +60,10 @@ export function breathe(this: Ecology, c: Cr, tx: number, ty: number, t: number)
   const d = Math.max(1, Math.sqrt(dx * dx + dy * dy));
   const ux = dx / d;
   const uy = dy / d;
-  // t は 0..11。先へ行くほど広く
+  // t は 0 から（成竜は 0..11、若い竜は 0..6）。先へ行くほど広く
   const reach = 1 + t * 0.6;
   const half = 0.6 + t * 0.25;
+  const lit: number[] = [];
   for (let s2 = Math.max(1, reach - 1.2); s2 <= reach; s2 += 0.5)
     for (let w = -half; w <= half; w += 0.5) {
       const x = c.x + (ux * s2 - uy * w) * TILE;
@@ -71,7 +72,22 @@ export function breathe(this: Ecology, c: Cr, tx: number, ty: number, t: number)
       if (k < 0 || m.solid[k]) continue;
       if (!lineOfSight(m, c.x, c.y, (k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8)) continue;
       this.ignite(k, 30 + (ih(k, this.step, 130) % 20));
+      if (!lit.includes(k)) lit.push(k);
     }
+  // 飛んでいる者（コウモリ、ワイバーン、ウィスプ）は、床に燃え残った火では焼けないが、吐いている炎そのものに当たれば焼ける
+  for (const k of lit) {
+    const x = (k % m.w) * TILE + 8;
+    const y = Math.floor(k / m.w) * TILE + 8;
+    this.nearby(x, y, 1, (o) => {
+      if (o.dead || o.away || o === c || !this.airborne(o)) return;
+      if (Math.abs(o.x - x) < 9 && Math.abs(o.y - y) < 9) this.die(o, 'burned', Kind.Dragon);
+    });
+  }
+}
+
+/** 宙にいて、床に燃え残った火では焼けない者（飛んでいるコウモリ、ワイバーン、ウィスプ） */
+export function airborne(this: Ecology, o: Cr): boolean {
+  return (o.k === Kind.Bat || o.k === Kind.Wyvern || o.k === Kind.Wisp) && o.st !== 0;
 }
 
 declare module '../ecology' {
@@ -79,7 +95,8 @@ declare module '../ecology' {
     ignite: typeof ignite;
     updateFire: typeof updateFire;
     breathe: typeof breathe;
+    airborne: typeof airborne;
   }
 }
 
-Object.assign(Ecology.prototype, { ignite, updateFire, breathe });
+Object.assign(Ecology.prototype, { ignite, updateFire, breathe, airborne });

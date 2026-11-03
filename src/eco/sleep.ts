@@ -126,7 +126,7 @@ export function slotOf(this: Ecology, c: Cr, g: { hx: number; hy: number; member
 /**
  * やわらかい間合い：近すぎる者どうしは、生き物の更新ごとに少しだけ離れる。止まっている者どうしほど強く、
  * 歩いている者どうしはごく弱く（すれ違いや交差はそのままできる）。動きを止めたり向きを変えさせたりはしない。
- * 群れで寄り添う種（大ネズミ、アリ、コウモリ）は間合いが小さい
+ * 群れで寄り添う種（大ネズミ、アリ、コウモリ）は間合いが小さい。ドラゴンは押されても動かず（相手だけがどく）、飛んでいる間は押し合わない
  */
 export function personalSpace(this: Ecology): void {
   for (const c of this.list) {
@@ -134,11 +134,13 @@ export function personalSpace(this: Ecology): void {
     const sa = Ecology.bodySize(c.k);
     if (!sa) continue;
     if (c.k === Kind.Bat && c.st !== 0) continue;
+    // 飛んでいるドラゴンは宙にいるので、地上の者と押し合わない
+    if (c.k === Kind.Dragon && c.st === 2) continue;
     const stillA = c.act === 0 || c.sleep > 0;
     this.nearby(c.x, c.y, 2, (o) => {
       if (o === c || o.dead || o.away || o.id < c.id) return;
       const sb = Ecology.bodySize(o.k);
-      if (!sb || (o.k === Kind.Bat && o.st !== 0)) return;
+      if (!sb || (o.k === Kind.Bat && o.st !== 0) || (o.k === Kind.Dragon && o.st === 2)) return;
       const huddle = (c.k === o.k && (c.k === Kind.Rat || c.k === Kind.Ant || c.k === Kind.Bat)) ? 0.65 : 1;
       const r = ((sa + sb) / 2) * huddle;
       const dx = o.x - c.x;
@@ -159,9 +161,12 @@ export function personalSpace(this: Ecology): void {
       const push = Math.min(1.2, (r - d) * k);
       const px = (ux / d) * push;
       const py = (uy / d) * push * 0.77;
-      // 大きいほうは動きにくい
-      const wa = sb / (sa + sb);
-      const wb = sa / (sa + sb);
+      // 大きいほうは動きにくい。ドラゴンは小さな者に押されても動かず、相手だけがどく
+      // （以前はコウモリやクモに押され、炎を吐いたまま向きを変えずに斜め後ろへ滑っていった）
+      const dA = c.k === Kind.Dragon && o.k !== Kind.Dragon;
+      const dB = o.k === Kind.Dragon && c.k !== Kind.Dragon;
+      const wa = dA ? 0 : dB ? 1 : sb / (sa + sb);
+      const wb = dB ? 0 : dA ? 1 : sa / (sa + sb);
       if (this.passable(c, c.x - px * wa, c.y - py * wa)) {
         c.x -= px * wa;
         c.y -= py * wa;
