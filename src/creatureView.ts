@@ -559,13 +559,23 @@ export class CreatureView {
       }
       const byId = new Map<number, (typeof eco.list)[number]>();
       for (const c of eco.list) byId.set(c.id, c);
+      const listening = new Set<number>();
+      for (const p of eco.parties) if ((p.listenT ?? 0) > eco.step && (p.camp ?? -1) < 0) for (const id of p.members) listening.add(id);
       for (const mk of eco.fxMarks) {
         const age = eco.w.tick - mk.t;
         if (age > 18) continue;
         const c = byId.get(mk.id);
         if (!c || c.dead || !inView(c.x, c.y, 20)) continue;
         const pop = age < 3 ? age : 3;
+        if (mk.m === '?' && listening.has(c.id)) continue;
         pushSprite(c.x + 5, c.y, 22 + pop + Ecology.bodySize(c.k) * 0.6, false, A.mark(mk.m), 0, 2);
+      }
+      // 聞き耳の「？」：立ち止まって耳を澄ませているあいだずっと、皆の頭の上に（前は出た瞬間の2秒だけで、見落としやすかった）
+      for (const id of listening) {
+        const c = byId.get(id);
+        if (!c || c.dead || c.sleep || !inView(c.x, c.y, 20)) continue;
+        const bob = Math.round(Math.sin(t * 3 + id * 0.7) * 0.8);
+        pushSprite(c.x + 5, c.y, 25 + bob + Ecology.bodySize(c.k) * 0.6, false, A.mark('?'), 0, 2);
       }
     }
     // 墓標（熟練以上の冒険者が倒れた所）
@@ -872,7 +882,7 @@ export class CreatureView {
           const ph = ((t + (c.id % 7) * 0.31) / cyc + i * 0.5) % 1;
           const zx = x + (flip ? -1 : 1) * (4 + ph * 6) + Math.sin(ph * 6) * 1.5;
           const zl = lift + fh * (sp === Kind.Dragon ? 0.55 : 0.75) + ph * 14;
-          pushSprite(zx, yy, zl, false, A.sleep(c.sleep === 2 ? 'Z' : 'z', Math.floor(ph * 4)), 0, 2);
+          pushSprite(zx, yy, zl, false, A.sleep(c.sleep === 2 || sp === Kind.Adventurer ? 'Z' : 'z', Math.floor(ph * 4)), 0, 2);
         }
         if (c.sleep === 3) pushSprite(x + (flip ? -2 : 2), yy, lift + fh * 0.72, false, A.sleep('eye', Math.floor(t * 2)), 0, 2);
       }

@@ -31,6 +31,8 @@ export interface Check {
 
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 const RUN_A = { seeds: ['かしたれ', 'seed8', 'abc', 'seed7'], from: 10, to: 18 };
+/** オークの取り立て：縄張りが長く続くシード（オークのいる日数が上限1でも2でも16日ほど） */
+const RUN_ORC = { seeds: ['かしたれ', 'seed27'], from: 10, to: 18 };
 
 export const CHECKS: Check[] = [
   {
@@ -129,8 +131,8 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'オークが貢ぎ物を取り立てる（4シードで1回以上）',
-    ...RUN_A,
+    name: 'オークが貢ぎ物を取り立てる（かしたれ・seed27 で1回以上）',
+    ...RUN_ORC,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'tribute').length);
       return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
@@ -176,7 +178,7 @@ export const CHECKS: Check[] = [
   {
     // 七巡目：取り立ては腹を空かせたときに、要る分（腹の空き＝120まで）を、蓄えの半分まで。空振り（0）は記録しない
     name: 'オークの取り立ては1回につき1〜120',
-    ...RUN_A,
+    ...RUN_ORC,
     test: (rs) => {
       const t = rs.flatMap((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'tribute'));
       const v = t.length ? sum(t.map((x) => x.n ?? 0)) / t.length : 0;

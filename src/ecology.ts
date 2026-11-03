@@ -316,6 +316,8 @@ export interface Camp {
   tribT?: number;
   /** 次に盗みに出られる刻み（夜の盗み：src/eco/raid.ts） */
   raidT?: number;
+  /** 次に通路での掠め取り（つける・待ち伏せ）に出られる刻み。夜の盗みとは別に数える（src/eco/raid.ts） */
+  snatchT?: number;
 }
 
 /** 種ごとの強さ（戦いの勝ち負けの確率に使う） */
@@ -641,7 +643,7 @@ export class Ecology {
   /** この刻みまでゴブリンは来ない（集落が襲われて捨てられたという外の噂） */
   goblinShun = 0;
   /** 同時にダンジョンの中にいる冒険者の一行の数の上限（切り替えられる。既定 1。段階13までは 2） */
-  static ADV_MAX_PARTIES = 1;
+  static ADV_MAX_PARTIES = 2;
   /**
    * ウィスプ（光の精を除く）が判断して動く間隔（生き物の1歩の何回に1回か）。数が多く（生き物の約6割）、漂うだけなので間引く。
    * 動く回に、間引いたぶん（WISP_EVERY 倍）動いて食べる。ほかの回は腹が減るだけ。描画は px から x へ WISP_EVERY 回ぶんの時間をかけて補間する（wispAlpha）
