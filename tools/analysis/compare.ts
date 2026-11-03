@@ -1,7 +1,7 @@
 /**
  * いくつかの batch の結果を、コボルトと大ネズミの目安で並べる（住みつける仕組みのチェック用）。
  *
- *   npm run compare -- --runs runs/batch-a,runs/batch-b --names "前,後" --out docs/compare.md
+ *   npm run compare -- --runs runs/batch-a,runs/batch-b --names "前,後" --out runs/compare.md
  *   npm run compare -- --runs ... --seeds "abc,かしたれ"     一部のシードだけ
  *   npm run compare -- --runs runs/ab-x/base,runs/ab-x/new --paired --since 10
  *       10日目より後のログだけで比べ、シードごとの差の分布と、差がばらつきに埋もれていないかの目安の表を先頭に付ける（ab が使う）

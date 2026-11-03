@@ -120,7 +120,7 @@ async function main(): Promise<void> {
   }
   mkdirSync('build/film', { recursive: true });
   const json = join('build/film', `${name}.json`);
-  writeFileSync(json, JSON.stringify({ frames, name, out: opt('out', 'docs/img'), title: `同じ冒険者の遠征ごとの姿：${title}（${seed}、${src}）`, cols: one ? 3 : 2 }));
+  writeFileSync(json, JSON.stringify({ frames, name, out: opt('out', 'build/img'), title: `同じ冒険者の遠征ごとの姿：${title}（${seed}、${src}）`, cols: one ? 3 : 2 }));
   console.log(`フレーム ${frames.length}（遠征 ${one ? frames.length : frames.length / 2} 回）→ ${json}`);
   execFileSync('node', ['tools/gallery/film.mjs', json], { stdio: 'inherit' });
 }

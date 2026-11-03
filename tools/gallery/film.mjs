@@ -1,7 +1,7 @@
 // tools/analysis/film.ts が書き出したフレームを、ゲーム画面（dist/index.html）でスクリーンショットに撮り、一枚に並べる（各フレームの下に、日と、先頭の生き物の情報パネルの内容）
 //   node tools/gallery/film.mjs build/film/<name>.json
 import { createRequire } from 'module';
-import { readFileSync, writeFileSync } from 'fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join, resolve } from 'path';
 const { chromium } = createRequire(import.meta.url)('playwright');
 
@@ -73,6 +73,7 @@ const strip = await page.evaluate(async ({ shots, labels, title, cols, W, H }) =
   }
   return c.toDataURL('image/png').split(',')[1];
 }, { shots, labels: sc.frames.map((f) => f.label), title: sc.title, cols, W, H });
+mkdirSync(sc.out, { recursive: true });
 const path = join(sc.out, `${sc.name}.png`);
 writeFileSync(path, Buffer.from(strip, 'base64'));
 console.log(`スクリーンショットを撮った：${path}（${shots.length}フレーム）${errs.length ? '（ページのエラー：' + errs.join(' / ') + '）' : ''}`);
