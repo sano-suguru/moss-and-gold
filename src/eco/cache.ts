@@ -130,10 +130,25 @@ export function cacheStep(this: Ecology, p: Party, alive: Cr[]): void {
         p.cacheGo = 0;
         p.targetAt = 0;
         // 着いたら、木箱のそばで焚き火を囲んで休む（休むあいだも置き場の食料で腹を満たすので、発つときには腹いっぱい）
-        if (!stuck && p.goal === 0 && (p.camp ?? -1) < 0 && o.food > 0 && ((p.fatigue ?? 0) > 800 || this.isNight())) this.startCamp(p, lead, o);
+        // （竜や手強い相手のそば、目標のすぐ手前の置き場では休まない）
+        if (!stuck && p.goal === 0 && (p.camp ?? -1) < 0 && o.food > 0 && ((p.fatigue ?? 0) > 800 || this.isNight()) && !this.cacheUnsafe(p, o)) this.startCamp(p, lead, o);
       }
     }
   }
+}
+
+/** 置き場で休むには危ないか：竜（12マス）か、一行の強さの7割を超える相手（8マス）がそばにいるか、目指す相手が15マスより近い */
+export function cacheUnsafe(this: Ecology, p: Party, o: SupplyCache): boolean {
+  if (p.aimKnown && sq((p.aimX ?? 0) - o.x) + sq((p.aimY ?? 0) - o.y) < 15 * TILE * 15 * TILE) return true;
+  const ps = this.partyStr(p);
+  let bad = false;
+  this.nearby(o.x, o.y, 12, (q) => {
+    if (bad || q.dead || q.away || q.k === Kind.Adventurer || q.k === Kind.Dwarf) return;
+    const d = sq(q.x - o.x) + sq(q.y - o.y);
+    if ((q.k === Kind.Dragon || q.k === Kind.Wyvern) && d < 12 * TILE * 12 * TILE) bad = true;
+    else if (d < 8 * TILE * 8 * TILE && this.str(q) > ps * 0.7) bad = true;
+  });
+  return bad;
 }
 
 /** 引き返す所に荷を下ろして、置き場を残す（近くに置き場があれば、そこに足す） */
@@ -251,9 +266,10 @@ declare module '../ecology' {
     cacheAhead: typeof cacheAhead;
     cacheStep: typeof cacheStep;
     dropCache: typeof dropCache;
+    cacheUnsafe: typeof cacheUnsafe;
     tellCaches: typeof tellCaches;
     ratRaidCache: typeof ratRaidCache;
   }
 }
 
-Object.assign(Ecology.prototype, { packForCaches, nextCache, cacheTarget, cacheAhead, cacheStep, dropCache, tellCaches, ratRaidCache });
+Object.assign(Ecology.prototype, { packForCaches, nextCache, cacheTarget, cacheAhead, cacheStep, dropCache, cacheUnsafe, tellCaches, ratRaidCache });
