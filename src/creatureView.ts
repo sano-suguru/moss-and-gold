@@ -789,6 +789,13 @@ export class CreatureView {
           }
           if (h!.rank >= 3) pushSprite(x, yy - 0.05, 6, false, A.halo(0), 0, 2);
         }
+        // 引退の前の最後の遠征の英雄：金の粒が二つ、ゆっくり立ちのぼる（「これが最後」。描画だけ）
+        if (h && h.last && h.rank >= 3) {
+          for (let i = 0; i < 2; i++) {
+            const ph = (t * 0.35 + i * 0.5 + c.id * 0.13) % 1;
+            pushSprite(x + Math.sin(ph * 6 + i * 3) * 6, yy, 6 + ph * 30, false, A.speck(1, Math.min(3, Math.floor(ph * 4))), 0, 2);
+          }
+        }
       }
       const glow = c.glow / 255;
       // 影
