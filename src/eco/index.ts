@@ -34,6 +34,7 @@ import './dragon';
 import './adventurer';
 import './aim';
 import './raid';
+import './cache';
 import './dwarf';
 import './arrivals';
 import './myconid';

@@ -821,6 +821,29 @@ function goblinCamp(){
  P.push(E(27,19,4,2,'bone',{ol:1}),C(25,17.6,29,18.4,0.7,'bone'),E(29.4,17,1.4,1.2,'bone',{ol:1}),D(29,17,COL.K),LN(24,20,30,16,'bone',3,{no:1}));
  return {...raster(33,22,P),ax:14,ay:20};
 }
+// ===== 物資の置き場（冒険者の遠征の木箱と寝具。tier 2 たっぷり、1 減った、0 空の残骸） =====
+function supplyCache(tier){
+ const P=[];
+ if(tier===0){
+  // 空の残骸：蓋のはずれた空の木箱、散らばった板、ほどけた寝具
+  P.push(PL([[8,9],[20,9],[20,19],[8,19]],'wood',1,{ol:1}),PL([[9,10],[19,10],[19,13],[9,13]],'char',1));
+  P.push(LN(9,15,19,15,'wood',0,{no:1}),LN(9,17,19,17,'wood',0,{no:1}));
+  P.push(PL([[21,17],[28,14],[29,16],[22,19]],'wood',2,{ol:1}),LN(22,18,28,15,'wood',1,{no:1}));
+  P.push(PL([[1,18],[6,16],[7,18],[2,20]],'wood',2,{ol:1}));
+  P.push(E(14,21,9,1.6,'leather',{ol:1}),LN(6,21,22,21,'leather',1,{no:1}));
+  return {...raster(30,23,P),ax:14,ay:21};
+ }
+ // 寝具（巻いた毛布と革ひも）
+ P.push(E(23,17,6,3.4,'tabard',{ol:1}),E(17.6,17,1.6,3.2,'tabard',{ol:1}),LN(21,14,21,20,'leather',1,{no:1}),LN(25,14,25,20,'leather',1,{no:1}));
+ // 木箱：板の継ぎ目と、角の鉄の金具
+ P.push(PL([[3,8],[16,8],[16,20],[3,20]],'wood',2,{ol:1}),PL([[3,8],[16,8],[17.6,5.6],[4.6,5.6]],'wood',3,{ol:1}));
+ P.push(LN(3,12,16,12,'wood',1,{no:1}),LN(3,16,16,16,'wood',1,{no:1}),LN(9.5,8,9.5,20,'wood',1,{no:1}));
+ P.push(D(4,9,RAMP.iron[3]),D(15,9,RAMP.iron[3]),D(4,19,RAMP.iron[2]),D(15,19,RAMP.iron[2]));
+ // 中身：たっぷりなら蓋の上に袋と干し肉の包み、減っていれば袋だけ
+ P.push(E(10,5,4.4,2.6,'rag',{ol:1}),LN(10,2.6,10,3.6,'leather',1,{no:1}));
+ if(tier===2)P.push(E(6,4.6,2.6,1.8,'leather',{ol:1}),E(14.6,4.8,2.2,1.6,'rag',{ol:1}));
+ return {...raster(30,23,P),ax:12,ay:20};
+}
 function reedHut(){
  const P=[];
  P.push(E(14,15,11,8,'reed',{ol:1}));
@@ -2671,4 +2694,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

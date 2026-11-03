@@ -99,6 +99,8 @@ export function syncLongSleep(this: Ecology): void {
     else if (c.k === Kind.Adventurer) {
       const p = this.parties.find((q) => q.id === c.party);
       if (p && (p.camp ?? -1) >= 0 && p.members[0] !== c.id && c.act === 0) z = 2;
+      // 焚き火の見張りがうとうとしている間は、浅い眠り（小さな z）
+      else if (p && p.members[0] === c.id && c.act === 0 && this.watchDozing(p)) z = 1;
     }
     c.sleep = z;
   }

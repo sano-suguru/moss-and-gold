@@ -16,6 +16,7 @@ import { parseArgs } from './common';
 import { DAY_TICKS } from '../../src/world';
 import { generate } from '../../src/mapgen';
 import { paired, pairedRow, PAIRED_HEAD, PAIRED_NOTE } from './lib/stats';
+import { MOMENTS, countMoments, momentTable } from './lib/moments';
 
 const args = parseArgs(process.argv.slice(2));
 const runs = (args.runs || '').split(',').filter(Boolean);
@@ -30,7 +31,7 @@ const median = (a: number[]) => {
 };
 const f1 = (v: number) => (isFinite(v) ? v.toFixed(1) : '—');
 
-interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number; orcStarveExit: number; storeMean: number; storeMax: number; storePos: number; storeKnown: boolean; ratReenter: number; ratZero: number; splitDur: number[]; splitStore: number }
+interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number; orcStarveExit: number; storeMean: number; storeMax: number; storePos: number; storeKnown: boolean; ratReenter: number; ratZero: number; splitDur: number[]; splitStore: number; mo: Record<string, number> }
 function measure(dir: string): M {
   const S = rd(dir, 'samples.jsonl');
   const D = rd(dir, 'deaths.jsonl');
@@ -132,6 +133,8 @@ function measure(dir: string): M {
           const v = S.filter((x) => (x.settle?.campStore ?? []).length).map((x) => (x.settle.campStore as number[]).reduce((a, b) => a + b, 0));
           return { storeKnown: S.some((x) => x.settle?.campStore), storeMean: v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0, storeMax: Math.max(0, ...v), storePos: v.length ? (100 * v.filter((x) => x > 0).length) / v.length : 0 };
         })(),
+        // 見せたい瞬間の回数（lib/moments.ts）
+        mo: countMoments(dir, sinceT),
         advDeaths: cnt(D, 25), gobStarveExit: cnt(X, 12, (x) => x.reason === 'starving'), gobAbandonExit: cnt(X, 12, (x) => x.reason === 'abandoned'), gobStarveDeath: cnt(D, 12, (d) => d.cause === 'starve'),
       };
     })(),
@@ -231,6 +234,7 @@ if (args.paired && all.length >= 2) {
     ['ゴブリン：オークに倒された', (m) => m.gobByOrc], ['ゴブリン：コボルト・冒険者・オーク以外に倒された', (m) => m.gobByOther],
     ['冒険者：死んだ', (m) => m.advDeaths], ['ゴブリンに倒されたコボルト', (m) => m.kobByGob], ['コボルトに倒されたゴブリン', (m) => m.gobByKob],
   ];
+  for (const mo of MOMENTS) P.push([`瞬間：${mo.label}`, (m) => m.mo[mo.key] ?? 0]);
   const sd = A.map((m) => m.seed);
   const Bs = sd.map((s) => Bm.find((m) => m.seed === s));
   L.push(`## 対にした比較：${names[0]} → ${names[names.length - 1]}（${sd.length} シード${args.since ? `、${args.since}日目より後` : ''}）`, '', PAIRED_NOTE, '', ...PAIRED_HEAD);
@@ -242,6 +246,7 @@ if (args.paired && all.length >= 2) {
   const dr = Math.max(0, ...Bm.map((m) => m.drift));
   L.push('', `帳簿のずれ（${names[names.length - 1]}、最大）：${dr}${dr ? ' ⚠' : ''}`, '');
 }
+L.push(...momentTable(names, all.map((ms) => ms.map((m) => m.mo))));
 if (args.goals) {
   const goals: { label: string; metric: string; op: string; value: number }[] = JSON.parse(readFileSync(args.goals, 'utf8'));
   const ok = (v: number, op: string, x: number) => (op === '>=' ? v >= x : op === '<=' ? v <= x : op === '>' ? v > x : op === '<' ? v < x : v === x);

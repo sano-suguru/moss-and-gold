@@ -158,6 +158,35 @@ export interface Party {
   dgvy?: number;
   /** 竜退治：知られた道をたどっている（見えるまでは、道の先＝見た所へ向かう） */
   aimWay?: number;
+  /** 焚き火の見張りのうとうと：うとうとしている刻みの終わり（この刻みまで、見張りは眠りの印を出して、忍び寄る者に気づかない）、次にうとうとしはじめる刻み */
+  dozeT?: number;
+  dozeNext?: number;
+  /** 最後に盗みを働いたゴブリンの集落（番号と、その時の場所）。生還者が町に伝える（盗みの噂）。robTold は伝えたか */
+  robCamp?: number;
+  robCX?: number;
+  robCY?: number;
+  robTold?: number;
+  /** 物資の置き場（冒険者の作り直しの三歩目）：知っている置き場、たどり終えた置き場、たどった置き場の入口からの道のりの最大、いま向かっている置き場、自分たちが残した置き場 */
+  cacheKnown?: number[];
+  cacheVis?: number[];
+  cacheD?: number;
+  cacheGo?: number;
+  cacheMine?: number[];
+}
+
+/**
+ * 物資の置き場：深部の探索の一行が、引き返す所に残す木箱と寝具。食料（food）は養分の帳簿に入る。
+ * d は入口から歩いた道のり（マス、つながっていなければ -1）、at は置いた刻み、by は置いた一行、rt は最後に魔物に荒らされた刻み
+ */
+export interface SupplyCache {
+  id: number;
+  x: number;
+  y: number;
+  food: number;
+  d: number;
+  at: number;
+  by: number;
+  rt: number;
 }
 
 /** 外の世界の地図：生還者が持ち帰った、探した範囲、宝のあった区画、危ない区画 [区画, 強さ, 刻み] */
@@ -169,6 +198,8 @@ export interface Lore {
   mouths?: number[];
   /** 竜の寝床への道：[見た者の立っていた所 x, y（画素）, 竜の番号, 持ち帰った刻み]。前の一行が見つけて持ち帰ったときだけ、竜殺しは竜退治を目標にする */
   dragonWay?: number[];
+  /** 生還者が町に伝えた物資の置き場（SupplyCache の番号） */
+  caches?: number[];
 }
 /** 地図の区画の大きさ（マス） */
 export const CELL = 8;
@@ -213,6 +244,11 @@ export interface Rumors {
   /** 竜を見かけた場所（竜殺しの一行が目指す噂の方角。0,0 なら知らない） */
   dragonX: number;
   dragonY: number;
+  /** 生還者が伝えた、ゴブリンの盗みの回数（2回でゴブリン退治の一行が来る。来たら0に戻す）と、最後に盗みを働いた集落（番号と場所） */
+  goblinRobs: number;
+  goblinCamp: number;
+  goblinCampX: number;
+  goblinCampY: number;
 }
 
 /** 金貨と宝石の山（量は整数で保存される） */
@@ -554,7 +590,7 @@ export class Ecology {
   /** 一度でも光に照らされた種 */
   discovered = new Uint8Array(32);
   gear: Item[] = [];
-  rumors: Rumors = { light: 0, gold: 0, undead: 0, beast: 0, dragon: 0, beastKind: 0, beastX: 0, beastY: 0, goblin: 0, goblinX: 0, goblinY: 0, dragonX: 0, dragonY: 0 };
+  rumors: Rumors = { light: 0, gold: 0, undead: 0, beast: 0, dragon: 0, beastKind: 0, beastX: 0, beastY: 0, goblin: 0, goblinX: 0, goblinY: 0, dragonX: 0, dragonY: 0, goblinRobs: 0, goblinCamp: 0, goblinCampX: 0, goblinCampY: 0 };
   /** 外との金貨の出入り */
   goldIn = 0;
   goldOut = 0;
@@ -569,6 +605,8 @@ export class Ecology {
   statues: Statue[] = [];
   statueAt = new Map<number, number>();
   camps: Camp[] = [];
+  /** 物資の置き場（深部の探索の一行が残す） */
+  caches: SupplyCache[] = [];
   /** 種ごとに、最後に群れが来た刻み（立て続けに来ないように） */
   lastArrival: number[] = [];
   colonies: Colony[] = [];
@@ -793,6 +831,8 @@ export class Ecology {
   fxMarks: { t: number; id: number; m: string }[] = [];
   /** マナから生まれた者（描画だけ：生まれる場所にマナが集まって姿が現れる演出。保存しない。判断に使わない） */
   fxManaBorn: { id: number; t: number; k: number; x: number; y: number }[] = [];
+  /** 大ネズミの巣穴の引っ越し（描画だけ：列の先頭が新しい巣穴に着くまで、古い場所に穴を描く。判断に使わない） */
+  fxMarch: { t: number; x: number; y: number; tx: number; ty: number }[] = [];
   noticed = new Map<number, number>();
 
   /** デモの組：攻める側と受ける側 */

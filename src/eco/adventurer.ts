@@ -72,6 +72,8 @@ export function maybeParty(this: Ecology): void {
   this.parties.push(party);
   // 目標を一つ決める（噂と職業の役目から）
   this.chooseAim(party, jobs, gobHunt);
+  // 町の知っている物資の置き場を覚え、深部の探索なら置き場に残す荷を背負う
+  this.packForCaches(party);
   const names = jobs.map((j) => JOB_NAMES[j]).join('・');
   const aim = this.aimPhrase(party);
   const who = `${JOB_NAMES[jobs[0]]}${party.name}の一行（${names}）が、${aim ? aim + '、' : ''}`;
@@ -113,6 +115,7 @@ export function updateParties(this: Ecology): void {
     p.members = alive.map((c) => c.id);
     if (!alive.length) continue;
     this.aimStep(p, alive);
+    this.cacheStep(p, alive);
     if (p.goal !== 0 && (p.camp ?? -1) >= 0) this.endCamp(p);
     if (p.goal === 0) {
       const lights = this.partyLights(p);
@@ -124,7 +127,8 @@ export function updateParties(this: Ecology): void {
         held += c.gold;
         if (c.food < SPEC[Kind.Adventurer].cap * 0.25) hungry = true;
       }
-      const tooLong = this.step - p.since > 10800;
+      // 置き場をたどった一行は、そのぶん長く奥にいられる
+      const tooLong = this.step - p.since > 10800 + 2500 * (p.cacheVis?.length ?? 0);
       const fewer = alive.length * 2 < p.initial;
       const dark = !lights.length;
       const slayer = alive.some((c) => c.sp === Job.Slayer);
@@ -140,7 +144,10 @@ export function updateParties(this: Ecology): void {
       p.fatigue = (p.fatigue ?? 0) + 1;
       // 食料が乏しくなったら、早めに引き返す（帰り道の分を残す）
       const foodAvg = alive.reduce((a2, o) => a2 + o.food / SPEC[Kind.Adventurer].cap, 0) / alive.length;
-      if (foodAvg < 0.45 && p.goal === 0) {
+      // 食料の残る置き場がすぐ先にあれば、着いて補ってから決める（引き返す判断は、置き場で補ったあとの量で）
+      const ahead = this.cacheAhead(p, alive[0], foodAvg);
+      if (hungry && ahead) hungry = false;
+      if (foodAvg < 0.45 && p.goal === 0 && !ahead) {
         p.goal = 1;
         p.camp = -1;
         this.setExit(p);
@@ -159,6 +166,7 @@ export function updateParties(this: Ecology): void {
       if (p.goal === 0 && foodAvg >= 0.5 && (p.camp ?? -1) < 0 && !(p.aimAt && !p.aimEnd) && this.step - (p.lastCamp ?? 0) > 2500 && ((p.fatigue ?? 0) > 3600 || worst < 0.5 || (this.isNight() && (p.fatigue ?? 0) > 2000))) this.startCamp(p, alive[0]);
       if ((p.camp ?? -1) >= 0 && (p.goal !== 0 || foodAvg < 0.3)) this.endCamp(p);
       if ((p.camp ?? -1) >= 0 && this.step >= (p.campUntil ?? 0)) this.endCamp(p);
+      if ((p.camp ?? -1) >= 0) this.watchDoze(p);
       if (held >= cap * 0.7 || hungry || tooLong || fewer || dark || ((p.saw & 8) !== 0 && !slayer)) {
         p.goal = 1;
         if ((p.camp ?? -1) >= 0) this.endCamp(p);
@@ -636,6 +644,8 @@ export function startCamp(this: Ecology, p: Party, leader: Cr): void {
   if (best < 0) return;
   p.camp = best;
   p.campUntil = this.step + 1500;
+  p.dozeT = 0;
+  p.dozeNext = 0;
   this.log((best % m.w) * TILE + 8, Math.floor(best / m.w) * TILE + 8, `冒険者の一行が焚き火を囲んで休みはじめた`);
 }
 
@@ -687,8 +697,11 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
   p.saw |= 16;
   if (c.gold > 0) this.log(c.x, c.y, `冒険者（${JOB_NAMES[c.sp]}）が金貨${c.gold}枚を持って生きて帰った`);
   else if (p.members[0] === c.id) this.log(c.x, c.y, `冒険者の一行が引き返して外へ出た`);
-  this.exported += c.body + c.food;
+  // 背負ってきた置き場の荷が残っていれば、それも持ち帰る
+  this.exported += c.body + c.food + c.units;
+  c.units = 0;
   this.goldOut += c.gold;
+  this.tellCaches(p);
   // 生きて帰った者が噂を持ち帰る
   const r = this.rumors;
   // 吟遊詩人が生きて帰れば噂は何倍にも広まり、吟遊詩人を失った一行の噂は細る
@@ -727,6 +740,16 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
     r.goblin += 0.12 * Math.min(3, p.robbed) * mul;
     r.goblinX = p.robX ?? 0;
     r.goblinY = p.robY ?? 0;
+    // 盗まれた回数と、盗みを働いた集落（一行で一度だけ伝える）。2回でゴブリン退治の一行が来る
+    if (!p.robTold) {
+      p.robTold = 1;
+      r.goblinRobs += p.robbed;
+      if (p.robCamp) {
+        r.goblinCamp = p.robCamp;
+        r.goblinCampX = p.robCX ?? 0;
+        r.goblinCampY = p.robCY ?? 0;
+      }
+    }
   }
   c.body = 0;
   c.food = 0;

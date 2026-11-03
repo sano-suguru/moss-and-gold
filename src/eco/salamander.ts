@@ -443,6 +443,7 @@ export function heldNutrients(this: Ecology, openOnly = false): number {
   if (this.hold) s += this.hold.store;
   for (const cp of this.camps) if (cp.id >= 0 && ok(cp.x, cp.y)) s += (cp.fuel ?? 0) + (cp.store ?? 0);
   for (const e of this.eggs) if (ok(e.x, e.y)) s += e.units;
+  for (const o of this.caches) if (ok(o.x, o.y)) s += o.food;
   return s;
 }
 

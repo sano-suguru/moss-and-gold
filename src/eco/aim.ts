@@ -17,13 +17,15 @@ const DRAGONS = [Kind.Dragon, Kind.Wyvern, Kind.Worm];
 const UNDEAD = [Kind.Zombie, Kind.Skeleton, Kind.Lich, Kind.Ghost];
 /** ゴブリン退治の一行が来る噂の強さ */
 export const GOBLIN_HUNT_AT = 0.5;
+/** ゴブリン退治の一行が来る、生還者が伝えた盗みの回数 */
+export const GOBLIN_HUNT_ROBS = 2;
 /** 構える長さ（生き物の1歩の回数）：目標に着いたとき、住処のそばを通るとき */
 const BRACE_ARRIVE = 16;
 const BRACE_PASS = 8;
 
 /** ゴブリン退治の一行が来るか（顔ぶれを決める前に見る） */
 export function goblinHuntReady(this: Ecology): boolean {
-  return this.rumors.goblin >= GOBLIN_HUNT_AT && this.camps.some((o) => o.id >= 0 && o.kind === 0);
+  return (this.rumors.goblin >= GOBLIN_HUNT_AT || this.rumors.goblinRobs >= GOBLIN_HUNT_ROBS) && this.camps.some((o) => o.id >= 0 && o.kind === 0);
 }
 
 /** 外の世界の地図に載っている場所か（生還者が探した区画、宝の区画、危ない区画。となりの区画まで含める） */
@@ -53,15 +55,21 @@ export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: bool
   p.aimEnd = 0;
   p.passed = [];
   if (gobHunt) {
-    // ゴブリン退治：最後に盗まれた場所にいちばん近い集落
-    let best: Camp | null = null;
-    let bd = 1e18;
-    for (const cp of this.camps) {
-      if (cp.id < 0 || cp.kind !== 0) continue;
-      const d = sq(cp.x - r.goblinX) + sq(cp.y - r.goblinY);
-      if (d < bd) {
-        bd = d;
-        best = cp;
+    // ゴブリン退治：いちばん最近盗みを働いた集落（逃げ帰ったゴブリンの足跡を、盗まれた一行がたどって町に伝えた）。
+    // その集落がすでに捨てられていれば、その近くの別の集落（場所を知らなければ当て推量で探す）
+    let best: Camp | null = this.camps.find((cp) => cp.id >= 0 && cp.kind === 0 && r.goblinCamp && cp.id === r.goblinCamp) ?? null;
+    const known = !!best;
+    if (!best) {
+      const ox = r.goblinCampX || r.goblinX;
+      const oy = r.goblinCampY || r.goblinY;
+      let bd = 1e18;
+      for (const cp of this.camps) {
+        if (cp.id < 0 || cp.kind !== 0) continue;
+        const d = sq(cp.x - ox) + sq(cp.y - oy);
+        if (d < bd) {
+          bd = d;
+          best = cp;
+        }
       }
     }
     if (best) {
@@ -69,10 +77,11 @@ export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: bool
       p.aimId = best.id;
       p.aimX = best.x;
       p.aimY = best.y;
-      p.aimKnown = this.loreKnows(best.x, best.y) ? 1 : 0;
+      p.aimKnown = known || this.loreKnows(best.x, best.y) ? 1 : 0;
       this.guessDeep(p);
       // 噂は、退治を引き受けた一行が出たことで落ち着く
       r.goblin *= 0.3;
+      r.goblinRobs = 0;
       return;
     }
   }
@@ -167,7 +176,11 @@ export function guessDeep(this: Ecology, p: Party): void {
   if (m.deep.x < 0) return;
   // ゴブリンの集落は最後に盗まれた場所へ、竜は見かけたという噂の場所へ、ほかは深部へ
   const r = this.rumors;
-  if (p.aim === 5 && (r.goblinX || r.goblinY)) {
+  if (p.aim === 5 && (r.goblinCampX || r.goblinCampY)) {
+    // 捨てられた集落のあった所へ（近くの別の集落を探す）
+    p.aimGuessX = r.goblinCampX;
+    p.aimGuessY = r.goblinCampY;
+  } else if (p.aim === 5 && (r.goblinX || r.goblinY)) {
     p.aimGuessX = r.goblinX;
     p.aimGuessY = r.goblinY;
   } else if (p.aim === 2 && (r.dragonX || r.dragonY)) {
@@ -386,7 +399,7 @@ export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
   }
   // 歩いて行けない行き先（道筋が見つからない。閉じた空洞の奥の寝床など）：当て推量ならまわりを探し、知っている目標ならあきらめる
   const pp = this.paths.get(lead.id);
-  if (pp && pp.path.length === 0 && pp.gk === this.tileOf(p.tx, p.ty) && sq(p.tx - lead.x) + sq(p.ty - lead.y) > 3 * TILE * 3 * TILE && !p.aimAt) {
+  if (pp && pp.path.length === 0 && pp.gk === this.tileOf(p.tx, p.ty) && sq(p.tx - lead.x) + sq(p.ty - lead.y) > 3 * TILE * 3 * TILE && !p.aimAt && !p.cacheGo) {
     if (!p.aimKnown && p.aimGuess) p.aimGuess = 0;
     else if (p.aimKnown) {
       this.endAim(p, lead, 2);
@@ -498,6 +511,8 @@ export function passBrace(this: Ecology, p: Party, lead: Cr): void {
  */
 export function aimTarget(this: Ecology, p: Party, from: Cr): boolean {
   if (!p.aim || p.aimEnd || p.goal !== 0) return false;
+  // 深部の探索と竜退治は、町の知っている物資の置き場を入口に近い順にたどってから、奥（目標）へ
+  if (this.cacheTarget(p)) return true;
   const m = this.w.map;
   if (!p.aimKnown) {
     // ゴブリン退治：盗まれた場所に着いても集落が見えなければ、そのまわり（12〜35マス。盗みに出たゴブリンはそのくらい遠くから来る）を順に探し歩く。
@@ -516,8 +531,8 @@ export function aimTarget(this: Ecology, p: Party, from: Cr): boolean {
     }
     // 当て推量の行き先へまっすぐ。着いたら、まわりの奥を探す（pickTarget が深部へ寄せる）
     if (!p.aimGuess) return false;
-    // 着いたか、地上の時間で長く（4000歩）向かっても着かなければ、まわりを探す
-    if (sq((p.aimGuessX ?? 0) - from.x) + sq((p.aimGuessY ?? 0) - from.y) < 3 * TILE * 3 * TILE || this.step - p.since > 4000) {
+    // 着いたか、地上の時間で長く（4000歩。たどった置き場ごとに2500歩足す）向かっても着かなければ、まわりを探す
+    if (sq((p.aimGuessX ?? 0) - from.x) + sq((p.aimGuessY ?? 0) - from.y) < 3 * TILE * 3 * TILE || this.step - p.since > 4000 + 2500 * (p.cacheVis?.length ?? 0)) {
       p.aimGuess = 0;
       return false;
     }

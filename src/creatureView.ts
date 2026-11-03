@@ -309,7 +309,22 @@ export class CreatureView {
     const inView = (x: number, y: number, m: number) => x > view.x0 - m && x < view.x1 + m && y > view.y0 - m && y < view.y1 + m + 40;
 
     // 地面のもの（巣穴、クモの巣）
-    for (const b of eco.burrows) if (inView(b.x, b.y, 16)) pushSprite(b.x, b.y, 0, false, A.burrow, 0, 2);
+    // 大ネズミの巣穴：引っ越しの列の先頭が新しい巣穴に着くまでは、古い場所に穴を描く（描画だけ。fxMarch）
+    for (const b of eco.burrows) {
+      let bx = b.x;
+      let by = b.y;
+      const mv = eco.fxMarch.find((e) => e.tx === b.x && e.ty === b.y && eco.w.tick - e.t < 3600);
+      if (mv) {
+        const lead = eco.list.find((c) => c.k === 2 && !c.dead && c.st === 11 && c.ref2 === 0 && c.hx === b.x && c.hy === b.y);
+        if (lead && (lead.x - b.x) ** 2 + (lead.y - b.y) ** 2 > 24 * 24) {
+          bx = mv.x;
+          by = mv.y;
+        }
+      }
+      if (inView(bx, by, 16)) pushSprite(bx, by, 0, false, A.burrow, 0, 2);
+    }
+    // 物資の置き場：木箱と寝具（食料が減ると中身が減り、空になれば残骸）
+    for (const o of eco.caches) if (inView(o.x, o.y, 24)) pushSprite(o.x, o.y + 6, 0, false, A.supply(o.food <= 0 ? 0 : o.food < 60 ? 1 : 2), 0, 2);
     // コボルトの住処：畑の畝、奥の寝床、入口の飾り柱、罠
     for (const wr of eco.warrens) {
       if (wr.id < 0 || !inView(wr.x, wr.y, 96)) continue;
