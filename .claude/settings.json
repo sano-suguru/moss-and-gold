@@ -5,10 +5,17 @@
         "source": "github",
         "repo": "cloudflare/skills"
       }
+    },
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
     }
   },
   "enabledPlugins": {
-    "cloudflare@cloudflare": true
+    "cloudflare@cloudflare": true,
+    "claude-md-management@claude-plugins-official": true
   },
   "hooks": {
     "SessionStart": [
