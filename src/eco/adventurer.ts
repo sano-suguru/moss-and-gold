@@ -163,7 +163,8 @@ export function updateParties(this: Ecology): void {
       }
       // 地上が夜なら、早めに休む（夜は焚き火を囲む）
       // 休むのは、探索中で食料に余裕があるときだけ（帰り道では休まずに出口を目指す。目標に着いて果たすまでの間も休まない）
-      if (p.goal === 0 && foodAvg >= 0.5 && (p.camp ?? -1) < 0 && !(p.aimAt && !p.aimEnd) && this.step - (p.lastCamp ?? 0) > 2500 && ((p.fatigue ?? 0) > 3600 || worst < 0.5 || (this.isNight() && (p.fatigue ?? 0) > 2000))) this.startCamp(p, alive[0]);
+      // 置き場へ向かう途中は休まない（置き場に着いてから、木箱のそばで休む。cacheStep）
+      if (p.goal === 0 && foodAvg >= 0.5 && (p.camp ?? -1) < 0 && !(p.aimAt && !p.aimEnd) && !(p.cacheGo && worst >= 0.5) && this.step - (p.lastCamp ?? 0) > 2500 && ((p.fatigue ?? 0) > 3600 || worst < 0.5 || (this.isNight() && (p.fatigue ?? 0) > 2000))) this.startCamp(p, alive[0]);
       if ((p.camp ?? -1) >= 0 && (p.goal !== 0 || foodAvg < 0.3)) this.endCamp(p);
       if ((p.camp ?? -1) >= 0 && this.step >= (p.campUntil ?? 0)) this.endCamp(p);
       if ((p.camp ?? -1) >= 0) this.watchDoze(p);
@@ -613,19 +614,22 @@ export function setExit(this: Ecology, p: Party): void {
 }
 
 /** 焚き火の場所：近くの、壁に囲まれた所（袋小路や角）。水辺なら少し好む */
-export function startCamp(this: Ecology, p: Party, leader: Cr): void {
+export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: number; y: number }): void {
   const m = this.w.map;
-  const hx = Math.floor(leader.x / TILE);
-  const hy = Math.floor(leader.y / TILE);
+  const hx = Math.floor((near ?? leader).x / TILE);
+  const hy = Math.floor((near ?? leader).y / TILE);
+  const R = near ? 2 : 8;
   let best = -1;
   let bv = -1e9;
-  for (let dy = -8; dy <= 8; dy++)
-    for (let dx = -8; dx <= 8; dx++) {
+  for (let dy = -R; dy <= R; dy++)
+    for (let dx = -R; dx <= R; dx++) {
       const x = hx + dx;
       const y = hy + dy;
       if (x < 2 || y < 2 || x >= m.w - 2 || y >= m.h - 2) continue;
       const k = y * m.w + x;
       if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 10 || this.w.burn[k]) continue;
+      // 置き場のそばで休むときは、木箱のマスそのものには焚き火を置かない
+      if (near && k === this.tileOf(near.x, near.y)) continue;
       let walls = 0;
       let water = 0;
       for (let yy = -1; yy <= 1; yy++)
@@ -643,7 +647,8 @@ export function startCamp(this: Ecology, p: Party, leader: Cr): void {
     }
   if (best < 0) return;
   p.camp = best;
-  p.campUntil = this.step + 1500;
+  // 夜は長めに休む（地上の夜のあいだ焚き火を囲む）
+  p.campUntil = this.step + (this.isNight() ? 2400 : 1500);
   p.dozeT = 0;
   p.dozeNext = 0;
   this.log((best % m.w) * TILE + 8, Math.floor(best / m.w) * TILE + 8, `冒険者の一行が焚き火を囲んで休みはじめた`);

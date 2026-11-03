@@ -39,6 +39,7 @@ const SCENES: Scene[] = [
   { name: 'sidecave', title: '地表の横穴', seed: 'abc', day: 12, phase: 0.45, zoom: 3, find: (w) => { const i = w.map.mouths.findIndex((q, j) => q.kind === 0 && w.eco.mouthOpen(j)); if (i < 0) return null; const [x, y] = w.eco.mouthSpot(i); const mo = w.map.mouths[i]; return { x: x + (mo.y === 0 ? 0 : mo.x === 0 ? 60 : -60), y: y + (mo.y === 0 ? 40 : 0), zoom: 3 }; } },
   { name: 'river', title: '地下の川の口', seed: 'abc', day: 12, phase: 0.45, zoom: 3, find: (w) => { const mo = w.map.mouths.find((q) => q.kind === 2); return mo ? { x: mo.x * T + 8, y: mo.y * T + 8, zoom: 3 } : null; } },
   { name: 'warren', title: 'コボルトの住処（横穴・罠・畑）', seed: 'かしたれ', day: 3.5, phase: 0.4, zoom: 4, search: 6, find: (w) => { const e = w.eco as any; const wr = e.warrens.find((o: any) => (o.tun ?? 0) >= 4 && e.traps.filter((t: any) => t.w === o.id).length >= 2); if (!wr) return null; const d = wr.door; return { x: Math.round(((d % w.map.w) * T + 8 + wr.x) / 2), y: Math.round((Math.floor(d / w.map.w) * T + 8 + wr.y) / 2), zoom: 4 }; } },
+  { name: 'cache', title: '冒険者の物資の置き場（木箱と寝具）', seed: 'abc', day: 13, phase: 0.45, zoom: 4, search: 8, find: (w) => { const o = w.eco.caches.find((q) => q.food > 0) ?? w.eco.caches[0]; return o ? { x: o.x, y: o.y, zoom: 4 } : null; } },
   { name: 'phone', title: 'スマホの画面全体', seed: 'かしたれ', day: 2, phase: 0.6, zoom: 2, device: 'phone', find: (w) => ({ x: w.map.entrance.x * T + 8, y: 30 * T, zoom: 2 }) },
 ];
 

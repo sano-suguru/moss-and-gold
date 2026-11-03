@@ -12,13 +12,13 @@ import { Cr, Ecology, Kind, Party, SPEC, SupplyCache, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 深部の探索の一行の者が背負ってくる、置き場に残す食料の荷 */
-export const CACHE_PACK = 45;
+export const CACHE_PACK = 60;
 /** これより入口に近い所（歩いて、マス）には置き場を残さない（荷は持ち帰る） */
 const CACHE_MIN_D = 30;
 /** 置き場の数の上限（超えたら、古い空の置き場から片づける） */
 const CACHE_MAX = 14;
 /** 置き場で食料を補う間合い（画素） */
-const CACHE_R = 2.5 * TILE;
+const CACHE_R = 3.5 * TILE;
 
 /** 置き場をたどる一行：深部の探索と竜退治 */
 function followsCaches(p: Party): boolean {
@@ -41,22 +41,35 @@ export function packForCaches(this: Ecology, p: Party): void {
   }
 }
 
-/** 次にたどる置き場：知っている置き場のうち、まだたどっていないもので、たどった所より奥の、いちばん入口に近いもの */
-export function nextCache(this: Ecology, p: Party): SupplyCache | undefined {
+/**
+ * 次にたどる置き場：目指す所（竜退治なら道の先か竜を見かけた噂の場所、深部の探索なら深部）にいちばん近い、まだたどっていない知った置き場。
+ * いまいる所より目指す所に近いものだけ（遠征を重ねて奥へ伸びた置き場の、いちばん奥へまっすぐ向かう。途中の置き場は、そばを通れば補う）
+ */
+export function nextCache(this: Ecology, p: Party, from?: Cr): SupplyCache | undefined {
   if (!followsCaches(p) || p.goal !== 0 || p.aimAt || p.aimEnd === 1) return undefined;
+  const lead = from ?? this.byId.get(p.members[0]);
+  if (!lead) return undefined;
+  const m = this.w.map;
+  const r = this.rumors;
+  const [gx, gy] = p.aim === 2 && p.aimKnown ? [p.aimX ?? 0, p.aimY ?? 0] : p.aim === 2 && (r.dragonX || r.dragonY) ? [r.dragonX, r.dragonY] : [m.deep.x * TILE + 8, m.deep.y * TILE + 8];
   let best: SupplyCache | undefined;
+  let bd = sq(gx - lead.x) + sq(gy - lead.y) - 8 * TILE * 8 * TILE;
   for (const id of p.cacheKnown ?? []) {
     if ((p.cacheVis ?? []).includes(id)) continue;
     const o = this.caches.find((q) => q.id === id);
-    if (!o || o.d < 0 || o.d < (p.cacheD ?? 0) - 10) continue;
-    if (!best || o.d < best.d || (o.d === best.d && o.id < best.id)) best = o;
+    if (!o || o.d < 0) continue;
+    const d = sq(gx - o.x) + sq(gy - o.y);
+    if (d < bd || (d === bd && best && o.id < best.id)) {
+      bd = d;
+      best = o;
+    }
   }
   return best;
 }
 
 /** 行き先を次の置き場に（aimTarget の初め）。true なら決めた */
-export function cacheTarget(this: Ecology, p: Party): boolean {
-  const o = this.nextCache(p);
+export function cacheTarget(this: Ecology, p: Party, from?: Cr): boolean {
+  const o = p.cacheGo ? this.caches.find((q) => q.id === p.cacheGo && !(p.cacheVis ?? []).includes(q.id)) ?? this.nextCache(p, from) : this.nextCache(p, from);
   p.cacheGo = o ? o.id : 0;
   if (!o) return false;
   p.tx = o.x;
@@ -116,6 +129,8 @@ export function cacheStep(this: Ecology, p: Party, alive: Cr[]): void {
         if (!stuck) p.cacheD = Math.max(p.cacheD ?? 0, o.d);
         p.cacheGo = 0;
         p.targetAt = 0;
+        // 着いたら、木箱のそばで焚き火を囲んで休む（休むあいだも置き場の食料で腹を満たすので、発つときには腹いっぱい）
+        if (!stuck && p.goal === 0 && (p.camp ?? -1) < 0 && o.food > 0 && ((p.fatigue ?? 0) > 800 || this.isNight())) this.startCamp(p, lead, o);
       }
     }
   }

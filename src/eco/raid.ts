@@ -11,7 +11,7 @@ import { Camp, Cr, DAY_TICKS_ECO, Ecology, Job, Kind, Party, SPEC, ih, sq } from
 import { TILE } from '../mapgen';
 
 /** 盗みに出る集落の、蓄えの乏しさ（蓄えの目安に対する割合） */
-const RAID_STORE = 0.4;
+const RAID_STORE = 0.7;
 /** 盗みに出る遠さ（集落から焚き火まで、マス）。焚き火の残りの時間で着ける所だけ（1マスあたり約25歩で見積もる） */
 const RAID_R = 50;
 
@@ -171,9 +171,9 @@ export function goblinRaid(this: Ecology, c: Cr): boolean {
     c.act = 0;
     c.dir = Math.abs(fx - c.x) > Math.abs(fy - c.y) ? (fx > c.x ? 2 : 3) : fy > c.y ? 0 : 1;
     if (c.gait <= 0) {
-      // 見張りが起きていれば、うとうとするのを待つ（眠りの印が出たら駆け寄る）。せっかちな者と、待ちくたびれた者は待たずに駆け寄る
+      // 見張りが起きていれば、うとうとするのを待つ（眠りの印が出たら駆け寄る）。せっかちな者（8匹に1匹）と、待ちくたびれた者は待たずに駆け寄る
       const watcher = this.byId.get(p.members[0]);
-      const patient = ih(c.id, c.lureAt, 274) % 4 !== 0;
+      const patient = ih(c.id, c.lureAt, 274) % 8 !== 0;
       c.gait = patient && watcher && !watcher.dead && !this.watchDozing(p) && this.step - c.lureAt < 2600 ? 1 : -1;
     }
     return true;

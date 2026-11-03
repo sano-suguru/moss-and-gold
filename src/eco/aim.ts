@@ -512,7 +512,7 @@ export function passBrace(this: Ecology, p: Party, lead: Cr): void {
 export function aimTarget(this: Ecology, p: Party, from: Cr): boolean {
   if (!p.aim || p.aimEnd || p.goal !== 0) return false;
   // 深部の探索と竜退治は、町の知っている物資の置き場を入口に近い順にたどってから、奥（目標）へ
-  if (this.cacheTarget(p)) return true;
+  if (this.cacheTarget(p, from)) return true;
   const m = this.w.map;
   if (!p.aimKnown) {
     // ゴブリン退治：盗まれた場所に着いても集落が見えなければ、そのまわり（12〜35マス。盗みに出たゴブリンはそのくらい遠くから来る）を順に探し歩く。
