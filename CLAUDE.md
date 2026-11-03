@@ -159,7 +159,7 @@ samples.jsonl は、刻みが `DAY_TICKS/4` の倍数のときに記録する（
 | src/main.ts | ループ、画面の部品（ミニマップ、記録、養分の表示）、保存 |
 | test/*.ts | テスト |
 | tools/gallery/ | 見た目の確認（scenes.ts と shoot.mjs：決まった場面の一覧、shot.ts と shot.mjs：見たいものを探して撮る） |
-| tools/analysis/ | 分析の道具（launch.mjs：組み立てて回す入口, sim, report, batch, ab：前の版との比較, compare, probe：調べ物, check と checks.ts：早めの確かめ, metric：回し直さずに値を計算, drift, digmap, planview など） |
+| tools/analysis/ | 分析の道具（launch.mjs：組み立てて回す入口, sim, report, batch, ab：前の版との比較, compare, advreport, probe：調べ物, check と checks.ts：早めの確かめ, metric：回し直さずに値を計算, cachemap：物資の置き場の推移と地図, lairdist, partydbg, drift, digmap, planview など） |
 | tools/analysis/lib/ | 道具の共通部品（bins.mjs：版の見分けと組み立て, engine.ts：進め方, state.ts：状態の読み書き, runs.ts：保存庫, open.ts：途中の状態を手に入れる, batchrun.ts, stats.ts：対にした比較の目安, seeds.ts：決まったシードの組） |
 | README.md | 段階ごとの仕組みの詳しい説明（仕様書として読める） |
 
@@ -198,6 +198,9 @@ samples.jsonl は、刻みが `DAY_TICKS/4` の倍数のときに記録する（
   竜殺しは、竜の寝床への道（`Lore.dragonWay`、寝床のドラゴンを見通しの利く所から見た一行が持ち帰る）が知られているときだけ竜退治（`aimWay`）、なければ深部の探索（`aim 6`、寝床を見たら道を持ち帰る）。
   コボルトは腹いっぱいなら住処へ持ち帰り（`st 13`）、集めの係は畑のキノコを摘む。住処の横穴には瓦礫を置かない（`inWarrenTunnel`。前は自分たちの掘った土で住処の奥が埋まっていた）。大ネズミの巣穴の引っ越しは一列で歩く（`st 11`、`ratMarch`）。
   マナから生まれる者の出現の演出（描画だけ、`fxManaBorn`、幼竜は卵が割れて出てくる）
+- 冒険者の作り直しの三歩目（docs/adventurer-step3-20261112.md、src/eco/cache.ts）：焚き火の見張りはときどきうとうとし（`Party.dozeT / dozeNext`、頭に小さな z）、その間は忍び寄るゴブリンに気づかない（ゴブリンはうとうとを待って駆け寄る）。生還者が伝えた盗みが2回（`Rumors.goblinRobs`）でゴブリン退治の一行が来て、最後に盗みを働いた集落（`goblinCamp`）を目指す。
+  深部の探索の一行は荷（一人60、`Cr.units`）を背負い、引き返す所に物資の置き場（`Ecology.caches`、木箱と寝具、食料は養分の帳簿に入る）を残し、生還すれば町の知識（`Lore.caches`）に。深部の探索と竜退治は、目指す所に近い置き場へまっすぐ向かって補い、着いた置き場で休む。大ネズミがあさる。幼竜が孵ると竜の噂が立つ。
+  見せたい瞬間の回数は tools/analysis/lib/moments.ts（compare.md と advreport の表）。巣穴の絵は列の先頭が着くまで古い場所（描画だけ、`fxMarch`）
 - 速さのための間引き（docs/speed-experiments）：ウィスプ（光の精を除く）は生き物の1歩の4回に1回だけ判断し、その回に4回ぶん動いて食べる（`Ecology.WISP_EVERY`、`wispIdle`。描画は `moveAlpha` で4回ぶんの時間をかけて補間）。苔とキノコは40刻みごとに2回ぶん進める（`MOSS_EVERY`、`MOSS_R`）。画面なしでは見たマスの更新を200刻みごと（lib/engine.ts。見たマスは生き物の判断に使わない）
 - 描画だけ：攻撃の技の演出（`fxAttacks`、`creatureView.drawAttacks`）、気づいた印、のけぞり、飛び散る粒。見本は `dist/index.html#fxdemo`。画面の部品を隠すのは `#clean`。
 
