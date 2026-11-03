@@ -36,6 +36,7 @@ npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 
 回した結果と1日ごとの状態は、版（シミュレーションのソースの中身のハッシュ）ごとの保存庫 `runs/.cache/` に残り、同じ版・同じシードなら使い回す（しくみは docs/rework-tools.md。大きくなったら消してよい）。main の版の保存庫は、クラウドのセッションでは始まりのフックが Release「sim-cache」から裏で取ってくる（様子は runs/.cache/fetched/log.txt。マージ直後で無ければ手元で回る）。
 
 ```bash
+npm install                       # 初回（クラウドのセッションでは始まりのフックが入れる）
 npm test                          # 決定性・帳簿・保存からの再現など（約12秒。TEST_FULL=1 で0日目から）
 npm run typecheck
 npm run build                     # dist/index.html（外部依存なしの1ファイル。dist はコミットしない）
