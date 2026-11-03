@@ -268,6 +268,22 @@ export interface Rumors {
 }
 
 /** 金貨と宝石の山（量は整数で保存される） */
+/**
+ * 情報パネルのための、死骸・落とし物・金貨の山・石像・物資の置き場のいきさつ（src/eco/notes.ts）。
+ * 見る人に「どうしてそこにあるか」を伝えるためだけの覚え書きで、シミュレーションの判断には使わない（セーブには入れる）。
+ * t はできた tick、cause は死んだ理由（die の cause）、by は倒した相手の種、bn は倒した相手の名前、
+ * who・job・name は持ち主（倒れた者、落とした者、置いた一行）の種・職業・名前
+ */
+export interface Note {
+  t: number;
+  cause?: string;
+  by?: number;
+  bn?: string;
+  who?: number;
+  job?: number;
+  name?: string;
+}
+
 export interface Pile {
   id: number;
   x: number;
@@ -619,6 +635,8 @@ export class Ecology {
   /** 燃えているマスの一覧 */
   burning: number[] = [];
   piles: Pile[] = [];
+  /** 死骸・落とし物・金貨の山・石像・物資の置き場のいきさつ（物の番号ごと。情報パネル用で、判断には使わない） */
+  notes = new Map<number, Note>();
   /** ワームの体がたどる跡（頭の過去の位置） */
   trails = new Map<number, number[]>();
   statues: Statue[] = [];

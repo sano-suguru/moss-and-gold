@@ -1,20 +1,22 @@
 /** Ecology のメソッド：宝（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Note, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
 
-/** 金貨をその場に落とす（近くに山があればそこに積む） */
-export function dropGold(this: Ecology, x: number, y: number, g: number): void {
+/** 金貨をその場に落とす（近くに山があればそこに積む）。n は情報パネルに出すいきさつ（落とした者。判断には使わない） */
+export function dropGold(this: Ecology, x: number, y: number, g: number, n?: Note): void {
   for (const p of this.piles) {
     if (sq(p.x - x) + sq(p.y - y) < 20 * 20) {
       p.gold += g;
+      if (n) this.note(p.id, n);
       return;
     }
   }
   const k = this.tileOf(x, y);
   const m = this.w.map;
+  if (n) this.note(this.nextId, n);
   this.piles.push({ id: this.nextId++, x: k >= 0 ? (k % m.w) * TILE + 8 : Math.round(x), y: k >= 0 ? Math.floor(k / m.w) * TILE + 8 : Math.round(y), gold: g, age: 0 });
 }
 

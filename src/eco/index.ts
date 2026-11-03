@@ -38,6 +38,8 @@ import './listen';
 import './loot';
 import './roster';
 import './cache';
+import './notes';
+import './inspect';
 import './dwarf';
 import './arrivals';
 import './myconid';

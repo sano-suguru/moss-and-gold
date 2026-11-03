@@ -5,6 +5,7 @@ import { load, packBits, packI32, packU8, save, unpackBits, unpackI32, unpackU8,
 import { buildAtlas } from './atlas';
 import { CreatureView } from './creatureView';
 import { CR_EVERY } from './ecology';
+import type { Thing } from './eco/inspect';
 import { DAY_TICKS, TICKS_PER_SEC, World, dayIntensity, timeLabel } from './world';
 import { JOB_NAMES, NAMES, renderEvent } from './names';
 
@@ -156,16 +157,16 @@ function boot(): void {
     onTap: (wx, wy) => onTap(wx, wy),
   });
 
-  // ---- 触れる：一回で生き物の情報パネル、二回続けて触れると UI を隠して絵だけ（もう一度で戻る） ----
+  // ---- 触れる：一回で生き物や物（死骸、金貨、道具、墓標など）の情報パネル、二回続けて触れると UI を隠して絵だけ（もう一度で戻る） ----
   let tapTimer = 0;
   let lastTap = { t: -1e9, x: 0, y: 0 };
-  let selected = 0;
+  let selected: Thing | null = null;
   const card = $('card');
   const cardTitle = $('cardTitle');
   const cardLines = $('cardLines');
   let cardAt = 0;
   const closeCard = () => {
-    selected = 0;
+    selected = null;
     card.hidden = true;
   };
   $('cardClose').addEventListener('click', closeCard);
@@ -180,11 +181,10 @@ function boot(): void {
     lastTap = { t: now, x: wx, y: wy };
     clearTimeout(tapTimer);
     tapTimer = window.setTimeout(() => {
-      const c = world.eco.pick(wx, wy);
-      // 生き物がいなければ、墓標（番号を負にして選ぶ）
-      const g = c ? null : world.eco.pickGrave(wx, wy);
-      if (c || g) {
-        selected = c ? c.id : -(g as { id: number }).id;
+      // 生き物 → 死骸 → 金貨・道具 → 墓標・石像・置き場・集落・焚き火 の順に選ぶ（src/eco/inspect.ts）
+      const s = world.eco.pickThing(wx, wy);
+      if (s) {
+        selected = s;
         card.hidden = false;
         cardAt = 0;
       } else closeCard();
@@ -200,18 +200,18 @@ function boot(): void {
   });
   function updateCard(now: number) {
     if (!selected) return;
-    const grave = selected < 0 ? world.eco.graves.find((o) => o.id === -selected) : undefined;
-    const c = grave ? { x: grave.x, y: grave.y + 8, dead: 0, away: false } : world.eco.list.find((o) => o.id === selected);
-    if (!c || c.dead || c.away) {
+    // 選んだ物が無くなったら（死んだ、去った、朽ちた、拾われた）閉じる
+    const c = world.eco.thingPos(selected);
+    if (!c) {
       closeCard();
       return;
     }
-    // カメラが生き物を追いかける（なめらかに）
+    // カメラが生き物（物ならその場所）を追いかける（なめらかに）
     cam.x += (c.x - cam.x) * 0.12;
     cam.y += (c.y - 10 - cam.y) * 0.12;
     if (now - cardAt > 300) {
       cardAt = now;
-      const d = grave ? world.eco.describeGrave(grave) : world.eco.describe(c as Parameters<typeof world.eco.describe>[0], NAMES, JOB_NAMES);
+      const d = selected.t === 'cr' ? world.eco.describe(c as Parameters<typeof world.eco.describe>[0], NAMES, JOB_NAMES) : world.eco.describeThing(selected);
       cardTitle.textContent = d.title;
       cardLines.textContent = '';
       for (const l of d.lines) {
@@ -341,6 +341,8 @@ function boot(): void {
       t.textContent = timeLabel(ev.t);
       b.append(t, renderEvent(ev.m, e.discovered));
       b.addEventListener('click', () => {
+        // 別の場所へ飛ぶので、追いかけていた生き物からは離れる
+        closeCard();
         cam.x = ev.x;
         cam.y = ev.y;
       });
@@ -418,6 +420,8 @@ function boot(): void {
     mctx.strokeRect(Math.floor(viewRect.x0 / TILE) + 0.5, Math.floor(viewRect.y0 / TILE) + 0.5, Math.max(2, Math.floor((viewRect.x1 - viewRect.x0) / TILE)), Math.max(2, Math.floor((viewRect.y1 - viewRect.y0) / TILE)));
   }
   mini.addEventListener('pointerdown', (ev) => {
+    // 別の場所へ飛ぶので、追いかけていた生き物からは離れる（情報パネルを閉じる）
+    closeCard();
     const r = mini.getBoundingClientRect();
     cam.x = ((ev.clientX - r.left) / r.width) * world.map.w * TILE;
     cam.y = ((ev.clientY - r.top) / r.height) * world.map.h * TILE;

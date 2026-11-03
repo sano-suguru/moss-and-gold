@@ -1,6 +1,6 @@
 /** Ecology のメソッド：冒険者（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Note, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
@@ -343,7 +343,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   if (c.torch > 0) {
     c.torch--;
     if (c.torch === 0) {
-      this.dropItem(c.x, c.y, ItemKind.Stub, 0);
+      this.dropItem(c.x, c.y, ItemKind.Stub, 0, this.ownerNote(c, 'spent'));
       if (c.ref2 > 0) {
         c.ref2--;
         c.torch = TORCH_FUEL;
@@ -839,15 +839,16 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
 
 /** 倒れた者の持ち物を床に落とす（冒険者の道具） */
 export function dropBelongings(this: Ecology, c: Cr): void {
+  const n = c.k === Kind.Goblin || c.k === Kind.Orc || c.k === Kind.Adventurer ? this.ownerNote(c, 'fell') : undefined;
   if (c.k === Kind.Skeleton && c.init) {
     this.dropJobItems(c);
     c.init = 0;
     return;
   }
   if (c.k === Kind.Goblin || c.k === Kind.Orc) {
-    if (c.party) this.dropItem(c.x, c.y, c.party, 0);
-    if (c.torch > 0) this.dropItem(c.x + 3, c.y, ItemKind.Torch, c.torch);
-    else if (c.torch < 0) this.dropItem(c.x + 3, c.y, ItemKind.Stub, 0);
+    if (c.party) this.dropItem(c.x, c.y, c.party, 0, n);
+    if (c.torch > 0) this.dropItem(c.x + 3, c.y, ItemKind.Torch, c.torch, n);
+    else if (c.torch < 0) this.dropItem(c.x + 3, c.y, ItemKind.Stub, 0, n);
     c.party = 0;
     c.torch = 0;
     return;
@@ -857,20 +858,24 @@ export function dropBelongings(this: Ecology, c: Cr): void {
   this.log(c.x, c.y, `冒険者（${JOB_NAMES[c.sp]}）が倒れた`);
   const x = c.x;
   const y = c.y;
-  if (c.torch > 0) this.dropItem(x + 4, y + 2, ItemKind.Torch, c.torch);
+  if (c.torch > 0) this.dropItem(x + 4, y + 2, ItemKind.Torch, c.torch, n);
   c.torch = 0;
   this.dropJobItems(c);
   // 背負っていた荷（背負い袋と寝具）も、倒れた所に残る
-  this.dropItem(x - 6, y - 3, ItemKind.Pack, 0);
+  this.dropItem(x - 6, y - 3, ItemKind.Pack, 0, n);
   c.party = 0;
 }
 
 export function dropJobItems(this: Ecology, c: Cr): void {
-  Ecology.JOB_ITEMS[c.sp].forEach((kd, i) => this.dropItem(c.x - 4 + i * 7, c.y + 3 - i * 2, kd, 0));
+  const n = this.ownerNote(c, 'fell');
+  Ecology.JOB_ITEMS[c.sp].forEach((kd, i) => this.dropItem(c.x - 4 + i * 7, c.y + 3 - i * 2, kd, 0, n));
 }
 
-export function dropItem(this: Ecology, x: number, y: number, kind: number, fuel: number): void {
-  this.gear.push({ id: this.nextId++, x: Math.round(x), y: Math.round(y), kind, fuel });
+/** 床に道具を置く。n は情報パネルに出すいきさつ（落とした者など。判断には使わない） */
+export function dropItem(this: Ecology, x: number, y: number, kind: number, fuel: number, n?: Note): void {
+  const id = this.nextId++;
+  this.gear.push({ id, x: Math.round(x), y: Math.round(y), kind, fuel });
+  if (n) this.note(id, n);
   // 古い燃えさしから片づける（道具が増えすぎないように）
   if (this.gear.length > 160) {
     const i = this.gear.findIndex((o) => o.kind === ItemKind.Stub);

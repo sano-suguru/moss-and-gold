@@ -462,7 +462,7 @@ export function goblin(this: Ecology, c: Cr): void {
     if (c.gold > 0) {
       c.act = 1;
       if (sq(camp.x - c.x) + sq(camp.y - c.y) < 18 * 18 || this.goTo(c, camp.x + 12, camp.y + 8, s.speed)) {
-        this.dropGold(camp.x + 12, camp.y + 8, c.gold);
+        this.dropGold(camp.x + 12, camp.y + 8, c.gold, this.ownerNote(c, 'stash'));
         c.gold = 0;
       }
       return;

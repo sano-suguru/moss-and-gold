@@ -11,7 +11,8 @@
 :root {
   --ink: #ebe4d0;
   --ink-dim: #a8a192;
-  --plaque: rgba(20, 18, 31, 0.86);
+  --plaque: rgba(20, 18, 31, 0.6);
+  --plaque-card: rgba(20, 18, 31, 0.75);
   --edge: #34304a;
   --edge-hi: #5b5470;
   --torch: #ffb36b;
@@ -27,7 +28,8 @@
   :root:not([data-theme="light"]) {
     --ink: #ebe4d0;
     --ink-dim: #a8a192;
-    --plaque: rgba(20, 18, 31, 0.86);
+    --plaque: rgba(20, 18, 31, 0.6);
+    --plaque-card: rgba(20, 18, 31, 0.75);
     --edge: #34304a;
     --edge-hi: #5b5470;
     --torch: #ffb36b;
@@ -40,7 +42,8 @@
 :root[data-theme="dark"] {
   --ink: #ebe4d0;
   --ink-dim: #a8a192;
-  --plaque: rgba(20, 18, 31, 0.86);
+  --plaque: rgba(20, 18, 31, 0.6);
+  --plaque-card: rgba(20, 18, 31, 0.75);
   --edge: #34304a;
   --edge-hi: #5b5470;
   --torch: #ffb36b;
@@ -100,7 +103,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--torch); out
 .mapbox { display: flex; flex-direction: column; align-items: flex-end; }
 .mapbox .head { display: flex; justify-content: flex-end; }
 /* 生き物の札 */
-.card { position: absolute; z-index: 3; pointer-events: auto; max-width: min(260px, calc(100vw - 24px)); padding: 8px 10px 8px 12px; font-size: 13px; line-height: 1.5; color: var(--ink); }
+.card { position: absolute; z-index: 3; pointer-events: auto; background: var(--plaque-card); max-width: min(260px, calc(100vw - 24px)); padding: 8px 10px 8px 12px; font-size: 13px; line-height: 1.5; color: var(--ink); }
 .card .t { font-size: 15px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .card .t button { min-height: 32px; min-width: 32px; padding: 2px 6px; font-size: 14px; color: var(--ink-dim); }
 .card ul { list-style: none; margin: 4px 0 0; padding: 0; color: var(--ink-dim); }

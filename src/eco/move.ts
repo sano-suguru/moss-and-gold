@@ -648,12 +648,13 @@ export function eat(this: Ecology, pred: Cr, prey: Cr): void {
   const quick = prey.dead !== 0 || [Kind.Wisp, Kind.Slime, Kind.Ghost, Kind.Myconid].includes(prey.k) || pred.k === Kind.Goblin || pred.k === Kind.Worm || pred.k === Kind.Mimic || total <= 4;
   if (!quick) {
     this.record('deaths', { t: this.w.tick, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}) } as never);
+    this.noteDeath(prey, 'eaten', pred.k, pred);
     this.raiseAlarm(prey, pred);
     this.paths.delete(prey.id);
     if (prey.k === Kind.Dwarf && this.hold && pred.k === Kind.Golem && this.list.some((o) => o.k === Kind.Dwarf && !o.dead && o !== prey)) this.hold.golem = 1;
     this.dropBelongings(prey);
     if (prey.gold > 0) {
-      this.dropGold(prey.x, prey.y, prey.gold);
+      this.dropGold(prey.x, prey.y, prey.gold, this.ownerNote(prey, 'fell'));
       prey.gold = 0;
     }
     prey.units = total;
@@ -681,7 +682,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr): void {
   if (prey.k === Kind.Dwarf && this.hold && pred.k === Kind.Golem && this.list.some((o) => o.k === Kind.Dwarf && !o.dead && o !== prey)) this.hold.golem = 1;
   this.dropBelongings(prey);
   if (prey.gold > 0) {
-    this.dropGold(prey.x, prey.y, prey.gold);
+    this.dropGold(prey.x, prey.y, prey.gold, this.ownerNote(prey, 'fell'));
     prey.gold = 0;
   }
   const take = Math.min(total, s.cap - pred.food);
@@ -718,6 +719,7 @@ export function die(this: Ecology, c: Cr, cause = '', by = -1): void {
       for (let q = 0; q < d.length; q++) if (d[q] >= 0 && Math.max(this.w.moss[q], this.w.fungus[q]) >= 20 && (near < 0 || d[q] < near)) near = d[q];
     }
     this.record('deaths', { t: this.w.tick, k: c.k, cause, by, x: Math.round(c.x), y: Math.round(c.y), ...(near !== undefined ? { near } : {}), ...(c.k === Kind.Rat && c.st === 11 ? { march: 1 } : {}) } as never);
+    this.noteDeath(c, cause, by);
     // 住処の仲間が襲われて倒れたら、群れは覚えている（何度も続けば住処を捨てる）
     if (c.k === Kind.Kobold && by >= 0 && by !== Kind.Kobold && cause !== 'starve') {
       const wr = this.warrenOf(c);
@@ -736,7 +738,7 @@ export function die(this: Ecology, c: Cr, cause = '', by = -1): void {
   this.paths.delete(c.id);
   this.dropBelongings(c);
   if (c.gold > 0) {
-    this.dropGold(c.x, c.y, c.gold);
+    this.dropGold(c.x, c.y, c.gold, this.ownerNote(c, 'fell'));
     c.gold = 0;
   }
   if (c.away) {
