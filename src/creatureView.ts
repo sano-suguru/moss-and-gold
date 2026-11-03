@@ -242,6 +242,8 @@ export class CreatureView {
   };
   private order: { y: number; c: Cr; x: number; yy: number }[] = [];
 
+  /** 幼竜と若い竜が左を向いているか（生き物の id ごと）。描画だけの記憶で、セーブしない */
+  private youngFaceL = new Map<number, boolean>();
   constructor(private atlas: Atlas) {}
 
   /** 種・向き・動作・コマから、アトラスのコマ番号を引く */
@@ -683,7 +685,18 @@ export class CreatureView {
       const sp = c.k;
       // 隠れている者は、こちら（暗がりの外）を向いて潜む（目が見えるように）
       let dir = c.dir === 0 || eco.isHidden(c) ? 0 : c.dir === 1 ? 1 : 2;
-      const flip = c.dir === 3;
+      let flip = c.dir === 3;
+      // 幼竜と若い竜には横向きの絵しかない。上下へ動くときも、横にどちらへ動いているかで左右を決め、
+      // 一時停止中やロード直後で動きが分からなければ、飛んでいる竜は行き先の側を向き、それ以外は直前の左右を保つ（以前は上下の向きのとき必ず右を向き、左上へ飛ぶと右を向いたまま後ろへ滑って見えた）
+      const youngDragon = sp === Kind.Dragon && c.sp < 2 && c.elite !== 8;
+      if (youngDragon) {
+        if (c.dir === 2 || c.dir === 3) flip = c.dir === 3;
+        else if (Math.abs(c.x - c.px) > 0.05) flip = c.x < c.px;
+        else if (c.st === 2 && Math.abs(eco.dragonFlightGoal(c)[0] - c.x) > 1) flip = eco.dragonFlightGoal(c)[0] < c.x;
+        else flip = this.youngFaceL.get(c.id) ?? false;
+        this.youngFaceL.set(c.id, flip);
+        dir = 2;
+      }
       let act = c.act;
       let f = 0;
       let lift = 0;
@@ -901,10 +914,16 @@ export class CreatureView {
       }
       // ドラゴンの炎の柱：口元から
       if (sp === Kind.Dragon && act === 2 && c.ref2 > 0 && !c.dead && dir !== 1) {
-        const bf = this.atlas.breath(dir === 0, Math.floor(t * 10));
-        if (dir === 2) pushSprite(x + (flip ? -1 : 1) * (44 + 4), yy - 40 * 1 + 1, 0, flip, bf, 0, 0);
-        else pushSprite(x, yy - 44 + 1, 0, false, bf, 0, 0);
-        dyn.push({ x: x + (dir === 2 ? (flip ? -40 : 40) : 0), y: yy - (dir === 2 ? 16 : 8), r: 90, i: 1.6, c: 1 });
+        if (youngDragon) {
+          // 若い竜：小さな炎を、若い竜の口元（体の中心から前へ約27px、上へ約24px）から
+          pushSprite(x + (flip ? -1 : 1) * 27, yy - 21, 0, flip, this.atlas.breathYoung(Math.floor(t * 10)), 0, 0);
+          dyn.push({ x: x + (flip ? -24 : 24), y: yy - 8, r: 60, i: 1.2, c: 1 });
+        } else {
+          const bf = this.atlas.breath(dir === 0, Math.floor(t * 10));
+          if (dir === 2) pushSprite(x + (flip ? -1 : 1) * (44 + 4), yy - 40 * 1 + 1, 0, flip, bf, 0, 0);
+          else pushSprite(x, yy - 44 + 1, 0, false, bf, 0, 0);
+          dyn.push({ x: x + (dir === 2 ? (flip ? -40 : 40) : 0), y: yy - (dir === 2 ? 16 : 8), r: 90, i: 1.6, c: 1 });
+        }
       }
       // 光を帯びた生き物の光
       if (!c.dead || c.k === Kind.Wisp) {

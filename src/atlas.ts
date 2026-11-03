@@ -54,6 +54,8 @@ export interface Atlas {
   wormSeg: (kind: number) => number;
   /** ドラゴンの炎の柱（down = 正面向き） */
   breath: (down: boolean, f: number) => number;
+  /** 若い竜の小さな炎（横向き） */
+  breathYoung: (f: number) => number;
   /** 床に落ちた道具（ItemKind の順） */
   item: (kind: number, f: number) => number;
   dust: (f: number) => number;
@@ -493,6 +495,12 @@ export function buildAtlas(): Atlas {
     breathFrames.push(raws.length);
     raws.push(fireBreath('down', f, 42, true) as RawFrame);
   }
+  // 若い竜の炎：口が低いので、短く落として床に届かせる
+  const breathYoungFrames: number[] = [];
+  for (let f = 0; f < 4; f++) {
+    breathYoungFrames.push(raws.length);
+    raws.push(fireBreath('side', f, 20, true) as RawFrame);
+  }
   // 床に落ちた道具
   const itemFrames: number[] = [];
   for (const kd of ['torch', 'stub', 'sword', 'shield', 'staff', 'mace', 'dagger', 'symbol', 'lute', 'bow', 'greatsword'])
@@ -802,6 +810,7 @@ export function buildAtlas(): Atlas {
     treasure: (size, f) => treasureFrames[size * 4 + (f & 3)],
     wormSeg: (kind) => segFrames[kind],
     breath: (down, f) => breathFrames[(down ? 4 : 0) + (f & 3)],
+    breathYoung: (f) => breathYoungFrames[f & 3],
     item: (kind, f) => (kind === 11 ? packFrame : itemFrames[kind * 4 + (f & 3)] ?? itemFrames[0]),
     dust: (f) => dustFrames[f & 3],
     forge: (f) => forgeFrames[f & 3],
