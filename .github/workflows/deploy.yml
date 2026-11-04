@@ -5,6 +5,7 @@
 #     preview … npm run build → wrangler versions upload（本番には出さないバージョン）→ プレビューの URL を PR にコメント
 #               （同じ PR では一つのコメントを書き換える。URL はバージョンごとのものと、PR ごとに変わらない pr-<番号> のエイリアス）
 #               フォークからの PR では Secrets を使えないので、プレビューは作らない。
+#               PR が閉じられたら（マージしたときも）、プレビューのバージョンは preview-cleanup.yml が消す。
 # - main への push：typecheck → npm test → npm run build → wrangler deploy（本番）
 #
 # 要るもの：リポジトリの Secrets に CLOUDFLARE_API_TOKEN と CLOUDFLARE_ACCOUNT_ID。無ければ公開だけ飛ばす。

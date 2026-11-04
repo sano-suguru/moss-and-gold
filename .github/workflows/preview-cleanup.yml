@@ -1,0 +1,82 @@
+# PR が閉じられたら（マージしたときも）、その PR のプレビューのバージョンを Cloudflare から消す。
+# プレビューは deploy.yml が PR を作ったとき・push したときにアップロードする、本番に出さないバージョン（マージ前に確かめるためのもの）。
+# 消し方は tools/preview-cleanup.mjs の先頭のコメント。PR のプレビューのコメントも「消した」と書き換える。
+# 手で実行（workflow_dispatch）すると、今開いていない PR のバージョンをすべて消す（溜まった分の掃除）。
+name: preview-cleanup
+
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 消さずに、消す予定のものを表示するだけ
+        type: boolean
+        default: false
+
+concurrency:
+  group: preview-cleanup-${{ github.event.pull_request.number || 'all' }}
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    # フォークからの PR はプレビューを作らないので、消すものも無い
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }} # 閉じた PR のブランチではなく、main のスクリプトを使う
+          sparse-checkout: |
+            tools/preview-cleanup.mjs
+            .node-version
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+      - name: 閉じた PR のプレビューのバージョンを消す
+        id: rm
+        if: env.CLOUDFLARE_API_TOKEN != '' && github.event_name == 'pull_request'
+        env:
+          PR: ${{ github.event.pull_request.number }}
+        run: node tools/preview-cleanup.mjs --pr "$PR"
+      - name: 今開いていない PR のプレビューのバージョンをすべて消す
+        if: env.CLOUDFLARE_API_TOKEN != '' && github.event_name == 'workflow_dispatch'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/preview-cleanup.mjs --closed ${{ inputs.dry_run && '--dry-run' || '' }}
+      - name: PR のプレビューのコメントを「消した」に書き換える
+        if: steps.rm.outcome == 'success'
+        uses: actions/github-script@v8
+        env:
+          DELETED: ${{ steps.rm.outputs.deleted }}
+        with:
+          script: |
+            const marker = '<!-- moss-and-gold-preview -->';
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+            const mine = comments.find((c) => c.user?.type === 'Bot' && c.body?.includes(marker));
+            if (!mine) return;
+            const how = context.payload.pull_request.merged ? 'マージされた' : '閉じられた';
+            const body = [
+              marker,
+              '### 🍂 プレビュー（消した）',
+              '',
+              `PR が${how}ので、この PR のプレビューのバージョン（${process.env.DELETED} 件）を Cloudflare から消しました。`,
+              '',
+              `<sub>${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC。PR を開き直すと、新しいプレビューが作られます。</sub>`,
+            ].join('\n');
+            await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+      - name: Secrets が無いので飛ばした
+        if: env.CLOUDFLARE_API_TOKEN == ''
+        run: echo "::notice::CLOUDFLARE_API_TOKEN が無いのでプレビューの削除を飛ばしました"
