@@ -6,13 +6,13 @@
  *   npm run compare -- --runs runs/ab-x/base,runs/ab-x/new --paired --since 10
  *       10日目より後のログだけで比べ、シードごとの差の分布と、差がばらつきに埋もれていないかの目安の表を先頭に付ける（ab が使う）
  *
- * 各 batch のシードごとに：ゴブリンの集落（続いた日数、終わり方、冒険者・コボルトとの殺し合い）、コボルトの住処が続いた日数（中央値、ゲーム内の1/4日ごとのサンプルから）、冒険者に倒されたコボルト、
+ * 各 batch のシードごとに：にぎわい（同時にいるモンスターの種の数とその内訳）、ゴブリンの集落（続いた日数、終わり方、冒険者・コボルトとの殺し合い）、コボルトの住処が続いた日数（中央値、ゲーム内の1/4日ごとのサンプルから）、冒険者に倒されたコボルト、
  * ドラゴンに焼かれたコボルト、コボルトの去り方（starving 一匹ずつ飢えて / abandoned 住処ごと）、大ネズミの飢え死に、
  * 大ネズミの来た数と去り方（dispersed）、大ネズミが最後に生きているか、四つの保存則のずれ
  */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { parseArgs } from './common';
+import { parseArgs, KIND_NAMES } from './common';
 import { DAY_TICKS } from '../../src/world';
 import { generate } from '../../src/mapgen';
 import { paired, pairedRow, PAIRED_HEAD, PAIRED_NOTE } from './lib/stats';
@@ -31,7 +31,23 @@ const median = (a: number[]) => {
 };
 const f1 = (v: number) => (isFinite(v) ? v.toFixed(1) : '—');
 
-interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number; orcStarveExit: number; storeMean: number; storeMax: number; storePos: number; storeKnown: boolean; ratReenter: number; ratZero: number; splitDur: number[]; splitStore: number; stuck: number; stuckNoPath: number; stuckAdv: number; unbury: number; mo: Record<string, number> }
+interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number; orcStarveExit: number; storeMean: number; storeMax: number; storePos: number; storeKnown: boolean; ratReenter: number; ratZero: number; splitDur: number[]; splitStore: number; stuck: number; stuckNoPath: number; stuckAdv: number; unbury: number; mo: Record<string, number>; kindsMean: number; kindsMin: number; kindShare: number[] }
+/** にぎわいで数えない種：冒険者とドワーフ（人の側。来訪の多さに数字が引っ張られないよう、モンスターと分ける） */
+const NOT_MONSTER = new Set([25, 28]);
+const MONSTER_KINDS = KIND_NAMES.map((_, k) => k).filter((k) => !NOT_MONSTER.has(k));
+/**
+ * にぎわい：ダンジョンに同時に何種類のモンスターがいるか。5日目以降のゲーム内の1/4日ごとのサンプル（samples.jsonl の種ごとの数）で、
+ * 1匹以上いる種を数え、その平均と最小を出す。あわせて、種ごとに「いたサンプルの割合（％）」を出す（どの種が消えやすいかの内訳）
+ */
+function nigiwai(S: any[]): { kindsMean: number; kindsMin: number; kindShare: number[] } {
+  const v = S.filter((x) => x.day >= 5 && x.counts);
+  const share = KIND_NAMES.map(() => 0);
+  if (!v.length) return { kindsMean: NaN, kindsMin: NaN, kindShare: share.map(() => NaN) };
+  const n = v.map((x) => MONSTER_KINDS.filter((k) => (x.counts[k] ?? 0) > 0).length);
+  for (const x of v) for (const k of MONSTER_KINDS) if ((x.counts[k] ?? 0) > 0) share[k]++;
+  return { kindsMean: n.reduce((a, b) => a + b, 0) / n.length, kindsMin: Math.min(...n), kindShare: share.map((c, k) => (NOT_MONSTER.has(k) ? NaN : (100 * c) / v.length)) };
+}
+
 function measure(dir: string): M {
   const S = rd(dir, 'samples.jsonl');
   const D = rd(dir, 'deaths.jsonl');
@@ -64,6 +80,7 @@ function measure(dir: string): M {
     ratStarve: cnt(D, 2, (d) => d.cause === 'starve'), ratArr: cnt(B, 2, (b) => b.origin !== 'born'), ratBorn: cnt(B, 2, (b) => b.origin === 'born'), ratDisp: cnt(X, 2, (x) => x.reason === 'dispersed'),
     ratLast: rs[rs.length - 1] ?? 0, ratMax: Math.max(0, ...rs), ratGone: (rs[rs.length - 1] ?? 0) === 0 && (rs[rs.length - 2] ?? 0) === 0, drift,
     ratMoves: MV.filter((x) => x.k === 2).length,
+    ...nigiwai(S),
     // シードの豊かさ：5日目以降のサンプルの平均（口が開いていないサンプルは除く）
     rich: (() => { const v = S.filter((x) => x.day >= 5 && typeof x.rich === 'number').map((x) => x.rich as number); return v.length ? v.reduce((p, q) => p + q, 0) / v.length : NaN; })(),
     // 飢え死にした大ネズミのうち、道のり10マス以内に食べられる苔があった数（ログに near があるものだけ）
@@ -223,6 +240,8 @@ const METRICS: Record<string, (ms: M[]) => number> = {
   richWarrenMedian: (ms) => median(halves(ms)[0].flatMap((m) => m.dur)),
   poorKobArr: (ms) => sum(halves(ms)[1], (m) => m.kobArr),
   poorEndFood: (ms) => sum(halves(ms)[1], (m) => m.endFood),
+  kindsMean: (ms) => median(ms.map((m) => m.kindsMean).filter(isFinite)),
+  kindsMin: (ms) => Math.min(...ms.map((m) => m.kindsMin).filter(isFinite)),
 };
 // A/B 比較（最初の実行結果と最後の実行結果の、同じシード同士の差）
 if (args.paired && all.length >= 2) {
@@ -230,6 +249,7 @@ if (args.paired && all.length >= 2) {
   const Bm = all[all.length - 1];
   const md = (a: number[]) => (a.length ? median(a) : NaN);
   const P: [string, (m: M) => number][] = [
+    ['にぎわい：同時にいるモンスターの種の数（平均）', (m) => m.kindsMean], ['にぎわい：同時にいるモンスターの種の数（最小）', (m) => m.kindsMin],
     ['大ネズミ：飢え死に', (m) => m.ratStarve], ['大ネズミ：来た', (m) => m.ratArr], ['大ネズミ：中で生まれた', (m) => m.ratBorn], ['大ネズミ：群れで出ていった', (m) => m.ratDisp], ['大ネズミ：巣穴の引っ越し', (m) => m.ratMoves], ['大ネズミ：最後の数', (m) => m.ratLast],
     ['コボルト：来た', (m) => m.kobArr], ['コボルト：中で生まれた', (m) => m.kobBorn], ['コボルト：住処の数', (m) => m.warrens], ['コボルト：住処の日数の中央値', (m) => md(m.dur)], ['コボルト：飢え死に', (m) => m.kobStarveDeath], ['コボルト：一匹ずつ飢えて去った', (m) => m.kobStarveExit], ['コボルト：冒険者に倒された', (m) => m.advKob], ['コボルト：最後の数', (m) => m.kobLast],
     ['ゴブリン：来た', (m) => m.gobArr], ['ゴブリン：中で生まれた', (m) => m.gobBorn], ['ゴブリン：集落の数', (m) => m.camps], ['ゴブリン：集落の日数の中央値', (m) => md(m.campDur)], ['ゴブリン：最後の数', (m) => m.gobLast], ['ゴブリン：飢え死に', (m) => m.gobStarveDeath], ['ゴブリン：冒険者に倒された', (m) => m.gobAdv],
@@ -274,6 +294,20 @@ if (args.goals) {
     for (const m of [...last].sort((a, b) => (isFinite(b.rich) ? b.rich : -1) - (isFinite(a.rich) ? a.rich : -1))) L.push(`| ${m.seed} | ${f1(m.rich)} | ${f1(median(m.dur))} / ${f1(Math.max(0, ...m.dur))} / ${m.warrens} | ${m.kobArr} / ${m.kobBorn} | ${m.endFood} / ${m.endAlone} / ${m.endRaid} / ${m.endDragon} |`);
     L.push('');
   }
+}
+L.push('## にぎわい', '', '同時にいるモンスターの種の数（冒険者・ドワーフを除く。1匹以上いれば数える）。5日目以降のゲーム内の1/4日ごとのサンプルで数える。', '');
+tbl('同時にいるモンスターの種の数（平均 / 最小）', (m) => `${f1(m.kindsMean)} / ${isFinite(m.kindsMin) ? m.kindsMin : '—'}`, (ms) => `平均の中央値 ${f1(METRICS.kindsMean(ms))} / 最小 ${isFinite(METRICS.kindsMin(ms)) ? METRICS.kindsMin(ms) : '—'}`);
+{
+  // にぎわいの内訳：種ごとに、いたサンプルの割合（全シードの平均％）と、一度でもいたシードの数
+  L.push('### にぎわいの内訳：種ごとに、いたサンプルの割合', '', '各列は「全シードの平均（％） / 一度でもいたシードの数」。', '', `| 種 | ${names.join(' | ')} |`, `|---|${names.map(() => '---:').join('|')}|`);
+  for (const k of MONSTER_KINDS) {
+    const cell = (ms: M[]) => {
+      const v = ms.map((m) => m.kindShare[k]).filter(isFinite);
+      return v.length ? `${f1(v.reduce((a, b) => a + b, 0) / v.length)} / ${v.filter((x) => x > 0).length}` : '—';
+    };
+    L.push(`| ${KIND_NAMES[k]} | ${all.map(cell).join(' | ')} |`);
+  }
+  L.push('');
 }
 L.push('## コボルト', '');
 tbl('住処が続いた日数（中央値 / 最長 / できた数）', (m) => `${f1(median(m.dur))} / ${f1(Math.max(0, ...m.dur))} / ${m.warrens}`, (ms) => `中央値 ${f1(median(ms.flatMap((m) => m.dur)))}（シードごとの中央値の中央値 ${f1(median(ms.filter((m) => m.dur.length).map((m) => median(m.dur))))}）`);
