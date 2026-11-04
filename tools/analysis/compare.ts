@@ -12,7 +12,7 @@
  */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { parseArgs, KIND_NAMES } from './common';
+import { parseArgs, KIND_NAMES, countsAsStuck } from './common';
 import { DAY_TICKS } from '../../src/world';
 import { generate } from '../../src/mapgen';
 import { paired, pairedRow, PAIRED_HEAD, PAIRED_NOTE } from './lib/stats';
@@ -200,9 +200,10 @@ function measure(dir: string): M {
           const v = S.filter((x) => (x.settle?.campStore ?? []).length).map((x) => (x.settle.campStore as number[]).reduce((a, b) => a + b, 0));
           return { storeKnown: S.some((x) => x.settle?.campStore), storeMean: v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0, storeMax: Math.max(0, ...v), storePos: v.length ? (100 * v.filter((x) => x > 0).length) / v.length : 0 };
         })(),
-        // 足踏み（sim.ts の stuck.jsonl）：起きて歩く姿のまま2分以上ほぼ同じ場所にいた回数、そのうち道が見つからないまま（壁に押しつけて）、冒険者
+        // 足踏み（sim.ts の stuck.jsonl）：起きて歩く姿のまま2分以上ほぼ同じ場所にいた回数、そのうち道が見つからないまま（壁に押しつけて）、冒険者。
+        // その場で漂う種と、巣に捕まってもがいていた者は数えない（common.ts の countsAsStuck）
         ...(() => {
-          const T = rd(dir, 'stuck.jsonl');
+          const T = rd(dir, 'stuck.jsonl').filter(countsAsStuck);
           // 壁や瓦礫に埋まっていて、安全策で床へ出た回数（settle.jsonl の unbury）
           const U = rd(dir, 'settle.jsonl').filter((x) => x.ev === 'unbury').length;
           return { stuck: T.length, stuckNoPath: T.filter((x) => x.nopath >= 0.5).length, stuckAdv: T.filter((x) => x.k === 25).length, unbury: U };
@@ -314,7 +315,7 @@ if (args.paired && all.length >= 2) {
     ['オーク：縄張りの日数の中央値', (m) => md(m.lairDur)], ['ゴブリン：5日以上続いた集落の割合（％）', (m) => (m.camps ? (100 * m.campDur.filter((d) => d >= 5).length) / m.camps : NaN)],
     ['ゴブリン：分かれてできた集落', (m) => m.splitDur.length], ['ゴブリン：分かれた集落の日数の中央値', (m) => md(m.splitDur)], ['ゴブリン：絶えた（1）', (m) => (m.gobGone ? 1 : 0)],
     ['ゴブリン：オークに倒された', (m) => m.gobByOrc], ['ゴブリン：コボルト・冒険者・オーク以外に倒された', (m) => m.gobByOther],
-    ['足踏み：起きて歩く姿のまま2分以上ほぼ動かない（全種）', (m) => m.stuck], ['足踏み：そのうち道が見つからないまま', (m) => m.stuckNoPath], ['足踏み：冒険者', (m) => m.stuckAdv], ['壁や瓦礫に埋まっていて床へ出た', (m) => m.unbury],
+    ['足踏み：起きて歩く姿のまま2分以上ほぼ動かない（漂う種と、巣に捕まった者を除く）', (m) => m.stuck], ['足踏み：そのうち道が見つからないまま', (m) => m.stuckNoPath], ['足踏み：冒険者', (m) => m.stuckAdv], ['壁や瓦礫に埋まっていて床へ出た', (m) => m.unbury],
     ['冒険者：死んだ', (m) => m.advDeaths], ['ゴブリンに倒されたコボルト', (m) => m.kobByGob], ['コボルトに倒されたゴブリン', (m) => m.gobByKob],
   ];
   for (const mo of MOMENTS) P.push([`瞬間：${mo.label}`, (m) => m.mo[mo.key] ?? 0]);

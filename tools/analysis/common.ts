@@ -3,6 +3,13 @@ import { deflateSync } from 'zlib';
 import { NAMES } from '../../src/names';
 
 export const KIND_NAMES = NAMES;
+
+/**
+ * 足踏みの記録（sim.ts の stuck.jsonl）のうち、数えるもの。次の二つは、引っかかっているのではなく、その場にいるのが本来の姿なので除く：
+ * その場で漂う種（ウィスプ 0、ゴースト 7）と、足踏みの間の半分以上をクモの巣に捕まってもがいていた者（web。記録を始める前の実行結果には無いので 0 とみなす）。
+ * 記録そのものは全部残し、数えるときにここで除く（前のバージョンの実行結果とも同じ基準で比べられるように）
+ */
+export const countsAsStuck = (x: { k: number; web?: number }): boolean => x.k !== 0 && x.k !== 7 && !((x.web ?? 0) >= 0.5);
 export const CAUSE_NAMES: Record<string, string> = {
   eaten: '食べられた', fight: '打ち合いで倒れた', starve: '飢えた', burned: '焼けた', crushed: '押しつぶされた',
   petrified: '石になった', killed: '襲われた', dried: '干からびた', faded: '消えた', planted: 'キノコになった', crumbled: '崩れて消えた', other: 'その他',

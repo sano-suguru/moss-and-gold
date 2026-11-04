@@ -12,7 +12,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { DAY_TICKS, World } from '../../src/world';
-import { CAUSE_NAMES, KIND_NAMES, ORIGIN_NAMES, encodePng, parseArgs } from './common';
+import { CAUSE_NAMES, KIND_NAMES, ORIGIN_NAMES, countsAsStuck, encodePng, parseArgs } from './common';
 
 const args = parseArgs(process.argv.slice(2));
 const run = args.run;
@@ -28,7 +28,8 @@ const births = rd('births.jsonl');
 const exits = rd('exits.jsonl');
 const events = rd('events.jsonl');
 // 足踏みのログは、記録を始める前のバージョンの実行結果には無い
-const stuck = existsSync(join(run, 'stuck.jsonl')) ? rd('stuck.jsonl') : [];
+// （その場で漂う種と、巣に捕まってもがいていた者は数えない。common.ts の countsAsStuck）
+const stuck = existsSync(join(run, 'stuck.jsonl')) ? rd('stuck.jsonl').filter(countsAsStuck) : [];
 const meta = JSON.parse(readFileSync(join(run, 'meta.json'), 'utf8'));
 const cp = JSON.parse(readFileSync(join(run, 'checkpoint.json'), 'utf8'));
 const unb64 = (s: string) => new Uint8Array(Buffer.from(s, 'base64'));
@@ -133,7 +134,7 @@ L.push('');
     if (r.nopath >= 0.5) b.nopath++;
     by.set(r.k, b);
   }
-  L.push(`## 足踏み（起きて歩く姿のまま、2分以上ほぼ同じ場所にいた。全${stuck.length}回）`, '');
+  L.push(`## 足踏み（起きて歩く姿のまま、2分以上ほぼ同じ場所にいた。漂う種と、巣に捕まった者を除く。全${stuck.length}回）`, '');
   if (!stuck.length) L.push('- なし');
   for (const [k, b] of [...by].sort((a, c) => c[1].n - a[1].n)) L.push(`- ${name(k)}：${b.n}回（うち道が見つからないまま ${b.nopath}回）`);
   L.push('');

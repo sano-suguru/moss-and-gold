@@ -18,7 +18,7 @@
  *   settle.jsonl     住みつく群れの出来事（コボルトの住処とゴブリンの集落を作った・捨てた・消えた、従えた、取り立て）
  *   events.jsonl     ゲーム内ログ（画面の「記録」）に出る出来事
  *   trace.jsonl      --trace で指定した生き物の毎 tick の状態
- *   stuck.jsonl      足踏み：起きて歩く姿のまま、ゲーム内の2分（1200 tick）以上ほぼ同じ場所（12px 以内）にいた生き物（そうなった時点で1回記録）
+ *   stuck.jsonl      足踏み：起きて歩く姿のまま、ゲーム内の2分（1200 tick）以上ほぼ同じ場所（12px 以内）にいた生き物（そうなった時点で1回記録。数えるときは、漂う種と巣に捕まっていた者を除く：common.ts の countsAsStuck）
  *   snap/dNNN.json.gz 日次スナップショット（ゲームのセーブと同じ形。調査と、後から値を計算するのに使う）
  *   checkpoint.json  再開するためのチェックポイント（ゲームのセーブと同じ形）
  * 0日目から一つのバージョンだけで実行したもの（pure）は、日次スナップショットを runs/.cache/snap/<バージョン>/ にも置く（probe などが再利用する）。
@@ -123,7 +123,7 @@ function richness(): number | null {
  * 読むだけで展開は変えない。状態はセーブしないので、再開した直後の 1200 tick は数え始めからやり直す
  */
 const STUCK_T = 1200;
-const still = new Map<number, { x: number; y: number; t0: number; n: number; walk: number; sleep: number; miss: number; done: boolean }>();
+const still = new Map<number, { x: number; y: number; t0: number; n: number; walk: number; sleep: number; miss: number; web: number; done: boolean }>();
 function watchStuck(): unknown[] {
   const e = w.eco;
   const rows: unknown[] = [];
@@ -133,18 +133,20 @@ function watchStuck(): unknown[] {
     seen.add(c.id);
     let r = still.get(c.id);
     if (!r || (c.x - r.x) ** 2 + (c.y - r.y) ** 2 > 144) {
-      r = { x: c.x, y: c.y, t0: w.tick, n: 0, walk: 0, sleep: 0, miss: 0, done: false };
+      r = { x: c.x, y: c.y, t0: w.tick, n: 0, walk: 0, sleep: 0, miss: 0, web: 0, done: false };
       still.set(c.id, r);
     }
     r.n++;
     if (c.act === 1) r.walk++;
     if (c.sleep > 0) r.sleep++;
+    // クモの巣に捕まってもがいていたか（捕まっている間も歩く姿のまま動かないので、数えるときに除く。common.ts の countsAsStuck）
+    if (c.caught) r.web++;
     // 道が見つからないまま歩いているか（道筋の記録に miss が無い古いバージョンでは、空の道筋で見る）
     const pp = e.paths.get(c.id) as { path: number[]; miss?: number } | undefined;
     if (pp && (pp.miss ?? (pp.path.length === 0 ? 1 : 0)) > 0) r.miss++;
     if (!r.done && w.tick - r.t0 >= STUCK_T) {
       r.done = true;
-      if (r.walk * 2 >= r.n && r.sleep * 2 < r.n) rows.push({ t: w.tick, k: c.k, id: c.id, st: c.st, x: Math.round(c.x), y: Math.round(c.y), nopath: +(r.miss / r.n).toFixed(2) });
+      if (r.walk * 2 >= r.n && r.sleep * 2 < r.n) rows.push({ t: w.tick, k: c.k, id: c.id, st: c.st, x: Math.round(c.x), y: Math.round(c.y), nopath: +(r.miss / r.n).toFixed(2), ...(r.web ? { web: +(r.web / r.n).toFixed(2) } : {}) });
     }
   }
   for (const id of still.keys()) if (!seen.has(id)) still.delete(id);
