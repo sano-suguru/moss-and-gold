@@ -51,6 +51,7 @@ export const MOMENTS: Moment[] = [
   { key: 'dragonSlain', label: '冒険者がドラゴンを倒した' },
   { key: 'dragonBurn', label: 'ドラゴンの炎で焼け死んだ（生き物の数）' },
   { key: 'flyerBurn', label: 'コウモリ・ワイバーン・ウィスプがドラゴンの炎で焼け死んだ' },
+  { key: 'burnEscape', label: 'ドラゴンの炎に焼かれて、逃げ延びた（焼かれてから生き物の更新100回後も生きていた）' },
   { key: 'cache', label: '物資の置き場を残した' },
   { key: 'supply', label: '置き場で食料を補った（一行ごと）' },
   { key: 'cacheRaid', label: '置き場が大ネズミにあさられた' },
@@ -199,6 +200,12 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     dragonSlain: d.filter((x) => x.k === K.Dragon && x.by === K.Adventurer).length,
     dragonBurn: d.filter((x) => x.cause === 'burned' && x.by === K.Dragon).length,
     flyerBurn: d.filter((x) => x.cause === 'burned' && x.by === K.Dragon && (x.k === K.Bat || x.k === K.Wyvern || x.k === K.Wisp)).length,
+    // 焼かれた記録（settle の burn。続けて焼かれても1回。src/eco/fire.ts の burnHurt）のうち、その者の死（deaths の id）が200 tick（生き物の更新100回）の内に無いもの
+    burnEscape: (() => {
+      const died = new Map<number, number[]>();
+      for (const x of d) if (x.id !== undefined) (died.get(x.id) ?? died.set(x.id, []).get(x.id)!).push(x.t);
+      return ev(K.Dragon, 'burn').filter((b) => !(died.get(b.id) ?? []).some((t) => t >= b.t && t <= b.t + 200)).length;
+    })(),
     cache: ev(K.Adventurer, 'cache').filter((x) => !x.merged).length,
     supply: uniq(ev(K.Adventurer, 'supply')),
     cacheRaid: ev(K.Rat, 'cache').length,

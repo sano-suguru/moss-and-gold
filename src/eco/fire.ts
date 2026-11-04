@@ -30,7 +30,12 @@ export function scorchMoss(this: Ecology, k: number): void {
 }
 
 /** 燃える床の上にいる者が受けるダメージ（生き物の更新4回ごとに、最大の体力のこの割合。逃げ遅れると数回で倒れる） */
-const FLOOR_BURN = 0.15;
+const FLOOR_BURN = 0.2;
+/** ドラゴンの炎の扇の中にいる者が、炎を吐く間に生き物の更新ごとに受けるダメージ（ドラゴンの強さに対する割合の幅。居続けると打ち合いの2〜3回分） */
+const BREATH_MIN = 0.4;
+const BREATH_RANGE = 0.4;
+/** 焼かれた記録（settle.jsonl の burn）を新しく残すまでの、前に傷を受けてからの間（tick。生き物の更新100回） */
+const BURN_EPISODE = 200;
 /** 炎に焼かれない者 */
 const FIREPROOF = [Kind.Dragon, Kind.Golem, Kind.Worm, Kind.Ghost, Kind.Salamander];
 
@@ -40,11 +45,16 @@ const FIREPROOF = [Kind.Dragon, Kind.Golem, Kind.Worm, Kind.Ghost, Kind.Salamand
  */
 export function burnHurt(this: Ecology, o: Cr, dmg: number, by: number): void {
   if (o.hp <= 0) o.hp = this.maxHp(o);
+  // 分析用：焼かれた（前に傷を受けてから生き物の更新100回より後の、最初の一回だけ。続けて焼かれても1回。lib/moments.ts が、その後に生き延びたかを数える）
+  if (this.w.tick - o.hitAt > BURN_EPISODE) this.record('settle', { t: this.w.tick, k: by, ev: 'burn', id: o.id, n: o.k, x: Math.round(o.x), y: Math.round(o.y) } as never);
   o.hp -= dmg;
   o.hitAt = this.w.tick;
   o.sleep = 0;
   this.fxHits.push({ t: this.w.tick, x: o.x, y: o.y, ax: o.x, ay: o.y + 8, id: o.id });
   if (this.fxHits.length > 120) this.fxHits.splice(0, 40);
+  // 焼かれている者に炎がまとわりつく（描画専用。src/creatureView.ts）
+  this.fxBurns.push({ t: this.w.tick, id: o.id });
+  if (this.fxBurns.length > 120) this.fxBurns.splice(0, 40);
   if (o.k === Kind.Vampire && o.hp < this.maxHp(o) * 0.35 && this.vampCanScatter(o)) {
     o.hp = Math.max(1, o.hp);
     this.vampScatter(o);
@@ -55,7 +65,7 @@ export function burnHurt(this: Ecology, o: Cr, dmg: number, by: number): void {
 }
 
 /**
- * 燃えているマス：苔とキノコは灰になって土に返り、上にいる生き物は少しずつ焼かれ（生き物の更新4回ごとに最大の体力の15％。FLOOR_BURN）、巣は燃え落ちる。
+ * 燃えているマス：苔とキノコは灰になって土に返り、上にいる生き物は少しずつ焼かれ（生き物の更新4回ごとに最大の体力の20％。FLOOR_BURN）、巣は燃え落ちる。
  * 火が消えると焼け跡が残る。燃える床を作るのはドラゴンの炎だけ（以前は魔法使いの呪文も作り、そばで打ち合う仲間を焼いていた）。
  * 以前は、燃えるマスの上にいる者は強さにかかわらずその場で焼け死んでいた
  */
@@ -118,20 +128,26 @@ export function breathe(this: Ecology, c: Cr, tx: number, ty: number, t: number)
       this.ignite(k, 30 + (ih(k, this.step, 130) % 20));
       if (!lit.includes(k)) lit.push(k);
     }
-  // 吐いている炎の先（この回に火がついたマス）にいる者は、ドラゴンの強さに応じた傷を負う（打ち合いの一打ちと同じくらい。炎が進む間に1〜2回当たる）。
-  // 飛んでいる者（コウモリ、ワイバーン、ウィスプ）は、床に燃え残った火では焼けないが、吐いている炎そのものには当たる。
-  // （以前は、飛んでいる者は炎に当たるとその場で焼け死に、地面にいる者は燃えるマスに立つとその場で焼け死んでいた）
+  // 扇の全体（口元から炎の先まで）にいる者は、炎を吐く間、生き物の更新ごとにドラゴンの強さの4〜8割の傷を負う（居続けると打ち合いの2〜3回分。逃げれば助かる）。
+  // 飛んでいる者（コウモリ、ワイバーン、ウィスプ）は、床に燃え残った火では焼けないが、吐いている炎そのものには当たる。床に火をつけるのは炎の先だけ（上の lit）。
+  // （以前は、飛んでいる者は炎の先に当たるとその場で焼け死に、地面にいる者は燃えるマスに立つとその場で焼け死んでいた）
   const hit = new Set<Cr>();
-  for (const k of lit) {
-    const x = (k % m.w) * TILE + 8;
-    const y = Math.floor(k / m.w) * TILE + 8;
-    this.nearby(x, y, 1, (o) => {
-      if (o.dead || o.away || o === c || hit.has(o) || FIREPROOF.includes(o.k)) return;
-      if (Math.abs(o.x - x) < 9 && Math.abs(o.y - y) < 9) {
-        hit.add(o);
-        this.burnHurt(o, this.str(c) * (0.6 + ((ih(c.id, o.id ^ this.step, 162) % 1000) / 1000) * 0.6), Kind.Dragon);
-      }
-    });
+  for (let s2 = 1; s2 <= reach; s2 += 0.5) {
+    const hw = 0.6 + ((s2 - 1) / 0.6) * 0.25;
+    for (let w = -hw; w <= hw; w += 0.5) {
+      const k = this.tileOf(c.x + (ux * s2 - uy * w) * TILE, c.y + (uy * s2 + ux * w) * TILE);
+      if (k < 0 || m.solid[k]) continue;
+      const kx = (k % m.w) * TILE + 8;
+      const ky = Math.floor(k / m.w) * TILE + 8;
+      if (!lineOfSight(m, c.x, c.y, kx, ky)) continue;
+      this.nearby(kx, ky, 1, (o) => {
+        if (o.dead || o.away || o === c || hit.has(o) || FIREPROOF.includes(o.k)) return;
+        if (Math.abs(o.x - kx) < 9 && Math.abs(o.y - ky) < 9) {
+          hit.add(o);
+          this.burnHurt(o, this.str(c) * (BREATH_MIN + ((ih(c.id, o.id ^ this.step, 162) % 1000) / 1000) * BREATH_RANGE), Kind.Dragon);
+        }
+      });
+    }
   }
 }
 

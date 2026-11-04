@@ -21,7 +21,7 @@ export function petrify(this: Ecology, c: Cr): void {
     this.die(c, 'petrified');
     return;
   }
-  this.record('deaths', { t: this.w.tick, k: c.k, cause: 'petrified', by: -1, x: Math.round(c.x), y: Math.round(c.y) } as never);
+  this.record('deaths', { t: this.w.tick, id: c.id, k: c.k, cause: 'petrified', by: -1, x: Math.round(c.x), y: Math.round(c.y) } as never);
   this.releaseMana(c);
   const st: Statue = { id: this.nextId++, x: Math.round(c.x), y: Math.round(c.y), k: c.k, sp: c.sp, dir: c.dir, act: c.act === 3 ? 0 : c.act, f: (this.step >> 2) & 3, units: c.body + c.food + c.units, age: 0 };
   this.statues.push(st);

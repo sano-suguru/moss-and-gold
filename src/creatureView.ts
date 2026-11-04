@@ -1023,6 +1023,9 @@ export class CreatureView {
     }
     this.order.sort((a, b) => a.y - b.y || a.c.id - b.c.id);
 
+    // 炎に焼かれた者（描画専用。fxBurns）
+    const burnAt = new Map<number, number>();
+    for (const e of eco.fxBurns) if (eco.w.tick - e.t < 30) burnAt.set(e.id, e.t);
     // マナから生まれた者（描画専用の出現の演出）
     const manaBorn = new Map<number, { t: number; x: number; y: number }>();
     for (const e of eco.fxManaBorn) if (eco.w.tick - e.t < 100) manaBorn.set(e.id, e);
@@ -1105,6 +1108,20 @@ export class CreatureView {
             f = Math.floor(t * 9 + seed) & 3;
           }
         } else if (c.caught) lift = 6;
+      }
+      // 炎に焼かれている者（描画専用）：燃える床の上にいる間と、炎に焼かれてから3秒ほど、体のまわりから火の粉が舞い上がる（src/eco/fire.ts の burnHurt）。
+      // （以前は、焼かれても傷を受けたときの白い光が出るだけで、燃える床で少しずつ焼かれていることが見えなかった）
+      if (!c.dead && sp !== Kind.Dragon) {
+        const tk = eco.tileOf(c.x, c.y);
+        const onFire = tk >= 0 && eco.w.burn[tk] > 0 && !eco.airborne(c);
+        if (onFire || burnAt.has(c.id)) {
+          const t = eco.w.tick + alpha;
+          const bh = Ecology.bodySize(sp) * 0.9 + 4;
+          for (let i = 0; i < 7; i++) {
+            const ph = (t * 0.045 + i * 0.37) % 1;
+            pushSprite(x + Math.sin(t * 0.2 + i * 2.1) * (4 + (i % 3) * 2), yy + 0.06, lift + 2 + ph * bh, false, A.speck(1, Math.min(3, Math.floor(ph * 4))), 0, 2);
+          }
+        }
       }
       // マナから生まれた者の出現（描画専用）：生まれる場所にマナの粒が渦を巻いて集まり、影の姿から白く光って形が固まる。
       // ドラゴンの幼子は、マナが卵に集まり、卵が揺れてひびが走り、割れて殻から出てくる
