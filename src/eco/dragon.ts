@@ -299,7 +299,7 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
       } else if (c.sp > 0 && d < 3 * TILE && !this.breathCovers(c, f.x, f.y)) {
         // 若い竜と成竜は、口元より手前のすぐそばの相手からは一歩下がって間合いを取る（炎は口元から先にしか届かない）。下がれなければ噛みつく
         if (!this.dragonStepBack(c, f.x, f.y) && d < 20) this.fight(c, f);
-      } else if (c.sp > 0 && d < (c.sp === 1 ? 4 : 6) * TILE && lineOfSight(m, c.x, c.y, f.x, f.y) && this.breathCovers(c, f.x, f.y)) {
+      } else if (c.sp > 0 && d < (c.sp === 1 ? 5 : 6) * TILE && lineOfSight(m, c.x, c.y, f.x, f.y) && this.breathCovers(c, f.x, f.y)) {
         c.act = 2;
         c.actT = 0;
         c.ref2 = c.sp === 1 ? 7 : 12;
@@ -391,7 +391,7 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
         this.fight(c, p);
       } else if (c.sp > 0 && d < 3 * TILE && !this.breathCovers(c, p.x, p.y)) {
         if (!this.dragonStepBack(c, p.x, p.y) && d < 20) this.fight(c, p);
-      } else if (c.sp > 0 && d < (c.sp === 1 ? 4 : 6) * TILE && lineOfSight(m, c.x, c.y, p.x, p.y) && this.breathCovers(c, p.x, p.y)) {
+      } else if (c.sp > 0 && d < (c.sp === 1 ? 5 : 6) * TILE && lineOfSight(m, c.x, c.y, p.x, p.y) && this.breathCovers(c, p.x, p.y)) {
         // （炎は口元から上下左右に吐くので、炎の扇に入る向きにいる相手にだけ吐く。斜めにいる相手には寄っていく。src/eco/fire.ts の breathCovers）
         if (this.step - (this.lastLogged[Kind.Dragon] ?? -99999) > 2000) {
           this.lastLogged[Kind.Dragon] = this.step;

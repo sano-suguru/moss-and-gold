@@ -4,6 +4,7 @@ import { TROPHY } from './eco/loot';
 import { ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
 import { RANK_AT, unpackLook } from './eco/roster';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
+import { BREATH_HALF0, BREATH_SPREAD, breathAxis } from './eco/fire';
 import { MAX_DYN } from './shaders';
 
 const MAX_SPRITES = 4096;
@@ -1372,6 +1373,36 @@ export class CreatureView {
           pushSprite(zx, yy, zl, false, A.sleep(c.sleep === 2 || sp === Kind.Adventurer ? 'Z' : 'z', Math.floor(ph * 4)), 0, 2);
         }
         if (c.sleep === 3) pushSprite(x + (flip ? -2 : 2), yy, lift + fh * 0.72, false, A.sleep('eye', Math.floor(t * 2)), 0, 2);
+      }
+      // ドラゴンの炎の扇：口元から炎の先まで、傷を負う範囲と同じ扇の形に、炎の粒が吹き出す（src/eco/fire.ts の breathe と同じ形。描画専用）。
+      // 粒は口元の高さから炎の先へ向かって地面へ下りる。口元に近いほど小さく黄色く、先や外側ほど大きく赤い
+      // （以前はまっすぐな炎の柱だけで、扇の中で焼かれていることが見えなかった）
+      if (sp === Kind.Dragon && act === 2 && c.ref2 > 0 && !c.dead) {
+        const ax = breathAxis(c, c.tx);
+        const tt = Math.max(0, (c.sp === 1 ? 7 : 12) - c.ref2) + alpha * 0.5;
+        const reach = 0.5 + tt * ax.step;
+        const mouthLift = ax.young ? 21 : ax.ux ? 40 : 30;
+        const fr = Math.floor(t * 10);
+        const hsh = (a: number, b: number) => {
+          let n = (Math.imul(a, 374761393) + Math.imul(b, 668265263)) | 0;
+          n = Math.imul(n ^ (n >>> 13), 1274126177);
+          return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+        };
+        for (let d = 0, di = 0; d <= reach; d += 0.33, di++) {
+          const hw = BREATH_HALF0 + d * BREATH_SPREAD;
+          const n = Math.max(1, Math.round(hw * 3) + 1);
+          for (let i = 0; i < n; i++) {
+            const w = n === 1 ? 0 : -hw + (2 * hw * i) / (n - 1);
+            const h = hsh(di * 17 + i, c.id + fr);
+            const jx = (h - 0.5) * 6;
+            const jy = (hsh(di * 17 + i, c.id + fr + 7) - 0.5) * 6;
+            const px = ax.mx + (ax.ux * d - ax.uy * w) * 16 + jx;
+            const py = ax.my + (ax.uy * d + ax.ux * w) * 16 + jy;
+            // 口元から先へ進むほど大きく赤く、扇の外側ほど一段先の色に（ちらつきを少し混ぜる）
+            const stage = Math.floor((d / Math.max(1, reach)) * 3.2 + (Math.abs(w) / (hw + 0.01)) * 0.8 + hsh(di * 17 + i, c.id + fr + 3) * 0.6);
+            pushSprite(px, py, mouthLift * Math.max(0, 1 - d / (reach + 0.5)) + 2, (i + fr) % 2 === 0, A.flame(stage), 0, 4);
+          }
+        }
       }
       // ドラゴンの炎の柱：口元から
       if (sp === Kind.Dragon && act === 2 && c.ref2 > 0 && !c.dead && dir !== 1) {

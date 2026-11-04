@@ -110,22 +110,26 @@ export function updateFire(this: Ecology): void {
 const MOUTH_YOUNG = 1.5;
 const MOUTH_SIDE = 2.5;
 const MOUTH_FRONT = 1;
-/** 炎の先が生き物の更新1回に進むマス数と、口元での扇の半分の幅、1マス進むごとに広がる半分の幅（炎の先の幅は、若い竜で3マス、成竜で5マス） */
-const BREATH_STEP = 0.6;
-const BREATH_HALF0 = 0.25;
-const BREATH_SPREAD = 0.25;
+/**
+ * 炎の先が生き物の更新1回に進むマス数（若い竜は吐く時間が短いので速く進む。炎の先は口元から、若い竜で約5マス、成竜で約7マス）と、
+ * 口元での扇の半分の幅、1マス進むごとに広がる半分の幅（炎の先の幅は、若い竜で3マス、成竜で5マス）。描画（src/creatureView.ts）も同じ形で炎の粒を描く
+ */
+export const BREATH_STEP = 0.6;
+export const BREATH_STEP_YOUNG = 0.8;
+export const BREATH_HALF0 = 0.25;
+export const BREATH_SPREAD = 0.25;
 /** 燃える床の燃え続ける長さ（生き物の更新の回数。16〜28回。通常速度で3〜6秒） */
 const BURN_MIN = 16;
 const BURN_RANGE = 13;
 
-/** ドラゴン c が炎を吐くときの向き（上下左右。若い竜は左右だけ）と口元。breathe と breathCovers で同じものを使う */
-function breathAxis(c: Cr, tx: number): { ux: number; uy: number; mx: number; my: number; young: boolean; dir: number } {
+/** ドラゴン c が炎を吐くときの向き（上下左右。若い竜は左右だけ）と口元、炎の先の進む速さ。breathe・breathCovers・描画で同じものを使う */
+export function breathAxis(c: Cr, tx: number): { ux: number; uy: number; mx: number; my: number; young: boolean; dir: number; step: number } {
   const young = c.sp < 2 && c.elite !== 8;
   const dir = young ? (tx >= c.x ? 2 : 3) : c.dir;
   const ux = dir === 2 ? 1 : dir === 3 ? -1 : 0;
   const uy = ux ? 0 : dir === 1 ? -1 : 1;
   const mouth = young ? MOUTH_YOUNG : ux ? MOUTH_SIDE : MOUTH_FRONT;
-  return { ux, uy, mx: c.x + ux * mouth * TILE, my: c.y + uy * mouth * TILE, young, dir };
+  return { ux, uy, mx: c.x + ux * mouth * TILE, my: c.y + uy * mouth * TILE, young, dir, step: young ? BREATH_STEP_YOUNG : BREATH_STEP };
 }
 
 /** ドラゴン c が今の向きで炎を吐けば、(x, y) が炎の扇の中に入るか（吐き終わるまでに炎の先が届く範囲。若い竜は左右だけを向く） */
@@ -133,7 +137,7 @@ export function breathCovers(this: Ecology, c: Cr, x: number, y: number): boolea
   const a = breathAxis(c, x);
   const d = ((x - a.mx) * a.ux + (y - a.my) * a.uy) / TILE;
   const w = Math.abs((x - a.mx) * -a.uy + (y - a.my) * a.ux) / TILE;
-  const reach = 0.5 + (a.young ? 6 : 11) * BREATH_STEP;
+  const reach = 0.5 + (a.young ? 6 : 11) * a.step;
   return d >= -0.5 && d <= reach && w <= BREATH_HALF0 + Math.max(0, d) * BREATH_SPREAD + 0.5;
 }
 
@@ -144,11 +148,11 @@ export function breathCovers(this: Ecology, c: Cr, x: number, y: number): boolea
  */
 export function breathe(this: Ecology, c: Cr, tx: number, ty: number, t: number): void {
   const m = this.w.map;
-  const { ux, uy, mx, my, dir } = breathAxis(c, tx);
+  const { ux, uy, mx, my, dir, step } = breathAxis(c, tx);
   // 若い竜は、いつも獲物のいる側の左右を向く（絵の向きも合わせる）
   c.dir = dir;
   // t は 0 から（成竜は 0..11、若い竜は 0..6）。先へ行くほど広く
-  const reach = 0.5 + t * BREATH_STEP;
+  const reach = 0.5 + t * step;
   const halfAt = (d: number) => BREATH_HALF0 + d * BREATH_SPREAD;
   // 扇の中の、口元からの遠さ d・横のずれ w のマス（体の中心から見通せるものだけ）を順に渡す
   const fan = (d0: number, fn: (k: number) => void) => {
