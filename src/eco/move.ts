@@ -3,6 +3,7 @@
 import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
+import { VAMP_SCATTER } from './vampire';
 import type { World } from '../world';
 
 export function record(this: Ecology, kind: 'deaths' | 'births' | 'exits' | 'moves' | 'settle', e: never): void {
@@ -17,7 +18,7 @@ export function tilePassable(this: Ecology, c: Cr, k: number): boolean {
   if (m.solid[k]) return false;
   // トロールは昼のあいだ、光の筋の差すマスを通らない（石にならないように）
   if (c.k === Kind.Troll && this.dayNow > 0.05 && this.w.lightBase[k] * this.dayNow > 150) return false;
-  if (c.k === Kind.Wisp || c.k === Kind.Bat || c.k === Kind.Ghost || c.k === Kind.Wyvern || (c.k === Kind.Gargoyle && c.act !== 0) || (c.k === Kind.Dragon && c.st === 2)) return true;
+  if (c.k === Kind.Wisp || c.k === Kind.Bat || c.k === Kind.Ghost || c.k === Kind.Wyvern || (c.k === Kind.Gargoyle && c.act !== 0) || (c.k === Kind.Dragon && c.st === 2) || (c.k === Kind.Vampire && c.st === VAMP_SCATTER)) return true;
   if (m.lava[k]) return false;
   if (this.statueAt.has(k) && this.tileOf(c.x, c.y) !== k) return false;
   // 大ネズミは深い水に入らない。ただし、水かさが増して深い水に取り残されたら、泳いで抜け出せる
@@ -51,10 +52,11 @@ export function findPath(this: Ecology, c: Cr, from: number, to: number): number
 
 /**
  * 道を探す広さの上限（調べるマスの数）。届かない目的地のために地図じゅうを探さない。
- * 冒険者は入口から深部まで歩くので、冒険者とドラゴンとドワーフ、外へ去ろうとしている者は、地図全体を探す
+ * 冒険者は入口から深部まで歩くので、冒険者とドラゴンとドワーフ、外へ去ろうとしている者は、地図全体を探す。
+ * ヴァンパイアも、縦穴のそばの住処から遠くの獲物へ遠出するので、地図全体を探す
  */
 export function searchLimit(this: Ecology, c: Cr): number {
-  return c.k === Kind.Adventurer || c.k === Kind.Dragon || c.k === Kind.Dwarf || c.st === 9 || (c.k === Kind.Kobold && c.st === 10) || (c.k === Kind.Rat && c.st === 8) || (c.k === Kind.Goblin && c.st >= 15) ? 40000 : c.k === Kind.Rat || c.k === Kind.Kobold ? 15000 : 6000;
+  return c.k === Kind.Adventurer || c.k === Kind.Dragon || c.k === Kind.Dwarf || c.k === Kind.Vampire || c.st === 9 || (c.k === Kind.Kobold && c.st === 10) || (c.k === Kind.Rat && c.st === 8) || (c.k === Kind.Goblin && c.st >= 15) ? 40000 : c.k === Kind.Rat || c.k === Kind.Kobold ? 15000 : 6000;
 }
 
 /**
@@ -220,7 +222,7 @@ export function passable(this: Ecology, c: Cr, x: number, y: number): boolean {
   if (k < 0) return false;
   const m = this.w.map;
   if (m.solid[k]) return false;
-  if (c.k === Kind.Wisp || c.k === Kind.Bat) return true;
+  if (c.k === Kind.Wisp || c.k === Kind.Bat || (c.k === Kind.Vampire && c.st === VAMP_SCATTER)) return true;
   if (m.lava[k]) return false;
   // 大ネズミは深い水に入らない。ただし、水かさが増して深い水に取り残されたら、泳いで抜け出せる
   if (c.k === Kind.Rat && this.w.water[k] > 40 && this.ratOnDry(c)) return false;
