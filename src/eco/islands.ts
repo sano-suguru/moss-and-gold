@@ -142,7 +142,7 @@ export function breakTopWall(this: Ecology): void {
     y += Math.sign(ty - y);
     path.push(y * m.w + x);
   }
-  if (path.some((k) => m.lava[k] || m.vault[k] || m.maze[k])) return;
+  if (path.some((k) => m.lava[k] || m.vault[k])) return;
   for (const k of path) if (m.solid[k]) this.w.dig(k);
   this.noise(mx * TILE + 8, py * TILE, 22);
   void from;

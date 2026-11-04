@@ -309,7 +309,7 @@ export function takeNutrients(this: Ecology, k: number, want: number, r = 3): nu
 
 /**
  * マナから上位の魔物が生まれる（通常速度で5秒ごと）：開いた床を数十か所見て、まわりのマナが濃く、条件の揃った所から、
- * トロール（60〜、暗がり）、ミノタウロス（50〜、迷路）、バジリスク（80〜、暗がり、人の気配が薄い）、
+ * トロール（40〜、暗がり）、ミノタウロス（縄張りの中なら、マナが薄くても）、バジリスク（60〜、暗がり、人の気配が薄い）、
  * ドラゴンの幼子（120〜、ダンジョンにドラゴンがいない）が生まれる。生まれるとき、まわりのマナと土の養分を使う
  */
 export function manaBirths(this: Ecology, day: number): void {
@@ -376,11 +376,16 @@ export function manaBirths(this: Ecology, day: number): void {
     }
   }
   const near = (k: number, kind: Kind, R: number) => this.list.some((c) => c.k === kind && !c.dead && Math.abs(c.x / TILE - (k % m.w)) + Math.abs(c.y / TILE - Math.floor(k / m.w)) < R);
+  // ミノタウロスは、ダンジョンに一頭もいなくて、2日目以降、前の一頭が生まれてから1日（生き物の更新 DAY_TICKS_ECO / CR_EVERY 回）たっていれば生まれる。
+  // そのときは、見る場所の一つめを縄張りの床にする（縄張りはせまく、ばらばらに見るだけではめったに当たらない）
+  const minoOk = n[Kind.Minotaur] === 0 && this.w.tick > DAY_TICKS_ECO * 2 && this.step - (this.lastArrival[Kind.Minotaur] ?? -1e9) > DAY_TICKS_ECO / CR_EVERY;
+  const lt = minoOk ? this.lairTiles() : [];
   for (let i = 0; i < 40; i++) {
-    const k = ih(this.step, i, 230) % (m.w * m.h);
+    const k = i === 0 && lt.length ? lt[ih(this.step, 0, 233) % lt.length] : ih(this.step, i, 230) % (m.w * m.h);
     if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 40) continue;
     const mn = this.manaAround(k);
-    if (mn < 2 && !m.maze[k]) continue;
+    const lair = this.inLair((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8);
+    if (mn < 2 && !lair) continue;
     const noSun = this.w.lightBase[k] === 0;
     const dark = this.lit(k, day) < 0.12;
     const x = (k % m.w) * TILE + 8;
@@ -396,8 +401,8 @@ export function manaBirths(this: Ecology, day: number): void {
       kind = Kind.Troll;
       cost = 160;
       body = 150;
-    } else if (m.maze[k] && n[Kind.Minotaur] === 0 && this.w.tick > DAY_TICKS_ECO * 2) {
-      // 迷路は古い呪いの場所：マナが薄くても、迷路の中なら主が生まれる
+    } else if (lair && minoOk) {
+      // 縄張りは古い呪いの場所：マナが薄くても、縄張りの中なら主が生まれる（寝床を住みかにする）
       kind = Kind.Minotaur;
       cost = 20;
       body = 120;
@@ -410,6 +415,11 @@ export function manaBirths(this: Ecology, day: number): void {
     this.takeMana(c, k, cost, 3);
     c.hx = x;
     c.hy = y;
+    if (kind === Kind.Minotaur) {
+      c.hx = m.lair.x * TILE + 8;
+      c.hy = m.lair.y * TILE + 8;
+      this.lastArrival[Kind.Minotaur] = this.step;
+    }
     this.log(x, y, `濃いマナから{k:${kind}}が生まれた`);
     return;
   }

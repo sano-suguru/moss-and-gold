@@ -47,14 +47,14 @@ export interface MapData {
   nutrients: Int32Array;
   /** 1 = 生き物が掘った床（崩れた岩のかけらが散らばる） */
   dug: Uint8Array;
-  /** 1 = 迷路の区画（ミノタウロスの縄張り） */
-  maze: Uint8Array;
   /** 1 = 宝物庫 */
   vault: Uint8Array;
   /** 宝物庫の宝の山の位置（なければ -1） */
   vaultCenter: { x: number; y: number };
   /** 未踏の深部（ワームが眠る場所、古い宝の山） */
   deep: { x: number; y: number };
+  /** ミノタウロスの寝床：深部の暗い行き止まりの奥（なければ -1）。そのまわり LAIR_R マスが縄張り */
+  lair: { x: number; y: number };
   /** 生成時の古い宝の山（タイル座標と金貨の量） */
   hoards: { x: number; y: number; gold: number }[];
   /** 1 = 岩の中に閉じた空洞の床（まだ掘り当てられていない） */
@@ -482,23 +482,22 @@ export function generate(seed: string): MapData {
   const nutrients = new Int32Array(W * H);
   for (let k = 0; k < W * H; k++) if (!solid[k] && !lava[k]) nutrients[k] = 28 + (n4[k] >> 3);
 
-  // 迷路の区画：岩の中に、細い通路が入り組む区画を一つ掘る（ほかの地形を変えないよう、最後に別の乱数で）
-  const maze = carveMaze(seed, W, H, solid, lava, paved, height, humidity, nutrients);
-  // 宝物庫と未踏の深部（これも最後に別の乱数で）
+  // 宝物庫と未踏の深部（ほかの地形を変えないよう、最後に別の乱数で）
   const vault = new Uint8Array(W * H);
-  const vaultCenter = carveVault(seed, W, H, solid, lava, paved, height, humidity, nutrients, maze, vault);
-  const deep = findDeep(W, H, solid, lava, maze, vault, ex, shafts);
+  const vaultCenter = carveVault(seed, W, H, solid, lava, paved, height, humidity, nutrients, vault);
+  const deep = findDeep(W, H, solid, lava, vault, ex, shafts);
   const hoards: { x: number; y: number; gold: number }[] = [];
   if (vaultCenter.x >= 0) hoards.push({ x: vaultCenter.x, y: vaultCenter.y, gold: 400 });
   if (deep.x >= 0) hoards.push({ x: deep.x, y: deep.y, gold: 250 });
 
-  const sealed = sealPockets(seed, W, H, solid, lava, maze, vault, ex, shafts, springs, height, humidity);
-  const mouths = placeMouths(seed, W, H, solid, sealed, lava, vault, maze, deep, springs);
+  const sealed = sealPockets(seed, W, H, solid, lava, vault, ex, shafts, springs, height, humidity);
+  const mouths = placeMouths(seed, W, H, solid, sealed, lava, vault, deep, springs);
+  const lair = findLair(W, H, solid, lava, paved, vault, ex, shafts, springs, deep, vaultCenter);
   const hard = rockHardness(seed, W, H);
 
   return {
     seed, w: W, h: H, solid, moss, paved, shafts, patches, rooms, entrance: { x: ex, y: 0 },
-    height, humidity, lava, springs, sinks, nutrients, dug: new Uint8Array(W * H), maze, vault, vaultCenter, deep, hoards,
+    height, humidity, lava, springs, sinks, nutrients, dug: new Uint8Array(W * H), vault, vaultCenter, deep, lair, hoards,
     sealed, rubble: new Uint8Array(W * H), mouths, hard,
   };
 }
@@ -535,10 +534,10 @@ function rockHardness(seed: string, W: number, H: number): Uint8Array {
  * 裂け目：深部にいちばん近い閉じた空洞の床。
  * 川の口：閉じた空洞の中の湧き水のうち、真上が岩のもの（なければ真上を岩にして口にする）。
  */
-function placeMouths(seed: string, W: number, H: number, solid: Uint8Array, sealed: Uint8Array, lava: Uint8Array, vault: Uint8Array, maze: Uint8Array, deep: { x: number; y: number }, springs: { x: number; y: number }[]): { kind: number; x: number; y: number }[] {
+function placeMouths(seed: string, W: number, H: number, solid: Uint8Array, sealed: Uint8Array, lava: Uint8Array, vault: Uint8Array, deep: { x: number; y: number }, springs: { x: number; y: number }[]): { kind: number; x: number; y: number }[] {
   const r = new Rng(hashSeed(seed + ':mouths'));
   const out: { kind: number; x: number; y: number }[] = [];
-  const ok = (k: number) => sealed[k] && !solid[k] && !lava[k] && !vault[k] && !maze[k];
+  const ok = (k: number) => sealed[k] && !solid[k] && !lava[k] && !vault[k];
   // 一つ目の横穴：始まりの洞窟の近く（6〜14マス先）の閉じた空洞から、上の端へまっすぐ掘る。掘り手が数日で掘り当てる距離
   {
     const ex = Math.floor(W / 2);
@@ -560,7 +559,7 @@ function placeMouths(seed: string, W: number, H: number, solid: Uint8Array, seal
         let clear = true;
         for (let yy = y - 1; yy >= 0 && clear; yy--) {
           const q = yy * W + x;
-          if ((!solid[q] && !sealed[q]) || lava[q] || vault[q] || maze[q]) clear = false;
+          if ((!solid[q] && !sealed[q]) || lava[q] || vault[q]) clear = false;
         }
         if (!clear) continue;
         const v = y * 4 + near + r.int(6) - Math.min(30, Math.abs(x - ex)) * 0.2;
@@ -657,7 +656,7 @@ export const OPEN_AREA = Math.round((MAP_W * MAP_H) / 12);
  * 残りの床は、いくつかの空洞に分け（境目は厚さ1マスの岩）、すべて「閉じた空洞」とする。
  * 開いた洞窟には光の筋と湧き水を少なくとも一つずつ置く。
  */
-function sealPockets(seed: string, W: number, H: number, solid: Uint8Array, lava: Uint8Array, maze: Uint8Array, vault: Uint8Array, ex: number, shafts: Shaft[], springs: { x: number; y: number; phase: number }[], height: Uint8Array, humidity: Uint8Array): Uint8Array {
+function sealPockets(seed: string, W: number, H: number, solid: Uint8Array, lava: Uint8Array, vault: Uint8Array, ex: number, shafts: Shaft[], springs: { x: number; y: number; phase: number }[], height: Uint8Array, humidity: Uint8Array): Uint8Array {
   const r = new Rng(hashSeed(seed + ':seal'));
   const N = W * H;
   const dist = new Int32Array(N).fill(-1);
@@ -718,10 +717,10 @@ function sealPockets(seed: string, W: number, H: number, solid: Uint8Array, lava
   // 空洞どうしの境目は厚さ2マスの岩
   const wall = new Uint8Array(N);
   for (const k of cells) {
-    if (vault[k] || maze[k] || own[k] < 0) continue;
+    if (vault[k] || own[k] < 0) continue;
     const x = k % W;
     for (const n of [x + 1 < W ? k + 1 : -1, k + W < N ? k + W : -1]) {
-      if (n < 0 || !sealed[n] || own[n] < 0 || own[n] === own[k] || vault[n] || maze[n]) continue;
+      if (n < 0 || !sealed[n] || own[n] < 0 || own[n] === own[k] || vault[n]) continue;
       wall[k] = 1;
       wall[n] = 1;
     }
@@ -756,7 +755,7 @@ function sealPockets(seed: string, W: number, H: number, solid: Uint8Array, lava
 }
 
 /** 宝物庫：岩の中に掘った石畳の四角い部屋。細い通路一本で洞窟とつながる */
-function carveVault(seed: string, W: number, H: number, solid: Uint8Array, lava: Uint8Array, paved: Uint8Array, height: Uint8Array, humidity: Uint8Array, nutrients: Int32Array, maze: Uint8Array, vault: Uint8Array): { x: number; y: number } {
+function carveVault(seed: string, W: number, H: number, solid: Uint8Array, lava: Uint8Array, paved: Uint8Array, height: Uint8Array, humidity: Uint8Array, nutrients: Int32Array, vault: Uint8Array): { x: number; y: number } {
   const r = new Rng(hashSeed(seed + ':vault'));
   const RW = 9;
   const RH = 7;
@@ -775,7 +774,7 @@ function carveVault(seed: string, W: number, H: number, solid: Uint8Array, lava:
     for (let y = y0 - mg; y < y0 + RH + mg && ok; y++)
       for (let x = x0 - mg; x < x0 + RW + mg; x++) {
         const k = y * W + x;
-        if (!solid[k] || lava[k] || maze[k]) ok = false;
+        if (!solid[k] || lava[k]) ok = false;
       }
     if (!ok) continue;
     // 入口の通路：部屋の縁の中央から外へまっすぐ、既存の床に届く方向を探す
@@ -791,7 +790,7 @@ function carveVault(seed: string, W: number, H: number, solid: Uint8Array, lava:
         const y = sy + dy * s;
         if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) break;
         const k = y * W + x;
-        if (lava[k] || maze[k]) break;
+        if (lava[k]) break;
         if (!solid[k]) {
           link = path;
           break;
@@ -812,7 +811,7 @@ function carveVault(seed: string, W: number, H: number, solid: Uint8Array, lava:
 }
 
 /** 未踏の深部：入口と光の筋からいちばん遠い床（歩いて行ける範囲で） */
-function findDeep(W: number, H: number, solid: Uint8Array, lava: Uint8Array, maze: Uint8Array, vault: Uint8Array, ex: number, shafts: { x: number; y: number }[]): { x: number; y: number } {
+function findDeep(W: number, H: number, solid: Uint8Array, lava: Uint8Array, vault: Uint8Array, ex: number, shafts: { x: number; y: number }[]): { x: number; y: number } {
   const dist = new Int32Array(W * H).fill(-1);
   const q = new Int32Array(W * H);
   let qh = 0;
@@ -833,7 +832,7 @@ function findDeep(W: number, H: number, solid: Uint8Array, lava: Uint8Array, maz
   let best = -1;
   let bv = -1;
   for (let k = 0; k < W * H; k++) {
-    if (dist[k] < 0 || maze[k] || vault[k]) continue;
+    if (dist[k] < 0 || vault[k]) continue;
     const x = k % W;
     const y = (k / W) | 0;
     let sd = 1e9;
@@ -852,103 +851,103 @@ function findDeep(W: number, H: number, solid: Uint8Array, lava: Uint8Array, maz
   return best < 0 ? { x: -1, y: -1 } : { x: best % W, y: (best / W) | 0 };
 }
 
-function carveMaze(seed: string, W: number, H: number, solid: Uint8Array, lava: Uint8Array, paved: Uint8Array, height: Uint8Array, humidity: Uint8Array, nutrients: Int32Array): Uint8Array {
-  const r = new Rng(hashSeed(seed + ':maze'));
-  const maze = new Uint8Array(W * H);
-  const MW = 23;
-  const MH = 15;
-  for (let tries = 0; tries < 1500; tries++) {
-    const x0 = 4 + r.int(W - MW - 8);
-    const y0 = 20 + r.int(H - MH - 26);
-    let rock = 0;
-    let bad = false;
-    for (let y = y0 - 2; y < y0 + MH + 2 && !bad; y++)
-      for (let x = x0 - 2; x < x0 + MW + 2; x++) {
-        const k = y * W + x;
-        if (lava[k]) bad = true;
-        if (y >= y0 && y < y0 + MH && x >= x0 && x < x0 + MW && solid[k]) rock++;
-      }
-    if (bad || rock < MW * MH * (tries < 600 ? 0.88 : 0.78)) continue;
-    // 穴掘り法で迷路を作る（奇数の座標が通路のマス）
-    const cw = (MW - 1) / 2;
-    const ch = (MH - 1) / 2;
-    const vis = new Uint8Array(cw * ch);
-    const open: number[] = [];
-    const cell = (cx: number, cy: number) => (y0 + 1 + cy * 2) * W + x0 + 1 + cx * 2;
-    const st = [r.int(cw * ch)];
-    vis[st[0]] = 1;
-    open.push(cell(st[0] % cw, (st[0] / cw) | 0));
-    while (st.length) {
-      const c = st[st.length - 1];
-      const cx = c % cw;
-      const cy = (c / cw) | 0;
-      const nb: number[] = [];
-      if (cx > 0 && !vis[c - 1]) nb.push(c - 1);
-      if (cx < cw - 1 && !vis[c + 1]) nb.push(c + 1);
-      if (cy > 0 && !vis[c - cw]) nb.push(c - cw);
-      if (cy < ch - 1 && !vis[c + cw]) nb.push(c + cw);
-      if (!nb.length) {
-        st.pop();
+/** ミノタウロスの縄張りの半径（マス）。寝床からこの距離の内の床が縄張り */
+export const LAIR_R = 8;
+
+/**
+ * ミノタウロスの寝床：入口から歩いて遠く、日の光（光の筋の照り返しは10マスほど届く）が届かず、
+ * 地表から離れた深い所（上から30マスより下）にあり、宝物庫・深部の一点から離れた、行き止まりの奥の床。
+ * 行き止まりの判定：その床から歩いて LAIR_REACH 歩の所に並ぶ床（外へ出る道の断面）が少なく（LAIR_EXIT マス以下）、ひとつながりで、
+ * その内側にある程度の広さ（寝床の部屋）があること。入口からいちばん遠いものを選ぶ（部屋のいちばん奥になる）。
+ * 見つからなければ、出口の条件をゆるめて探し直す
+ */
+function findLair(W: number, H: number, solid: Uint8Array, lava: Uint8Array, paved: Uint8Array, vault: Uint8Array, ex: number, shafts: Shaft[], springs: { x: number; y: number }[], deep: { x: number; y: number }, vaultCenter: { x: number; y: number }): { x: number; y: number } {
+  const N = W * H;
+  const dist = new Int32Array(N).fill(-1);
+  const q = new Int32Array(N);
+  let qh = 0;
+  let qt = 0;
+  dist[W + ex] = 0;
+  q[qt++] = W + ex;
+  const nb = (c: number) => {
+    const x = c % W;
+    const y = (c / W) | 0;
+    return [x + 1 < W ? c + 1 : -1, x > 0 ? c - 1 : -1, y + 1 < H ? c + W : -1, y > 0 ? c - W : -1];
+  };
+  while (qh < qt) {
+    const c = q[qh++];
+    for (const n of nb(c)) {
+      if (n < 0 || dist[n] >= 0 || solid[n] || lava[n]) continue;
+      dist[n] = dist[c] + 1;
+      q[qt++] = n;
+    }
+  }
+  const LAIR_REACH = 9;
+  const local = new Int32Array(N).fill(-1);
+  const touched: number[] = [];
+  const deadEnd = (k: number, maxExit: number): boolean => {
+    for (const t of touched) local[t] = -1;
+    touched.length = 0;
+    let h = 0;
+    const lq: number[] = [k];
+    local[k] = 0;
+    touched.push(k);
+    const rim: number[] = [];
+    let inner = 0;
+    while (h < lq.length) {
+      const c = lq[h++];
+      if (local[c] === LAIR_REACH) {
+        rim.push(c);
         continue;
       }
-      const n = nb[r.int(nb.length)];
-      vis[n] = 1;
-      const a = cell(cx, cy);
-      const b = cell(n % cw, (n / cw) | 0);
-      open.push((a + b) / 2, b);
-      st.push(n);
-    }
-    // ところどころ壁を抜いて、行き止まりだらけにしない
-    for (let i = 0; i < 10; i++) {
-      const cx = r.int(cw - 1);
-      const cy = r.int(ch);
-      open.push((cell(cx, cy) + cell(cx + 1, cy)) / 2);
-    }
-    // 洞窟へのつなぎ：迷路の縁から外へまっすぐ掘り、既存の床に届いたら採用
-    const links: number[][] = [];
-    for (let i = 0; i < 40 && links.length < 3; i++) {
-      const side = r.int(4);
-      let x: number;
-      let y: number;
-      let dx = 0;
-      let dy = 0;
-      if (side < 2) {
-        x = x0 + 1 + r.int(cw) * 2;
-        y = side === 0 ? y0 : y0 + MH - 1;
-        dy = side === 0 ? -1 : 1;
-      } else {
-        y = y0 + 1 + r.int(ch) * 2;
-        x = side === 2 ? x0 : x0 + MW - 1;
-        dx = side === 2 ? -1 : 1;
+      inner++;
+      for (const n of nb(c)) {
+        if (n < 0 || local[n] >= 0 || solid[n] || lava[n]) continue;
+        local[n] = local[c] + 1;
+        touched.push(n);
+        lq.push(n);
       }
-      const path: number[] = [y * W + x];
-      let ok = false;
-      for (let s = 1; s < 16; s++) {
-        const k = (y + dy * s) * W + x + dx * s;
-        if (lava[k]) break;
-        if (!solid[k]) {
-          ok = true;
-          break;
-        }
-        path.push(k);
+    }
+    if (!rim.length || rim.length > maxExit || inner < 18) return false;
+    // 断面がひとつながりか（斜めのとなりも続きとみなす）
+    const seen = new Set<number>([rim[0]]);
+    const st = [rim[0]];
+    while (st.length) {
+      const c = st.pop() as number;
+      for (const r of rim) if (!seen.has(r) && Math.abs((r % W) - (c % W)) <= 1 && Math.abs(((r / W) | 0) - ((c / W) | 0)) <= 1) {
+        seen.add(r);
+        st.push(r);
       }
-      if (ok && !links.some((l) => Math.abs((l[0] % W) - x) + Math.abs(((l[0] / W) | 0) - y) < 8)) links.push(path);
     }
-    if (links.length < 2) continue;
-    for (let y = y0; y < y0 + MH; y++) for (let x = x0; x < x0 + MW; x++) maze[y * W + x] = 1;
-    for (const k of [...open, ...links.flat()]) {
-      solid[k] = 0;
-      paved[k] = 1;
-      height[k] = 110;
-      humidity[k] = 70;
-      nutrients[k] = 6;
+    return seen.size === rim.length;
+  };
+  for (const maxExit of [4, 7]) {
+    let best = -1;
+    let bv = -1;
+    for (let k = 0; k < N; k++) {
+      if (dist[k] < 60 || vault[k] || paved[k]) continue;
+      const x = k % W;
+      const y = (k / W) | 0;
+      if (y < 30) continue;
+      let sd = 1e9;
+      for (const s of shafts) sd = Math.min(sd, Math.abs(s.x - x) + Math.abs(s.y - y));
+      if (sd < 16) continue;
+      if (deep.x >= 0 && Math.abs(deep.x - x) + Math.abs(deep.y - y) < 30) continue;
+      if (vaultCenter.x >= 0 && Math.abs(vaultCenter.x - x) + Math.abs(vaultCenter.y - y) < 24) continue;
+      if (springs.some((p) => Math.abs(p.x - x) + Math.abs(p.y - y) < 6)) continue;
+      let hot = false;
+      for (let dy = -4; dy <= 4 && !hot; dy++) for (let dx = -4; dx <= 4; dx++) if (lava[k + dy * W + dx]) hot = true;
+      if (hot) continue;
+      const v = dist[k] + Math.min(sd, 40);
+      if (v <= bv || !deadEnd(k, maxExit)) continue;
+      bv = v;
+      best = k;
     }
-    return maze;
+    if (best >= 0) return { x: best % W, y: (best / W) | 0 };
   }
-  return maze;
+  return { x: -1, y: -1 };
 }
 
-/** タイル単位の見通し判定。光源のマスと対象のマスは遮らない。 */
 export function lineOfSight(m: MapData, ax: number, ay: number, bx: number, by: number): boolean {
   const ta = Math.floor(ax / TILE) + Math.floor(ay / TILE) * 100000;
   const tbx = Math.floor(bx / TILE);

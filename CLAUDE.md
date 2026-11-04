@@ -101,7 +101,7 @@ URL の末尾に `#lit`（全体を明るくする）、`#albedo`（地形の色
 
 | ファイル | 中身 |
 |---|---|
-| src/mapgen.ts | 地形の生成（洞窟、迷路、水路、溶岩、苔、養分、宝物庫、深部、閉じた空洞） |
+| src/mapgen.ts | 地形の生成（洞窟、水路、溶岩、苔、養分、宝物庫、深部、ミノタウロスの寝床、閉じた空洞） |
 | src/world.ts | 世界の1 tick の更新（水、養分、熱、苔、キノコ、光、掘削、瓦礫、崩落、マナの流れ `manaStep`）。地形変更ログ `digs`（値は `k*8+種類`。種類は 0 掘削 / 1 瓦礫 / 2 崩落 / 3 風化 / 4 石畳） |
 | src/ecology.ts | 生き物全体を持つクラス Ecology の本体：状態のフィールド、セーブしないキャッシュ、定数（種ごとの性質 `SPEC`、強さ `STR`、賢さの段階 `TIER` など）、型。メソッドはここには無い |
 | src/eco/*.ts | Ecology のメソッドを、種や仕組みごとに分けたもの（rat、kobold、goblin、orc、adventurer、aim、raid、cache、listen、loot、roster、dwarf、dragon、step、move、senses、groups、sleep、combat、arrivals、save など）。src/eco/index.ts がすべてを読み込む |

@@ -91,7 +91,7 @@ export function pickDark(this: Ecology, salt: number, R: number): number {
   const m = this.w.map;
   for (let i = 0; i < 120; i++) {
     const k = ih(this.step, i, 111 + salt) % (m.w * m.h);
-    if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 10 || m.maze[k]) continue;
+    if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 10 || this.inLair((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8)) continue;
     if (this.w.lightBase[k] > 0 || this.w.mossGlow[k] > 0.02 || this.w.lavaGlow[k] > 0.02) continue;
     const x = k % m.w;
     const y = Math.floor(k / m.w);

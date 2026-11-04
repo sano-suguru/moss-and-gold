@@ -64,9 +64,12 @@ check(fnv(generate('かしたれ').solid) !== fnv(generate('abc').solid), '別�
     if (open < 1200 || open > 3200 || !sh || !sp || !nearPocket) badOpen++;
   }
   check(badOpen === 0, `30個のシードすべてで、開いた洞窟は地図の約12分の1、光の筋と湧き水があり、3マス以内に閉じた空洞がある`);
-  let mz = 0;
-  for (let i = 0; i < 30; i++) if (gen('seed' + i).maze.some((v) => v)) mz++;
-  check(mz >= 27, `30個のシードのうち ${mz} 個に迷路の区画がある`);
+  let lr = 0;
+  for (let i = 0; i < 30; i++) {
+    const g = gen('seed' + i);
+    if (g.lair.x >= 0 && !g.solid[g.lair.y * g.w + g.lair.x]) lr++;
+  }
+  check(lr >= 28, `30個のシードのうち ${lr} 個にミノタウロスの寝床（深部の行き止まり）がある`);
   let vs = 0;
   for (let i = 0; i < 30; i++) if (gen('seed' + i).vaultCenter.x >= 0) vs++;
   check(vs >= 28, `30個のシードのうち ${vs} 個に宝物庫がある`);

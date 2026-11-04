@@ -338,7 +338,7 @@ export function vampLair(this: Ecology, tx: number, ty: number): number {
       const d = dx * dx + dy * dy;
       if (d >= bd || d < 9) continue;
       const k = y * m.w + x;
-      if (m.solid[k] || !m.solid[k - m.w] || m.lava[k] || m.maze[k] || this.w.water[k] > 10) continue;
+      if (m.solid[k] || !m.solid[k - m.w] || m.lava[k] || this.inLair(x * TILE + 8, y * TILE + 8) || this.w.water[k] > 10) continue;
       if (this.w.lightBase[k] > 20 || this.w.lightBase[k - m.w] > 40 || this.w.mossGlow[k] > 0.03 || this.w.lavaGlow[k] > 0.02) continue;
       if (this.regionOf(k) !== main) continue;
       best = k;
