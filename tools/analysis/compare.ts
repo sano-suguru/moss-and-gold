@@ -81,6 +81,22 @@ const linkName = (key: string) => {
   return `${KIND_NAMES[+a]}→${KIND_NAMES[+b]}：${rel}`;
 };
 
+/**
+ * 内訳の印：最初と最後の実行結果で、その種がいた（その関わりが起きた）シードの数が大きく変わったか。
+ * にぎわいの平均は、もともとまれな種が1種消えても、シードごとのばらつきに埋もれて「はっきり」にならない（大トカゲが来なくなる実験で確かめた）。
+ * それを補うため、シードの数が「3以上かつ元の半分以上」減った、または3シード以上から0になったものに「⚠ 減」を付ける（増えたほうも同じ条件で「✚ 増」）。
+ * 2シードほどの出入りは、展開のばらつきでも珍しい組み合わせによく起きるので数えない
+ */
+function seedShift(a: number, b: number): string {
+  if ((a - b >= 3 && a - b >= a / 2) || (a >= 3 && b === 0)) return '⚠ 減';
+  if ((b - a >= 3 && b - a >= b / 2) || (b >= 3 && a === 0)) return '✚ 増';
+  return '';
+}
+/** 種がいたシードの数（一度でもいれば） */
+const kindSeeds = (ms: M[], k: number) => ms.filter((m) => m.kindShare[k] > 0).length;
+/** 関わりの組み合わせが起きたシードの数 */
+const linkSeeds = (ms: M[], key: string) => ms.filter((m) => m.links.has(key)).length;
+
 function measure(dir: string): M {
   const S = rd(dir, 'samples.jsonl');
   const D = rd(dir, 'deaths.jsonl');
@@ -310,6 +326,21 @@ if (args.paired && all.length >= 2) {
     if (pr.verdict === '差なし' && pr.sumA === 0) continue;
     L.push(pairedRow(label, pr));
   }
+  // 内訳の印（seedShift）が付いた種と関わりを、ここにもまとめて出す（表の後ろのほうまで読まなくても気づけるように）
+  const flagged: string[] = [];
+  for (const k of MONSTER_KINDS) {
+    const a = kindSeeds(A, k);
+    const b = kindSeeds(Bm, k);
+    const f = seedShift(a, b);
+    if (f) flagged.push(`- ${f}　にぎわい：${KIND_NAMES[k]}がいたシード ${a} → ${b}`);
+  }
+  for (const key of [...new Set([...A, ...Bm].flatMap((m) => [...m.links.keys()]))].sort()) {
+    const a = linkSeeds(A, key);
+    const b = linkSeeds(Bm, key);
+    const f = seedShift(a, b);
+    if (f) flagged.push(`- ${f}　関わり：「${linkName(key)}」が起きたシード ${a} → ${b}`);
+  }
+  if (flagged.length) L.push('', '**いた種・起きた関わりのシードの数が大きく変わったもの**（3以上かつ元の半分以上減った・増えた、または3シード以上から0になった・0から3シード以上になった）：', '', ...flagged);
   const dr = Math.max(0, ...Bm.map((m) => m.drift));
   L.push('', `保存則のずれ（${names[names.length - 1]}、最大）：${dr}${dr ? ' ⚠' : ''}`, '');
 }
@@ -338,13 +369,14 @@ L.push('## にぎわい', '', '同時にいるモンスターの種の数（冒�
 tbl('同時にいるモンスターの種の数（平均 / 最小）', (m) => `${f1(m.kindsMean)} / ${isFinite(m.kindsMin) ? m.kindsMin : '—'}`, (ms) => `平均の中央値 ${f1(METRICS.kindsMean(ms))} / 最小 ${isFinite(METRICS.kindsMin(ms)) ? METRICS.kindsMin(ms) : '—'}`);
 {
   // にぎわいの内訳：種ごとに、いたサンプルの割合（全シードの平均％）と、一度でもいたシードの数
-  L.push('### にぎわいの内訳：種ごとに、いたサンプルの割合', '', '各列は「全シードの平均（％） / 一度でもいたシードの数」。', '', `| 種 | ${names.join(' | ')} |`, `|---|${names.map(() => '---:').join('|')}|`);
+  L.push('### にぎわいの内訳：種ごとに、いたサンプルの割合', '', `各列は「全シードの平均（％） / 一度でもいたシードの数」。${all.length >= 2 ? '「⚠ 減」「✚ 増」は、最初と最後の実行結果で、いたシードの数が大きく変わった種（3以上かつ元の半分以上）。' : ''}`, '', `| 種 | ${names.join(' | ')} |`, `|---|${names.map(() => '---:').join('|')}|`);
   for (const k of MONSTER_KINDS) {
     const cell = (ms: M[]) => {
       const v = ms.map((m) => m.kindShare[k]).filter(isFinite);
       return v.length ? `${f1(v.reduce((a, b) => a + b, 0) / v.length)} / ${v.filter((x) => x > 0).length}` : '—';
     };
-    L.push(`| ${KIND_NAMES[k]} | ${all.map(cell).join(' | ')} |`);
+    const f = all.length >= 2 ? seedShift(kindSeeds(all[0], k), kindSeeds(all[all.length - 1], k)) : '';
+    L.push(`| ${KIND_NAMES[k]}${f ? ` ${f}` : ''} | ${all.map(cell).join(' | ')} |`);
   }
   L.push('');
 }
@@ -353,11 +385,10 @@ tbl('起きた組み合わせの数：全部 / 命のやりとり / 命を取ら
 {
   // 関わりの内訳：組み合わせごとに、起きたシードの数と回数の合計。起きたシードの数の多い順（最後の実行結果、次に最初の実行結果）
   const keys = [...new Set(all.flatMap((ms) => ms.flatMap((m) => [...m.links.keys()])))];
-  const seedsOf = (ms: M[], k: string) => ms.filter((m) => m.links.has(k)).length;
   const total = (ms: M[], k: string) => sum(ms, (m) => m.links.get(k) ?? 0);
-  keys.sort((p, q) => seedsOf(all[all.length - 1], q) - seedsOf(all[all.length - 1], p) || seedsOf(all[0], q) - seedsOf(all[0], p) || total(all[all.length - 1], q) - total(all[all.length - 1], p));
-  L.push('### 関わりの内訳：組み合わせごとに、起きたシードの数 / 回数の合計', '', `| 組み合わせ | ${names.join(' | ')} |`, `|---|${names.map(() => '---:').join('|')}|`);
-  for (const k of keys) L.push(`| ${linkName(k)} | ${all.map((ms) => `${seedsOf(ms, k)} / ${total(ms, k)}`).join(' | ')} |`);
+  keys.sort((p, q) => linkSeeds(all[all.length - 1], q) - linkSeeds(all[all.length - 1], p) || linkSeeds(all[0], q) - linkSeeds(all[0], p) || total(all[all.length - 1], q) - total(all[all.length - 1], p));
+  L.push('### 関わりの内訳：組み合わせごとに、起きたシードの数 / 回数の合計', '', ...(all.length >= 2 ? ['「⚠ 減」「✚ 増」は、最初と最後の実行結果で、起きたシードの数が大きく変わった組み合わせ（にぎわいの内訳と同じ条件）。', ''] : []), `| 組み合わせ | ${names.join(' | ')} |`, `|---|${names.map(() => '---:').join('|')}|`);
+  for (const k of keys) L.push(`| ${linkName(k)}${(() => { const f = all.length >= 2 ? seedShift(linkSeeds(all[0], k), linkSeeds(all[all.length - 1], k)) : ''; return f ? ` ${f}` : ''; })()} | ${all.map((ms) => `${linkSeeds(ms, k)} / ${total(ms, k)}`).join(' | ')} |`);
   L.push('');
 }
 L.push('## コボルト', '');
