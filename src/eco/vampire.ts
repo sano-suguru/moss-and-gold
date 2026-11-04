@@ -29,6 +29,8 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
   if (c.act === 2 && c.actT < 4) return;
   // 光を嫌う：日の光と溶岩の照り返し。光る苔のほのかな明かりは、夜の通り道としてなら通れる程度に軽く数える
   const lightAt = (q: number) => (q < 0 ? 0 : this.w.lightBase[q] * day + this.w.mossGlow[q] * 500 + this.w.lavaGlow[q] * 1500);
+  // 歩くときに手前で止まるのは、日の光だけ（夜に光る苔や溶岩の照り返しの手前で止まると、住処へ帰れずにその場で動けなくなっていた）
+  const sunAt = (q: number) => (q < 0 ? 0 : this.w.lightBase[q] * day);
   if (lightAt(k) > 60) {
     let best = k;
     for (const q of [k + 1, k - 1, k + m.w, k - m.w]) if (q >= 0 && q < m.solid.length && !m.solid[q] && lightAt(q) < lightAt(best)) best = q;
@@ -83,7 +85,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       this.goTo(c, c.hx, c.hy, s.speed);
       // 帰り道の次の一歩が明るい所なら、進まずに暗がりで日が落ちるのを待つ
       // （以前は明るい所へ一歩出ては光を嫌って戻り、その場で行ったり来たりしていた）
-      if (lightAt(this.tileOf(c.x, c.y)) > 60) {
+      if (sunAt(this.tileOf(c.x, c.y)) > 60) {
         c.x = x0;
         c.y = y0;
         c.act = 0;
@@ -171,7 +173,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
         const y0 = c.y;
         this.goTo(c, p.x, p.y, s.speed * 1.2);
         // 明るい所へは踏み込まない（手前で待つ）
-        if (lightAt(this.tileOf(c.x, c.y)) > 60) {
+        if (sunAt(this.tileOf(c.x, c.y)) > 60) {
           c.x = x0;
           c.y = y0;
           c.act = 0;
@@ -199,7 +201,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       const x0 = c.x;
       const y0 = c.y;
       this.goTo(c, c.tx, c.ty, s.speed);
-      if (lightAt(this.tileOf(c.x, c.y)) > 60) {
+      if (sunAt(this.tileOf(c.x, c.y)) > 60) {
         c.x = x0;
         c.y = y0;
         c.act = 0;
@@ -213,7 +215,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
     const x0 = c.x;
     const y0 = c.y;
     this.goTo(c, c.hx, c.hy, s.speed);
-    if (lightAt(this.tileOf(c.x, c.y)) > 60) {
+    if (sunAt(this.tileOf(c.x, c.y)) > 60) {
       c.x = x0;
       c.y = y0;
       c.act = 0;
@@ -289,6 +291,8 @@ export function vampCoffin(this: Ecology, c: Cr): boolean {
       c.act = 0;
       return true;
     }
+    // 棺で眠ったので眠気は消える（眠りの処理 doSleep を通らないので、ここで消す。消さないと夜の帰り道で眠り込んでいた）
+    c.drowsy = 0;
     c.st = 0;
     c.away = false;
     c.sleep = 0;
