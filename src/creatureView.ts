@@ -950,19 +950,43 @@ export class CreatureView {
     // 生き物は足元の位置で前後を決める
     this.order.length = 0;
     for (const c of eco.list) {
-      // コウモリの群れにばらけたヴァンパイア：姿の代わりに、8匹のコウモリが渦を巻きながら住処へ飛ぶ（src/eco/vampire.ts の vampScatter）
+      // コウモリの群れにばらけたヴァンパイア：姿の代わりに、14匹のコウモリが、飛ぶ向きの後ろへ尾を引いて住処へ飛ぶ（src/eco/vampire.ts の vampScatter）。
+      // ばらけた直後（生き物の更新12回まで）は、ヴァンパイアのいた所から四方へはじけ、それから尾の形に寄り集まる。
+      // （以前は8匹が半径4〜14px に固まり、石像の色で描いていたので、小さな灰色の点にしか見えなかった）
       if (c.k === Kind.Vampire && c.st === VAMP_SCATTER && !c.dead) {
         const a = eco.moveAlpha(c, alpha);
         const x = c.px + (c.x - c.px) * a;
         const y = c.py + (c.y - c.py) * a;
-        if (inView(x, y, 60)) {
+        if (inView(x, y, 90)) {
           const t = eco.w.tick + alpha;
-          const age = eco.step - c.lureAt;
-          const spread = Math.min(1, age / 15);
-          for (let i = 0; i < 8; i++) {
-            const ang = t * 0.25 + i * 0.785;
-            const r = (4 + (i % 3) * 5) * (0.4 + spread * 0.6);
-            pushSprite(x + Math.cos(ang) * r, y + Math.sin(ang) * r * 0.5, 10 + (i % 4) * 3 + Math.sin(t * 0.3 + i) * 2, Math.cos(ang) < 0, A.index(1, 2, 1, (Math.floor(t * 0.5) + i) & 3), 0, 3);
+          const age = eco.step - c.lureAt + alpha * 0.5;
+          // 飛ぶ向き：動いた向き。止まっていれば住処の向き
+          let dx = c.x - c.px;
+          let dy = c.y - c.py;
+          if (Math.abs(dx) + Math.abs(dy) < 0.05) {
+            dx = c.hx - x;
+            dy = c.hy - y;
+          }
+          const L = Math.hypot(dx, dy) || 1;
+          const ux = dx / L;
+          const uy = dy / L;
+          const m = Math.min(1, age / 12);
+          const N = 14;
+          for (let i = 0; i < N; i++) {
+            // 尾：先頭から後ろへ並び、後ろほど幅が広く、左右に揺れる
+            const back = (i / N) * 38;
+            const wid = 4 + back * 0.5;
+            const sway = Math.sin(t * 0.21 + i * 1.9) * wid;
+            const surge = Math.cos(t * 0.17 + i * 2.7) * 4;
+            const tx = x - ux * (back + surge) - uy * sway;
+            const ty = y - uy * (back + surge) * 0.8 + ux * sway * 0.6;
+            // はじける：四方へ広がって（生き物の更新6回で半径30px）、また尾へ寄る
+            const ang = i * 2.399;
+            const rad = 30 * Math.sin(m * Math.PI) + 2;
+            const bx = (x + Math.cos(ang) * rad) * (1 - m) + tx * m;
+            const by = (y + Math.sin(ang) * rad * 0.6) * (1 - m) + ty * m;
+            const flip = m < 1 ? Math.cos(ang) < 0 : ux < 0;
+            pushSprite(bx, by, 9 + (i % 5) * 3 + Math.sin(t * 0.3 + i) * 3, flip, A.index(1, 2, 1, (Math.floor(t * 0.5) + i) & 3), 0, 0);
           }
         }
         continue;
@@ -974,6 +998,28 @@ export class CreatureView {
       // （ワームは胴が長いので、頭が少し画面の外でも描く）
       if (!inView(x, y, c.k === Kind.Worm ? 150 : 40)) continue;
       this.order.push({ y, c, x, yy: y });
+    }
+    // ヴァンパイアの黒い霧：コウモリにばらけた瞬間と、姿を戻した瞬間（描画専用。fxVampMist）。
+    // 姿を戻すときは、四方からコウモリが寄り集まって、霧の中で人の形に戻る
+    for (const ef of eco.fxVampMist) {
+      const tt = eco.w.tick + alpha;
+      const age = tt - ef.t;
+      const dur = ef.how ? 36 : 28;
+      if (age < 0 || age >= dur || !inView(ef.x, ef.y, 60)) continue;
+      const ph = age / dur;
+      for (let i = 0; i < 5; i++) {
+        const an = i * 1.257 + ef.t;
+        const r = 4 + ph * 14;
+        pushSprite(ef.x + Math.cos(an) * r, ef.y + Math.sin(an) * r * 0.5 + 0.1, 6 + ph * 10 + (i % 2) * 4, i % 2 === 1, A.mist(Math.min(3, Math.floor(ph * 4))), 0, 0);
+      }
+      if (ef.how === 1 && ph < 0.75) {
+        const p2 = ph / 0.75;
+        for (let i = 0; i < 10; i++) {
+          const an = i * 2.399 + ef.t * 0.1;
+          const r = 34 * (1 - p2);
+          pushSprite(ef.x + Math.cos(an) * r, ef.y + Math.sin(an) * r * 0.6, 10 + (1 - p2) * 10 + (i % 3) * 2, Math.cos(an) > 0, A.index(1, 2, 1, (Math.floor(tt * 0.5) + i) & 3), 0, 0);
+        }
+      }
     }
     this.order.sort((a, b) => a.y - b.y || a.c.id - b.c.id);
 

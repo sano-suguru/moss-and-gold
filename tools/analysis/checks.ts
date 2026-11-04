@@ -59,6 +59,25 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // ヴァンパイア（src/eco/vampire.ts、src/eco/bat.ts）：日暮れにコウモリを呼び寄せ、コウモリに群がられて足止めされた獲物に打ちかかる
+    name: 'ヴァンパイアが日暮れにコウモリを呼び寄せ、コウモリに群がられた獲物に打ちかかる（4シードで呼び寄せ1回・足止め2回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const ca = rs.map((r) => r.settle.filter((x) => x.k === 19 && x.ev === 'callBats').length);
+      const pin = rs.map((r) => r.settle.filter((x) => x.k === 19 && x.ev === 'pin').length);
+      return { ok: sum(ca) >= 1 && sum(pin) >= 2, value: rs.map((r, i) => `${r.seed} 呼び寄せ${ca[i]}・足止め${pin[i]}`).join('、') };
+    },
+  },
+  {
+    // ヴァンパイア（src/eco/vampire.ts の vampRaiseFallen）：倒れた冒険者の亡骸にかがみ込み、眷属として起き上がらせる
+    name: '倒れた冒険者がヴァンパイアの眷属として起き上がる（4シードで1体以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.births.filter((x) => x.k === 30 && x.from === 25).length);
+      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
     // リビングアーマー（src/eco/armor.ts）：倒れた冒険者の武具に未練が宿り、溜まり場で甲冑が立ち上がる
     name: 'リビングアーマーが武具の溜まり場から立ち上がる（6シードで2回以上）',
     ...RUN_ARMOR,

@@ -4,10 +4,16 @@ import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, 
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
+import { BAT_CALLED, PIN_R } from './vampire';
 
 export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
   const night = day <= 0 && (phase > 0.79 || phase < 0.18);
   const s = SPEC[Kind.Bat];
+  // ヴァンパイアに呼ばれて、外を回って入り直すところ（src/eco/vampire.ts の batCalled）
+  if (c.st === BAT_CALLED) {
+    this.batCalled(c);
+    return;
+  }
   if (!night) {
     if (c.away) {
       // 外から戻る
@@ -65,26 +71,41 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
     if (c.st === 0 || c.st === 2) c.st = 1;
     c.act = 1;
     // 主が獲物を決めていれば、その上を旋回して居場所を示し（偵察）、主が近づくと獲物に群がる（足止め。src/eco/vampire.ts の batPinned）。
-    // 決めていなければ、主の周りを回る
+    // 決めていなければ、主の周りを回る。腹が半分を切ったコウモリは、主が獲物に近づくまでは、主の近くの苔を食べに行く（batForage）
     const prey = lord.ref ? this.byId.get(lord.ref) : undefined;
+    const hunt = !!prey && !prey.dead && sq(prey.x - lord.x) + sq(prey.y - lord.y) < sq(40 * TILE);
+    const close = hunt && sq(prey!.x - lord.x) + sq(prey!.y - lord.y) < sq(PIN_R * TILE);
+    if (!close && c.food < s.cap * 0.5 && this.batForage(c, lord)) return;
     const x0 = c.x;
     const y0 = c.y;
     let cx = lord.x;
     let cy = lord.y;
-    if (prey && !prey.dead && sq(prey.x - lord.x) + sq(prey.y - lord.y) < sq(40 * TILE)) {
-      const close = sq(prey.x - lord.x) + sq(prey.y - lord.y) < sq(6 * TILE);
+    let gx: number;
+    let gy: number;
+    let sp = s.speed;
+    if (hunt) {
+      const p = prey as Cr;
       const a = (this.step * (close ? 0.09 : 0.05) + c.id * 1.7) % 6.283;
       const r = close ? 7 + (c.id % 3) * 3 : 16 + (c.id % 3) * 6;
-      cx = prey.x;
-      cy = prey.y;
-      this.moveToward(c, prey.x + Math.cos(a) * r, prey.y - (close ? 4 : 14) + Math.sin(a) * r * 0.6, s.speed * 1.2);
+      cx = p.x;
+      cy = p.y;
+      gx = p.x + Math.cos(a) * r;
+      gy = p.y - (close ? 4 : 14) + Math.sin(a) * r * 0.6;
+      sp = s.speed * 1.2;
     } else {
       const a = (this.step * 0.02 + c.id * 1.7) % 6.283;
       const r = 20 + (c.id % 3) * 8;
-      this.moveToward(c, lord.x + Math.cos(a) * r, lord.y - 10 + Math.sin(a) * r * 0.6, s.speed);
+      gx = lord.x + Math.cos(a) * r;
+      gy = lord.y - 10 + Math.sin(a) * r * 0.6;
     }
-    // 回る点が壁の向こうで進めなければ、道を探して中心（主か獲物）へ寄る（壁に押しつけられて止まらないように）
-    if (c.x === x0 && c.y === y0 && sq(cx - c.x) + sq(cy - c.y) > sq(TILE)) this.goTo(c, cx, cy, s.speed);
+    // 中心（獲物か主）から3マスより離れていれば、道を探して寄る（回る点へまっすぐ向かうと、曲がった通路で壁に引っかかり、
+    // 主から十数マス離れた所に取り残されて、主が獲物に打ちかかっても群がれなかった）。近ければ、回る点へ飛ぶ
+    if (sq(cx - c.x) + sq(cy - c.y) > sq(3 * TILE)) this.goTo(c, cx, cy, sp);
+    else {
+      this.moveToward(c, gx, gy, sp);
+      // 回る点が壁の向こうで進めなければ、中心へ寄る（壁に押しつけられて止まらないように）
+      if (c.x === x0 && c.y === y0 && sq(cx - c.x) + sq(cy - c.y) > sq(TILE)) this.goTo(c, cx, cy, sp);
+    }
     const k0 = this.tileOf(c.x, c.y);
     if (c.food < s.cap && k0 >= 0 && this.w.moss[k0] > 20) this.eatMoss(c, 2);
     return;
@@ -128,10 +149,43 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
   }
 }
 
+/**
+ * ヴァンパイアに従うコウモリの食事：主が獲物を決めていない間、腹が半分を切ったコウモリは、主から8マス以内の苔へ飛んで食べる
+ * （苔の場所は c.ref に「マスの番号＋1」で持つ。主から離れすぎた苔は捨てる）。
+ * 従うコウモリは外へ餌を取りに出ないので、以前は1日ほどで飢え死にして、ヴァンパイアの周りから従うコウモリがいなくなっていた。
+ * true なら、この回は苔へ向かったか食べた
+ */
+export function batForage(this: Ecology, c: Cr, lord: Cr): boolean {
+  const s = SPEC[Kind.Bat];
+  const m = this.w.map;
+  const k = this.tileOf(c.x, c.y);
+  if (k >= 0 && this.w.moss[k] > 20 && this.eatMoss(c, 2)) {
+    c.act = 2;
+    c.actT = 0;
+    return true;
+  }
+  if (c.ref > 0) {
+    const t = c.ref - 1;
+    const gx = (t % m.w) * TILE + 8;
+    const gy = Math.floor(t / m.w) * TILE + 8;
+    if (this.w.moss[t] <= 20 || sq(gx - lord.x) + sq(gy - lord.y) > sq(10 * TILE)) c.ref = 0;
+  }
+  if (c.ref <= 0 && this.step % 8 === c.id % 8) {
+    const t = this.findMoss(c, lord.x, lord.y, 8, 120);
+    c.ref = t >= 0 ? t + 1 : 0;
+  }
+  if (c.ref <= 0) return false;
+  const t = c.ref - 1;
+  c.act = 1;
+  if (this.goTo(c, (t % m.w) * TILE + 8, Math.floor(t / m.w) * TILE + 8, s.speed)) c.ref = 0;
+  return true;
+}
+
 declare module '../ecology' {
   interface Ecology {
     bat: typeof bat;
+    batForage: typeof batForage;
   }
 }
 
-Object.assign(Ecology.prototype, { bat });
+Object.assign(Ecology.prototype, { bat, batForage });

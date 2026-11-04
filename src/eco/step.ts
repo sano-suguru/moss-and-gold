@@ -209,8 +209,9 @@ export function metabolism(this: Ecology, c: Cr): void {
   // 眠っている間は腹が減りにくい（生き物の更新2回に1回だけ）
   if (c.sleep > 0 && this.step % 2 === 0) return;
   c.sinceMeal++;
-  // ねぐらで眠るコウモリは代謝を落とす
-  const meta = c.k === Kind.Bat && c.st === 0 ? s.meta * 5 : s.meta;
+  // ねぐらで眠るコウモリは代謝を落とす。ヴァンパイアに従うコウモリも、主の力で、ねぐらで眠るときと同じく腹が減りにくい（5分の1）。
+  // 従うコウモリは外へ餌を取りに出ないので、野生のコウモリと同じ減り方では1日ほどで、3分の1でもシードによっては飢え死にしていた（src/eco/bat.ts の batForage）
+  const meta = c.k === Kind.Bat && (c.st === 0 || c.ref2) ? s.meta * 5 : s.meta;
   if (c.k === Kind.Bat && c.st === 0 && this.step % 5 !== 0) {
     if (c.food === 0) return;
   }

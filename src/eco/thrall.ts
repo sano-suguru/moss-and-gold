@@ -7,6 +7,8 @@
  * 起き上がる流れ：ヴァンパイアが血の通った獲物（THRALL_KINDS）を倒すと、連れている眷属の強さの合計に空きがあれば、
  * 亡骸に主の番号（lure）と印を付けた時刻（lureAt）を覚えさせる（vampClaim）。ヴァンパイアは血を短く吸うだけで離れ（生き物の更新15回）、
  * 印から生き物の更新30回たつと、亡骸が眷属として起き上がる（raiseThrall。亡骸の残りの養分がそのまま体になる）。
+ * 眷属が倒した者も、主が倒したのと同じく印が付く（thrallClaim）。冒険者は、ヴァンパイアが倒した者でなくても、骨になる前の亡骸に
+ * ヴァンパイアがかがみ込んで印を付ける（src/eco/vampire.ts の vampRaiseFallen）。冒険者の眷属は、枠に空きがなければ、冒険者でない眷属を崩して枠を空ける。
  * 眷属の持ち物：sp に元の種、ref2 に主の番号、lure に元の冒険者の職業＋1（冒険者でなければ 0）、lureAt に起き上がった時刻（step）。
  * 終わり方：主が死ぬか、起き上がってからゲーム内の2日たつと崩れて、ふたたび亡骸になる（die。養分は亡骸へ戻る）。
  */
@@ -45,15 +47,59 @@ function thrallLoad(e: Ecology, v: Cr): [number, number] {
   return [s, n];
 }
 
-/** ヴァンパイア v が倒した亡骸 d に、眷属として起き上がる印を付ける（付けたら true） */
+/**
+ * ヴァンパイア v の亡骸 d に、眷属として起き上がる印を付ける（付けたら true）。v が倒した者のほか、倒れたばかりの冒険者の亡骸にも使う（vampRaiseFallen）。
+ * 冒険者は、枠（強さの合計と数）に空きがなければ、冒険者でない眷属のうち弱いものから崩して枠を空ける（冒険者の眷属は見せたい場面なので、
+ * 大ネズミやコボルトの眷属で枠が埋まっていても起き上がれるように）
+ */
 export function vampClaim(this: Ecology, v: Cr, d: Cr): boolean {
   if (v.k !== Kind.Vampire || d.dead !== 1 || !THRALL_KINDS.has(d.k)) return false;
-  const [s, n] = thrallLoad(this, v);
   const add = d.k === Kind.Adventurer ? JOB_STR[d.sp] ?? 5 : STR[d.k];
+  let [s, n] = thrallLoad(this, v);
+  while (d.k === Kind.Adventurer && (n >= THRALL_MAX || s + add > THRALL_STR_CAP)) {
+    let weak: Cr | null = null;
+    for (const o of this.list) if (o.k === Kind.Thrall && !o.dead && o.ref2 === v.id && o.sp !== Kind.Adventurer && (!weak || origStr(o) < origStr(weak) || (origStr(o) === origStr(weak) && o.id < weak.id))) weak = o;
+    if (!weak) break;
+    this.crumbleThrall(weak);
+    [s, n] = thrallLoad(this, v);
+  }
   if (n >= THRALL_MAX || s + add > THRALL_STR_CAP) return false;
   d.lure = v.id;
   d.lureAt = this.step;
   return true;
+}
+
+/** 眷属 t が倒した者 d を、主の眷属として起き上がらせる印を付ける（主のヴァンパイアが倒したのと同じ扱い） */
+export function thrallClaim(this: Ecology, t: Cr, d: Cr): boolean {
+  const lord = this.byId.get(t.ref2);
+  return !!lord && !lord.dead && this.vampClaim(lord, d);
+}
+
+/** ヴァンパイア v が、冒険者の亡骸 d を眷属にできるか（冒険者でない眷属を崩せば枠が空くなら true） */
+export function thrallRoomForAdv(this: Ecology, v: Cr, d: Cr): boolean {
+  let s = 0;
+  let n = 0;
+  for (const o of this.list) {
+    if (o.k === Kind.Thrall && !o.dead && o.ref2 === v.id && o.sp === Kind.Adventurer) {
+      s += origStr(o);
+      n++;
+    } else if (o.dead === 1 && o.lure === v.id && o.k === Kind.Adventurer) {
+      s += JOB_STR[o.sp] ?? 5;
+      n++;
+    }
+  }
+  return n < THRALL_MAX && s + (JOB_STR[d.sp] ?? 5) <= THRALL_STR_CAP;
+}
+
+/** 眷属が崩れ落ちて、元の種の亡骸に戻る（ふつうの亡骸として朽ち、食べられる） */
+export function crumbleThrall(this: Ecology, c: Cr): void {
+  this.log(c.x, c.y, `{k:${Kind.Thrall}}が崩れ落ちた`);
+  this.die(c, 'crumble', Kind.Vampire);
+  const orig = c.sp;
+  c.sp = orig === Kind.Adventurer ? Math.max(0, c.lure - 1) : orig;
+  c.k = orig;
+  c.lure = 0;
+  c.ref2 = 0;
 }
 
 /** 印の付いた亡骸を、眷属として起き上がらせる（src/eco/step.ts の decay から。起き上がったら true） */
@@ -114,14 +160,7 @@ export function thrallOrigin(this: Ecology, c: Cr): string {
 export function thrall(this: Ecology, c: Cr): void {
   const lord = this.byId.get(c.ref2);
   if (!lord || lord.dead || lord.k !== Kind.Vampire || this.step - c.lureAt > THRALL_LIFE) {
-    this.log(c.x, c.y, `{k:${Kind.Thrall}}が崩れ落ちた`);
-    this.die(c, 'crumble', Kind.Vampire);
-    // 崩れたあとは、元の種の亡骸に戻る（ふつうの亡骸として朽ち、食べられる）
-    const orig = c.sp;
-    c.sp = orig === Kind.Adventurer ? Math.max(0, c.lure - 1) : orig;
-    c.k = orig;
-    c.lure = 0;
-    c.ref2 = 0;
+    this.crumbleThrall(c);
     return;
   }
   const s = SPEC[Kind.Thrall];
@@ -155,10 +194,13 @@ export function thrall(this: Ecology, c: Cr): void {
 declare module '../ecology' {
   interface Ecology {
     vampClaim: typeof vampClaim;
+    crumbleThrall: typeof crumbleThrall;
+    thrallRoomForAdv: typeof thrallRoomForAdv;
+    thrallClaim: typeof thrallClaim;
     raiseThrall: typeof raiseThrall;
     thrallOrigin: typeof thrallOrigin;
     thrall: typeof thrall;
   }
 }
 
-Object.assign(Ecology.prototype, { vampClaim, raiseThrall, thrallOrigin, thrall });
+Object.assign(Ecology.prototype, { vampClaim, crumbleThrall, thrallRoomForAdv, thrallClaim, raiseThrall, thrallOrigin, thrall });

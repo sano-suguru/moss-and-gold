@@ -18,6 +18,7 @@ export interface Moment {
 export const MOMENTS: Moment[] = [
   { key: 'slainEat', label: '狩り：打ち合って仕留めて食べた' },
   { key: 'vampArrive', label: 'ヴァンパイア：コウモリの群れを連れて現れた' },
+  { key: 'vampCall', label: 'ヴァンパイア：日暮れにコウモリを呼び寄せた' },
   { key: 'vampScout', label: 'ヴァンパイア：コウモリが獲物の上を旋回して居場所を示した' },
   { key: 'vampPin', label: 'ヴァンパイア：コウモリが獲物に群がって足止めし、ヴァンパイアが打ちかかった' },
   { key: 'vampScatter', label: 'ヴァンパイア：追い詰められてコウモリの群れにばらけて逃げた' },
@@ -159,6 +160,7 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
   return {
     slainEat: d.filter((y) => y.cause === 'eaten' && y.slain === 1).length,
     vampArrive: b.filter((y) => y.k === K.Vampire).length,
+    vampCall: ev(K.Vampire, 'callBats').length,
     vampScout: ev(K.Vampire, 'scout').length,
     vampPin: ev(K.Vampire, 'pin').length,
     vampScatter: ev(K.Vampire, 'scatter').length,
