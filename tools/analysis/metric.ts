@@ -32,6 +32,7 @@ export const NAMED: Record<string, { expr: string; label: string; raw?: boolean 
   warrens: { label: 'コボルトの住処の数', expr: 'e.warrens.length' },
   burrows: { label: '大ネズミの巣穴の数', expr: 'e.burrows.length' },
   hungryRats: { label: '腹を空かせた大ネズミの割合（％）', expr: '(() => { const r = e.list.filter((c) => c.k === 2 && !c.dead); return r.length ? 100 * r.filter((c) => c.hungry).length / r.length : NaN; })()' },
+  monsterKinds: { label: '同時にいるモンスターの種の数（にぎわい。冒険者・ドワーフを除き、1匹以上いれば数える）', expr: 'new Set(e.list.filter((c) => !c.dead && c.k !== K[\'冒険者\'] && c.k !== K[\'ドワーフ\']).map((c) => c.k)).size' },
   alive: { label: '生きている生き物の数', expr: 'e.list.filter((c) => !c.dead).length' },
   nextId: { label: '生き物の番号（これまでに現れた数）', expr: 's.eco.n', raw: true },
 };
