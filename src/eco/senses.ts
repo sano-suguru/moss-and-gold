@@ -62,6 +62,8 @@ export function shyOfPeople(this: Ecology, c: Cr): boolean {
   if (STR[c.k] < 7 || [Kind.Adventurer, Kind.Dwarf, Kind.Golem, Kind.Dragon, Kind.Worm, Kind.Mimic, Kind.Gargoyle, Kind.Lich].includes(c.k)) return false;
   const st = this.str(c);
   if (st < 10 || c.act === 2 || c.flee > 0 || c.sleep > 0 || this.w.tick - c.hitAt < 300) return false;
+  // 夜襲に出る大物は、細った焚き火のまわり（12マス）の気配を避けない（src/eco/night.ts）
+  if (this.nightRaider(c) && this.weakCampAt(c.x, c.y, 12)) return false;
   const p = this.presenceAt(c.x, c.y);
   const excess = p - Math.max(0.2, 0.9 - st * 0.02);
   if (excess <= 0 || ih(c.id, this.step, 207) % 100 >= excess * 120) return false;
@@ -127,7 +129,8 @@ export function canSense(this: Ecology, c: Cr, o: Cr): boolean {
       if (d2 < 1.5 * 1.5 * T2) return true;
       return d2 < 64 * T2 && this.isLit(o) && los();
     case 'smell':
-      return d2 < 36 * T2;
+      // 焚き火で眠る一行の食べ物の匂いは、遠く（10マス）まで届く
+      return d2 < (this.campSleeper(o) ? 100 : 36) * T2;
     case 'vib':
       return d2 < 49 * T2 && o.act === 1 && o.sleep === 0;
     case 'echo':
@@ -145,7 +148,8 @@ export function fires(this: Ecology): [number, number, number][] {
   if (this.fireStep === this.step) return this.fireList;
   const m = this.w.map;
   const out: [number, number, number][] = [];
-  for (const p of this.parties) if ((p.camp ?? -1) >= 0) out.push([((p.camp as number) % m.w) * TILE + 8, Math.floor((p.camp as number) / m.w) * TILE + 8, 4 * TILE]);
+  // 冒険者の焚き火は、休みの最後の3分の1で細る（怖さの届く範囲が4マスから約1.5マスへ。src/eco/night.ts の campFire）
+  for (const p of this.parties) if ((p.camp ?? -1) >= 0) out.push([((p.camp as number) % m.w) * TILE + 8, Math.floor((p.camp as number) / m.w) * TILE + 8, 4 * TILE * this.campFire(p)]);
   for (const cp of this.camps) if (cp.id >= 0 && (cp.fuel ?? 0) > 0) out.push([cp.x, cp.y + 10, 4 * TILE]);
   const gx = m.entrance.x * TILE + 16;
   out.push([gx - 29, 40, 4 * TILE], [gx + 28, 40, 4 * TILE]);
@@ -184,6 +188,8 @@ export function fireNear(this: Ecology, x: number, y: number): [number, number, 
 /** 火を怖がる獣は、火のそばから離れる（飢え死にしそうなとき、襲われて打ち返すときは別） */
 export function fearFire(this: Ecology, c: Cr): boolean {
   if (!Ecology.FEARS_FIRE.has(c.k) || c.sleep > 0 || this.w.tick - c.hitAt < 120) return false;
+  // 夜襲に出る大物は、細った焚き火からは逃げない（src/eco/night.ts）
+  if (this.nightRaider(c) && !this.fireDaunts(c, c.x, c.y)) return false;
   // 腹をすかせた大ネズミとコウモリは、眠っている者の食料や血の匂いに惹かれて、火のそばにも忍び寄る
   if ((c.k === Kind.Rat || c.k === Kind.Bat) && c.hungry) return false;
   if (c.sinceMeal > SPEC[c.k].starve * 0.85) return false;
@@ -264,20 +270,31 @@ export function lurk(this: Ecology, c: Cr): boolean {
         this.tryMove(c, bx * SPEC[c.k].speed, by * SPEC[c.k].speed);
       }
     }
-    if (this.step % 30 !== c.id % 30 || (!c.hungry && !bold && ih(c.id, this.step, 210) % 3 !== 0)) return false;
+    // 夜、焚き火を囲む一行がいれば、オークとコボルトはその焚き火をよく探し（ふだんの3倍）、腹が満ちていても半分は出ていく（夜襲。src/eco/night.ts）。
+    // この多めの探し方で狙うのは焚き火の一行だけ（松明を持って歩く一行には、ふだんどおり）
+    const usual = this.step % 30 === c.id % 30 && (c.hungry || bold || ih(c.id, this.step, 210) % 3 === 0);
+    const campOnly = !usual && c.k !== Kind.Goblin && this.isNight() && this.step % 10 === c.id % 10 && (c.hungry || ih(c.id, this.step, 219) % 2 === 0) && this.parties.some((q) => (q.camp ?? -1) >= 0);
+    if (!usual && !campOnly) return false;
     let best: Cr | null = null;
     let bd = 20 * TILE * 20 * TILE;
     for (const o of this.list) {
       if (o.dead || o.away || o.k !== Kind.Adventurer) continue;
       const p = this.parties.find((q) => q.id === o.party);
-      const bright = o.torch > 0 || (p && (p.camp ?? -1) >= 0);
-      if (!bright) continue;
+      const fire = !!p && (p.camp ?? -1) >= 0;
+      const bright = o.torch > 0 || fire;
+      if (!bright || (campOnly && !fire)) continue;
       const d = sq(o.x - c.x) + sq(o.y - c.y);
       if (d >= bd || !lineOfSight(m, c.x, c.y, o.x, o.y)) continue;
       bd = d;
       best = o;
     }
     if (!best) return false;
+    // 焚き火を囲む一行なら、見張り（先頭）ではなく、眠っている者を狙う
+    const bp = this.parties.find((q) => q.id === (best as Cr).party);
+    if (c.k !== Kind.Goblin && bp && (bp.camp ?? -1) >= 0) {
+      const sl = bp.members.slice(1).filter((id) => { const o = this.byId.get(id); return !!o && !o.dead; });
+      if (sl.length) best = this.byId.get(sl[ih(c.id, this.step, 218) % sl.length]) as Cr;
+    }
     c.lure = (best as Cr).id;
     c.lureAt = this.step;
     if (this.step - (this.lastLogged[998] ?? -99999) > 3000) {
@@ -294,7 +311,11 @@ export function lurk(this: Ecology, c: Cr): boolean {
   const alone = !this.list.some((o) => o !== t && !o.dead && o.k === Kind.Adventurer && o.party === t.party && sq(o.x - t.x) + sq(o.y - t.y) < 4 * TILE * 4 * TILE);
   // 集落の待ち伏せ：弱い一行が集落のそば（9マス）に踏み込んだら、暗がりから群れで襲いかかる
   const ambush = !!camp && camp.hide === 2 && sq(t.x - camp.x) + sq(t.y - camp.y) < 9 * TILE * 9 * TILE;
-  if (alone || t.sleep > 0 || ambush) {
+  // 焚き火で眠る一行を狙うオークとコボルトは、見張りがうとうとするのを待つ（せっかちな者＝8匹に1匹と、待ちくたびれた者は待たない）
+  const tp = this.parties.find((q) => q.id === t.party);
+  const atCamp = c.k !== Kind.Goblin && !!tp && (tp.camp ?? -1) >= 0;
+  const sleepOk = t.sleep > 0 && (!atCamp || this.watchDozing(tp as Party) || ih(c.id, c.lureAt, 217) % 8 === 0 || this.step - c.lureAt > 1200);
+  if (alone || sleepOk || ambush) {
     c.act = 1;
     if (sq(t.x - c.x) + sq(t.y - c.y) < 14 * 14) {
       // はぐれた者には、仲間が2匹以上そばにいるか頭がいれば、盗むのではなく襲いかかる（集落の者だけ）

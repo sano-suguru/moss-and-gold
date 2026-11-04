@@ -701,6 +701,7 @@ export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: numbe
     }
   if (best < 0) return;
   p.camp = best;
+  p.campAt = this.step;
   // 夜は長めに休む（ゲーム内の夜のあいだ焚き火を囲む）
   p.campUntil = this.step + (this.isNight() ? 2400 : 1500);
   p.dozeT = 0;
@@ -925,7 +926,12 @@ export function eachLight(this: Ecology, fn: (x: number, y: number, r: number, i
   // 鍛冶場の火と坑道のランプ、冒険者の焚き火
   const mw = this.w.map.w;
   for (const cp of this.camps) if (cp.id >= 0 && (cp.fuel ?? 0) > 0) fn(cp.x, cp.y + 6, 140, 1.25, 1.0, 0.58, 0.26);
-  for (const p of this.parties) if ((p.camp ?? -1) >= 0) fn(((p.camp as number) % mw) * TILE + 8, Math.floor((p.camp as number) / mw) * TILE + 4, 120, 1.25, 1.0, 0.6, 0.28);
+  // 冒険者の焚き火は、休みの最後の3分の1で細って、光の輪が小さく暗くなる（src/eco/night.ts の campFire）
+  for (const p of this.parties) {
+    if ((p.camp ?? -1) < 0) continue;
+    const f = this.campFire(p);
+    fn(((p.camp as number) % mw) * TILE + 8, Math.floor((p.camp as number) / mw) * TILE + 4, 120 * Math.max(0.55, f), 1.25 * (0.6 + 0.4 * f), 1.0, 0.6, 0.28);
+  }
   if (this.hold && this.hold.forge >= 0) fn((this.hold.forge % mw) * TILE + 8, Math.floor(this.hold.forge / mw) * TILE + 2, 130, 1.3, 1.0, 0.55, 0.22);
   for (const k of this.lamps) fn((k % mw) * TILE + 8, Math.floor(k / mw) * TILE + 2, 64, 0.8, 1.0, 0.85, 0.55);
   for (const it of this.gear) if (it.kind === ItemKind.Torch) fn(it.x, it.y - 4, 52, 0.7, 1.0, 0.6, 0.28);

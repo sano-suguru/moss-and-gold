@@ -178,9 +178,12 @@ export function orcWary(this: Ecology, c: Cr): boolean {
   if (!seen) return false;
   const p = this.parties.find((q) => q.id === (seen as Cr).party);
   if (!p) return false;
+  // 眠る一行に忍び寄っている間は唸らない（起こされた一行には、ふだんどおり見極める。src/eco/night.ts）
+  if (c.lure && (p.camp ?? -1) >= 0 && !this.campAwake(p) && p.members.includes(c.lure)) return false;
   // 一行に打たれたばかりなら、見極めずに打ち返す
   if (this.w.tick - c.hitAt < 150 && p.members.includes(c.foe)) return false;
-  const theirs = this.partyMight(p);
+  // 焚き火で眠る一行は、起きている者の分だけの強さに見える（src/eco/night.ts の campMight）
+  const theirs = this.campMight(p);
   let ours = 0;
   this.nearby(c.x, c.y, 6, (o) => {
     if (o.dead || o.away || o.k !== Kind.Orc || sq(o.x - c.x) + sq(o.y - c.y) > 6 * TILE * 6 * TILE) return;
