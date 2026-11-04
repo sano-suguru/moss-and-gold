@@ -89,6 +89,9 @@ export class Renderer {
   private shadowVao: WebGLVertexArrayObject;
   private vao: WebGLVertexArrayObject;
   private mapTex: WebGLTexture;
+  // 壁の角の丸め方（マスごと）：bit0 壁か、bit1〜4 左上・右上・左下・右下の角を丸めるか（壁のマスなら削る、床のマスなら岩を張り出させる）
+  private cornerTex: WebGLTexture;
+  private cornerData: Uint8Array = new Uint8Array(0);
   private fieldTex: WebGLTexture;
   private manaTex: WebGLTexture;
   private manaData = new Uint8Array(0);
@@ -135,7 +138,7 @@ export class Renderer {
     gl.vertexAttribDivisor(0, 1);
     gl.bindVertexArray(null);
     this.scene = program(gl, FS_SCENE, '場面', [
-      'uMap', 'uField', 'uGlow', 'uLight', 'uFx', 'uMana', 'uMapSize', 'uOrigin', 'uArtSize', 'uLmOrigin', 'uLmSize', 'uTime',
+      'uMap', 'uField', 'uGlow', 'uLight', 'uFx', 'uMana', 'uCorner', 'uMapSize', 'uOrigin', 'uArtSize', 'uLmOrigin', 'uLmSize', 'uTime',
       'uNumHalo', 'uH', 'uHC', 'uNumShaft', 'uS', 'uDebug',
     ]);
     this.blit = program(gl, FS_BLIT, '拡大', ['uTex', 'uBloom', 'uScale', 'uBloomStr']);
@@ -145,6 +148,7 @@ export class Renderer {
     this.bloomFb = [gl.createFramebuffer()!, gl.createFramebuffer()!];
     this.vao = gl.createVertexArray()!;
     this.mapTex = makeTex(gl, gl.NEAREST);
+    this.cornerTex = makeTex(gl, gl.NEAREST);
     this.fieldTex = makeTex(gl, gl.LINEAR);
     this.manaTex = makeTex(gl, gl.LINEAR);
     this.glowTex = makeTex(gl, gl.LINEAR);
@@ -163,6 +167,7 @@ export class Renderer {
     this.mapH = m.h;
     const N = m.w * m.h;
     this.mapData = new Uint8Array(N * 4);
+    this.cornerData = new Uint8Array(N);
     this.uploadMap(w);
     this.fieldData = new Uint8Array(N * 4);
     this.glowData = new Uint8Array(N * 4);
@@ -198,6 +203,9 @@ export class Renderer {
     }
     gl.bindTexture(gl.TEXTURE_2D, this.mapTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, m.w, m.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.mapData);
+    cornerBits(m, this.cornerData);
+    gl.bindTexture(gl.TEXTURE_2D, this.cornerTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, m.w, m.h, 0, gl.RED, gl.UNSIGNED_BYTE, this.cornerData);
   }
 
   setAtlas(a: Atlas): void {
@@ -363,6 +371,9 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE5);
     gl.bindTexture(gl.TEXTURE_2D, this.manaTex);
     gl.uniform1i(u.uMana, 5);
+    gl.activeTexture(gl.TEXTURE6);
+    gl.bindTexture(gl.TEXTURE_2D, this.cornerTex);
+    gl.uniform1i(u.uCorner, 6);
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform2i(u.uMapSize, this.mapW, this.mapH);
     gl.uniform2f(u.uOrigin, f.originX, f.originY);
@@ -465,3 +476,39 @@ export function newShafts(): Float32Array {
   return new Float32Array(MAX_SHAFTS * 4);
 }
 export { MAX_DYN, MAX_LIGHTS, MAX_SHAFTS };
+
+/**
+ * 壁の角の丸め方を、マスごとに求める（地形シェーダーの wallPx が読む。地形が変わるたびに uploadMap から呼ぶ）。
+ * 見た目だけのもので、シミュレーションには使わない。
+ * - bit0：壁か（瓦礫を除く岩。地図の外も壁とみなす）
+ * - bit1〜4：左上・右上・左下・右下の角を丸めるか。壁のマスでは、その角をはさむ横と縦の隣がどちらも床なら削る（出っ張った角）。
+ *   床のマスでは、横・縦・斜めの隣がすべて岩なら岩を張り出させる（へこんだ角）。
+ *   角を囲む4マスのどれかが人の手のもの（石畳の床、石畳に面した石積みの壁）か瓦礫なら、直角のまま
+ */
+export function cornerBits(m: { w: number; h: number; solid: ArrayLike<number>; rubble: ArrayLike<number>; paved: ArrayLike<number> }, out: Uint8Array): void {
+  const { w, h } = m;
+  const inMap = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h;
+  const wall = (x: number, y: number) => !inMap(x, y) || (!!m.solid[y * w + x] && !m.rubble[y * w + x]);
+  const square = (x: number, y: number) => {
+    if (!inMap(x, y)) return false;
+    const k = y * w + x;
+    if (m.paved[k] || m.rubble[k]) return true;
+    return wall(x, y) && inMap(x, y + 1) && !!m.paved[k + w];
+  };
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const self = wall(x, y);
+      let b = self ? 1 : 0;
+      for (let q = 0; q < 4; q++) {
+        const hx = x + (q & 1 ? 1 : -1);
+        const vy = y + (q & 2 ? 1 : -1);
+        const hw = wall(hx, y);
+        const vw = wall(x, vy);
+        const round = self ? !hw && !vw : hw && vw && wall(hx, vy);
+        if (!round) continue;
+        if (square(x, y) || square(hx, y) || square(x, vy) || square(hx, vy)) continue;
+        b |= 2 << q;
+      }
+      out[y * w + x] = b;
+    }
+}
