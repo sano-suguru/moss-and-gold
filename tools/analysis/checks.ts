@@ -142,12 +142,13 @@ export const CHECKS: Check[] = [
   {
     // 狩りは打ち合って仕留めてから食べる（一口で食べるのは、クモの巣・丸のみ・空中でさらう・死骸だけ）。
     // 打ち合いで仕留めて食べたのが、一口で食べたより多い
-    name: '狩りは打ち合って仕留めて食べる（各シードで20回以上、一口で食べたより多い）',
+    // （1シードの揺れに左右されないよう、回数は4シードの合計で見る。クモの巣の変更（#38）のあと、abc の10〜18日目は10回ほどになった）
+    name: '狩りは打ち合って仕留めて食べる（4シードの合計で80回以上、どのシードでも一口で食べたより多い）',
     ...RUN_A,
     test: (rs) => {
       const sl = rs.map((r) => r.deaths.filter((x) => x.cause === 'eaten' && x.slain === 1).length);
       const gu = rs.map((r) => r.deaths.filter((x) => x.cause === 'eaten' && !x.slain).length);
-      return { ok: sl.every((v, i) => v >= 20 && v > gu[i]), value: rs.map((r, i) => `${r.seed} ${sl[i]}（一口 ${gu[i]}）`).join('、') };
+      return { ok: sum(sl) >= 80 && sl.every((v, i) => v > gu[i]), value: rs.map((r, i) => `${r.seed} ${sl[i]}（一口 ${gu[i]}）`).join('、') };
     },
   },
   {
