@@ -185,6 +185,12 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1): boolean {
   const sa = this.str(a) * (1 + 0.4 * allies(a));
   const dmg = sa * (1.2 + (ih(a.id, d.id ^ this.step, 161) % 1000) / 1000 * 1.2) * mul;
   d.hp -= dmg;
+  // やられそうになったヴァンパイアは、コウモリの群れにばらけて逃げる（1日に1回、光の中ではできない。src/eco/vampire.ts）
+  let scatter = false;
+  if (d.k === Kind.Vampire && d.hp < this.maxHp(d) * 0.35 && this.vampCanScatter(d)) {
+    d.hp = Math.max(1, d.hp);
+    scatter = true;
+  }
   if (d.k === Kind.Adventurer && d.hp > 0) this.heroHurt(d);
   d.hitAt = this.w.tick;
   d.foe = a.id;
@@ -198,6 +204,7 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1): boolean {
   this.bleed(d, 1);
   // 焚き火のそばの小物との小競り合い（コウモリに血を吸われて払うなど）は、一行の皆を起こすほどの音を立てない
   if (!this.campPetty(a, d)) this.noise(d.x, d.y, 9);
+  if (scatter) this.vampScatter(d);
   return d.hp <= 0;
 }
 
@@ -220,7 +227,8 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
   if (d.flee <= 0 && this.str(d) > 0 && !asleep) {
     d.act = 2;
     d.actT = 0;
-    if (this.strike(d, a, 0.8)) {
+    // コウモリに群がられている者の打ち返しは弱い（src/eco/vampire.ts の batPinned）
+    if (this.strike(d, a, this.batPinned(d) ? 0.4 : 0.8)) {
       this.die(a, 'fight', d.k);
       return false;
     }

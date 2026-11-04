@@ -3,6 +3,7 @@
 import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
+import { VAMP_SCATTER } from './vampire';
 import type { World } from '../world';
 
 export function update(this: Ecology, tick: number, day: number, phase: number): void {
@@ -39,6 +40,19 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       c.act = 1;
       // もがいて抜け出す（コウモリは70分の1、大ネズミとアリは60分の1、ウィスプは160分の1。生き物の更新ごと）。抜け出したら巣の外へ跳び出す（escapeWeb）
       if (ih(c.id, this.step, 41) % (c.k === Kind.Bat ? 70 : c.k === Kind.Rat || c.k === Kind.Ant ? 60 : 160) === 0) this.escapeWeb(c);
+      this.metabolism(c);
+      continue;
+    }
+    // コウモリの群れにばらけたヴァンパイアは、住処へ飛ぶだけ（src/eco/vampire.ts の vampFly）
+    if (c.k === Kind.Vampire && c.st === VAMP_SCATTER) {
+      this.vampFly(c);
+      this.metabolism(c);
+      continue;
+    }
+    // ヴァンパイアのコウモリに群がられている間は、もがくだけで逃げられない（src/eco/vampire.ts の batPinned）
+    if (this.batPinned(c)) {
+      c.act = 1;
+      c.flee = 0;
       this.metabolism(c);
       continue;
     }

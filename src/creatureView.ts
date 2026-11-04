@@ -2,6 +2,7 @@ import type { Atlas } from './atlas';
 import { BLOOD, Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
 import { RANK_AT, unpackLook } from './eco/roster';
+import { VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
 
 const MAX_SPRITES = 4096;
@@ -898,6 +899,23 @@ export class CreatureView {
     // 生き物は足元の位置で前後を決める
     this.order.length = 0;
     for (const c of eco.list) {
+      // コウモリの群れにばらけたヴァンパイア：姿の代わりに、8匹のコウモリが渦を巻きながら住処へ飛ぶ（src/eco/vampire.ts の vampScatter）
+      if (c.k === Kind.Vampire && c.st === VAMP_SCATTER && !c.dead) {
+        const a = eco.moveAlpha(c, alpha);
+        const x = c.px + (c.x - c.px) * a;
+        const y = c.py + (c.y - c.py) * a;
+        if (inView(x, y, 60)) {
+          const t = eco.w.tick + alpha;
+          const age = eco.step - c.lureAt;
+          const spread = Math.min(1, age / 15);
+          for (let i = 0; i < 8; i++) {
+            const ang = t * 0.25 + i * 0.785;
+            const r = (4 + (i % 3) * 5) * (0.4 + spread * 0.6);
+            pushSprite(x + Math.cos(ang) * r, y + Math.sin(ang) * r * 0.5, 10 + (i % 4) * 3 + Math.sin(t * 0.3 + i) * 2, Math.cos(ang) < 0, A.index(1, 2, 1, (Math.floor(t * 0.5) + i) & 3), 0, 3);
+          }
+        }
+        continue;
+      }
       if (c.dead === 2 || c.away) continue;
       const a = eco.moveAlpha(c, alpha);
       const x = c.px + (c.x - c.px) * a;

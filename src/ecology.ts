@@ -450,7 +450,8 @@ export const SPEC: Spec[] = [
   { body: 150, cap: 250, meta: 40, starve: 6000, speed: 0.85, glowDecay: 1 },
   { body: 60, cap: 100, meta: 50, starve: 5000, speed: 0.5, glowDecay: 1 },
   { body: 20, cap: 40, meta: 200, starve: 20000, speed: 1.6, glowDecay: 1 },
-  { body: 50, cap: 100, meta: 50, starve: 6000, speed: 0.9, glowDecay: 1 },
+  // ヴァンパイア：血を吸えば長くもつ（住処に数日は居つくように。以前は半日ほどで飢えて去っていた）
+  { body: 50, cap: 100, meta: 100, starve: 16000, speed: 0.9, glowDecay: 1 },
   { body: 10, cap: 60, meta: 120, starve: 40000, speed: 0.4, glowDecay: 1 },
   { body: 0, cap: 0, meta: 1e9, starve: 1e9, speed: 0.6, glowDecay: 1 },
   { body: 300, cap: 300, meta: 400, starve: 1e9, speed: 2, glowDecay: 1 },
