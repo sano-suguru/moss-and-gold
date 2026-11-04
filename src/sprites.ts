@@ -1257,21 +1257,30 @@ function dragon(dir,act,f){
  const step=act==='move'?q:0;
  const bob=act==='move'?[0,-1,0,-1][q]:0;
  if(fly){
-  // 翼を大きく広げて飛ぶ（上から見たような姿）
+  // 翼を大きく広げて飛ぶ（上から見たような姿）。頭が上の絵を基準に描き、向きに合わせて座標を変える：
+  // up = 頭が画面の上（後頭部が見える）、down = 頭が画面の下（顔と光る目が見える）、side = 頭が右（翼は上下に広がる。左向きは描くときに反転）
   const flap=[0,1,2,1][q],up=[-8,0,8,0][q];
   const cy=34;
-  const back=dir==='up';
+  const back=dir==='up',side=dir==='side';
+  const FW=100,FH=side?104:78,sc=52;
+  const T=side?(x,y)=>[50+(cy-y),sc+(x-50)]:dir==='down'?(x,y)=>[x,2*cy-y+8]:(x,y)=>[x,y];
+  const tp=(pts)=>pts.map(([x,y])=>T(x,y));
+  const tC=(x0,y0,x1,y1,r,m)=>{const [a,b]=T(x0,y0),[c,d]=T(x1,y1);return C(a,b,c,d,r,m)};
+  const tL=(x0,y0,x1,y1,m,i,o)=>{const [a,b]=T(x0,y0),[c,d]=T(x1,y1);return LN(a,b,c,d,m,i,o)};
+  const tE=(x,y,rx,ry,m,o)=>{const [a,b]=T(x,y);return side?E(a,b,ry,rx,m,o):E(a,b,rx,ry,m,o)};
   for(const sx of [-1,1]){const X=(x)=>50+sx*x;
    const pts=[[X(6),cy-4],[X(20),cy-16+up],[X(34),cy-24+up*1.4],[X(48),cy-18+up*1.6],[X(42),cy-6+up],[X(46),cy+4+up*0.6],[X(34),cy+2],[X(30),cy+10],[X(18),cy+6],[X(12),cy+8]];
-   P.push(PL(pts,'drgW',2,{ol:1}));
-   [[X(34),cy-24+up*1.4],[X(48),cy-18+up*1.6],[X(46),cy+4+up*0.6],[X(30),cy+10]].forEach(([tx,ty])=>P.push(LN(X(20),cy-16+up,tx,ty,'drgD',1,{no:1})));
-   P.push(C(X(6),cy-4,X(20),cy-16+up,1.6,'drg'));}
-  P.push(C(50,cy+6,50+(back?0:0),cy+26,4,'drg'),C(50,cy+26,52,cy+34,2.6,'drg'),PL([[48,cy+34],[52,cy+40],[56,cy+34]],'drgD',2,{ol:1}));
-  P.push(E(50,cy,8,12,'drg',{ol:1}));
-  for(let y=cy-8;y<=cy+20;y+=5)spike(50,y,3);
-  if(!back){P.push(C(50,cy-10,50,cy-22,4,'drg'),PL([[45,cy-22],[55,cy-22],[54,cy-32],[46,cy-32]],'drg',2,{ol:1}),PL([[46,cy-26],[40,cy-20],[45,cy-23]],'horn',3),PL([[54,cy-26],[60,cy-20],[55,cy-23]],'horn',3));glow.push([48,cy-27],[52,cy-27])}
-  else P.push(C(50,cy-10,50,cy-20,4,'drg'),PL([[46,cy-20],[54,cy-20],[53,cy-28],[47,cy-28]],'drg',2,{ol:1}));
-  return {...fin(raster(W,H,P)),ax:50,ay:G-6};
+   P.push(PL(tp(pts),'drgW',2,{ol:1}));
+   [[X(34),cy-24+up*1.4],[X(48),cy-18+up*1.6],[X(46),cy+4+up*0.6],[X(30),cy+10]].forEach(([tx,ty])=>P.push(tL(X(20),cy-16+up,tx,ty,'drgD',1,{no:1})));
+   P.push(tC(X(6),cy-4,X(20),cy-16+up,1.6,'drg'));}
+  P.push(tC(50,cy+6,50,cy+26,4,'drg'),tC(50,cy+26,52,cy+34,2.6,'drg'),PL(tp([[48,cy+34],[52,cy+40],[56,cy+34]]),'drgD',2,{ol:1}));
+  P.push(tE(50,cy,8,12,'drg',{ol:1}));
+  for(let y=cy-8;y<=cy+20;y+=5)P.push(PL(tp([[48.4,y],[50.4,y-3],[51.6,y]]),'drgD',2,{ol:1}));
+  if(!back){P.push(tC(50,cy-10,50,cy-22,4,'drg'),PL(tp([[45,cy-22],[55,cy-22],[54,cy-32],[46,cy-32]]),'drg',2,{ol:1}),PL(tp([[46,cy-26],[40,cy-20],[45,cy-23]]),'horn',3),PL(tp([[54,cy-26],[60,cy-20],[55,cy-23]]),'horn',3));glow.push(T(48,cy-27),T(52,cy-27))}
+  else P.push(tC(50,cy-10,50,cy-20,4,'drg'),PL(tp([[46,cy-20],[54,cy-20],[53,cy-28],[47,cy-28]]),'drg',2,{ol:1}));
+  // 足元の基準点（影の位置）は、体の中心から32px下
+  const [,by0]=T(50,cy);
+  return {...fin(raster(FW,FH,P)),ax:50,ay:Math.round(by0)+32};
  }
  if(dir==='side'){
   const lf=[2,0,-2,0][step],lh=-lf;

@@ -93,6 +93,12 @@ export function dragonSide(this: Ecology, hoard: Pile): number {
   return gx > hoard.x ? -1 : 1;
 }
 
+/** 飛んでいるドラゴンの行き先：腹が減って外へ出るなら裂け目（tx, ty）、そうでなければ寝床（hx, hy） */
+export function dragonFlightGoal(this: Ecology, c: Cr): [number, number] {
+  const goingOut = c.food < SPEC[Kind.Dragon].cap * 0.3 && c.ref === -1;
+  return goingOut ? [c.tx, c.ty] : [c.hx, c.hy];
+}
+
 export function dragon(this: Ecology, c: Cr, day: number): void {
   const s = SPEC[Kind.Dragon];
   const m = this.w.map;
@@ -175,8 +181,7 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
   if (c.st === 2) {
     c.act = 1;
     const goingOut = c.food < s.cap * 0.3 && c.ref === -1;
-    const gx = goingOut ? c.tx : c.hx;
-    const gy = goingOut ? c.ty : c.hy;
+    const [gx, gy] = this.dragonFlightGoal(c);
     // 飛んでいる：岩の上も越えて、まっすぐ目的地へ（道筋は探さない）
     {
       const dx = gx - c.x;
@@ -273,7 +278,8 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
   }
   // 起きている：炎を吐いている途中
   if (c.act === 2 && c.ref2 > 0) {
-    const t = 12 - c.ref2;
+    // 炎は口元から順に先へ燃え広がる（t は 0 から。若い竜は吐く時間が短いぶん、届く先も短い）
+    const t = Math.max(0, (c.sp === 1 ? 7 : 12) - c.ref2);
     this.breathe(c, c.tx, c.ty, t);
     c.ref2--;
     if (c.ref2 === 0) c.actT = 0;
@@ -443,8 +449,9 @@ declare module '../ecology' {
     pileOwner: typeof pileOwner;
     dragonLightSleep: typeof dragonLightSleep;
     dragonSide: typeof dragonSide;
+    dragonFlightGoal: typeof dragonFlightGoal;
     dragon: typeof dragon;
   }
 }
 
-Object.assign(Ecology.prototype, { wyvern, pickDragonHoard, pileOwner, dragonLightSleep, dragonSide, dragon });
+Object.assign(Ecology.prototype, { wyvern, pickDragonHoard, pileOwner, dragonLightSleep, dragonSide, dragonFlightGoal, dragon });

@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-const K = { Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Dragon: 24, Adventurer: 25 };
+const K = { Wisp: 0, Bat: 1, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Dragon: 24, Adventurer: 25 };
 
 export interface Moment {
   key: string;
@@ -28,6 +28,8 @@ export const MOMENTS: Moment[] = [
   { key: 'wayHome', label: '竜の寝床への道が町に伝わった' },
   { key: 'lairArrive', label: '竜退治の一行が寝床に着いた' },
   { key: 'dragonSlain', label: '冒険者がドラゴンを倒した' },
+  { key: 'dragonBurn', label: 'ドラゴンの炎で焼け死んだ（生き物の数）' },
+  { key: 'flyerBurn', label: 'コウモリ・ワイバーン・ウィスプがドラゴンの炎で焼け死んだ' },
   { key: 'cache', label: '物資の置き場を残した' },
   { key: 'supply', label: '置き場で食料を補った（一行ごと）' },
   { key: 'cacheRaid', label: '置き場が大ネズミにあさられた' },
@@ -85,6 +87,8 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     wayHome: ev(K.Adventurer, 'way').length,
     lairArrive: new Set(ev(K.Adventurer, 'arrive').filter((x) => x.how === 2).map((x) => x.id)).size,
     dragonSlain: d.filter((x) => x.k === K.Dragon && x.by === K.Adventurer).length,
+    dragonBurn: d.filter((x) => x.cause === 'burned' && x.by === K.Dragon).length,
+    flyerBurn: d.filter((x) => x.cause === 'burned' && x.by === K.Dragon && (x.k === K.Bat || x.k === K.Wyvern || x.k === K.Wisp)).length,
     cache: ev(K.Adventurer, 'cache').filter((x) => !x.merged).length,
     supply: uniq(ev(K.Adventurer, 'supply')),
     cacheRaid: ev(K.Rat, 'cache').length,
