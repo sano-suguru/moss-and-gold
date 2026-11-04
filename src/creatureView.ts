@@ -30,6 +30,8 @@ export class CreatureView {
   private eatHop = new Map<number, number>();
   /** 足につかんで運ばれている獲物（さらった者の id → 獲物の絵のコマと、さらってからの tick） */
   private eatClutch = new Map<number, { frame: number; age: number }>();
+  /** 糸の繭を抱えて食べているクモ（クモの id → 繭の大きさ 0〜2 と、巻き始めてからの tick） */
+  private eatCocoon = new Map<number, { v: number; age: number }>();
   /** 飲み込んだ獲物の膨らみ（ワームの id → 頭からの道のり px） */
   private wormBulge = new Map<number, number>();
   /** ワームの頭が岩の中にいたか（岩から床へ出た瞬間に土ぼこりを上げるため） */
@@ -138,6 +140,7 @@ export class CreatureView {
     this.eatCarry.clear();
     this.eatHop.clear();
     this.eatClutch.clear();
+    this.eatCocoon.clear();
     this.wormBulge.clear();
     const pos = (c: Cr): [number, number] => {
       const a = eco.moveAlpha(c, alpha);
@@ -160,12 +163,9 @@ export class CreatureView {
         if (age > 50 && !feeding) continue;
         if (live) this.eatHide.add(e.id);
         const v = feeding && live!.init > 0 ? (live!.units > live!.init * 0.6 ? 0 : live!.units > live!.init * 0.25 ? 1 : 2) : age < 20 ? 0 : age < 36 ? 1 : 2;
-        push(px, py + 0.05, 4, false, A.fx(`cocoon:${v}`), 0, 2);
-        // 巻きつける糸：白い粒が繭のまわりを回る
-        if (age < 10) for (let i = 0; i < 4; i++) {
-          const a = i * 1.57 + age * 0.9;
-          push(px + Math.cos(a) * 6, py + Math.sin(a) * 2, 6 + Math.sin(a) * 2, false, A.fx('bit:3:7:0'), 0, 4);
-        }
+        // 繭は、獲物に取りついたクモの体に隠れないよう、クモの絵の手前に重ねる（生き物を描く所で）
+        if (pred && !pred.dead) this.eatCocoon.set(pred.id, { v, age });
+        else push(px, py + 0.05, 4, false, A.fx(`cocoon:${v}`), 0, 2);
         continue;
       }
       if (e.bk === Kind.Worm && pred && !pred.dead) {
@@ -1117,6 +1117,19 @@ export class CreatureView {
       // 傷を受けた瞬間は白く光る
       const flash = !isCorpse && eco.w.tick - c.hitAt < 2 ? 20 : 0;
       pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0), (c.id * 0.6180339) % 1);
+      // 糸の繭を抱えて食べるクモ：体の手前に繭、巻き始めは白い糸の粒が繭のまわりを回る
+      {
+        const cc = this.eatCocoon.get(c.id);
+        if (cc) {
+          const cx = x + (flip ? -4 : 4);
+          pushSprite(cx, yy + 2, 1, false, A.fx(`cocoon:${cc.v}`), 0, 2);
+          if (cc.age < 12)
+            for (let i = 0; i < 4; i++) {
+              const a = i * 1.57 + cc.age * 0.9;
+              pushSprite(cx + Math.cos(a) * 5, yy + 2 + Math.sin(a) * 2, 5 + Math.sin(a) * 2, false, A.fx('bit:3:7:0'), 0, 4);
+            }
+        }
+      }
       // さらったコウモリを足につかんで飛ぶ：体の下側に、もがく獲物を重ねる
       {
         const cl = this.eatClutch.get(c.id);
