@@ -6,7 +6,7 @@
  *   npm run compare -- --runs runs/ab-x/base,runs/ab-x/new --paired --since 10
  *       10日目より後のログだけで比べ、シードごとの差の分布と、差がばらつきに埋もれていないかの目安の表を先頭に付ける（ab が使う）
  *
- * 各 batch のシードごとに：にぎわい（同時にいるモンスターの種の数とその内訳）、ゴブリンの集落（続いた日数、終わり方、冒険者・コボルトとの殺し合い）、コボルトの住処が続いた日数（中央値、ゲーム内の1/4日ごとのサンプルから）、冒険者に倒されたコボルト、
+ * 各 batch のシードごとに：にぎわい（同時にいるモンスターの種の数とその内訳）、関わり（どの種がどの種に何をしたかの組み合わせの数とその内訳）、ゴブリンの集落（続いた日数、終わり方、冒険者・コボルトとの殺し合い）、コボルトの住処が続いた日数（中央値、ゲーム内の1/4日ごとのサンプルから）、冒険者に倒されたコボルト、
  * ドラゴンに焼かれたコボルト、コボルトの去り方（starving 一匹ずつ飢えて / abandoned 住処ごと）、大ネズミの飢え死に、
  * 大ネズミの来た数と去り方（dispersed）、大ネズミが最後に生きているか、四つの保存則のずれ
  */
@@ -31,7 +31,7 @@ const median = (a: number[]) => {
 };
 const f1 = (v: number) => (isFinite(v) ? v.toFixed(1) : '—');
 
-interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number; orcStarveExit: number; storeMean: number; storeMax: number; storePos: number; storeKnown: boolean; ratReenter: number; ratZero: number; splitDur: number[]; splitStore: number; stuck: number; stuckNoPath: number; stuckAdv: number; unbury: number; mo: Record<string, number>; kindsMean: number; kindsMin: number; kindShare: number[] }
+interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number; orcStarveExit: number; storeMean: number; storeMax: number; storePos: number; storeKnown: boolean; ratReenter: number; ratZero: number; splitDur: number[]; splitStore: number; stuck: number; stuckNoPath: number; stuckAdv: number; unbury: number; mo: Record<string, number>; kindsMean: number; kindsMin: number; kindShare: number[]; links: Map<string, number> }
 /** にぎわいで数えない種：冒険者とドワーフ（人の側。来訪の多さに数字が引っ張られないよう、モンスターと分ける） */
 const NOT_MONSTER = new Set([25, 28]);
 const MONSTER_KINDS = KIND_NAMES.map((_, k) => k).filter((k) => !NOT_MONSTER.has(k));
@@ -47,6 +47,38 @@ function nigiwai(S: any[]): { kindsMean: number; kindsMin: number; kindShare: nu
   for (const x of v) for (const k of MONSTER_KINDS) if ((x.counts[k] ?? 0) > 0) share[k]++;
   return { kindsMean: n.reduce((a, b) => a + b, 0) / n.length, kindsMin: Math.min(...n), kindShare: share.map((c, k) => (NOT_MONSTER.has(k) ? NaN : (100 * c) / v.length)) };
 }
+
+/** 関わりの種類（組み合わせの名前の後ろに付ける）。命のやりとりは「倒した」だけ、残りは命を取らない関わり */
+const KILL = '倒した';
+/**
+ * 関わり：どの種がどの種に何をしたかの組み合わせ（向きあり、同じ種どうしは除く）を、範囲内のログから集めて回数を数える。
+ * 命のやりとりは deaths.jsonl の「手を下した種 → 倒れた種」（死因は分けない）。命を取らない関わりは settle.jsonl から：
+ * ゴブリンが冒険者から盗んだ（盗み・夜に忍び寄る・通路でつける・待ち伏せ）、オークがゴブリンの集落から取り立てた・従えた、
+ * オークが冒険者の一行をにらんで退いた、焚き火で眠る一行に夜襲した（打った種・見張りに気づかれた種）、大ネズミが冒険者の物資の置き場をあさった
+ */
+function links(D: any[], SE: any[]): Map<string, number> {
+  const L = new Map<string, number>();
+  const add = (a: number, b: number, rel: string) => {
+    if (a < 0 || b < 0 || a === b) return;
+    const key = `${a}>${b}>${rel}`;
+    L.set(key, (L.get(key) ?? 0) + 1);
+  };
+  for (const d of D) add(d.by ?? -1, d.k, KILL);
+  for (const x of SE) {
+    if (x.k === 12 && (x.ev === 'rob' || x.ev === 'raid' || x.ev === 'stalk' || x.ev === 'ambush')) add(12, 25, '盗んだ');
+    else if ((x.k === 13 && x.ev === 'tribute') || (x.k === 12 && x.ev === 'vassal')) add(13, 12, '取り立てた・従えた');
+    else if (x.k === 13 && x.ev === 'bluff') add(13, 25, 'にらんで退いた');
+    else if (x.k === 25 && (x.ev === 'nightHit' || x.ev === 'wake')) add(x.n ?? -1, 25, '夜襲した');
+    else if (x.k === 2 && x.ev === 'cache') add(2, 25, 'あさった');
+  }
+  return L;
+}
+/** 関わりの組み合わせの数（kill：true 命のやりとりだけ / false 命を取らないものだけ / undefined 全部。min：その回数以上起きたものだけ） */
+const linkCount = (m: M, kill?: boolean, min = 1) => [...m.links].filter(([key, n]) => n >= min && (kill === undefined || key.endsWith(`>${KILL}`) === kill)).length;
+const linkName = (key: string) => {
+  const [a, b, rel] = key.split('>');
+  return `${KIND_NAMES[+a]}→${KIND_NAMES[+b]}：${rel}`;
+};
 
 function measure(dir: string): M {
   const S = rd(dir, 'samples.jsonl');
@@ -81,6 +113,7 @@ function measure(dir: string): M {
     ratLast: rs[rs.length - 1] ?? 0, ratMax: Math.max(0, ...rs), ratGone: (rs[rs.length - 1] ?? 0) === 0 && (rs[rs.length - 2] ?? 0) === 0, drift,
     ratMoves: MV.filter((x) => x.k === 2).length,
     ...nigiwai(S),
+    links: links(D, rd(dir, 'settle.jsonl')),
     // シードの豊かさ：5日目以降のサンプルの平均（口が開いていないサンプルは除く）
     rich: (() => { const v = S.filter((x) => x.day >= 5 && typeof x.rich === 'number').map((x) => x.rich as number); return v.length ? v.reduce((p, q) => p + q, 0) / v.length : NaN; })(),
     // 飢え死にした大ネズミのうち、道のり10マス以内に食べられる苔があった数（ログに near があるものだけ）
@@ -242,6 +275,8 @@ const METRICS: Record<string, (ms: M[]) => number> = {
   poorEndFood: (ms) => sum(halves(ms)[1], (m) => m.endFood),
   kindsMean: (ms) => median(ms.map((m) => m.kindsMean).filter(isFinite)),
   kindsMin: (ms) => Math.min(...ms.map((m) => m.kindsMin).filter(isFinite)),
+  links: (ms) => median(ms.map((m) => linkCount(m))),
+  links2: (ms) => median(ms.map((m) => linkCount(m, undefined, 2))),
 };
 // A/B 比較（最初の実行結果と最後の実行結果の、同じシード同士の差）
 if (args.paired && all.length >= 2) {
@@ -250,6 +285,9 @@ if (args.paired && all.length >= 2) {
   const md = (a: number[]) => (a.length ? median(a) : NaN);
   const P: [string, (m: M) => number][] = [
     ['にぎわい：同時にいるモンスターの種の数（平均）', (m) => m.kindsMean], ['にぎわい：同時にいるモンスターの種の数（最小）', (m) => m.kindsMin],
+    ['関わり：起きた組み合わせの数', (m) => linkCount(m)], ['関わり：そのうち2回以上起きたもの', (m) => linkCount(m, undefined, 2)],
+    ['関わり：命のやりとりの組み合わせ', (m) => linkCount(m, true)], ['関わり：命のやりとりで2回以上', (m) => linkCount(m, true, 2)],
+    ['関わり：命を取らない組み合わせ', (m) => linkCount(m, false)], ['関わり：命を取らないもので2回以上', (m) => linkCount(m, false, 2)],
     ['大ネズミ：飢え死に', (m) => m.ratStarve], ['大ネズミ：来た', (m) => m.ratArr], ['大ネズミ：中で生まれた', (m) => m.ratBorn], ['大ネズミ：群れで出ていった', (m) => m.ratDisp], ['大ネズミ：巣穴の引っ越し', (m) => m.ratMoves], ['大ネズミ：最後の数', (m) => m.ratLast],
     ['コボルト：来た', (m) => m.kobArr], ['コボルト：中で生まれた', (m) => m.kobBorn], ['コボルト：住処の数', (m) => m.warrens], ['コボルト：住処の日数の中央値', (m) => md(m.dur)], ['コボルト：飢え死に', (m) => m.kobStarveDeath], ['コボルト：一匹ずつ飢えて去った', (m) => m.kobStarveExit], ['コボルト：冒険者に倒された', (m) => m.advKob], ['コボルト：最後の数', (m) => m.kobLast],
     ['ゴブリン：来た', (m) => m.gobArr], ['ゴブリン：中で生まれた', (m) => m.gobBorn], ['ゴブリン：集落の数', (m) => m.camps], ['ゴブリン：集落の日数の中央値', (m) => md(m.campDur)], ['ゴブリン：最後の数', (m) => m.gobLast], ['ゴブリン：飢え死に', (m) => m.gobStarveDeath], ['ゴブリン：冒険者に倒された', (m) => m.gobAdv],
@@ -307,6 +345,18 @@ tbl('同時にいるモンスターの種の数（平均 / 最小）', (m) => `$
     };
     L.push(`| ${KIND_NAMES[k]} | ${all.map(cell).join(' | ')} |`);
   }
+  L.push('');
+}
+L.push('## 関わり', '', 'どの種がどの種に何をしたかの組み合わせ（向きあり、同じ種どうしは除く）。命のやりとり（倒した。死因は分けない）と、命を取らない関わり（盗んだ・取り立てた・従えた・にらんで退いた・夜襲した・あさった）。範囲内のログすべてから数える。', '');
+tbl('起きた組み合わせの数：全部 / 命のやりとり / 命を取らない（括弧内は2回以上起きたもの）', (m) => `${linkCount(m)}（${linkCount(m, undefined, 2)}） / ${linkCount(m, true)}（${linkCount(m, true, 2)}） / ${linkCount(m, false)}（${linkCount(m, false, 2)}）`, (ms) => `中央値 ${f1(METRICS.links(ms))}（${f1(METRICS.links2(ms))}）`);
+{
+  // 関わりの内訳：組み合わせごとに、起きたシードの数と回数の合計。起きたシードの数の多い順（最後の実行結果、次に最初の実行結果）
+  const keys = [...new Set(all.flatMap((ms) => ms.flatMap((m) => [...m.links.keys()])))];
+  const seedsOf = (ms: M[], k: string) => ms.filter((m) => m.links.has(k)).length;
+  const total = (ms: M[], k: string) => sum(ms, (m) => m.links.get(k) ?? 0);
+  keys.sort((p, q) => seedsOf(all[all.length - 1], q) - seedsOf(all[all.length - 1], p) || seedsOf(all[0], q) - seedsOf(all[0], p) || total(all[all.length - 1], q) - total(all[all.length - 1], p));
+  L.push('### 関わりの内訳：組み合わせごとに、起きたシードの数 / 回数の合計', '', `| 組み合わせ | ${names.join(' | ')} |`, `|---|${names.map(() => '---:').join('|')}|`);
+  for (const k of keys) L.push(`| ${linkName(k)} | ${all.map((ms) => `${seedsOf(ms, k)} / ${total(ms, k)}`).join(' | ')} |`);
   L.push('');
 }
 L.push('## コボルト', '');
