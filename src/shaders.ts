@@ -195,6 +195,22 @@ vec4 stones(vec2 p, vec2 cs, uint salt) {
   return vec4(d1, d2, id, pos);
 }
 
+// 点 p にいちばん近い石の中心（stones と同じ並び）。岩の硬さを石ひとつごとに決めて、層の境目を石のひび割れに沿わせるのに使う
+vec2 stoneSeed(vec2 p, vec2 cs, uint salt) {
+  vec2 g = floor(p / cs);
+  float d1 = 1e9;
+  vec2 best = p;
+  for (int j = -1; j <= 1; j++)
+    for (int i = -1; i <= 1; i++) {
+      ivec2 c = ivec2(g) + ivec2(i, j);
+      uint h = hash2(c, salt);
+      vec2 fp = (vec2(c) + 0.15 + 0.7 * vec2(float(h & 255u), float((h >> 8u) & 255u)) / 255.0) * cs;
+      float d = length((p - fp) / cs);
+      if (d < d1) { d1 = d; best = fp; }
+    }
+  return best;
+}
+
 float seenSoft(vec2 wp) { return texture(uField, wp / 16.0 / vec2(uMapSize)).g; }
 bool lavaAt(ivec2 t) { return inMap(t) && texelFetch(uMap, t, 0).g > 0.5; }
 float lavaF(ivec2 t) { return lavaAt(t) ? 1.0 : 0.0; }
@@ -335,7 +351,10 @@ void main() {
     alb = ramp(idx);
     // 岩の硬さ：柔らかい層は茶色がかった細かい肌、硬い岩は青みがかった暗い大きな岩肌（石積みと切り石は人の手のものなので色を分けない）
     if (!brick && !cope) {
-      int hb = abits(t);
+      // 硬さは、その点が属する石の中心があるマスで決める（中心が壁でなければ自分のマス）。境目がマスの直線でなく、石のひび割れに沿う
+      vec2 sc = top ? stoneSeed(wp + 0.5, vec2(11.0, 9.0), 41u) : stoneSeed(wp + 0.5, vec2(10.0, 5.0), 23u);
+      ivec2 mt = tileOfPx(ivec2(floor(sc)));
+      int hb = wallAt(mt) ? abits(mt) : abits(t);
       if ((hb & 8) != 0) {
         alb *= vec3(1.22, 1.0, 0.74);
         if (h01(w, 501u) < 0.2) alb *= 1.12;
