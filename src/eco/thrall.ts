@@ -19,8 +19,8 @@ import { VAMP_SCATTER } from './vampire';
 /** 眷属になれる種（血の通った生き物。虫、炎の体、石化の目、地中の巨体、すでに不死のもの、竜の仲間は除く） */
 export const THRALL_KINDS = new Set<number>([Kind.Rat, Kind.Lizard, Kind.Kobold, Kind.Goblin, Kind.Orc, Kind.Lizardman, Kind.Minotaur, Kind.Troll, Kind.Dwarf, Kind.Adventurer]);
 /** 連れていられる眷属の強さの合計（元の種の強さ）と、数の上限 */
-const THRALL_STR_CAP = 20;
-const THRALL_MAX = 6;
+const THRALL_STR_CAP = 12;
+const THRALL_MAX = 4;
 /** 眷属が崩れるまで（生き物の更新の回数。ゲーム内の2日） */
 const THRALL_LIFE = (2 * DAY_TICKS_ECO) / CR_EVERY;
 

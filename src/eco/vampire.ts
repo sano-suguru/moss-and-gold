@@ -12,6 +12,9 @@ export const VAMP_COFFIN = 41;
 /** ばらけて逃げられる間隔（生き物の更新の回数。ゲーム内の1日） */
 const SCATTER_EVERY = DAY_TICKS_ECO / CR_EVERY;
 
+/** 狩りに出る腹の減り方：胃の中が4割を切ったら（以前は7割。長く居つくようになって、獲物を倒しすぎていた） */
+const HUNT_BELOW = 0.4;
+
 /** ヴァンパイアが血を吸う獲物 */
 const VAMP_PREY = new Set<number>([Kind.Rat, Kind.Goblin, Kind.Kobold, Kind.Lizardman, Kind.Adventurer]);
 
@@ -90,7 +93,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
   // 獲物を決めたら（c.ref に獲物の番号）、コウモリはまずその上を旋回し、ヴァンパイアが近づくと獲物に群がって足止めする（batPinned）
   // 夜明け前（1日の 0.1〜0.2）には狩りをやめて住処へ帰りはじめる（夜が明けると、帰り道の明るい所の手前で動けなくなり、そこで冒険者に見つかっていた）
   const predawn = this.phaseNow >= 0.1 && this.phaseNow < 0.2;
-  if (c.food < s.cap * 0.7 && !predawn) {
+  if (c.food < s.cap * HUNT_BELOW && !predawn) {
     // 眷属を連れている間は、強い獲物（オーク、ドワーフ）も狙う
     let thr = -1;
     const withThralls = () => {
@@ -203,7 +206,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
   } else c.ref = 0;
   c.act = 1;
   // 腹が満ちているか夜明け前で、住処から遠ければ、暗がりを通って住処へ帰る（明るい所の手前では待つ）。飢えていれば、暗がりをさまよって獲物を探す
-  if ((c.food >= s.cap * 0.7 || predawn) && sq(c.hx - c.x) + sq(c.hy - c.y) > sq(8 * TILE)) {
+  if ((c.food >= s.cap * HUNT_BELOW || predawn) && sq(c.hx - c.x) + sq(c.hy - c.y) > sq(8 * TILE)) {
     const x0 = c.x;
     const y0 = c.y;
     this.goTo(c, c.hx, c.hy, s.speed);
