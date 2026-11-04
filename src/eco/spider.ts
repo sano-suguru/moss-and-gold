@@ -23,13 +23,15 @@ export function spider(this: Ecology, c: Cr, day: number): void {
     const ty0 = Math.floor(oy / TILE);
     let best = -1;
     let bv = 0;
+    // 歩いて行ける所（つながった洞窟の同じ領域）だけを選ぶ（以前は岩の向こうの行けない所を選んで、道が見つからないまま足踏みすることがあった）
+    const home = this.regionOf(this.tileOf(c.x, c.y));
     for (let i = 0; i < 40; i++) {
       const h = ih(c.id, this.step, 500 + i);
       const x = tx0 + ((h & 255) % 31) - 15;
       const y = ty0 + (((h >>> 8) & 255) % 31) - 15;
       if (x < 1 || y < 1 || x >= m.w - 1 || y >= m.h - 1) continue;
       const k = y * m.w + x;
-      if (m.solid[k] || m.lava[k]) continue;
+      if (m.solid[k] || m.lava[k] || (home >= 0 && this.regionOf(k) !== home)) continue;
       let walls = 0;
       for (const n of [k + 1, k - 1, k + m.w, k - m.w, k + m.w + 1, k - m.w - 1]) walls += m.solid[n];
       if (walls < 2) continue;
@@ -116,6 +118,27 @@ export function inWeb(this: Ecology, c: Cr): boolean {
   return false;
 }
 
+/**
+ * 巣から抜け出す：糸を振りほどいて、巣の縁のすぐ外へ跳び出す（巣の中に残ると、また捕まって抜け出せないまま動けなくなるため）。
+ * 跳び出せる床がなければ、その場で放される
+ */
+export function escapeWeb(this: Ecology, c: Cr): void {
+  c.caught = false;
+  const web = this.webs.find((w) => w.id === c.ref);
+  if (!web) return;
+  const a0 = Math.atan2(c.y - web.y, c.x - web.x) || (c.id % 8) * 0.785;
+  for (let i = 0; i < 8; i++) {
+    const a = a0 + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.785;
+    const x = web.x + Math.cos(a) * (web.r + 4);
+    const y = web.y + Math.sin(a) * (web.r + 4);
+    if (this.passable(c, x, y)) {
+      c.x = x;
+      c.y = y;
+      return;
+    }
+  }
+}
+
 /** 巣を引き裂く（大きな者が通った、冒険者が切り払った）。巣の主のクモは、次の更新で巣を張り直しに出る */
 export function tearWeb(this: Ecology, web: Web, by: Cr, how: 'tear' | 'cut'): void {
   this.webs = this.webs.filter((w) => w !== web);
@@ -125,9 +148,7 @@ export function tearWeb(this: Ecology, web: Web, by: Cr, how: 'tear' | 'cut'): v
   // 捕まっていた者は、糸がほどけて逃げられる
   for (const o of this.list) if (o.caught && o.ref === web.id) o.caught = false;
   if (how === 'cut') {
-    // 冒険者は立ち止まって、刃物か松明で巣を払う（攻撃の振りを見せる）
-    by.act = 2;
-    by.actT = 0;
+    // 冒険者は、刃物か松明で巣を払う（振りの演出だけを出す。戦いの姿 act 2 にはしない：目標や聞き耳の判断が「戦っている」と見てしまうため）
     this.fxAttacks.push({ t: this.w.tick, style: 'slash', col: 0, size: 1, ax: by.x, ay: by.y, dx: web.x, dy: web.y, did: 0, aid: by.id, big: false, kill: false });
   }
 }
@@ -138,7 +159,8 @@ export function updateWebs(this: Ecology): void {
     web.age++;
     const R = Math.ceil(web.r / TILE) + 1;
     this.nearby(web.x, web.y, R, (o) => {
-      if (o.dead || o.caught || o.away || o.sleep === 2) return;
+      // （眠っている者は巣に関わらない：焚き火で眠る冒険者が巣を切り払ったり、ねぐらのコウモリが捕まったりしない）
+      if (o.dead || o.caught || o.away || o.sleep > 0) return;
       if (sq(o.x - web.x) + sq(o.y - web.y) > web.r * web.r) return;
       const ef = this.webEffect(o);
       if (ef === 1) {
@@ -165,7 +187,8 @@ declare module '../ecology' {
     webEffect: typeof webEffect;
     inWeb: typeof inWeb;
     tearWeb: typeof tearWeb;
+    escapeWeb: typeof escapeWeb;
   }
 }
 
-Object.assign(Ecology.prototype, { webEffect, inWeb, tearWeb, spider, updateWebs });
+Object.assign(Ecology.prototype, { webEffect, inWeb, tearWeb, escapeWeb, spider, updateWebs });
