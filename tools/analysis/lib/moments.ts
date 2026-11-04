@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-const K = { Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Dragon: 24, Adventurer: 25 };
+const K = { Vampire: 19, Thrall: 29, Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Dragon: 24, Adventurer: 25 };
 
 export interface Moment {
   key: string;
@@ -17,6 +17,13 @@ export interface Moment {
 /** 数える場面（表に並べる順） */
 export const MOMENTS: Moment[] = [
   { key: 'slainEat', label: '狩り：打ち合って仕留めて食べた' },
+  { key: 'vampArrive', label: 'ヴァンパイア：コウモリの群れを連れて現れた' },
+  { key: 'vampScout', label: 'ヴァンパイア：コウモリが獲物の上を旋回して居場所を示した' },
+  { key: 'vampPin', label: 'ヴァンパイア：コウモリが獲物に群がって足止めし、ヴァンパイアが打ちかかった' },
+  { key: 'vampScatter', label: 'ヴァンパイア：追い詰められてコウモリの群れにばらけて逃げた' },
+  { key: 'vampLightKill', label: 'ヴァンパイア：光の中で追い詰められ、ばらけられずに倒された' },
+  { key: 'thrallRise', label: 'ヴァンパイア：倒された者が眷属として起き上がった' },
+  { key: 'thrallAdv', label: 'ヴァンパイア：倒れた冒険者が眷属として起き上がった' },
   { key: 'webEat', label: '狩り：クモが巣にかかった獲物を食べた' },
   { key: 'webCatch', label: 'クモの巣：大ネズミかアリが捕まった' },
   { key: 'webTear', label: 'クモの巣：大きな者が引き裂いた' },
@@ -145,6 +152,13 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
   const gulp = (by: number[]) => d.filter((y) => y.cause === 'eaten' && !y.slain && by.includes(y.by)).length;
   return {
     slainEat: d.filter((y) => y.cause === 'eaten' && y.slain === 1).length,
+    vampArrive: b.filter((y) => y.k === K.Vampire).length,
+    vampScout: ev(K.Vampire, 'scout').length,
+    vampPin: ev(K.Vampire, 'pin').length,
+    vampScatter: ev(K.Vampire, 'scatter').length,
+    vampLightKill: ev(K.Vampire, 'lightKill').length,
+    thrallRise: b.filter((y) => y.k === K.Thrall).length,
+    thrallAdv: b.filter((y) => y.k === K.Thrall && y.from === K.Adventurer).length,
     webEat: gulp([K.Spider]),
     webCatch: ev(K.Spider, 'web').filter((y) => y.how === 'catch').length,
     webTear: ev(K.Spider, 'web').filter((y) => y.how === 'tear').length,

@@ -24,6 +24,8 @@ export function pick(this: Ecology, wx: number, wy: number): Cr | null {
 
 /** 生き物の名前と、いまの様子と、属する群れを、短い言葉で */
 export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]): { title: string; lines: string[] } {
+  // ヴァンパイアの眷属：見出しは主の名、本文は元の姿の1行（src/eco/thrall.ts）
+  if (c.k === Kind.Thrall) return { title: `${this.discovered[Kind.Vampire] ? names[Kind.Vampire] : '見知らぬ影'}の眷属`, lines: [`元は${this.thrallOrigin(c)}`] };
   const known = !!this.discovered[c.k];
   let title = known ? names[c.k] : '見知らぬ影';
   if (c.elite) {

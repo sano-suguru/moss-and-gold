@@ -106,7 +106,7 @@ function kindName(e: Ecology, k: number): string {
 }
 
 /** 覚え書きの持ち主の呼び方（「冒険者（戦士）」「熟練の戦士アルド」「オーク」など） */
-function whoName(e: Ecology, n: Note): string {
+export function whoName(e: Ecology, n: Note): string {
   const k = n.who ?? -1;
   if (k < 0) return '';
   if (!e.discovered[k]) return UNKNOWN;

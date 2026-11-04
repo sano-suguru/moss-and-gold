@@ -46,6 +46,16 @@ const RUN_TRIB = { seeds: ['seed23', 'seed41', 'seed30'], from: 10, to: 18 };
 
 export const CHECKS: Check[] = [
   {
+    // ヴァンパイア（src/eco/vampire.ts、src/eco/thrall.ts）：コウモリが獲物を見つけ、倒された者が眷属として起き上がる
+    name: 'ヴァンパイアのコウモリが獲物の上を旋回し、倒された者が眷属として起き上がる（4シードで旋回1回・眷属1体以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const sc = rs.map((r) => r.settle.filter((x) => x.k === 19 && x.ev === 'scout').length);
+      const th = rs.map((r) => r.births.filter((x) => x.k === 29).length);
+      return { ok: sum(sc) >= 1 && sum(th) >= 1, value: rs.map((r, i) => `${r.seed} 旋回${sc[i]}・眷属${th[i]}`).join('、') };
+    },
+  },
+  {
     // 焚き火の夜（src/eco/night.ts）：焚き火で眠る一行が、見張り・盗賊に起こされるか、寝込みを打たれて飛び起きる
     name: '焚き火で眠る一行が、敵に気づいた見張りか、寝込みの一打ちで起こされる（4シードで1回以上）',
     ...RUN_A,

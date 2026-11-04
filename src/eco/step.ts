@@ -15,7 +15,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   this.buildGroups();
   this.buildLitMap();
   this.corpses = this.list.filter((c) => c.dead === 1 && c.units > 0 && c.k !== Kind.Wisp && c.k !== Kind.Slime && c.k !== Kind.Myconid);
-  this.counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  this.counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (const c of this.list) if (!c.dead) this.counts[c.k]++;
 
   for (const c of this.list) {
@@ -121,6 +121,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       case Kind.Skeleton: this.skeleton(c, day); break;
       case Kind.Lich: this.lich(c, day); break;
       case Kind.Dwarf: this.dwarf(c); break;
+      case Kind.Thrall: this.thrall(c); break;
     }
     if (!c.dead) this.metabolism(c);
   }
@@ -230,6 +231,8 @@ export function decay(this: Ecology, c: Cr): void {
     if (c.actT > 8) c.dead = 2;
     return;
   }
+  // ヴァンパイアの印の付いた亡骸は、眷属として起き上がる（src/eco/thrall.ts）
+  if (this.raiseThrall(c)) return;
   // 何もされなければ、死骸はとてもゆっくり朽ちて土に返る。骨はさらに長く残る
   const stage = this.corpseStage(c);
   const every = stage === 2 ? 400 : 60;

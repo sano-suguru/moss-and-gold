@@ -67,8 +67,18 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
   // 偵察：従えるコウモリが多いほど遠くの獲物まで見つける（コウモリ1匹ごとに4マス、10マスから30マスまで）。
   // 獲物を決めたら（c.ref に獲物の番号）、コウモリはまずその上を旋回し、ヴァンパイアが近づくと獲物に群がって足止めする（batPinned）
   if (c.food < s.cap * 0.7) {
+    // 眷属を連れている間は、強い獲物（オーク、ドワーフ）も狙う
+    let thr = -1;
+    const withThralls = () => {
+      if (thr < 0) {
+        thr = 0;
+        for (const o of this.list) if (o.k === Kind.Thrall && !o.dead && o.ref2 === c.id) thr++;
+      }
+      return thr > 0;
+    };
     const ok = (o: Cr) => {
-      if (o.dead || o.away || !VAMP_PREY.has(o.k)) return false;
+      if (o.dead || o.away) return false;
+      if (!VAMP_PREY.has(o.k) && !((o.k === Kind.Orc || o.k === Kind.Dwarf) && withThralls())) return false;
       if (lightAt(this.tileOf(o.x, o.y)) > 60) return false;
       // 火の明かりの中の獲物は狙わない。冒険者の焚き火は、細るのを待つ（src/eco/night.ts の campFire）
       return !(this.fireNear(o.x, o.y) && !this.weakCampAt(o.x, o.y));
@@ -90,13 +100,22 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
           prey = o;
         }
       });
-      if (prey) c.ref = (prey as Cr).id;
+      if (prey) {
+        c.ref = (prey as Cr).id;
+        // 分析用：コウモリ（2匹以上）が見つけた獲物の上を旋回しはじめた
+        if (fol >= 2) this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'scout', id: c.id, n: (prey as Cr).k, x: Math.round((prey as Cr).x), y: Math.round((prey as Cr).y) } as never);
+      }
     }
     if (prey) {
       const p = prey as Cr;
       c.act = 1;
       if (sq(p.x - c.x) + sq(p.y - c.y) < 11 * 11) {
         // 一口では食べず、打ち合って仕留める（src/eco/combat.ts の hunt と同じ）
+        // 分析用：コウモリに群がられて足止めされた獲物に、ヴァンパイアが打ちかかった（獲物ごとに1回）
+        if (this.batPinned(p) && c.gait !== p.id) {
+          c.gait = p.id;
+          this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'pin', id: c.id, n: p.k, x: Math.round(p.x), y: Math.round(p.y) } as never);
+        }
         const won = this.fight(c, p);
         // 獲物の分け前を、従うコウモリに与える
         if (won) {

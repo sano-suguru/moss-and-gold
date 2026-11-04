@@ -941,7 +941,10 @@ export class CreatureView {
       const c = ord.c;
       let x = ord.x;
       let yy = ord.yy;
-      const sp = c.k;
+      // ヴァンパイアの眷属は、元の種の姿で描き、青白く塗り替える（シェーダーの kind 6。src/eco/thrall.ts）。冒険者の眷属は生前の姿のまま
+      const thrallOf = c.k === Kind.Thrall && !c.dead;
+      const sp = thrallOf ? c.sp : c.k;
+      const csp = thrallOf ? (c.sp === Kind.Adventurer ? Math.max(0, c.lure - 1) : 0) : c.sp;
       // 隠れている者は、こちら（暗がりの外）を向いて潜む（目が見えるように）
       let dir = c.dir === 0 || eco.isHidden(c) ? 0 : c.dir === 1 ? 1 : 2;
       let flip = c.dir === 3;
@@ -1068,11 +1071,11 @@ export class CreatureView {
       const hidden = eco.isHidden(c);
       const isCorpse = c.dead === 1 && c.actT >= 4 && sp !== Kind.Wisp && sp !== Kind.Slime && sp !== Kind.Ghost && sp !== Kind.Myconid;
       const eliteName = ['', 'firespirit', 'pknight', '', '', '', 'wspirit', 'lspirit', '', 'mlord'][c.elite] ?? '';
-      let frame = !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : c.sp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Adventurer ? (c.sp >= 4 ? 8 + c.sp - 4 : c.sp * 2 + (c.torch > 0 && c.sp !== 1 ? 1 : 0)) : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][c.sp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? c.sp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
+      let frame = !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : csp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Adventurer ? (csp >= 4 ? 8 + csp - 4 : csp * 2 + (c.torch > 0 && csp !== 1 ? 1 : 0)) : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][csp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? csp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
       // 名簿の冒険者：一人ひとりの姿と位の装備（src/eco/roster.ts、src/sprites.ts の heroSprite）
       if (sp === Kind.Adventurer && !isCorpse) {
-        const h = eco.heroOf(c);
-        if (h) frame = this.atlas.hero(c.sp, c.torch > 0 && c.sp !== 1 && c.sp < 4, h.look, h.rank, dir, act, f);
+        const h = thrallOf ? eco.roster.find((q) => q.cid === c.id) ?? null : eco.heroOf(c);
+        if (h) frame = this.atlas.hero(csp, !thrallOf && c.torch > 0 && csp !== 1 && csp < 4, h.look, h.rank, dir, act, f);
         // 位が上がって初めての遠征：入ってきてしばらく、金の光の粒が体のまわりを立ちのぼる（「見違えた」）
         const pt = h && h.rank > 0 && h.ret === RANK_AT[h.rank] ? eco.parties.find((q) => q.id === c.party) : undefined;
         if (pt && eco.step - pt.since < 400) {
@@ -1168,7 +1171,7 @@ export class CreatureView {
       }
       // 傷を受けた瞬間は白く光る
       const flash = !isCorpse && eco.w.tick - c.hitAt < 2 ? 20 : 0;
-      pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0), (c.id * 0.6180339) % 1);
+      pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0) + (thrallOf && !hidden && veil !== 2 ? 6 : 0), (c.id * 0.6180339) % 1);
       // 糸の繭を抱えて食べるクモ：体の手前に繭、巻き始めは白い糸の粒が繭のまわりを回る
       {
         const cc = this.eatCocoon.get(c.id);
@@ -1188,7 +1191,11 @@ export class CreatureView {
         if (cl) pushSprite(x + (flip ? -3 : 3) + Math.sin(cl.age * 1.3) * 1.5, yy + 0.05, lift + (sp === Kind.Wyvern ? 2 : 0) + Math.abs(Math.sin(cl.age * 0.9)) * 1.5, flip, cl.frame, 0, 0);
       }
       // 隠れている者の目：影の姿の上で光る（ときどきまばたき）。暗がりで灯りを狙って潜む者（待ち伏せのゴブリンなど）も、暗ければ目だけ光る
-      if (hidden || (!isCorpse && (c.lure || (sp === Kind.Goblin && c.st === 17)) && !c.dead && c.act === 0 && !eco.isLit(c))) {
+      if (thrallOf && !hidden) {
+        // 眷属の目：いつも赤く光る（ときどきまばたき）
+        const ph = Math.floor(t * 2 + c.id * 0.37) % 9;
+        pushSprite(x + (flip ? -1 : 1) * (dir === 2 ? 1 : 0), yy + 0.05, lift + Math.max(4, (Ecology.bodySize(sp) || 6) * 1.5), false, A.redEyes(ph === 8 ? 3 : ph & 1), 0, 0);
+      } else if (hidden || (!isCorpse && (c.lure || (sp === Kind.Goblin && c.st === 17)) && !c.dead && c.act === 0 && !eco.isLit(c))) {
         const ph = Math.floor(t * 2 + c.id * 0.37) % 7;
         pushSprite(x, yy + 0.05, lift + (sp === Kind.Goblin ? 14 : 7), false, A.eyes(ph === 6 ? 3 : ph & 1), 0, 0);
       }

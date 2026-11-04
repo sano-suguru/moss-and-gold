@@ -439,6 +439,11 @@ export function feeding(this: Ecology, c: Cr): boolean {
     c.feed = 0;
     return false;
   }
+  // ヴァンパイアは、眷属として起き上がらせる亡骸からは、血を短く吸うだけで離れる（src/eco/thrall.ts）
+  if (c.k === Kind.Vampire && d.lure === c.id && this.step - d.lureAt > 15) {
+    c.feed = 0;
+    return false;
+  }
   c.dir = Math.abs(d.x - c.x) > Math.abs(d.y - c.y) ? (d.x > c.x ? 2 : 3) : d.y > c.y ? 0 : 1;
   if (this.step % 4 === c.id % 4) {
     const t = Math.min(5, d.units, s.cap - c.food);

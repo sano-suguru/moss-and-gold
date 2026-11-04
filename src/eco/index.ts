@@ -6,6 +6,7 @@
 export * from '../ecology';
 import './move';
 import './step';
+import './thrall';
 import './undead';
 import './wisp';
 import './bat';

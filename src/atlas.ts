@@ -52,6 +52,7 @@ export interface Atlas {
   supply: (tier: number) => number;
   furrow: (grown: number) => number;
   eyes: (f: number) => number;
+  redEyes: (f: number) => number;
   /** 宝の山（大きさ 0..2、きらめきのコマ） */
   treasure: (size: number, f: number) => number;
   wormSeg: (kind: number) => number;
@@ -299,6 +300,10 @@ const BANNER = pattern(
 // 暗がりで光る目（二つの点。3 コマ目はまばたき）
 const EYES = [0, 1, 2, 3].map((f) =>
   pattern(f === 3 ? ['.....', '.k.k.', '.....'] : ['.....', '.E.E.', '.....'], { E: f === 1 ? [255, 236, 150, 1] : [255, 214, 110, 1], k: [70, 60, 40] }, 2, 1),
+);
+// ヴァンパイアの眷属の赤く光る目（3 コマ目はまばたき）
+const RED_EYES = [0, 1, 2, 3].map((f) =>
+  pattern(f === 3 ? ['.....', '.k.k.', '.....'] : ['.....', '.E.E.', '.....'], { E: f === 1 ? [255, 90, 80, 1] : [235, 50, 44, 1], k: [70, 20, 20] }, 2, 1),
 );
 
 export function buildAtlas(): Atlas {
@@ -738,6 +743,10 @@ export function buildAtlas(): Atlas {
     raws.push(e);
     return raws.length - 1;
   });
+  const redEyeFrames = RED_EYES.map((e) => {
+    raws.push(e);
+    return raws.length - 1;
+  });
 
   const prayFrames: number[] = [];
   for (let f = 0; f < 4; f++) {
@@ -861,6 +870,7 @@ export function buildAtlas(): Atlas {
     supply: (tier) => cacheFrames[Math.max(0, Math.min(2, tier))],
     furrow: (g) => furrowFrames[g ? 1 : 0],
     eyes: (f) => eyeFrames[f & 3],
+    redEyes: (f) => redEyeFrames[f & 3],
     treasure: (size, f) => treasureFrames[size * 4 + (f & 3)],
     wormSeg: (kind) => segFrames[kind],
     wormBody: (r, v) => bodyFrames[(Math.max(3, Math.min(12, Math.round(r))) - 3) * 2 + (v & 1)],
