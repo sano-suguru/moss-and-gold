@@ -18,6 +18,11 @@ import { TILE } from '../mapgen';
 const RAID_STORE = 0.7;
 /** 盗みに出る遠さ（集落から焚き火まで、マス）。焚き火の残りの時間で着ける所だけ（1マスあたり生き物の更新約25回で見積もる） */
 const RAID_R = 80;
+/**
+ * 一つの集落が焚き火へ盗みに出る間隔（tick）。ゲーム内の1/8日（夜のうちに2〜3回出られる）。
+ * 以前の1/3日では一晩に1回までで、集落のあるシードでも盗みは数えるほどしか起きなかった
+ */
+const RAID_EVERY = DAY_TICKS_ECO / 8;
 /** 通路での掠め取りに出る集落の、蓄えの乏しさ（蓄えの目安に対する割合。目安近くまで蓄えがあれば出ない） */
 const SNATCH_STORE = 0.9;
 /** 通路での掠め取りに出る遠さ（集落から最後尾の冒険者まで、マス） */
@@ -31,7 +36,7 @@ export function isNight(this: Ecology): boolean {
   return this.phaseNow > 0.79 || this.phaseNow < 0.18;
 }
 
-/** 盗みに出る（updateCamps から、通常速度で5秒ごと）：夜、蓄えの乏しい集落のそば（40マス）で一行が焚き火を囲んでいれば、1〜3匹が忍び出る */
+/** 盗みに出る（生き物の更新50回ごと＝通常速度で10秒ごと）：夜、蓄えの乏しい集落から10〜80マスの所で一行が焚き火を囲んでいれば、1〜3匹が忍び出る（出た者が戻るまで、次は出ない） */
 export function planRaids(this: Ecology): void {
   if (!this.isNight()) return;
   const m = this.w.map;
@@ -74,7 +79,7 @@ export function planRaids(this: Ecology): void {
       c.gait = 0;
       c.ref2 = 0;
     }
-    cp.raidT = this.w.tick + DAY_TICKS_ECO / 3;
+    cp.raidT = this.w.tick + RAID_EVERY;
     this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'raid', n, to: best.p.id, x: Math.round(best.fx), y: Math.round(best.fy) } as never);
     if (this.step - (this.lastLogged[986] ?? -99999) > 1500) {
       this.lastLogged[986] = this.step;
