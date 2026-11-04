@@ -24,6 +24,8 @@
  * マナが少なくなると、土のマナが濃いほうへ向かう。
  * 襲う相手：武具を持つ侵入者（冒険者、ドワーフ、武器を拾ったゴブリン・オーク）。アンデッド、獣や虫、他の番人は襲わない（番人の側も甲冑を襲わない）。
  * 賢さは本能だけで、逃げない。強さは6に、手に取り込んだ武器と盾1つごとに +3（ARMOR_HAND_MAX 個まで。src/eco/combat.ts の str）。
+ * 体力は強さの ARMOR_HP_MUL 倍（空の鎧は固い）。打たれていないあいだは、体のマナを使って少しずつ傷を直す（マナが ARMOR_LOW の半分を下回ると直せない）。
+ * 倒した相手の落とし物は、取り込みの間隔（ARMOR_ABSORB_GAP）を待たずに、強さの上限を超えても ARMOR_ROB_MAX 個まで取り込む（強さは上がらない）。
  * アンデッドとして扱う（冒険者の一行の目標「アンデッド祓い」の相手になる。src/eco/aim.ts）。
  *
  * 状態（Cr の項目の使い方）：st 10 組み上がり中、0 巡回先へ歩く、1 立ち番。tx, ty 巡回先。sinceMeal 立ち番や歩きの経過（生き物の更新の回数）。
@@ -49,7 +51,13 @@ export const ARMOR_MANA_MAX = 120;
 export const ARMOR_LOW = 30;
 /** 手に取り込める武器と盾の数と、取り込んでから次を取り込めるまでの生き物の更新の回数（通常速度で約1分。少しずつ強くなるのが見えるように） */
 export const ARMOR_HAND_MAX = 5;
+/** 倒した相手から奪う物は、強さの上限（ARMOR_HAND_MAX）を超えても、この数まで取り込む（強さは上がらず、巡る武具が増えるだけ） */
+export const ARMOR_ROB_MAX = 8;
 export const ARMOR_ABSORB_GAP = 300;
+/** 体力：強さの何倍か（ほかの種は5倍。空の鎧は固い。src/eco/combat.ts の maxHp） */
+export const ARMOR_HP_MUL = 12;
+/** 傷を直す：打たれてから何 tick 経てば直しはじめるか。直すときは生き物の更新6回ごとに体力の30分の1を直し、体のマナを1使う（足もとの土へ還る） */
+export const ARMOR_MEND_AFTER = 100;
 /** 立ち番の長さ（生き物の更新の回数） */
 const ARMOR_GUARD = 300;
 
@@ -268,6 +276,14 @@ export function armor(this: Ecology, c: Cr): void {
     this.die(c, 'faded');
     return;
   }
+  // 傷を直す：打たれていないあいだ、体のマナを使って少しずつ（使ったマナは足もとの土へ）
+  const mx = this.maxHp(c);
+  if (c.hp > 0 && c.hp < mx && this.w.tick - c.hitAt > ARMOR_MEND_AFTER && c.mana > ARMOR_LOW / 2 && this.step % 6 === c.id % 6) {
+    c.hp = Math.min(mx, c.hp + mx / 30);
+    c.mana--;
+    if (k >= 0) this.w.mana[k]++;
+    else this.w.manaFaded++;
+  }
   // 組み上がり：その場で、武具が寄り集まって立ち上がる
   if (c.st === 10) {
     c.act = 0;
@@ -305,12 +321,18 @@ export function armor(this: Ecology, c: Cr): void {
     }
     return;
   }
-  // 床の武器と盾を取り込む（8マスの内の、見通しの利く物。前に取り込んでから ARMOR_ABSORB_GAP 回の更新が経っていれば）
-  if (this.armorHand(c).length < ARMOR_HAND_MAX && this.step - c.lureAt >= ARMOR_ABSORB_GAP) {
+  // 床の武器と盾を取り込む（8マスの内の、見通しの利く物。前に取り込んでから ARMOR_ABSORB_GAP 回の更新が経っていれば。
+  // 倒した相手の落とし物＝亡骸のそば3マスの内の物は、倒してから生き物の更新900回の内なら、間隔を待たずに）
+  const victim = c.ref && this.step - c.ref2 < 900 ? this.byId.get(c.ref) : undefined;
+  const gapOk = this.step - c.lureAt >= ARMOR_ABSORB_GAP;
+  const nHand = this.armorHand(c).length;
+  if ((nHand < ARMOR_HAND_MAX && (gapOk || victim)) || (victim && nHand < ARMOR_ROB_MAX)) {
     let best: Item | null = null;
     let bd2 = sq(8 * TILE);
     for (const it of this.gear) {
       if (!isHandItem(it.kind)) continue;
+      const robbed = !!victim && sq(victim.x - it.x) + sq(victim.y - it.y) < sq(3 * TILE);
+      if (!robbed && (!gapOk || nHand >= ARMOR_HAND_MAX)) continue;
       const d = sq(it.x - c.x) + sq(it.y - c.y);
       if (d >= bd2) continue;
       const ik = this.tileOf(it.x, it.y);

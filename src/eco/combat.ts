@@ -4,6 +4,7 @@ import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, 
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
+import { ARMOR_HAND_MAX, ARMOR_HP_MUL } from './armor';
 
 /** 攻める側の勝つ確率は、近くの仲間を含めた強さの比で決まる。負けた側は死ぬことがある */
 /** 強さ：冒険者は職業と一行の格で決まる */
@@ -13,7 +14,7 @@ export function str(this: Ecology, c: Cr): number {
   if (c.k === Kind.Skeleton) return c.init ? JOB_STR[c.sp] * 1.2 : 3;
   if (c.k === Kind.Dwarf) return DWARF_STR[c.sp];
   // リビングアーマーは、手に取り込んだ武器と盾1つごとに強くなる（src/eco/armor.ts）
-  if (c.k === Kind.Armor) return STR[c.k] + 3 * this.armorHand(c).length;
+  if (c.k === Kind.Armor) return STR[c.k] + 3 * Math.min(ARMOR_HAND_MAX, this.armorHand(c).length);
   if ((c.k === Kind.Goblin || c.k === Kind.Orc) && c.party) return STR[c.k] * 1.6;
   // 特別な個体
   if (c.elite === 1) return 12;
@@ -162,6 +163,8 @@ export function hunt(this: Ecology, c: Cr, R: number, kinds: Kind[], speed: numb
 
 /** 体力の上限（強さに比例） */
 export function maxHp(this: Ecology, c: Cr): number {
+  // リビングアーマー（空の鎧）は固い（src/eco/armor.ts の ARMOR_HP_MUL）
+  if (c.k === Kind.Armor) return Math.round(4 + this.str(c) * ARMOR_HP_MUL);
   return Math.round(4 + this.str(c) * 5);
 }
 
@@ -224,6 +227,11 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
     d.actT = 0;
     if (this.strike(d, a, 0.8)) {
       this.die(a, 'fight', d.k);
+      // リビングアーマーは、打ち返しで倒した相手も覚える（その落とし物を「奪って」取り込む。src/eco/armor.ts）
+      if (d.k === Kind.Armor) {
+        d.ref = a.id;
+        d.ref2 = this.step;
+      }
       return false;
     }
   }
