@@ -177,10 +177,8 @@ export function onDayEvents(this: Ecology, prevPhase: number, phase: number): vo
 export function homeBat(this: Ecology, b: Cr, sx: number, sy: number): void {
   // ねぐらの天井に、仲間と少しずつ間をあけてぶら下がる（ねぐらの何匹目かで場所を決める）
   const i = this.list.filter((o) => o !== b && o.k === Kind.Bat && !o.dead && o.tx === sx * TILE + 8 && o.ty === sy * TILE + 8).length;
-  // ねぐらは縦穴のそばの暗がり（src/eco/bat.ts の batRoost）
-  const [rx, ry] = this.batRoost(sx * TILE + 8, sy * TILE + 8);
-  b.hx = rx + ((i % 6) - 2.5) * 7 + ((b.id % 3) - 1);
-  b.hy = ry - Math.floor(i / 6) * 8;
+  b.hx = sx * TILE + 8 + ((i % 6) - 2.5) * 7 + ((b.id % 3) - 1);
+  b.hy = sy * TILE - 18 - Math.floor(i / 6) * 8;
   b.tx = sx * TILE + 8;
   b.ty = sy * TILE + 8;
   b.st = 4;

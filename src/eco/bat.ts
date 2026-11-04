@@ -40,9 +40,8 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
       if (g && this.step % 20 === c.id % 20) {
         const mates = g.members.filter((o) => o.k === Kind.Bat && !o.ref2).sort((a, b) => a.id - b.id);
         const i = Math.max(0, mates.indexOf(c));
-        const [rx, ry] = this.batRoost(c.tx, c.ty);
-        c.hx = rx + ((i % 6) - 2.5) * 7 + ((c.id % 3) - 1);
-        c.hy = ry - Math.floor(i / 6) * 8;
+        c.hx = c.tx + ((i % 6) - 2.5) * 7 + ((c.id % 3) - 1);
+        c.hy = c.ty - 26 - Math.floor(i / 6) * 8;
       }
     }
     if (c.st !== 0) {
@@ -121,54 +120,10 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
   }
 }
 
-/** ねぐらの場所のキャッシュ（地形だけから決まるので、地形変更ログの長さが変わったら作り直す。セーブしない） */
-const roostCache = new WeakMap<Ecology, { digs: number; at: Map<number, [number, number]> }>();
-
-/**
- * 縦穴（光の筋）を出入りするコウモリが、昼にぶら下がる場所（ぶら下がる列の一段目の位置、px）。
- * 縦穴の真下は日が差して明るいので、縦穴からつながった範囲（12マス以内。閉じた空洞の中も含む）で、壁を背にした、昼でも暗い床のマスを選ぶ。
- * 近いものほど選ばれやすい。見つからなければ縦穴の真上（以前の場所）。(tx, ty) は縦穴のマスの中心
- */
-export function batRoost(this: Ecology, tx: number, ty: number): [number, number] {
-  const m = this.w.map;
-  let rc = roostCache.get(this);
-  if (!rc || rc.digs !== this.w.digs.length) {
-    rc = { digs: this.w.digs.length, at: new Map() };
-    roostCache.set(this, rc);
-  }
-  const sx = Math.floor(tx / TILE);
-  const sy = Math.floor(ty / TILE);
-  const s0 = sy * m.w + sx;
-  const hit = rc.at.get(s0);
-  if (hit) return hit;
-  let out: [number, number] = [tx, ty - 26];
-  if (s0 >= 0 && s0 < m.solid.length && !m.solid[s0]) {
-    const dist = new Map<number, number>([[s0, 0]]);
-    const q = [s0];
-    for (let h = 0; h < q.length; h++) {
-      const k = q[h];
-      const d = dist.get(k) as number;
-      if (d >= 3 && m.solid[k - m.w] && this.w.lightBase[k] <= 20 && this.w.lightBase[k - m.w] <= 40 && this.w.mossGlow[k] < 0.03 && this.w.lavaGlow[k] < 0.02 && this.w.water[k] <= 10) {
-        out = [(k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE - 4];
-        break;
-      }
-      if (d >= 12) continue;
-      for (const n of [k + 1, k - 1, k + m.w, k - m.w]) {
-        if (n < 0 || n >= m.solid.length || m.solid[n] || m.lava[n] || dist.has(n)) continue;
-        dist.set(n, d + 1);
-        q.push(n);
-      }
-    }
-  }
-  rc.at.set(s0, out);
-  return out;
-}
-
 declare module '../ecology' {
   interface Ecology {
     bat: typeof bat;
-    batRoost: typeof batRoost;
   }
 }
 
-Object.assign(Ecology.prototype, { bat, batRoost });
+Object.assign(Ecology.prototype, { bat });
