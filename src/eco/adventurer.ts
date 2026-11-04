@@ -854,6 +854,12 @@ export function dropBelongings(this: Ecology, c: Cr): void {
     this.scatterArmor(c);
     return;
   }
+  // ドワーフの戦士と鍛冶屋は、手の武器（床の道具では鎚矛として扱う）を落とす。坑夫のつるはしは武器ではないので落とさない。
+  // 未練は宿らない（宿るのは冒険者の道具だけ。src/eco/armor.ts）
+  if (c.k === Kind.Dwarf) {
+    if (c.sp === 1 || c.sp === 2) this.dropItem(c.x + 3, c.y + 2, ItemKind.Mace, 0, this.ownerNote(c, 'fell'));
+    return;
+  }
   if (c.k === Kind.Skeleton && c.init) {
     this.dropJobItems(c);
     c.init = 0;
