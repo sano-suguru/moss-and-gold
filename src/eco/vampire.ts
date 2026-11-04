@@ -51,8 +51,8 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       const p = prey as Cr;
       c.act = 1;
       if (sq(p.x - c.x) + sq(p.y - c.y) < 11 * 11) {
-        // 焚き火で休む冒険者は、一口で食べずに打ち合う（src/eco/night.ts）
-        const won = STR[p.k] * 2 < STR[c.k] && !this.inCamp(p) ? (this.eat(c, p), true) : this.fight(c, p);
+        // 一口では食べず、打ち合って仕留める（src/eco/combat.ts の hunt と同じ）
+        const won = this.fight(c, p);
         // 獲物の分け前を、従うコウモリに与える
         if (won) {
           this.nearby(c.x, c.y, 6, (b) => {

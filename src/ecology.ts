@@ -884,6 +884,11 @@ export class Ecology {
   fxMarks: { t: number; id: number; m: string }[] = [];
   /** マナから生まれた者（描画専用：生まれる場所にマナが集まって姿が現れる演出。セーブしない。シミュレーションの判断に使わない） */
   fxManaBorn: { id: number; t: number; k: number; x: number; y: number }[] = [];
+  /**
+   * 捕食の演出の記録（描画専用）：生きている獲物が食べられた瞬間ごとに、獲物（id、種 k、位置）と食べた者（by、種 bk）、
+   * 打ち合いで仕留めてから食べたか（slain）。シミュレーションの判断には使わない（セーブには、映像のために直前の6秒分だけ残す）。src/creatureView.ts が、くわえて振る・繭・丸のみ・さらう・消え方を描く
+   */
+  fxEats: { t: number; id: number; k: number; sp: number; by: number; bk: number; x: number; y: number; slain: boolean }[] = [];
   /** 大ネズミの巣穴の引っ越し（描画専用：列の先頭が新しい巣穴に着くまで、古い場所に穴を描く。判断に使わない） */
   fxMarch: { t: number; x: number; y: number; tx: number; ty: number }[] = [];
   noticed = new Map<number, number>();

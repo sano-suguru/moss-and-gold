@@ -430,12 +430,12 @@ export function pester(this: Ecology, c: Cr): boolean {
   return false;
 }
 
-/** 倒した獲物の死骸を、数秒かけて食べる（生き物の更新4回に1回、一口）。襲われたら食べるのをやめる。true なら今は食べている */
+/** 倒した獲物の死骸を、数秒かけて食べる（生き物の更新4回に1回、一口）。ほかの者に襲われたら食べるのをやめる（仕留める間の獲物の打ち返しは数えない）。true なら今は食べている */
 export function feeding(this: Ecology, c: Cr): boolean {
   if (!c.feed) return false;
   const d = this.byId.get(c.feed);
   const s = SPEC[c.k];
-  if (!d || d.dead !== 1 || d.units <= 0 || c.food >= s.cap || this.w.tick - c.hitAt < 30 || sq(d.x - c.x) + sq(d.y - c.y) > 18 * 18) {
+  if (!d || d.dead !== 1 || d.units <= 0 || c.food >= s.cap || (this.w.tick - c.hitAt < 30 && c.foe !== d.id) || sq(d.x - c.x) + sq(d.y - c.y) > 18 * 18) {
     c.feed = 0;
     return false;
   }

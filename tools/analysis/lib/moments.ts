@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-const K = { Wisp: 0, Bat: 1, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Dragon: 24, Adventurer: 25 };
+const K = { Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Dragon: 24, Adventurer: 25 };
 
 export interface Moment {
   key: string;
@@ -16,6 +16,10 @@ export interface Moment {
 
 /** 数える場面（表に並べる順） */
 export const MOMENTS: Moment[] = [
+  { key: 'slainEat', label: '狩り：打ち合って仕留めて食べた' },
+  { key: 'webEat', label: '狩り：クモが巣にかかった獲物を食べた' },
+  { key: 'swallow', label: '狩り：ワームかミミックが丸のみにした' },
+  { key: 'airSnatch', label: '狩り：ワイバーンかガーゴイルが飛ぶコウモリをさらった' },
   { key: 'snatch', label: '通路での掠め取り：盗んだ' },
   { key: 'stalk', label: '通路での掠め取り：つけた' },
   { key: 'anyRob', label: 'ゴブリンの盗み（夜と通路の合計）' },
@@ -135,7 +139,12 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
   const ev = (k: number, e: string) => s.filter((x) => x.k === k && x.ev === e);
   const rob = ev(K.Goblin, 'rob');
   const uniq = (a: { id: number; to?: number }[]) => new Set(a.map((x) => `${x.id},${x.to ?? ''}`)).size;
+  const gulp = (by: number[]) => d.filter((y) => y.cause === 'eaten' && !y.slain && by.includes(y.by)).length;
   return {
+    slainEat: d.filter((y) => y.cause === 'eaten' && y.slain === 1).length,
+    webEat: gulp([K.Spider]),
+    swallow: gulp([K.Worm, K.Mimic]),
+    airSnatch: gulp([K.Wyvern, K.Gargoyle]),
     snatch: rob.filter((x) => x.how === 'snatch').length,
     stalk: ev(K.Goblin, 'stalk').length,
     anyRob: rob.filter((x) => x.how === 'snatch' || x.how === 'raid').length,

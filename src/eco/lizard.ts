@@ -14,8 +14,8 @@ export function lizard(this: Ecology, c: Cr, day: number): void {
     } else {
       c.act = 1;
       if (this.moveToward(c, prey.x, prey.y, 2.4)) {
-        this.eat(c, prey);
-        c.st = 1;
+        // 飛びかかって打ち合い、仕留めたら待ち伏せに戻る
+        if (this.fight(c, prey)) c.st = 1;
       } else if (sq(prey.x - c.x) + sq(prey.y - c.y) > 70 * 70) c.st = 1;
       return;
     }

@@ -1,5 +1,5 @@
 import type { Atlas } from './atlas';
-import { Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
+import { BLOOD, Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
 import { RANK_AT, unpackLook } from './eco/roster';
 import { MAX_DYN } from './shaders';
@@ -24,6 +24,233 @@ export class CreatureView {
   /** 飛び散る粒（描画専用）：位置、高さ、速さ、種類、色、生まれた tick、寿命 */
   private bits: { x: number; y: number; z: number; vx: number; vy: number; vz: number; kind: number; col: number; t0: number; life: number }[] = [];
   private bitsTick = -1;
+  /** 捕食の演出（drawEats が毎フレーム決める）：描かない獲物、くわえて振られている獲物の位置、跳ねるミミックの高さ */
+  private eatHide = new Set<number>();
+  private eatCarry = new Map<number, { x: number; y: number; lift: number }>();
+  private eatHop = new Map<number, number>();
+  /** 足につかんで運ばれている獲物（さらった者の id → 獲物の絵のコマと、さらってからの tick） */
+  private eatClutch = new Map<number, { frame: number; age: number }>();
+  /** 糸の繭を抱えて食べているクモ（クモの id → 繭の大きさ 0〜2 と、巻き始めてからの tick） */
+  private eatCocoon = new Map<number, { v: number; age: number }>();
+  /** 飲み込んだ獲物の膨らみ（ワームの id → 頭からの道のり px） */
+  private wormBulge = new Map<number, number>();
+  /** ワームの頭が岩の中にいたか（岩から床へ出た瞬間に土ぼこりを上げるため） */
+  private wormInRock = new Map<number, boolean>();
+
+  /**
+   * 起きているワーム（描画専用）：頭の跡（eco.trails、14px ごとの点）をなぞって4px ごとに胴の節を重ね、頭の側を太く尾へ細くする。
+   * 節は膨らみとくびれを交互に置いて環形の胴に見せ、飲み込んだ獲物の膨らみ（wormBulge）はその所を太くする。
+   * 岩のマスにある部分は体を描かず、押し上げられて割れた岩（マスに一つ）にする。頭が岩の中なら大きく割れて土ぼこりが立ち、岩から床へ出た瞬間に土ぼこりと小石が散る
+   */
+  private drawWorm(eco: Ecology, A: Atlas, c: Cr, x: number, yy: number, t: number, push: (x: number, y: number, lift: number, flip: boolean, frame: number, glow: number, kind: number) => void): void {
+    const m = eco.w.map;
+    const tileAt = (px: number, py: number) => {
+      const tx = Math.floor(px / 16);
+      const ty = Math.floor(py / 16);
+      return tx < 0 || ty < 0 || tx >= m.w || ty >= m.h ? -1 : ty * m.w + tx;
+    };
+    const rock = (k: number) => k < 0 || !!m.solid[k];
+    const tr = eco.trails.get(c.id) ?? [];
+    const pts: number[] = [x, yy];
+    for (let i = 0; i + 1 < tr.length; i += 2) pts.push(tr[i], tr[i + 1]);
+    const STEP = 4;
+    const LMAX = 132;
+    const samples: number[] = [];
+    let base = 0;
+    let next = 6;
+    for (let i = 0; i + 3 < pts.length && next <= LMAX; i += 2) {
+      const ax = pts[i];
+      const ay = pts[i + 1];
+      const L = Math.hypot(pts[i + 2] - ax, pts[i + 3] - ay);
+      if (L < 0.01) continue;
+      while (next <= base + L && next <= LMAX) {
+        const u = (next - base) / L;
+        samples.push(ax + (pts[i + 2] - ax) * u, ay + (pts[i + 3] - ay) * u, next);
+        next += STEP;
+      }
+      base += L;
+    }
+    const flash = eco.w.tick - c.hitAt < 2 ? 20 : 0;
+    const bulge = this.wormBulge.get(c.id);
+    const mounds = new Set<number>();
+    // 尾から頭へ（頭に近い節を手前に）
+    for (let j = samples.length / 3 - 1; j >= 0; j--) {
+      const sx = samples[j * 3];
+      const sy = samples[j * 3 + 1];
+      const s = samples[j * 3 + 2];
+      const k = tileAt(sx, sy);
+      if (rock(k)) {
+        if (k >= 0 && !mounds.has(k)) {
+          mounds.add(k);
+          push(sx, sy + 3, 0, false, A.wormMound(k, false, m.hard[k]), 0, 5);
+        }
+        continue;
+      }
+      let r = 10 - (s / LMAX) * 6.5;
+      if (j === samples.length / 3 - 1) r -= 1.5;
+      if (bulge !== undefined && Math.abs(s - bulge) < 10) r += 3.5 * (1 - Math.abs(s - bulge) / 10);
+      push(sx, sy + r * 0.8, 0, false, A.wormBody(r, Math.round(s / STEP) & 1), 0, flash);
+    }
+    // 頭：進む向き（頭と、少し後ろの跡の点から）。開いた口は、食べる時と、掘り進む間の噛みしめ
+    let hx = 0;
+    let hy = 0;
+    for (let i = 2; i + 1 < pts.length; i += 2) {
+      if (Math.hypot(pts[i] - x, pts[i + 1] - yy) > 3) {
+        hx = x - pts[i];
+        hy = yy - pts[i + 1];
+        break;
+      }
+    }
+    const d8 = hx || hy ? (Math.round(Math.atan2(hy, hx) / (Math.PI / 4)) + 8) % 8 : [2, 6, 0, 4][c.dir] ?? 2;
+    const open = c.act === 2 ? [1, 2, 3, 2][Math.min(3, c.actT)] : c.act === 1 ? (Math.floor(t * 3 + c.id) & 1) : 0;
+    const hk = tileAt(x, yy);
+    const inRock = rock(hk);
+    if (inRock) {
+      push(x, yy + 4, 0, false, A.wormMound(hk + Math.floor(t * 2), true, hk >= 0 ? m.hard[hk] : 1), 0, 5 + flash);
+      for (let i = 0; i < 3; i++) {
+        const ph = (t * 0.9 + i / 3) % 1;
+        push(x + Math.cos(i * 2.1 + t) * 9, yy + 2, 2 + ph * 10, false, A.dust(Math.min(3, Math.floor(ph * 4))), 0, 2);
+      }
+    } else push(x, yy + 10, 0, false, A.wormMouth(d8, open), 0, flash);
+    // 岩から床へ出た瞬間：土ぼこりと小石
+    const was = this.wormInRock.get(c.id);
+    this.wormInRock.set(c.id, inRock);
+    if (was && !inRock) {
+      const now = eco.w.tick;
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * 6.283;
+        this.bits.push({ x, y: yy + 4, z: 4, vx: Math.cos(a) * 1.1, vy: Math.sin(a) * 0.55, vz: i & 1 ? 0.5 : 2, kind: i & 1 ? 1 : 0, col: 0, t0: now, life: i & 1 ? 16 : 18 });
+      }
+    }
+  }
+
+  /** 死骸をかじった一口（食べる者の id → その一口の tick と、死骸への向き） */
+  private bites = new Map<number, { t: number; step: number; ux: number; uy: number }>();
+
+  /**
+   * 捕食の演出（eco.fxEats と、死骸を食べている者から。すべて描画専用）。
+   * 打ち合いで仕留めた獲物は、口にくわえて振り回してから地面に落とす。食べている間は、一口ごとに死骸へ頭を突っ込み、肉片や血のしずくが飛ぶ。
+   * 一口で食べる場面：クモは獲物を糸の繭に巻いて食べ（食べるにつれて繭が細る）、ワームは獲物を口へ吸い込んで胴の膨らみが尾へ送られ、
+   * ミミックは獲物を箱へ引き込んで閉じ、何度か跳ねる。ワイバーンとガーゴイルは、さらったコウモリを足につかんだまましばらく飛ぶ。
+   * 肉でない獲物（ウィスプ・スライム・ゴースト・マイコニド）は、光の粒・しずく・白い靄・胞子になって散る
+   */
+  private drawEats(eco: Ecology, A: Atlas, inView: (x: number, y: number, m: number) => boolean, push: (x: number, y: number, lift: number, flip: boolean, frame: number, glow: number, kind: number) => void, dyn: { x: number; y: number; r: number; i: number; c?: number }[], alpha: number): void {
+    const now = eco.w.tick;
+    this.eatHide.clear();
+    this.eatCarry.clear();
+    this.eatHop.clear();
+    this.eatClutch.clear();
+    this.eatCocoon.clear();
+    this.wormBulge.clear();
+    const pos = (c: Cr): [number, number] => {
+      const a = eco.moveAlpha(c, alpha);
+      return [c.px + (c.x - c.px) * a, c.py + (c.y - c.py) * a];
+    };
+    const fxCol = (k: number) => [5, 5, 3, 6][BLOOD[k]] ?? -1;
+    const lerp = (a: number, b: number, p: number) => a + (b - a) * p;
+    for (const e of eco.fxEats) {
+      const age = now - e.t + alpha;
+      if (age < 0 || age > 60 * 10) continue;
+      const pred = eco.byId.get(e.by);
+      const prey = eco.byId.get(e.id);
+      const live = prey && prey.dead !== 2 ? prey : null;
+      const px = live ? live.x : e.x;
+      const py = live ? live.y : e.y;
+      if (!inView(px, py, 60)) continue;
+      if (e.bk === Kind.Spider) {
+        // 糸の繭：巻いている間（最初の5秒）と、クモが食べている間
+        const feeding = pred && !pred.dead && pred.feed === e.id && live && live.dead === 1;
+        if (age > 50 && !feeding) continue;
+        if (live) this.eatHide.add(e.id);
+        const v = feeding && live!.init > 0 ? (live!.units > live!.init * 0.6 ? 0 : live!.units > live!.init * 0.25 ? 1 : 2) : age < 20 ? 0 : age < 36 ? 1 : 2;
+        // 繭は、獲物に取りついたクモの体に隠れないよう、クモの絵の手前に重ねる（生き物を描く所で）
+        if (pred && !pred.dead) this.eatCocoon.set(pred.id, { v, age });
+        else push(px, py + 0.05, 4, false, A.fx(`cocoon:${v}`), 0, 2);
+        continue;
+      }
+      if (e.bk === Kind.Worm && pred && !pred.dead) {
+        const [wx, wy] = pos(pred);
+        // 吸い込む：獲物が0.8秒かけて口へ引き寄せられる
+        if (age < 8) {
+          const p = age / 8;
+          push(lerp(e.x, wx, p * p), lerp(e.y, wy, p * p) + 0.1, lerp(2, 10, p), lerp(e.x, wx, 1) < e.x, this.frameOf(e.k, e.sp, 0, 3, Math.min(3, Math.floor(age / 2)), 0, 0), 0, 3);
+        }
+        // 胴の膨らみ：頭から尾へ送られていく（drawWorm が、頭からこの道のりの所の節を太く描く）
+        if (age >= 6 && age < 50) this.wormBulge.set(pred.id, (age - 6) * 3);
+        continue;
+      }
+      if (e.bk === Kind.Mimic && pred && !pred.dead) {
+        const [mx, my] = pos(pred);
+        // 箱へ引き込み、閉じて三度跳ねる
+        if (age < 5) push(lerp(e.x, mx, age / 5), lerp(e.y, my, age / 5) + 0.1, lerp(3, 6, age / 5), mx < e.x, this.frameOf(e.k, e.sp, 0, 3, 1, 0, 0), 0, 3);
+        if (age < 30) this.eatHop.set(pred.id, Math.abs(Math.sin((age / 10) * Math.PI)) * 4 * (1 - age / 36));
+        continue;
+      }
+      if ((e.bk === Kind.Wyvern || e.bk === Kind.Gargoyle) && pred && !pred.dead && age < 24) {
+        // さらう：コウモリを足につかんで飛ぶ（2秒ほど。そのあいだ地面の死骸は描かない）
+        // （さらった者の姿の上に重ねて描く。生き物を描く所で）
+        if (live) this.eatHide.add(e.id);
+        this.eatClutch.set(pred.id, { frame: this.frameOf(e.k, e.sp, 0, 3, 1, 0, 0), age });
+        continue;
+      }
+      if (e.k === Kind.Wisp || e.k === Kind.Slime || e.k === Kind.Ghost || e.k === Kind.Myconid) {
+        // 肉でない獲物は、食べられた所で散る
+        if (age >= 16) continue;
+        const p = age / 16;
+        const f = Math.min(3, Math.floor(p * 4));
+        for (let i = 0; i < 8; i++) {
+          const a = i * 0.785 + (e.id % 7);
+          const r = 2 + p * (e.k === Kind.Slime ? 9 : 7);
+          const x = e.x + Math.cos(a) * r;
+          const y = e.y + Math.sin(a) * r * 0.5;
+          if (e.k === Kind.Wisp) push(x, y, 7 + p * 12 + (i % 3), false, A.speck(2, f), 0, 2);
+          else if (e.k === Kind.Ghost) push(x, y, 8 + p * 16 + (i % 3), false, A.speck(0, f), 0, 2);
+          else if (e.k === Kind.Myconid) push(x, y, 4 + p * 14 + (i % 4), false, A.speck(2, f), 0, 2);
+          else push(x, y, Math.max(0, 5 + (i % 3) - p * p * 12), false, A.fx('bit:2:3:0'), 0, 4);
+        }
+        if (e.k === Kind.Wisp) dyn.push({ x: e.x, y: e.y - 8, r: 26, i: 0.5 * (1 - p) });
+        continue;
+      }
+      // 打ち合いで仕留めた獲物：口にくわえて振り回し（1.2秒）、地面に落とす（0.4秒）
+      if (e.slain && live && live.dead === 1 && pred && !pred.dead && pred.feed === e.id && age < 16) {
+        const [ax, ay] = pos(pred);
+        const bs = Ecology.bodySize(pred.k) || 6;
+        const fwd = pred.dir === 2 ? 1 : pred.dir === 3 ? -1 : 0;
+        const mx = ax + fwd * bs * 0.6;
+        const my = ay + (pred.dir === 0 ? 2 : pred.dir === 1 ? -2 : 0) + 0.2;
+        const ml = bs * 0.55 + 2;
+        if (age < 12) {
+          const sh = Math.sin(age * 2.2) * 2.5;
+          this.eatCarry.set(e.id, { x: mx + sh, y: my, lift: ml + Math.abs(Math.cos(age * 2.2)) * 1.5 });
+        } else {
+          const p = (age - 12) / 4;
+          this.eatCarry.set(e.id, { x: lerp(mx, live.x, p), y: lerp(my, live.y, p), lift: ml * (1 - p * p) });
+        }
+      }
+    }
+    // 食べている者の一口：死骸へ頭を突っ込み、肉片と血のしずくが飛ぶ（生き物の更新ごとに一度だけまく）
+    for (const c of eco.list) {
+      if (!c.feed || c.dead || c.act !== 2 || c.actT !== 0) continue;
+      const d = eco.byId.get(c.feed);
+      if (!d || d.dead !== 1 || !inView(d.x, d.y, 20)) continue;
+      const b = this.bites.get(c.id);
+      if (b && b.step === eco.step) continue;
+      const L = Math.hypot(d.x - c.x, d.y - c.y) || 1;
+      this.bites.set(c.id, { t: now, step: eco.step, ux: (d.x - c.x) / L, uy: (d.y - c.y) / L });
+      const col = fxCol(d.k);
+      if (col < 0) continue;
+      for (let i = 0; i < 3; i++) {
+        const a = ((eco.step * 7 + i * 13 + c.id) % 12) * 0.52;
+        this.bits.push({ x: d.x, y: d.y, z: 3, vx: Math.cos(a) * 0.8, vy: Math.sin(a) * 0.4, vz: 1.3 + (i % 2) * 0.4, kind: 2, col, t0: now, life: 14 });
+      }
+      if (b && now - b.t < 40) continue;
+      this.bits.push({ x: d.x, y: d.y, z: 3, vx: 0, vy: 0, vz: 1.8, kind: 0, col: 0, t0: now, life: 12 });
+    }
+    for (const [id, b] of this.bites) {
+      if (now - b.t > 60) this.bites.delete(id);
+      else if (now - b.t <= 6 && !this.lunge.has(id)) this.lunge.set(id, { t: b.t, ux: b.ux, uy: b.uy });
+    }
+  }
 
   /**
    * 攻撃の技の演出：記録（eco.fxAttacks）ごとに、技の種類に応じて部品を組み合わせて描く。
@@ -525,6 +752,7 @@ export class CreatureView {
         this.lunge.set(r.aid, { t: r.t, ux: (r.dx - r.ax) / L, uy: (r.dy - r.ay) / L });
       }
       this.drawAttacks(eco, A, inView, pushSprite, dyn);
+      this.drawEats(eco, A, inView, pushSprite, dyn, alpha);
       // 粒を動かす（tick ごと）：石のかけらは跳ねて転がり、土ぼこりはふくらんで沈み、しずくと氷は落ち、火花は飛んで消える
       {
         const now2 = eco.w.tick;
@@ -635,18 +863,6 @@ export class CreatureView {
       const tier = p.gold >= 250 ? 4 : p.gold >= 100 ? 3 : p.gold >= 40 ? 2 : p.gold >= 10 ? 1 : 0;
       pushSprite(p.x, p.y + 4, 0, false, A.hoard(tier, eco.pileOwner(p), tf + p.id), 0, 2);
     }
-    // ワームの胴：頭の跡をたどる節
-    for (const c of eco.list) {
-      if (c.k !== Kind.Worm || c.dead || c.sleep === 2) continue;
-      const tr = eco.trails.get(c.id);
-      if (!tr) continue;
-      const n = Math.min(tr.length / 2, 10);
-      for (let i = n - 1; i >= 1; i--) {
-        const sx = tr[i * 2];
-        const sy = tr[i * 2 + 1];
-        if (inView(sx, sy, 32)) pushSprite(sx, sy + 6, 0, false, A.wormSeg(i === n - 1 ? 1 : 0), 0, 0);
-      }
-    }
     // 石像：石になった瞬間の姿を、石の色で
     for (const st of eco.statues) {
       if (!inView(st.x, st.y, 40)) continue;
@@ -662,7 +878,8 @@ export class CreatureView {
       const a = eco.moveAlpha(c, alpha);
       const x = c.px + (c.x - c.px) * a;
       const y = c.py + (c.y - c.py) * a;
-      if (!inView(x, y, 40)) continue;
+      // （ワームは胴が長いので、頭が少し画面の外でも描く）
+      if (!inView(x, y, c.k === Kind.Worm ? 150 : 40)) continue;
       this.order.push({ y, c, x, yy: y });
     }
     this.order.sort((a, b) => a.y - b.y || a.c.id - b.c.id);
@@ -783,6 +1000,17 @@ export class CreatureView {
         }
       }
       if (veil === 1) continue;
+      // 捕食の演出（drawEats）：繭やさらわれた姿で描く獲物は、ふつうには描かない。くわえて振られている獲物は口元に。食べたミミックは跳ねる
+      if (this.eatHide.has(c.id)) continue;
+      {
+        const cr = this.eatCarry.get(c.id);
+        if (cr) {
+          x = cr.x;
+          yy = cr.y;
+          lift = cr.lift;
+        }
+        lift += this.eatHop.get(c.id) ?? 0;
+      }
       const bright = sp === Kind.Wisp && c.glow > 90 ? 1 : 0;
       // 隠れている者（ほかの生き物には気づかれない）：眺める人には、暗く沈んだ影の姿と光る目で見せる
       const hidden = eco.isHidden(c);
@@ -811,6 +1039,11 @@ export class CreatureView {
         }
       }
       const glow = c.glow / 255;
+      // 起きているワーム：頭の跡に沿ったひと続きの胴と、進む向きに口を開く頭（drawWorm）
+      if (sp === Kind.Worm && !c.dead && c.sleep !== 2) {
+        this.drawWorm(eco, A, c, x, yy, t, pushSprite);
+        continue;
+      }
       // 影
       if (o.nShadows < MAX_SPRITES && sp !== Kind.Wisp && sp !== Kind.Ghost && !isCorpse && !(sp === Kind.Bat && act === 0 && lift === 0)) {
         const fr = this.atlas.frames[frame];
@@ -884,6 +1117,24 @@ export class CreatureView {
       // 傷を受けた瞬間は白く光る
       const flash = !isCorpse && eco.w.tick - c.hitAt < 2 ? 20 : 0;
       pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0), (c.id * 0.6180339) % 1);
+      // 糸の繭を抱えて食べるクモ：体の手前に繭、巻き始めは白い糸の粒が繭のまわりを回る
+      {
+        const cc = this.eatCocoon.get(c.id);
+        if (cc) {
+          const cx = x + (flip ? -4 : 4);
+          pushSprite(cx, yy + 2, 1, false, A.fx(`cocoon:${cc.v}`), 0, 2);
+          if (cc.age < 12)
+            for (let i = 0; i < 4; i++) {
+              const a = i * 1.57 + cc.age * 0.9;
+              pushSprite(cx + Math.cos(a) * 5, yy + 2 + Math.sin(a) * 2, 5 + Math.sin(a) * 2, false, A.fx('bit:3:7:0'), 0, 4);
+            }
+        }
+      }
+      // さらったコウモリを足につかんで飛ぶ：体の下側に、もがく獲物を重ねる
+      {
+        const cl = this.eatClutch.get(c.id);
+        if (cl) pushSprite(x + (flip ? -3 : 3) + Math.sin(cl.age * 1.3) * 1.5, yy + 0.05, lift + (sp === Kind.Wyvern ? 2 : 0) + Math.abs(Math.sin(cl.age * 0.9)) * 1.5, flip, cl.frame, 0, 0);
+      }
       // 隠れている者の目：影の姿の上で光る（ときどきまばたき）。暗がりで灯りを狙って潜む者（待ち伏せのゴブリンなど）も、暗ければ目だけ光る
       if (hidden || (!isCorpse && (c.lure || (sp === Kind.Goblin && c.st === 17)) && !c.dead && c.act === 0 && !eco.isLit(c))) {
         const ph = Math.floor(t * 2 + c.id * 0.37) % 7;

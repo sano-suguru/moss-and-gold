@@ -1,4 +1,4 @@
-import { heroSprite, heroBed, graveMarker, prayLight, adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache } from './sprites';
+import { heroSprite, heroBed, graveMarker, prayLight, adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -52,6 +52,12 @@ export interface Atlas {
   /** 宝の山（大きさ 0..2、きらめきのコマ） */
   treasure: (size: number, f: number) => number;
   wormSeg: (kind: number) => number;
+  /** ワームの胴の一節（太さ r 3〜12、v 0 膨らみ / 1 くびれ） */
+  wormBody: (r: number, v: number) => number;
+  /** ワームの頭（進む向き d 0〜7、口の開き open 0〜3） */
+  wormMouth: (d: number, open: number) => number;
+  /** 岩の下を進むワームが押し上げた岩（形 v 0〜2、big は頭の上、hard はマスの岩の硬さ 0 柔らかい・1 ふつう・2 硬い） */
+  wormMound: (v: number, big: boolean, hard: number) => number;
   /** ドラゴンの炎の柱（down = 正面向き） */
   breath: (down: boolean, f: number) => number;
   /** 若い竜の小さな炎（横向き） */
@@ -574,6 +580,16 @@ export function buildAtlas(): Atlas {
   for (let d = 0; d < 8; d++) addFx(`arrow2:${d}`, fxArrow2(d) as RawFrame);
   for (let kind = 0; kind < 5; kind++) for (let col = 0; col < 8; col++) for (let f = 0; f < 4; f++) addFx(`bit:${kind}:${col}:${f}`, fxBit(kind, col, f) as RawFrame);
   for (let v = 0; v < 3; v++) addFx(`crack:${v}`, fxCrack(v) as RawFrame);
+  // クモの糸の繭（クモの巣にかかった獲物を巻いたもの）：0 大、1 中、2 小（食べられて細っていく）
+  {
+    const silk = { W: [236, 232, 220], w: [170, 164, 154], o: [70, 66, 62] };
+    const cocoons = [
+      ['..ooo..', '.oWWWo.', 'oWwWwWo', 'oWWwWWo', 'oWwWwWo', 'oWWwWWo', 'oWwWwWo', '.oWWWo.', '..ooo..'],
+      ['.ooo.', 'oWWWo', 'owWwo', 'oWWWo', 'owWwo', 'oWWWo', '.ooo.'],
+      ['.o.', 'oWo', 'owo', 'oWo', '.o.'],
+    ];
+    cocoons.forEach((rows, v) => addFx(`cocoon:${v}`, pattern(rows, silk, rows[0].length >> 1, rows.length - 1)));
+  }
   for (let k = 0; k < 3; k++) for (let v = 0; v < 3; v++) addFx(`stain:${k}:${v}`, fxStain(k, v) as RawFrame);
   // 気づいた印と、当たった印
   const markFrames: Record<string, number> = {};
@@ -660,6 +676,21 @@ export function buildAtlas(): Atlas {
   }
   const segFrames = [raws.length, raws.length + 1];
   raws.push(wormSeg(0, 0) as RawFrame, wormSeg(1, 0) as RawFrame);
+  const bodyFrames: number[] = [];
+  for (let r = 3; r <= 12; r++) for (let v = 0; v < 2; v++) {
+    bodyFrames.push(raws.length);
+    raws.push(wormBody(r, v) as RawFrame);
+  }
+  const wormMouthFrames: number[] = [];
+  for (let d = 0; d < 8; d++) for (let o = 0; o < 4; o++) {
+    wormMouthFrames.push(raws.length);
+    raws.push(wormMouth(d, o) as RawFrame);
+  }
+  const moundFrames: number[] = [];
+  for (let h = 0; h < 3; h++) for (let b = 0; b < 2; b++) for (let v = 0; v < 3; v++) {
+    moundFrames.push(raws.length);
+    raws.push(wormMound(v, b === 1, h) as RawFrame);
+  }
   const web = raws.length;
   raws.push(makeWeb());
   const burrow = raws.length;
@@ -809,6 +840,9 @@ export function buildAtlas(): Atlas {
     eyes: (f) => eyeFrames[f & 3],
     treasure: (size, f) => treasureFrames[size * 4 + (f & 3)],
     wormSeg: (kind) => segFrames[kind],
+    wormBody: (r, v) => bodyFrames[(Math.max(3, Math.min(12, Math.round(r))) - 3) * 2 + (v & 1)],
+    wormMouth: (d, open) => wormMouthFrames[(d & 7) * 4 + Math.max(0, Math.min(3, open))],
+    wormMound: (v, big, hard) => moundFrames[Math.max(0, Math.min(2, hard)) * 6 + (big ? 3 : 0) + (((v % 3) + 3) % 3)],
     breath: (down, f) => breathFrames[(down ? 4 : 0) + (f & 3)],
     breathYoung: (f) => breathYoungFrames[f & 3],
     item: (kind, f) => (kind === 11 ? packFrame : itemFrames[kind * 4 + (f & 3)] ?? itemFrames[0]),

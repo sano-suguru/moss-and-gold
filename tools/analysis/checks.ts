@@ -137,6 +137,17 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 狩りは打ち合って仕留めてから食べる（一口で食べるのは、クモの巣・丸のみ・空中でさらう・死骸だけ）。
+    // 打ち合いで仕留めて食べたのが、一口で食べたより多い
+    name: '狩りは打ち合って仕留めて食べる（各シードで20回以上、一口で食べたより多い）',
+    ...RUN_A,
+    test: (rs) => {
+      const sl = rs.map((r) => r.deaths.filter((x) => x.cause === 'eaten' && x.slain === 1).length);
+      const gu = rs.map((r) => r.deaths.filter((x) => x.cause === 'eaten' && !x.slain).length);
+      return { ok: sl.every((v, i) => v >= 20 && v > gu[i]), value: rs.map((r, i) => `${r.seed} ${sl[i]}（一口 ${gu[i]}）`).join('、') };
+    },
+  },
+  {
     // 大ネズミの巣穴の引っ越しは、群れが一列になって歩いていく
     name: '大ネズミが一列になって巣穴を引っ越す（4シードで1回以上）',
     ...RUN_A,
@@ -272,15 +283,16 @@ export const CHECKS: Check[] = [
   },
   {
     // 若い竜の炎は口元から燃え始め（以前は口元から2.8マスに火がつかず、すぐそばの獲物へ吐き続けても焼けなかった）、
-    // 飛んでいるコウモリなども、吐いている炎そのものに当たれば焼ける（以前は飛んでいれば焼けなかった）。seed4 は 14〜17日目に若い竜がいる
-    name: 'ドラゴンの炎で飛ぶ者（コウモリ・ワイバーン・ウィスプ）が焼ける（seed4 で1回以上）',
-    seeds: ['seed4'],
+    // 飛んでいるコウモリなども、吐いている炎そのものに当たれば焼ける（以前は飛んでいれば焼けなかった）。
+    // #31 の main の10日目から続けると seed4 は 14〜17日目に若い竜がいる。狩りを打ち合いにした後（0日目から）は seed4 では起きず、seed7・seed23 で起きる。どちらのスナップショットから始めても通るよう、3シードの合計で見る
+    name: 'ドラゴンの炎で飛ぶ者（コウモリ・ワイバーン・ウィスプ）が焼ける（seed4・seed7・seed23 の合計で1回以上）',
+    seeds: ['seed4', 'seed7', 'seed23'],
     from: 10,
     to: 18,
     test: (rs) => {
       const all = rs.map((r) => r.deaths.filter((x) => x.cause === 'burned' && x.by === 24));
       const fly = all.map((a) => a.filter((x) => x.k === 1 || x.k === 23 || x.k === 0).length);
-      return { ok: fly.every((n) => n >= 1), value: rs.map((r, i) => `${r.seed} 炎で死んだ${all[i].length}（うち飛ぶ者${fly[i]}）`).join('、') };
+      return { ok: sum(fly) >= 1, value: rs.map((r, i) => `${r.seed} 炎で死んだ${all[i].length}（うち飛ぶ者${fly[i]}）`).join('、') };
     },
   },
   {
