@@ -34,6 +34,7 @@ import './dragon';
 import './adventurer';
 import './aim';
 import './raid';
+import './night';
 import './listen';
 import './loot';
 import './roster';
