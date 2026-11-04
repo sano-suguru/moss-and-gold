@@ -354,18 +354,18 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 若い竜の炎は口元から燃え始め（以前は口元から2.8マスに火がつかず、すぐそばの獲物へ吐き続けても焼けなかった）、
-    // 飛んでいるコウモリなども、吐いている炎そのものに当たれば焼ける（以前は飛んでいれば焼けなかった）。
-    // ドラゴンの炎と燃える床を即死から傷に変えた（#42）あと、迷路をなくした（#41）main の10日目から続けると、seed7・seed23 では飛ぶ者が焼けなくなった。
-    // main（abc 6・seed41 9・seed35 8・seed4 9）でも、炎を傷に変えたコード（abc 4・seed41 1）でも起きるシードを並べ、4シードの合計で見る
-    name: 'ドラゴンの炎で飛ぶ者（コウモリ・ワイバーン・ウィスプ）が焼ける（abc・seed41・seed35・seed4 の合計で1回以上）',
-    seeds: ['abc', 'seed41', 'seed35', 'seed4'],
+    // ドラゴンの炎（src/eco/fire.ts）：口元から細い扇で吐き、扇の中と燃える床で焼かれた者が倒れる。
+    // 以前は飛ぶ者（コウモリ・ワイバーン・ウィスプ）が炎に当たると即死していたのでそれを見ていたが、炎を口元から細い扇で吐くようにしたあと（#42）、
+    // 迷路をなくした（#41）main の10日目から続けると、飛ぶ者が焼けるのは16シードで seed7 の3回だけになった。焼け死ぬ者すべてで見る。
+    // main（abc 41・seed7 22・seed41 42・seed4 37）でも、細い扇のコード（abc 7・seed7 7・seed41 12・seed4 1）でも起きるシードを並べる
+    name: 'ドラゴンの炎で焼け死ぬ（abc・seed7・seed41・seed4 の合計で3回以上・焼け死んだシード2つ以上）',
+    seeds: ['abc', 'seed7', 'seed41', 'seed4'],
     from: 10,
     to: 18,
     test: (rs) => {
       const all = rs.map((r) => r.deaths.filter((x) => x.cause === 'burned' && x.by === 24));
       const fly = all.map((a) => a.filter((x) => x.k === 1 || x.k === 23 || x.k === 0).length);
-      return { ok: sum(fly) >= 1, value: rs.map((r, i) => `${r.seed} 炎で死んだ${all[i].length}（うち飛ぶ者${fly[i]}）`).join('、') };
+      return { ok: sum(all.map((a) => a.length)) >= 3 && all.filter((a) => a.length > 0).length >= 2, value: rs.map((r, i) => `${r.seed} 炎で死んだ${all[i].length}（うち飛ぶ者${fly[i]}）`).join('、') };
     },
   },
   {
