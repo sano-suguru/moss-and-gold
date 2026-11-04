@@ -23,6 +23,10 @@ import { paired, pairedRow, PAIRED_HEAD, PAIRED_NOTE } from './lib/stats';
 export const NAMED: Record<string, { expr: string; label: string; raw?: boolean }> = {
   campStore: { label: 'ゴブリンの集落の蓄えの合計', expr: 'e.camps.filter((c) => c.kind === 0 && c.id >= 0).reduce((a, c) => a + (c.store ?? 0), 0)' },
   camps: { label: 'ゴブリンの集落の数', expr: 'e.camps.filter((c) => c.kind === 0 && c.id >= 0).length' },
+  gobMouth: { label: 'ゴブリンが新しく集落を作りに入れる地表の横穴があった日の割合（％。横穴が開いていて竜が近くになく、近くに住める場所がある。600回の更新ごとの判定 gobMouthOk の 1 か 2）', expr: '(s.eco.GM ?? []).some((v) => v >= 1) ? 100 : 0', raw: true },
+  gobMouthRich: { label: 'そのうち、食べ物の足りる場所のある横穴があった日の割合（％。gobMouthOk が 1）', expr: '(s.eco.GM ?? []).some((v) => v === 1) ? 100 : 0', raw: true },
+  campDays: { label: 'ゴブリンの集落があった日の割合（％。日次スナップショットの時点で一つ以上）', expr: 'e.camps.some((c) => c.kind === 0 && c.id >= 0) ? 100 : 0' },
+  goblins: { label: '生きているゴブリンの数', expr: 'e.list.filter((c) => c.k === 12 && !c.dead).length' },
   vassalCamps: { label: 'オークに従う集落の数', expr: 'e.camps.filter((c) => c.kind === 0 && (c.lx || c.ly)).length' },
   warrenStore: { label: 'コボルトの住処の蓄えの合計', expr: 'e.warrens.reduce((a, v) => a + (v.store ?? 0), 0)' },
   warrens: { label: 'コボルトの住処の数', expr: 'e.warrens.length' },
