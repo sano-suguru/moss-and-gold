@@ -222,12 +222,17 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
 
 /**
  * やられそうになったヴァンパイアが、コウモリの群れにばらけて逃げられるか：1日に1回まで（最後にばらけた step を lureAt に持つ）。
- * 日の光や火の明かりの中ではばらけられず、そのまま倒される（松明を掲げた冒険者や、焚き火のそばで追い詰めれば倒し切れる）
+ * 日の光や、据えた大きな火（焚き火、かがり火、炉、入口の灯り）の明かりの中ではばらけられず、そのまま倒される。
+ * 松明の明かりではばらけられる（松明でも封じると、松明を持つ冒険者の一行にほぼ必ず倒され、1日もたずにいなくなっていた）
  */
 export function vampCanScatter(this: Ecology, c: Cr): boolean {
   if (c.k !== Kind.Vampire || c.dead || c.st === VAMP_SCATTER) return false;
   if (this.step - c.lureAt < SCATTER_EVERY) return false;
-  if (this.sunlit(this.tileOf(c.x, c.y), this.dayNow) || this.fireNear(c.x, c.y)) return false;
+  if (this.sunlit(this.tileOf(c.x, c.y), this.dayNow)) return false;
+  for (const f of this.fires()) {
+    if (sq(f[0] - c.x) + sq(f[1] - c.y) >= f[2] * f[2] || f[2] < 3 * TILE) continue;
+    return false;
+  }
   return true;
 }
 

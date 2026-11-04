@@ -67,16 +67,24 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
     // 主が獲物を決めていれば、その上を旋回して居場所を示し（偵察）、主が近づくと獲物に群がる（足止め。src/eco/vampire.ts の batPinned）。
     // 決めていなければ、主の周りを回る
     const prey = lord.ref ? this.byId.get(lord.ref) : undefined;
+    const x0 = c.x;
+    const y0 = c.y;
+    let cx = lord.x;
+    let cy = lord.y;
     if (prey && !prey.dead && sq(prey.x - lord.x) + sq(prey.y - lord.y) < sq(40 * TILE)) {
       const close = sq(prey.x - lord.x) + sq(prey.y - lord.y) < sq(6 * TILE);
       const a = (this.step * (close ? 0.09 : 0.05) + c.id * 1.7) % 6.283;
       const r = close ? 7 + (c.id % 3) * 3 : 16 + (c.id % 3) * 6;
+      cx = prey.x;
+      cy = prey.y;
       this.moveToward(c, prey.x + Math.cos(a) * r, prey.y - (close ? 4 : 14) + Math.sin(a) * r * 0.6, s.speed * 1.2);
     } else {
       const a = (this.step * 0.02 + c.id * 1.7) % 6.283;
       const r = 20 + (c.id % 3) * 8;
       this.moveToward(c, lord.x + Math.cos(a) * r, lord.y - 10 + Math.sin(a) * r * 0.6, s.speed);
     }
+    // 回る点が壁の向こうで進めなければ、道を探して中心（主か獲物）へ寄る（壁に押しつけられて止まらないように）
+    if (c.x === x0 && c.y === y0 && sq(cx - c.x) + sq(cy - c.y) > sq(TILE)) this.goTo(c, cx, cy, s.speed);
     const k0 = this.tileOf(c.x, c.y);
     if (c.food < s.cap && k0 >= 0 && this.w.moss[k0] > 20) this.eatMoss(c, 2);
     return;
