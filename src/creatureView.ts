@@ -997,6 +997,8 @@ export class CreatureView {
         if (roosting) {
           act = 0;
           dir = 0;
+          // ヴァンパイアに従うコウモリは、主の住処の床のマスの上端にいる。絵は壁の面にぶら下がって見えるよう持ち上げる
+          if (c.ref2) lift = 18;
         } else if (!c.dead && !c.caught) {
           lift = 16;
           if (act === 0) {
@@ -1100,7 +1102,7 @@ export class CreatureView {
         continue;
       }
       // 影
-      if (o.nShadows < MAX_SPRITES && sp !== Kind.Wisp && sp !== Kind.Ghost && !isCorpse && !(sp === Kind.Bat && act === 0 && lift === 0)) {
+      if (o.nShadows < MAX_SPRITES && sp !== Kind.Wisp && sp !== Kind.Ghost && !isCorpse && !(sp === Kind.Bat && act === 0 && (lift === 0 || c.ref2 > 0))) {
         const fr = this.atlas.frames[frame];
         const k = o.nShadows * 4;
         o.shadows[k] = x;
@@ -1114,7 +1116,7 @@ export class CreatureView {
       if (!isCorpse && c.sleep === 2) {
         if (sp === Kind.Dragon) frame = A.sleep(c.elite === 8 ? 'dragonB' : ['dragonH', 'dragonY', 'dragon'][Math.min(2, c.sp)], sf);
         else if (sp === Kind.Worm) frame = A.sleep('worm', sf);
-        else if (sp === Kind.Bat && lift === 0) frame = A.sleep('bat', sf);
+        else if (sp === Kind.Bat && (lift === 0 || (c.ref2 > 0 && act === 0))) frame = A.sleep('bat', sf);
         else if (sp === Kind.Adventurer) {
           const h = eco.heroOf(c);
           frame = h ? A.heroBed(c.sp, h.look, h.rank, sf) : A.sleep('bed-' + ['warrior', 'wizard', 'thief', 'priest', 'bard', 'hunter', 'slayer'][c.sp], sf);

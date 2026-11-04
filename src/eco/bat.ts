@@ -25,8 +25,13 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
         const g = this.groups.get(`v${lord0.id}`);
         const mates = (g ? g.members : [c]).filter((o) => o.k === Kind.Bat).sort((a, b) => a.id - b.id);
         const i = Math.max(0, mates.indexOf(c));
-        c.hx = lord0.hx + ((i % 6) - 2.5) * 7 + ((c.id % 3) - 1);
-        c.hy = lord0.hy - 16 - Math.floor(i / 6) * 8;
+        // 主の左右に交互に、天井ぎわ（住処のマスの上端）に並ぶ。壁の中になるなら主の真上へ寄せる
+        const side = i % 2 ? 1 : -1;
+        const x = lord0.hx + side * (12 + Math.floor(i / 2) * 7) + ((c.id % 3) - 1);
+        const y = lord0.hy - 7 + (Math.floor(i / 2) % 2) * 2;
+        const ok = this.tilePassable(c, this.tileOf(x, y));
+        c.hx = ok ? x : lord0.hx + side * 3;
+        c.hy = ok ? y : lord0.hy - 7;
       }
     }
     // ぶら下がる場所は、いまねぐらにいる仲間の並び順で決め直す（同じ場所に重ならないように）
