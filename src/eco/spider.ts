@@ -43,7 +43,11 @@ export function spider(this: Ecology, c: Cr, day: number): void {
       // 通路をふさぐ所（両脇が岩で、前後が開いている）を好む
       const corridor = (m.solid[k - 1] && m.solid[k + 1] && !m.solid[k - m.w] && !m.solid[k + m.w]) || (m.solid[k - m.w] && m.solid[k + m.w] && !m.solid[k - 1] && !m.solid[k + 1]) ? 3 : 0;
       const v = fly + corridor + this.lit(k, Math.max(day, 0.5)) * 3;
-      if (v > bv && !this.webs.some((w) => Math.abs(w.x - x * TILE) < 64 && Math.abs(w.y - y * TILE) < 64)) {
+      // ほかのクモとその巣から、縄張り（Ecology.TERRITORY、6マス）より離れた所（以前は縄張りの中を選び、向かっては主に追い払われて戻り、行ったり来たりしていた）
+      const far = (Ecology.TERRITORY[Kind.Spider] + 1) * TILE;
+      const px = x * TILE + 8;
+      const py = y * TILE + 8;
+      if (v > bv && !this.webs.some((w) => w.owner !== c.id && sq(w.x - px) + sq(w.y - py) < far * far) && !this.list.some((o) => o !== c && o.k === Kind.Spider && !o.dead && sq(o.x - px) + sq(o.y - py) < far * far)) {
         bv = v;
         best = k;
       }

@@ -82,6 +82,9 @@ export function ant(this: Ecology, c: Cr): void {
   // 運ぶ物を探す：巣に近い死骸、なければキノコや苔
   let target = this.byId.get(c.ref2) ?? null;
   if (target && (target.dead !== 1 || target.units <= 0)) target = null;
+  // 目当ての死骸が無くなっていたら（ほかの者に食べられた、朽ちた）、覚えた番号を消して探し直す
+  // （以前は番号が残ったまま探し直さず、何もしないまま歩く姿でその場に立ち続けていた）
+  if (!target && c.ref2 > 0) c.ref2 = 0;
   if (!target && c.ref2 === 0) {
     let bd = 14 * TILE * 14 * TILE;
     for (const o of this.corpses) {
