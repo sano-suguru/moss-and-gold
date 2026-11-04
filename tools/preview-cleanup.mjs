@@ -5,6 +5,9 @@
 // （一覧 GET / 削除 DELETE /accounts/{アカウント}/workers/workers/{Worker}/versions）。
 // どの PR のものかは、アップロードのときのメッセージ（annotations の workers/message）の先頭の「PR #<番号> 」で見分ける。
 // 本番のデプロイに使われている（または使われた）バージョンは消さない。
+// いちばん新しいバージョンは Cloudflare の決まりで消せない（エラー 10339）。マージの直後は、本番の公開より先に
+// この PR のプレビューがいちばん新しいことが多いので、それは残しておき、main を本番に公開したあと
+// （deploy.yml が --closed で実行する）に消す。
 //
 //   node tools/preview-cleanup.mjs --pr 32        # PR #32 のバージョンを消す
 //   node tools/preview-cleanup.mjs --closed       # 今開いていない PR のバージョンをすべて消す（溜まった分の掃除。GitHub の API で開いている PR を調べる）
@@ -40,10 +43,13 @@ async function cf(method, path) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok || body.success === false) {
     const why = (body.errors || []).map((e) => `${e.code} ${e.message}`).join('; ') || res.statusText;
-    throw new Error(`${method} ${path} → ${res.status} ${why}`);
+    const err = new Error(`${method} ${path} → ${res.status} ${why}`);
+    err.codes = (body.errors || []).map((e) => e.code);
+    throw err;
   }
   return body;
 }
+const LATEST = 10339; // The latest version cannot be deleted.
 
 /** Worker のバージョンをすべて取得する（新しい順に1ページ100件ずつ、空のページが来るまで） */
 async function allVersions() {
@@ -99,6 +105,7 @@ const doomed = versions.filter((v) => {
 console.log(`バージョン ${versions.length} 件のうち、消すもの ${doomed.length} 件${dry ? '（--dry-run なので消さない）' : ''}`);
 
 let failed = 0;
+let kept = 0;
 for (const v of doomed) {
   const label = `${v.id}（${v.annotations['workers/message']}、${v.created_on}）`;
   if (dry) {
@@ -109,15 +116,21 @@ for (const v of doomed) {
     await cf('DELETE', `/workers/workers/${worker}/versions/${v.id}`);
     console.log(`  消した ${label}`);
   } catch (e) {
-    // 消せないもの（デプロイに使われているなど）は飛ばして、ほかを続ける
-    failed++;
-    console.log(`  消せなかった ${label}：${e.message}`);
+    if (e.codes?.includes(LATEST)) {
+      // いちばん新しいバージョン。次に main を本番に公開したあとに消す
+      kept++;
+      console.log(`  残した（いちばん新しいので今は消せない） ${label}`);
+    } else {
+      // ほかの理由で消せないものも飛ばして、残りを続ける
+      failed++;
+      console.log(`  消せなかった ${label}：${e.message}`);
+    }
   }
 }
-const ok = doomed.length - failed;
+const ok = dry ? 0 : doomed.length - failed - kept;
 if (process.env.GITHUB_OUTPUT) {
   const fs = await import('node:fs');
-  fs.appendFileSync(process.env.GITHUB_OUTPUT, `deleted=${dry ? 0 : ok}\nfailed=${failed}\n`);
+  fs.appendFileSync(process.env.GITHUB_OUTPUT, `deleted=${ok}\nkept=${kept}\nfailed=${failed}\n`);
 }
-// 一つも消せなかったときだけ失敗にする（一部が消せないのはデプロイの履歴にあるものなどで、異常ではない）
-if (!dry && doomed.length > 0 && ok === 0) process.exit(1);
+// いちばん新しいもの以外で消せなかったものがあれば失敗にする（トークンの権限が足りないなど）
+if (failed > 0) process.exit(1);
