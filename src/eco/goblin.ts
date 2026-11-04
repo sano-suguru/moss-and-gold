@@ -147,7 +147,7 @@ export function newCamp(this: Ecology, k: number, how: string, store = 0, poor =
   const x = (k % m.w) * TILE + 8;
   const y = Math.floor(k / m.w) * TILE + 8;
   this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: this.nextId, ev: 'found', how, x, y, ...(store ? { store } : {}), ...(poor ? { poor: 1 } : {}) } as never);
-  const cp: Camp = { id: this.nextId++, kind: 0, x, y, dry: 0, fuel: 0, store, hide: 0, raids: 0, empty: -1, alone: -1 };
+  const cp: Camp = { id: this.nextId++, kind: 0, x, y, dry: 0, fuel: 0, store, hide: 0, raids: 0, empty: -1, alone: -1, poor: poor ? 1 : 0 };
   this.camps.push(cp);
   return cp;
 }
@@ -203,6 +203,8 @@ export function abandonCamp(this: Ecology, cp: Camp, reason: number): boolean {
   const open = m.mouths.some((mo, i) => mo.kind === 0 && this.mouthOpen(i));
   const rec = (to: string) => this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'abandon', reason: ['food', 'raids', 'alone', 'dragon'][reason], to, n: members.length, x: Math.round(cp.x), y: Math.round(cp.y) } as never);
   if (reason === 1 || reason === 3) this.goblinShun = Math.max(this.goblinShun, this.w.tick + DAY_TICKS_ECO * 2);
+  // 貧しい集落を食べ物が尽きて捨てたら、外の噂で1日はゴブリンが来ない（同じ貧しい場所に、次の少ない群れがすぐ住みついては去る繰り返しを止める）
+  if (reason === 0 && cp.poor === 1) this.goblinShun = Math.max(this.goblinShun, this.w.tick + DAY_TICKS_ECO);
   if (!open) {
     const site = this.pickGoblinCamp(cp, [cp.x, cp.y], Ecology.GOBLIN_MIN_FOOD);
     if (site < 0) return false;

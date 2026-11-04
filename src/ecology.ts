@@ -341,6 +341,8 @@ export interface Camp {
   raidT?: number;
   /** 次に通路での掠め取り（つける・待ち伏せ）に出られる tick。夜の盗みとは別に数える（src/eco/raid.ts） */
   snatchT?: number;
+  /** 1 なら、食べ物の足りる場所が無く、貧しい場所に少ない群れで住みついた集落（`checkGoblinMouths`） */
+  poor?: number;
 }
 
 /** 種ごとの強さ（戦いの勝ち負けの確率に使う） */
