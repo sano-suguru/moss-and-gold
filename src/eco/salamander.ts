@@ -4,6 +4,7 @@ import { BLOOD, Burrow, CELL, CR_EVERY, MOSS_R, Camp, Colony, Cr, DAY_TICKS_ECO,
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
+import { isJobItem } from './armor';
 
 export function spawnSalamanders(this: Ecology): void {
   const m = this.w.map;
@@ -418,6 +419,8 @@ export function manaBirths(this: Ecology, day: number): void {
 export function heldMana(this: Ecology): number {
   let s = 0;
   for (const c of this.list) if (c.dead !== 2) s += c.mana;
+  // 床の武具に宿る未練（src/eco/armor.ts）
+  for (const it of this.gear) if (isJobItem(it.kind)) s += it.fuel;
   return s;
 }
 

@@ -1,6 +1,7 @@
 import type { Atlas } from './atlas';
 import { BLOOD, Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
+import { ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
 import { RANK_AT, unpackLook } from './eco/roster';
 import { MAX_DYN } from './shaders';
 
@@ -501,9 +502,41 @@ export class CreatureView {
       case Kind.Skeleton: return A.named('skel', dir, act, f, v);
       case Kind.Lich: return A.named('lich', dir, act, f);
       case Kind.Dwarf: return A.named('dwarf', dir, act, f, v);
+      case Kind.Armor: return A.named('armor', dir, act, f, v);
       case Kind.Rat: return v === 1 ? A.named('pup', dir, act === 1 ? 1 : 0, f) : A.index(sp, dir, act, f, bright);
       default: return A.index(sp, dir, act, f, bright);
     }
+  }
+
+  /**
+   * リビングアーマーの武具の置き方（描画専用）：取り込んだ武器と盾が、芯（宙に浮く胸当てと冑）の周りをゆっくり巡る。
+   * 体になった武具は芯に溶け込んでいるので描かない（誕生のとき、芯へ寄り集まる演出で見せる）。
+   * 攻めるときは、最初に取り込んだ武具が向いている方へ飛び出して戻る。front は芯より手前に描くか
+   */
+  private armorGear(eco: Ecology, A: Atlas, c: Cr, x: number, y: number, lift: number, t: number): { x: number; y: number; lift: number; flip: boolean; frame: number; front: boolean }[] {
+    const kit = eco.armorKit.get(c.id) ?? [0];
+    const hand = kit.slice(1 + kit[0]);
+    const out: { x: number; y: number; lift: number; flip: boolean; frame: number; front: boolean }[] = [];
+    const ph = c.id * 0.731;
+    const n = hand.length;
+    const dir = [[0, 1], [0, -1], [1, 0], [-1, 0]][c.dir] ?? [0, 1];
+    const fly = c.act === 2 && c.actT < 4 ? [5, 11, 15, 8][c.actT] : 0;
+    hand.forEach((kd, i) => {
+      const a = t * 0.9 + (i * 6.2832) / n + ph;
+      const s = Math.sin(a);
+      let gx = x + Math.cos(a) * 13;
+      let gy = y + s * 4;
+      let gl = lift + 10 + Math.sin(t * 2.1 + i * 1.7) * 1.5;
+      let front = s >= 0;
+      if (i === 0 && fly) {
+        gx = x + dir[0] * fly;
+        gy = y + dir[1] * fly * 0.6 + 0.1;
+        gl = lift + 9;
+        front = true;
+      }
+      out.push({ x: gx, y: gy + (front ? 0.08 : -0.08), lift: gl, flip: Math.cos(a) < 0, frame: A.item(kd, Math.floor(t * 6) + i), front });
+    });
+    return out;
   }
 
   build(eco: Ecology, view: { x0: number; y0: number; x1: number; y1: number }, t: number, alpha: number, night: boolean): CreatureFrame {
@@ -866,7 +899,15 @@ export class CreatureView {
     }
     // 床に落ちた道具（松明は燃え、金属は光が当たるときらめく）
     const itf = Math.floor(t * 6);
-    for (const it of eco.gear) if (inView(it.x, it.y, 16)) pushSprite(it.x, it.y + 2, 0, false, it.kind === 12 ? A.trophy(TROPHY[it.fuel]?.[1] ?? 'fang') : A.item(it.kind, itf + it.id), 0, 2);
+    for (const it of eco.gear) {
+      if (!inView(it.x, it.y, 16)) continue;
+      pushSprite(it.x, it.y + 2, 0, false, it.kind === 12 ? A.trophy(TROPHY[it.fuel]?.[1] ?? 'fang') : A.item(it.kind, itf + it.id), 0, 2);
+      // 持ち主の未練（マナ）が宿った武具：青白い粒がかすかに立ちのぼる（未練が濃いほど頻く。src/eco/armor.ts）
+      if (isJobItem(it.kind) && it.fuel > 0) {
+        const ph = (t * 0.45 + it.id * 0.137) % 1;
+        if (ph < Math.min(1, it.fuel / 24)) pushSprite(it.x + Math.sin(ph * 6 + it.id) * 3, it.y + 2.05, 2 + ph * 12, false, A.manaMote(Math.min(3, Math.floor(ph * 4))), 0, 2);
+      }
+    }
     // 宝の山：量に応じた大きさ。光が当たるときらめく
     const tf = Math.floor(t * 3);
     // 宝：溜まった量で五段階（1〜9、10〜39、40〜99、100〜249、250〜）、持ち主で飾りを変える
@@ -954,6 +995,8 @@ export class CreatureView {
       if (sp === Kind.Zombie && act === 1) f = Math.floor(t * 4.5 + seed) & 3;
       if (sp === Kind.Ghost) lift = 6 + (Math.floor(t * 1.5 + seed) & 1);
       if (sp === Kind.Gargoyle && act !== 0 && !c.dead) lift = 10;
+      // リビングアーマーは宙に浮く
+      if (sp === Kind.Armor && !c.dead) lift = 5;
       if (sp === Kind.Wyvern && !c.dead) lift = 18 + (Math.floor(t * 2 + seed) & 1);
       if (sp === Kind.Dragon && c.st === 2 && !c.dead) lift = 20;
       if (sp === Kind.Dragon && c.away) continue;
@@ -1011,6 +1054,33 @@ export class CreatureView {
           }
         }
       }
+      // リビングアーマーの組み上がり（描画専用。st 10 の間）：散らばった武具が震え、寄り集まって浮き上がり、白い光の中で甲冑の形になる
+      if (sp === Kind.Armor && c.st === 10 && !c.dead) {
+        const age = Math.min(ARMOR_RISE, c.actT + alpha);
+        const p = age / ARMOR_RISE;
+        // 武具は床にあった位置から寄り集まる（ロードし直した直後など、その記録が無ければ、まわりに散らした位置から）
+        const rec = eco.fxArmorRise.find((e) => e.id === c.id);
+        const kit = eco.armorKit.get(c.id) ?? [0];
+        const parts: [number, number, number][] = rec ? rec.parts : kit.slice(1, 1 + kit[0]).map((kd, i) => {
+          const ang = i * 2.399 + c.id * 0.7;
+          const r0 = 14 + ((i * 7 + c.id) % 12);
+          return [kd, Math.cos(ang) * r0 * 1.2, Math.sin(ang) * r0 * 0.6];
+        });
+        if (p < 0.85)
+          parts.forEach(([kd, dx, dy], i) => {
+            const g = p < 0.4 ? 0 : Math.min(1, (p - 0.4) / 0.4);
+            const k2 = 1 - g * g;
+            const shake = (Math.floor(t * 18 + i * 3) % 2 ? 1 : -1) * (p < 0.4 ? 0.4 + p * 2 : 0.4);
+            pushSprite(c.x + dx * k2 + shake, c.y + dy * k2 + 2, g * 10, false, A.item(kd, 0), 0, 2);
+          });
+        if (p > 0.3 && p < 0.9)
+          for (let i = 0; i < 6; i++) {
+            const ph = (t * 0.9 + i / 6) % 1;
+            pushSprite(x + Math.cos(i * 2.4 + t * 3) * (8 - ph * 6), yy + 0.05, 2 + ph * 18, false, A.manaMote(Math.min(3, Math.floor(ph * 4))), 0, 2);
+          }
+        if (p < 0.8) veil = 1;
+        else if (p < 0.9) veil = 3;
+      }
       if (veil === 1) continue;
       // クモの巣の糸の中：捕まった者はもがいて小刻みに揺れ、足を取られた者は糸を引きずって揺れる。どちらも白い糸がまとわりつく
       if (!c.dead && eco.webs.length && (c.caught || (eco.webEffect(c) === 2 && eco.inWeb(c)))) {
@@ -1060,7 +1130,9 @@ export class CreatureView {
           }
         }
       }
-      const glow = c.glow / 255;
+      let glow = c.glow / 255;
+      // リビングアーマーの冑の覗き穴の光：マナが十分なら灯り続け、少なくなるとちらつく（描画専用）
+      if (sp === Kind.Armor && !c.dead) glow = c.mana < ARMOR_LOW ? ((Math.floor(t * 6) * 7 + c.id * 13) % 5 < 2 ? 0 : 0.3) : 0.8;
       // 起きているワーム：頭の跡に沿ったひと続きの胴と、進む向きに口を開く頭（drawWorm）
       if (sp === Kind.Worm && !c.dead && c.sleep !== 2) {
         this.drawWorm(eco, A, c, x, yy, t, pushSprite);
@@ -1138,7 +1210,11 @@ export class CreatureView {
       }
       // 傷を受けた瞬間は白く光る
       const flash = !isCorpse && eco.w.tick - c.hitAt < 2 ? 20 : 0;
+      // リビングアーマーの武具（芯の後ろ側の分。手前の分は芯のあと）
+      const armorGear = sp === Kind.Armor && !c.dead && veil === 0 ? this.armorGear(eco, A, c, x, yy, lift, t) : null;
+      if (armorGear) for (const g of armorGear) if (!g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
       pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0), (c.id * 0.6180339) % 1);
+      if (armorGear) for (const g of armorGear) if (g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
       // 糸の繭を抱えて食べるクモ：体の手前に繭、巻き始めは白い糸の粒が繭のまわりを回る
       {
         const cc = this.eatCocoon.get(c.id);

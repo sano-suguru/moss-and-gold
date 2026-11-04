@@ -14,7 +14,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   this.buildGroups();
   this.buildLitMap();
   this.corpses = this.list.filter((c) => c.dead === 1 && c.units > 0 && c.k !== Kind.Wisp && c.k !== Kind.Slime && c.k !== Kind.Myconid);
-  this.counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  this.counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (const c of this.list) if (!c.dead) this.counts[c.k]++;
 
   for (const c of this.list) {
@@ -107,6 +107,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       case Kind.Skeleton: this.skeleton(c, day); break;
       case Kind.Lich: this.lich(c, day); break;
       case Kind.Dwarf: this.dwarf(c); break;
+      case Kind.Armor: this.armor(c); break;
     }
     if (!c.dead) this.metabolism(c);
   }
@@ -132,6 +133,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   if (this.step % 50 === 25) this.planRaids();
   if (this.step % 50 === 35) this.planSnatch();
   if (this.step % 50 === 45) this.updateStatues(day);
+  if (this.step % 50 === 47) this.armorBirths();
   if (this.step % 50 === 30) this.updateTreasure(day);
   this.updateFire();
   this.updateDigging();

@@ -4,6 +4,7 @@ import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, 
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
+import { ARMOR_REMNANT, isJobItem } from './armor';
 import type { World } from '../world';
 
 /** 噂の総量（評判） */
@@ -396,7 +397,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
           p.by = Math.round(o.y);
         }
       }
-      if (o.k === Kind.Skeleton || o.k === Kind.Lich) p.saw |= 2;
+      if (o.k === Kind.Skeleton || o.k === Kind.Lich || o.k === Kind.Armor) p.saw |= 2;
       // 危ない相手：一行より強そうなら区画を覚え、勝てそうになければ引き返す
       if (o.k !== Kind.Adventurer && STR[o.k] >= 6 && TIER[o.k] !== undefined) {
         const os = this.str(o) * (o.hp > 0 ? o.hp / this.maxHp(o) : 1);
@@ -445,7 +446,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     c.dir = Math.abs(bx - c.x) > Math.abs(by - c.y) ? (bx > c.x ? 2 : 3) : by > c.y ? 0 : 1;
     return;
   }
-  const ENEMY = [Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Lizardman, Kind.Minotaur, Kind.Troll, Kind.Vampire, Kind.Zombie, Kind.Basilisk, Kind.Skeleton, Kind.Lich];
+  const ENEMY = [Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Lizardman, Kind.Minotaur, Kind.Troll, Kind.Vampire, Kind.Zombie, Kind.Basilisk, Kind.Skeleton, Kind.Lich, Kind.Armor];
   // ウィスプは剣では払えない光なので、雑魚に含めない（誘われても追いかけて迷うだけ。魔法使いは瓶に捕まえる）
   const MINOR = [Kind.Rat, Kind.Bat, Kind.Ant, Kind.Myconid, Kind.Salamander, Kind.Lizard, Kind.Spider, Kind.Slime];
   if (c.sp === Job.Slayer) ENEMY.push(Kind.Dragon, Kind.Wyvern, Kind.Worm);
@@ -849,6 +850,16 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
 /** 倒れた者の持ち物を床に落とす（冒険者の道具） */
 export function dropBelongings(this: Ecology, c: Cr): void {
   const n = c.k === Kind.Goblin || c.k === Kind.Orc || c.k === Kind.Adventurer ? this.ownerNote(c, 'fell') : undefined;
+  if (c.k === Kind.Armor) {
+    this.scatterArmor(c);
+    return;
+  }
+  // ドワーフの戦士と鍛冶屋は、手の武器（床の道具では鎚矛として扱う）を落とす。坑夫のつるはしは武器ではないので落とさない。
+  // 未練は宿らない（宿るのは冒険者の道具だけ。src/eco/armor.ts）
+  if (c.k === Kind.Dwarf) {
+    if (c.sp === 1 || c.sp === 2) this.dropItem(c.x + 3, c.y + 2, ItemKind.Mace, 0, this.ownerNote(c, 'fell'));
+    return;
+  }
   if (c.k === Kind.Skeleton && c.init) {
     this.dropJobItems(c);
     c.init = 0;
@@ -877,7 +888,12 @@ export function dropBelongings(this: Ecology, c: Cr): void {
 
 export function dropJobItems(this: Ecology, c: Cr): void {
   const n = this.ownerNote(c, 'fell');
-  Ecology.JOB_ITEMS[c.sp].forEach((kd, i) => this.dropItem(c.x - 4 + i * 7, c.y + 3 - i * 2, kd, 0, n));
+  // 倒れた冒険者の道具には、持ち主の未練としてマナが宿る（新しいマナの湧き口。スケルトンが落とし直す物には宿らない。src/eco/armor.ts）
+  const rem = c.k === Kind.Adventurer ? ARMOR_REMNANT : 0;
+  Ecology.JOB_ITEMS[c.sp].forEach((kd, i) => {
+    this.w.manaBorn += rem;
+    this.dropItem(c.x - 4 + i * 7, c.y + 3 - i * 2, kd, rem, n);
+  });
 }
 
 /** 床に道具を置く。n は情報パネルに出すいきさつ（落とした者など。判断には使わない） */
@@ -888,14 +904,19 @@ export function dropItem(this: Ecology, x: number, y: number, kind: number, fuel
   // 古い燃えさしから片づける（道具が増えすぎないように）
   if (this.gear.length > 160) {
     const i = this.gear.findIndex((o) => o.kind === ItemKind.Stub);
-    this.gear.splice(i >= 0 ? i : 0, 1);
+    const [gone] = this.gear.splice(i >= 0 ? i : 0, 1);
+    // 片づけた武具に宿っていた未練は、薄れて消えたことにする（マナの保存則）
+    if (isJobItem(gone.kind) && gone.fuel > 0) this.w.manaFaded += gone.fuel;
   }
 }
 
 /** 床に落ちた松明は燃え続け、燃え尽きると燃えさしになる */
 export function updateItems(this: Ecology): void {
   for (const it of this.gear) {
-    if (it.kind !== ItemKind.Torch) continue;
+    if (it.kind !== ItemKind.Torch) {
+      this.fadeRemnant(it);
+      continue;
+    }
     it.fuel--;
     if (it.fuel <= 0) it.kind = ItemKind.Stub;
   }

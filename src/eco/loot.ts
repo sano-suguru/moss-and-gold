@@ -28,6 +28,7 @@ export const TROPHY: Record<number, [string, string]> = {
   [Kind.Orc]: ['オークの斧', 'axe'],
   [Kind.Lizardman]: ['リザードマンの槍', 'spear'],
   [Kind.Golem]: ['ゴーレムの核', 'eye'],
+  [Kind.Armor]: ['動く甲冑の冑', 'helm'],
   [Kind.Gargoyle]: ['ガーゴイルの角', 'horn'],
   [Kind.Mimic]: ['ミミックの歯', 'fang'],
   [Kind.Spider]: ['大グモの毒牙', 'fang'],
@@ -47,8 +48,10 @@ export function takeTrophy(this: Ecology, p: Party, lead: Cr): void {
     const t = this.byId.get(p.aimId ?? 0);
     k = t ? t.k : a === 2 ? Kind.Dragon : this.rumors.beastKind || Kind.Troll;
   } else if (a === 4) {
-    // アンデッド祓い：リッチを倒していれば杖、ほかは骨の冠
+    // アンデッド祓い：リッチを倒していれば杖、リビングアーマーが崩れていれば冑（生き物の更新3000回の内に、目標の10マスの内で）、ほかは骨の冠
     k = Kind.Skeleton;
+    const f = this.armorFalls;
+    for (let i = 0; i + 2 < f.length; i += 3) if (f[i + 2] >= this.step - 3000 && sq(f[i] - (p.aimX ?? 0)) + sq(f[i + 1] - (p.aimY ?? 0)) < 10 * TILE * 10 * TILE) k = Kind.Armor;
     for (const o of this.corpses) if (o.k === Kind.Lich && o.dead === 1 && sq(o.x - (p.aimX ?? 0)) + sq(o.y - (p.aimY ?? 0)) < 10 * TILE * 10 * TILE) k = Kind.Lich;
   } else k = Kind.Goblin;
   const alive = p.members.map((id) => this.byId.get(id)).filter((c): c is Cr => !!c && !c.dead);

@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-const K = { Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Dragon: 24, Adventurer: 25 };
+const K = { Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Dragon: 24, Adventurer: 25, Armor: 29 };
 
 export interface Moment {
   key: string;
@@ -74,6 +74,11 @@ export const MOMENTS: Moment[] = [
   { key: 'retire', label: '英雄が引退した' },
   { key: 'scar', label: '傷の残った帰還（眼帯・包帯）' },
   { key: 'orcBluff', label: 'オークが威嚇して退いた' },
+  { key: 'armorRise', label: 'リビングアーマー：武具が寄り集まって立ち上がった' },
+  { key: 'armorAbsorb', label: 'リビングアーマー：武具を取り込んだ（床の物と奪った物）' },
+  { key: 'armorRob', label: 'リビングアーマー：倒した相手の武具を奪って取り込んだ' },
+  { key: 'armorFall', label: 'リビングアーマー：崩れて武具が散らばった' },
+  { key: 'armorSlain', label: 'リビングアーマー：冒険者かドワーフに倒された' },
 ];
 
 const DAY = 14400;
@@ -202,6 +207,11 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     retire: ev(K.Adventurer, 'retire').length,
     scar: ev(K.Adventurer, 'scar').length,
     orcBluff: ev(K.Orc, 'bluff').length,
+    armorRise: b.filter((x) => x.k === K.Armor && x.origin === 'gear').length,
+    armorAbsorb: ev(K.Armor, 'absorb').length,
+    armorRob: ev(K.Armor, 'absorb').filter((x) => x.how === 'rob').length,
+    armorFall: ev(K.Armor, 'fall').length,
+    armorSlain: d.filter((x) => x.k === K.Armor && (x.by === K.Adventurer || x.by === 28)).length,
   };
 }
 

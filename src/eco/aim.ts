@@ -15,7 +15,7 @@ import { ADV_NAMES, AIM_NAMES, JOB_NAMES } from '../names';
 import { heroTitle } from './roster';
 
 const DRAGONS = [Kind.Dragon, Kind.Wyvern, Kind.Worm];
-const UNDEAD = [Kind.Zombie, Kind.Skeleton, Kind.Lich, Kind.Ghost];
+const UNDEAD = [Kind.Zombie, Kind.Skeleton, Kind.Lich, Kind.Ghost, Kind.Armor];
 /** ゴブリン退治の一行が来る噂の強さ */
 export const GOBLIN_HUNT_AT = 0.5;
 /** ゴブリン退治の一行が来る、生還者が伝えた盗みの回数 */

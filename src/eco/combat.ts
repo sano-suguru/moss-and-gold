@@ -4,6 +4,7 @@ import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, 
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
+import { ARMOR_HAND_MAX, ARMOR_HP_MUL } from './armor';
 
 /** 攻める側の勝つ確率は、近くの仲間を含めた強さの比で決まる。負けた側は死ぬことがある */
 /** 強さ：冒険者は職業と一行の格で決まる */
@@ -12,6 +13,8 @@ export function str(this: Ecology, c: Cr): number {
   // スケルトンは生前の装備で強さが決まる。武器を拾ったゴブリンとオークは強くなる
   if (c.k === Kind.Skeleton) return c.init ? JOB_STR[c.sp] * 1.2 : 3;
   if (c.k === Kind.Dwarf) return DWARF_STR[c.sp];
+  // リビングアーマーは、手に取り込んだ武器と盾1つごとに強くなる（src/eco/armor.ts）
+  if (c.k === Kind.Armor) return STR[c.k] + 3 * Math.min(ARMOR_HAND_MAX, this.armorHand(c).length);
   if ((c.k === Kind.Goblin || c.k === Kind.Orc) && c.party) return STR[c.k] * 1.6;
   // 特別な個体
   if (c.elite === 1) return 12;
@@ -160,6 +163,8 @@ export function hunt(this: Ecology, c: Cr, R: number, kinds: Kind[], speed: numb
 
 /** 体力の上限（強さに比例） */
 export function maxHp(this: Ecology, c: Cr): number {
+  // リビングアーマー（空の鎧）は固い（src/eco/armor.ts の ARMOR_HP_MUL）
+  if (c.k === Kind.Armor) return Math.round(4 + this.str(c) * ARMOR_HP_MUL);
   return Math.round(4 + this.str(c) * 5);
 }
 
@@ -212,7 +217,7 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
   // 寝込みの一打ち：焚き火で眠っている冒険者への最初の一打ちは重く（1.5倍）、その打ち合いでは打ち返されない（src/eco/night.ts）
   const asleep = this.nightHit(a, d);
   if (this.strike(a, d, asleep ? 1.5 : 1)) {
-    if (a.k === Kind.Skeleton || a.k === Kind.Lich || a.k === Kind.Dwarf || a.k === Kind.Golem || a.k === Kind.Gargoyle || (a.k === Kind.Adventurer && d.k !== Kind.Rat)) this.die(d, 'fight', a.k);
+    if (a.k === Kind.Skeleton || a.k === Kind.Lich || a.k === Kind.Dwarf || a.k === Kind.Golem || a.k === Kind.Gargoyle || a.k === Kind.Armor || (a.k === Kind.Adventurer && d.k !== Kind.Rat)) this.die(d, 'fight', a.k);
     else this.eat(a, d, true);
     return true;
   }
@@ -222,6 +227,11 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
     d.actT = 0;
     if (this.strike(d, a, 0.8)) {
       this.die(a, 'fight', d.k);
+      // リビングアーマーは、打ち返しで倒した相手も覚える（その落とし物を「奪って」取り込む。src/eco/armor.ts）
+      if (d.k === Kind.Armor) {
+        d.ref = a.id;
+        d.ref2 = this.step;
+      }
       return false;
     }
   }
@@ -233,7 +243,7 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
   const mx = this.maxHp(c);
   if (c.hp <= 0 || c.hp > mx) c.hp = mx;
   // 回復：ゆっくり。住みかや巣、食べたばかりなら早く。トロールは見る間にふさがる（炎の傷は除く）。骨と石は自分では治らない
-  if (c.hp < mx && c.k !== Kind.Skeleton && c.k !== Kind.Golem && c.k !== Kind.Gargoyle) {
+  if (c.hp < mx && c.k !== Kind.Skeleton && c.k !== Kind.Golem && c.k !== Kind.Gargoyle && c.k !== Kind.Armor) {
     const home = sq(c.hx - c.x) + sq(c.hy - c.y) < 3 * TILE * 3 * TILE && (c.hx || c.hy);
     const every = c.k === Kind.Troll ? 8 : c.sleep > 0 ? 12 : home || c.sinceMeal < 200 ? 20 : 60;
     if (this.step % every === c.id % every) {

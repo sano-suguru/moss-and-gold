@@ -3044,6 +3044,62 @@ function fireSpirit(act,f){
  setPx(fr,10,12,[60,16,10],false);setPx(fr,14,12,[60,16,10],false);if(at){setPx(fr,11,15,[60,16,10],false);setPx(fr,12,15,[60,16,10],false);setPx(fr,13,15,[60,16,10],false)}
  return {...fr,ax:12,ay:H-2};
 }
+/**
+ * リビングアーマー：人の形をしていない。胸当てと冑だけが宙に浮く芯で、手足は無い。継ぎ目と胸当ての下の空洞から青白いマナの光が漏れる
+ * （光を帯びたときに光る模様の点。描画が強さを渡して、マナが減るとちらつく。src/creatureView.ts）。
+ * 体になった武具と、取り込んだ武器・盾は、描画のときに床の道具の絵を芯のまわりに重ねる（下にぶら下がる・周りを巡る。src/creatureView.ts）
+ */
+const ARMOR_EYE=[52,70,92],ARMOR_RUST=[[110,62,36],[140,84,48]];
+function armorHelm(eyes){return(dir,P,x,y,dead,open,k)=>{
+ const side=dir==='side',back=dir==='up',K=k,o=side?0.4*K:0;
+ // 天辺の平らな大兜：裾がわずかに広がり、目の高さに横長の覗き穴、その下に通気の穴
+ P.push(PL([[x+o-3*K,y+2.6*K],[x+o-2.8*K,y-2.4*K],[x+o-2*K,y-3.2*K],[x+o+2*K,y-3.2*K],[x+o+2.8*K,y-2.4*K],[x+o+3*K,y+2.6*K]],'plate',2,{ol:1}));
+ P.push(LN(x+o-2.6*K,y-2.6*K,x+o+2.6*K,y-2.6*K,'plate',4,{no:1}),LN(x+o-2.8*K,y+2.2*K,x+o+2.8*K,y+2.2*K,'iron',1,{no:1}));
+ P.push(D(x+o+(side?-1.6:1.9)*K,y-2*K,ARMOR_RUST[0]));
+ if(back){P.push(LN(x,y-2.4*K,x,y+2*K,'iron',2,{no:1}));return}
+ if(side){
+  P.push(LN(x+o+0.8*K,y-0.6*K,x+o+3*K,y-0.6*K,'boot',0,{no:1}),D(x+o+2.2*K,y+1.2*K,RAMP.boot[0]));
+  eyes.push([x+o+2*K,y-0.6*K]);
+ }else{
+  P.push(LN(x-2.4*K,y-0.6*K,x+2.4*K,y-0.6*K,'boot',0,{no:1}),LN(x-2.4*K,y-0.6*K+1,x+2.4*K,y-0.6*K+1,'boot',0,{no:1}),LN(x,y-0.6*K+1,x,y+2*K,'plate',4,{no:1}));
+  [[-1.2,1.4],[1.2,1.4]].forEach(([a,b])=>P.push(D(x+a*K,y+b*K,RAMP.boot[0])));
+  eyes.push([x-1.2*K,y-0.6*K],[x+1.2*K,y-0.6*K]);
+ }
+}}
+function livingArmor(dir,act,f){
+ const W=24,H=28,cx=12,base=26,q=mod(f,4),mv=act==='move',at=act==='attack';
+ const P=[],glows=[],eyes=[];
+ const band=(x0,x1,y)=>{for(let x=Math.round(x0);x<=Math.round(x1);x++)glows.push([x,y])};
+ const finish=()=>{const fr=raster(W,H,P);for(const [gx,gy] of [...glows,...eyes]){const x=Math.round(gx),y=Math.round(gy);if(x<0||y<0||x>=W||y>=H)continue;const p=y*W+x;fr.px[p*4]=ARMOR_EYE[0];fr.px[p*4+1]=ARMOR_EYE[1];fr.px[p*4+2]=ARMOR_EYE[2];fr.px[p*4+3]=255;fr.mat[p]='glw'}return {...fr,ax:cx,ay:base}};
+ if(act==='death'){
+  // 床に落ちた胸当てと、転がった冑（光は消えている）
+  const sl=q===0?0:1;
+  P.push(E(cx-1,base-2.4-(1-sl)*2,5,2.6-sl*0.4,'plate',{ol:1}),PL([[cx-5.6,base-3],[cx-1,base-5],[cx-1,base-0.6],[cx-5,base-0.8]],'iron',2));
+  armorHelm([])('side',P,cx+4+sl*2,base-3.6-(1-sl)*4,true,false,1.1);
+  return finish();
+ }
+ const side=dir==='side',back=dir==='up';
+ // 宙に浮いて上下する。冑は胸当てより遅れて動く。攻めるときは前へ傾いて突き出る
+ const bob=mv?[0,-1,-1.5,-1][q]:[0,-0.6,-1,-0.6][q];
+ const hb=mv?[-1,0,-1,-1.5][q]:[-0.4,0,-0.6,-1][q];
+ const lean=at?[0,-1,2,1][q]:0;
+ const ty=base-9+bob,helmY=ty-9+hb;
+ const tx=cx+(side?lean:0),tyy=ty+(side?0:lean*0.5);
+ // 胸当ての下から垂れる草摺の板（ばらばらに浮く）と、空洞から漏れる光
+ const tassets=side?[[-1.6,0],[1.4,0.6]]:[[-3.2,0],[0,0.6],[3.2,0]];
+ for(const [dx,dy] of tassets){const sw=mv?[0.4,0,-0.4,0][(q+Math.round(dx))&3]:0;P.push(PL([[tx+dx-1.4+sw,tyy+5.6+dy],[tx+dx+1.4+sw,tyy+5.6+dy],[tx+dx+1.1+sw*1.5,tyy+8.4+dy],[tx+dx-1.1+sw*1.5,tyy+8.4+dy]],'iron',2,{ol:1}))}
+ // 肩当て：胸当ての脇に、離れて浮く
+ const pd=[[-6.4,-3.2],[6.4,-3.2]];
+ if(!side)for(const [dx,dy] of pd)P.push(E(tx+dx,tyy+dy+(mv?[0,0.5,0,-0.5][q]*(dx<0?1:-1):0),2.2,1.6,'plate',{ol:1}));
+ else P.push(E(tx-0.6,tyy-3.4,2.4,1.6,'plate',{ol:1}));
+ // 胸当て：色と錆の違う板金の継ぎはぎ
+ if(side){P.push(E(tx,tyy,3.4,4.4,'plate',{ol:1}),PL([[tx-3.2,tyy-1.6],[tx-0.6,tyy-3.8],[tx-0.6,tyy+4.2],[tx-2.8,tyy+3]],'iron',2),LN(tx+2.2,tyy-2.6,tx+2.6,tyy+2.4,'plate',4,{no:1}),D(tx-1.6,tyy+1,ARMOR_RUST[1]))}
+ else{P.push(E(tx,tyy,4.6,4.4,'plate',{ol:1}));if(!back)P.push(PL([[tx-4.4,tyy-1.6],[tx-0.4,tyy-3.8],[tx-0.4,tyy+4.2],[tx-3.6,tyy+3]],'iron',2),LN(tx,tyy-3.4,tx,tyy+3,'plate',4,{no:1}),D(tx+2.2,tyy+1.6,ARMOR_RUST[0]),D(tx-2,tyy-2,ARMOR_RUST[1]),D(tx+1.4,tyy-2.6,ARMOR_RUST[0]));else P.push(LN(tx,tyy-3.4,tx,tyy+3,'iron',1,{no:1}),D(tx-1.6,tyy+1,ARMOR_RUST[0]))}
+ // 光：首の隙間、胸当ての下の空洞、肩の付け根
+ if(side){band(tx-0.6,tx+1.8,tyy-6);band(tx-2,tx+2,tyy+5.2)}else{band(tx-1.6,tx+1.6,tyy-6);band(tx-3,tx+3,tyy+5);band(tx-1,tx+1,tyy+4.2);band(tx-4.6,tx-4.2,tyy-3.4);band(tx+4.2,tx+4.6,tyy-3.4)}
+ armorHelm(eyes)(back?'up':side?'side':'down',P,tx+(side?0.4+lean*0.5:0),helmY+(side?0:lean*0.4),false,false,1.3);
+ return finish();
+}
 /** 亡霊の騎士：青白く透ける鎧の騎士。兜の覗き穴が光り、裾は点描で透けて消える。剣を持つ。act attack は剣を振り上げる */
 function phantomKnight(act,f){
  const q=mod(f,4),W=26,H=34,fr=blank(W,H),at=act==='attack';
@@ -3213,4 +3269,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

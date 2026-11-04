@@ -136,7 +136,7 @@ export function canSense(this: Ecology, c: Cr, o: Cr): boolean {
     case 'echo':
       return d2 < 36 * T2 && los();
     case 'magic':
-      return d2 < 64 * T2 && ![Kind.Zombie, Kind.Skeleton, Kind.Ghost, Kind.Lich, Kind.Golem, Kind.Gargoyle, Kind.Wisp].includes(o.k);
+      return d2 < 64 * T2 && ![Kind.Zombie, Kind.Skeleton, Kind.Ghost, Kind.Lich, Kind.Golem, Kind.Gargoyle, Kind.Wisp, Kind.Armor].includes(o.k);
     default:
       if (d2 < 25 * T2) return los();
       return d2 < 64 * T2 && this.isLit(o) && los();
@@ -474,14 +474,14 @@ export function noise(this: Ecology, x: number, y: number, r: number, s = 0): vo
 }
 
 /** 足音を立てる重い者と、うなる者（生き物の更新8回ごとに、生き物を順に） */
-const HEAVY = new Set<number>([Kind.Troll, Kind.Minotaur, Kind.Orc, Kind.Basilisk, Kind.Golem, Kind.Worm, Kind.Skeleton, Kind.Zombie, Kind.Lizardman]);
+const HEAVY = new Set<number>([Kind.Troll, Kind.Minotaur, Kind.Orc, Kind.Basilisk, Kind.Golem, Kind.Worm, Kind.Skeleton, Kind.Zombie, Kind.Lizardman, Kind.Armor]);
 const GROWL = new Set<number>([Kind.Troll, Kind.Minotaur, Kind.Orc, Kind.Basilisk, Kind.Wyvern, Kind.Dragon, Kind.Lizard, Kind.Zombie, Kind.Vampire]);
 export function creatureSounds(this: Ecology): void {
   if (!this.parties.length) return;
   for (const c of this.list) {
     if (c.dead || c.away || c.sleep > 0 || c.k === Kind.Adventurer) continue;
     const heavy = HEAVY.has(c.k) || (c.k === Kind.Dragon && c.sp >= 1);
-    if (heavy && c.act === 1 && ih(c.id, this.step >> 3, 300) % 3 === 0) this.noise(c.x, c.y, c.k === Kind.Skeleton || c.k === Kind.Zombie || c.k === Kind.Lizardman ? 7 : 9, 1);
+    if (heavy && c.act === 1 && ih(c.id, this.step >> 3, 300) % 3 === 0) this.noise(c.x, c.y, c.k === Kind.Skeleton || c.k === Kind.Zombie || c.k === Kind.Lizardman || c.k === Kind.Armor ? 7 : 9, 1);
     else if (GROWL.has(c.k) && (c.hungry > 0 || this.w.tick - c.hitAt < 150) && ih(c.id, this.step >> 3, 301) % 8 === 0) this.noise(c.x, c.y, c.k === Kind.Dragon || c.k === Kind.Troll || c.k === Kind.Minotaur ? 12 : 9, 2);
   }
 }

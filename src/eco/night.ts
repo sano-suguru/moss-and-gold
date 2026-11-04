@@ -48,6 +48,7 @@ export function campFoe(this: Ecology, o: Cr): boolean {
     case Kind.Basilisk:
     case Kind.Skeleton:
     case Kind.Lich:
+    case Kind.Armor:
     case Kind.Golem:
     case Kind.Wyvern:
     case Kind.Dragon:
