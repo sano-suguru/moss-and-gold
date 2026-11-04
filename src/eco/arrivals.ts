@@ -62,7 +62,10 @@ export function pickDoor(this: Ecology, k: Kind, salt: number): number {
   }
   if (k === Kind.Goblin) {
     const founding = !this.camps.some((o) => o.id >= 0 && o.kind === 0);
-    open = open.filter((i) => !this.dragonNearMouth(i) && (!founding || this.gobMouthOk[i] === 1));
+    open = open.filter((i) => !this.dragonNearMouth(i) && (!founding || this.gobMouthOk[i] >= 1));
+    // 食べ物の足りる場所のある口があれば、貧しい場所しかない口より先に選ぶ
+    const rich = open.filter((i) => !founding || this.gobMouthOk[i] === 1);
+    if (rich.length) open = rich;
   }
   // 大ネズミは、まわり（道のり RAT_DOOR_REACH マス）で養える数に余裕のある口か天井の裂け目からだけ来る（裂け目からは、地表の横穴が一つも開いていない間だけ）
   if (k === Kind.Rat) {
@@ -248,11 +251,14 @@ export function arrivals(this: Ecology, day: number): void {
     if (!gcamps.length) {
       next();
       door = this.pickDoor(Kind.Goblin, Kind.Goblin);
-      const site = door >= 0 ? this.pickGoblinCamp(undefined, this.mouthSpot(door), Ecology.GOBLIN_MIN_FOOD) : -1;
+      // 食べ物の足りる場所が無ければ、貧しい場所に少ない群れで住みつく（その口の判定が 2 のとき）
+      let site = door >= 0 ? this.pickGoblinCamp(undefined, this.mouthSpot(door), Ecology.GOBLIN_MIN_FOOD) : -1;
+      const poor = site < 0 && door >= 0 && this.gobMouthOk[door] === 2;
+      if (poor) site = this.pickGoblinCamp(undefined, this.mouthSpot(door), Ecology.GOBLIN_POOR_FOOD);
       if (site >= 0) {
         this.lastArrival[Kind.Goblin] = this.step;
-        const cp = this.newCamp(site, 'arrive');
-        for (let i = 0; i < 5; i++) {
+        const cp = this.newCamp(site, 'arrive', 0, poor);
+        for (let i = 0; i < (poor ? Ecology.GOBLIN_POOR_BAND : 5); i++) {
           const g = enter(Kind.Goblin, 20, 45);
           g.ref = cp.id;
           // 持ってきた食べ物の一部を、集落の蓄えにする

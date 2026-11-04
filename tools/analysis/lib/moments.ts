@@ -45,6 +45,16 @@ export const MOMENTS: Moment[] = [
   { key: 'trophyHome', label: '戦利品を持ち帰った' },
   { key: 'trophyTake', label: '戦利品を手に入れた' },
   { key: 'abandon', label: '住処・集落を群れで捨てた' },
+  { key: 'gobArrive', label: 'ゴブリンの群れが外から来て集落を作った' },
+  { key: 'gobPoor', label: 'ゴブリンの少ない群れが貧しい場所に集落を作った' },
+  { key: 'gobFound', label: 'ゴブリンの集落ができた（外から来た・引っ越し・分かれた）' },
+  { key: 'gobCampDays', label: 'ゴブリンの集落があった日数（一つ以上ある間。小数1桁）' },
+  { key: 'gobAbFood', label: 'ゴブリンが集落を捨てた：食べ物が尽きた' },
+  { key: 'gobAbRaids', label: 'ゴブリンが集落を捨てた：襲われすぎた' },
+  { key: 'gobAbAlone', label: 'ゴブリンが集落を捨てた：2匹未満になった' },
+  { key: 'gobAbDragon', label: 'ゴブリンが集落を捨てた：竜が近くに来た' },
+  { key: 'gobEmpty', label: 'ゴブリンの集落に誰もいなくなった' },
+  { key: 'gobHomeless', label: '集落の無いゴブリンが飢えて外へ去った（匹）' },
   { key: 'heroAgain', label: '同じ顔の再訪（2回目以上の遠征の冒険者）' },
   { key: 'rank1', label: '位が上がった：熟練' },
   { key: 'rank2', label: '位が上がった：歴戦' },
@@ -58,6 +68,52 @@ export const MOMENTS: Moment[] = [
   { key: 'scar', label: '傷の残った帰還（眼帯・包帯）' },
   { key: 'orcBluff', label: 'オークが威嚇して退いた' },
 ];
+
+const DAY = 14400;
+
+/**
+ * ゴブリンの集落が一つ以上あった長さ（日）。集落ごとに、できた（found）から、捨てた（abandon）か誰もいなくなった（empty）のうち早い方までを区間とし、
+ * 重なりをまとめて足す。終わりの記録が無い集落は実行の終わり（meta.json の tick）まで。since より前にできた集落は since から数える。
+ */
+function campDays(s: { k: number; ev: string; id: number; t: number }[], dir: string, since: number, pre: { k: number; ev: string; id: number; t: number }[]): number {
+  const metaP = join(dir, 'meta.json');
+  const end = existsSync(metaP) ? (JSON.parse(readFileSync(metaP, 'utf8')).tick as number) : Math.max(0, ...s.map((x) => x.t));
+  const t0 = Math.max(0, since);
+  const st = new Map<number, number>();
+  const en = new Map<number, number>();
+  // since より前にできて、since の時点でまだ終わっていなかった集落
+  for (const x of pre) {
+    if (x.k !== K.Goblin) continue;
+    if (x.ev === 'found') st.set(x.id, t0);
+    else if (x.ev === 'abandon' || x.ev === 'empty') st.delete(x.id);
+  }
+  for (const x of s) {
+    if (x.k !== K.Goblin) continue;
+    if (x.ev === 'found') st.set(x.id, x.t);
+    else if ((x.ev === 'abandon' || x.ev === 'empty') && st.has(x.id) && !en.has(x.id)) en.set(x.id, x.t);
+  }
+  const iv = [...st].map(([id, a]) => [a, en.get(id) ?? end]).sort((p, q) => p[0] - q[0]);
+  let tot = 0;
+  let cs = -1;
+  let ce = -1;
+  for (const [a, b] of iv) {
+    if (a > ce) {
+      if (ce > cs) tot += ce - cs;
+      cs = a;
+      ce = b;
+    } else ce = Math.max(ce, b);
+  }
+  if (ce > cs) tot += ce - cs;
+  return Math.round((10 * tot) / DAY) / 10;
+}
+
+const readAll = (dir: string, f: string) =>
+  existsSync(join(dir, f))
+    ? readFileSync(join(dir, f), 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map((l) => JSON.parse(l))
+    : [];
 
 const read = (dir: string, f: string, since: number) =>
   existsSync(join(dir, f))
@@ -73,6 +129,9 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
   const s = read(dir, 'settle.jsonl', since);
   const b = read(dir, 'births.jsonl', since);
   const d = read(dir, 'deaths.jsonl', since);
+  const x = read(dir, 'exits.jsonl', since);
+  const pre = since >= 0 ? readAll(dir, 'settle.jsonl').filter((r) => typeof r.t === 'number' && r.t <= since) : [];
+  const gobAb = (r: string) => s.filter((y) => y.k === K.Goblin && y.ev === 'abandon' && y.reason === r).length;
   const ev = (k: number, e: string) => s.filter((x) => x.k === k && x.ev === e);
   const rob = ev(K.Goblin, 'rob');
   const uniq = (a: { id: number; to?: number }[]) => new Set(a.map((x) => `${x.id},${x.to ?? ''}`)).size;
@@ -106,6 +165,16 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     hatch: b.filter((x) => x.origin === 'mana' && x.k === K.Dragon).length,
     march: ev(K.Rat, 'march').length,
     abandon: s.filter((x) => (x.k === K.Kobold || x.k === K.Goblin) && x.ev === 'abandon').length,
+    gobArrive: ev(K.Goblin, 'found').filter((y) => y.how === 'arrive').length,
+    gobPoor: ev(K.Goblin, 'found').filter((y) => y.poor === 1).length,
+    gobFound: ev(K.Goblin, 'found').length,
+    gobCampDays: campDays(s, dir, since, pre),
+    gobAbFood: gobAb('food'),
+    gobAbRaids: gobAb('raids'),
+    gobAbAlone: gobAb('alone'),
+    gobAbDragon: gobAb('dragon'),
+    gobEmpty: ev(K.Goblin, 'empty').length,
+    gobHomeless: x.filter((y) => y.k === K.Goblin && y.reason === 'starving').length,
     tribute: ev(K.Orc, 'tribute').length,
     heroAgain: ev(K.Adventurer, 'hero').filter((x) => (x.how ?? 0) >= 2).length,
     rank1: ev(K.Adventurer, 'rank').filter((x) => x.how === 1).length,
@@ -128,7 +197,9 @@ export function momentCell(vals: number[]): string {
   const s = [...vals].sort((a, b) => a - b);
   const med = n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0;
   const ok = hit >= Math.ceil(n * 0.75);
-  return `${ok ? '✅' : '❌'} ${hit}/${n}（計 ${vals.reduce((a, v) => a + v, 0)}、中央値 ${med}）`;
+  // 日数などの小数の値は、足したときの丸めの誤差を表に出さない
+  const r1 = (v: number) => Math.round(v * 10) / 10;
+  return `${ok ? '✅' : '❌'} ${hit}/${n}（計 ${r1(vals.reduce((a, v) => a + v, 0))}、中央値 ${r1(med)}）`;
 }
 
 /** 見せたい場面の表（複数の実行の組を列に並べる）。runs[i][j] は組 i のシード j の回数 */
