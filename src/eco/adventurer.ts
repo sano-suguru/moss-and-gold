@@ -492,11 +492,12 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     this.markNotice(c, f, '!');
     c.dir = Math.abs(f.x - c.x) > Math.abs(f.y - c.y) ? (f.x > c.x ? 2 : 3) : f.y > c.y ? 0 : 1;
     if (c.sp === Job.Wizard) {
-      // 炎の呪文：敵を焼き、足もとの苔も焼いてしまう
+      // 炎の呪文：離れた所から敵を焼き（毎回当たる。打ち合いの一打ちの半分ほど）、敵の足もとの苔とキノコも焼いてしまう（scorchMoss）。
+      // 燃える床は作らない（以前は敵の足もとに火をつけ、そばで打ち合う仲間の冒険者がその火で焼け死んでいた。燃える床はドラゴンの炎だけ）
       c.act = 2;
       c.actT = 0;
-      this.ignite(this.tileOf(f.x, f.y), 14);
-      if (ih(c.id, f.id, this.step) % 3 === 0 && this.strike(c, f, 0.8)) this.die(f, 'fight', c.k);
+      this.scorchMoss(this.tileOf(f.x, f.y));
+      if (this.strike(c, f, 0.5)) this.die(f, 'fight', c.k);
       return;
     }
     if (c.sp === Job.Hunter) {

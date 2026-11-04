@@ -14,7 +14,51 @@ export function ignite(this: Ecology, k: number, dur: number): void {
   this.w.fxDirty = true;
 }
 
-/** 燃えているマス：苔とキノコは灰になって土に返り、上にいる生き物は焼け死に、巣は燃え落ちる。火が消えると焼け跡が残る */
+/** マスの苔とキノコを焼く（燃える床は作らない。焼けた分は土の養分に返る。魔法使いの炎の呪文から） */
+export function scorchMoss(this: Ecology, k: number): void {
+  if (k < 0 || k >= this.w.map.solid.length) return;
+  if (this.w.moss[k]) {
+    this.w.nutr[k] += this.w.moss[k];
+    this.w.moss[k] = 0;
+    this.mossTouched = true;
+  }
+  if (this.w.fungus[k]) {
+    this.w.nutr[k] += this.w.fungus[k];
+    this.w.fungus[k] = 0;
+    this.mossTouched = true;
+  }
+}
+
+/** 燃える床の上にいる者が受けるダメージ（生き物の更新4回ごとに、最大の体力のこの割合。逃げ遅れると数回で倒れる） */
+const FLOOR_BURN = 0.15;
+/** 炎に焼かれない者 */
+const FIREPROOF = [Kind.Dragon, Kind.Golem, Kind.Worm, Kind.Ghost, Kind.Salamander];
+
+/**
+ * 炎で傷を負う（燃える床とドラゴンの炎から）。体力が尽きれば焼け死ぬ（手を下した種は by）。
+ * やられそうになったヴァンパイアは、ばらけられるならコウモリの群れにばらけて逃げる（src/eco/vampire.ts の vampCanScatter）
+ */
+export function burnHurt(this: Ecology, o: Cr, dmg: number, by: number): void {
+  if (o.hp <= 0) o.hp = this.maxHp(o);
+  o.hp -= dmg;
+  o.hitAt = this.w.tick;
+  o.sleep = 0;
+  this.fxHits.push({ t: this.w.tick, x: o.x, y: o.y, ax: o.x, ay: o.y + 8, id: o.id });
+  if (this.fxHits.length > 120) this.fxHits.splice(0, 40);
+  if (o.k === Kind.Vampire && o.hp < this.maxHp(o) * 0.35 && this.vampCanScatter(o)) {
+    o.hp = Math.max(1, o.hp);
+    this.vampScatter(o);
+    return;
+  }
+  if (o.hp <= 0) this.die(o, 'burned', by);
+  else if (o.k === Kind.Adventurer) this.heroHurt(o);
+}
+
+/**
+ * 燃えているマス：苔とキノコは灰になって土に返り、上にいる生き物は少しずつ焼かれ（生き物の更新4回ごとに最大の体力の15％。FLOOR_BURN）、巣は燃え落ちる。
+ * 火が消えると焼け跡が残る。燃える床を作るのはドラゴンの炎だけ（以前は魔法使いの呪文も作り、そばで打ち合う仲間を焼いていた）。
+ * 以前は、燃えるマスの上にいる者は強さにかかわらずその場で焼け死んでいた
+ */
 export function updateFire(this: Ecology): void {
   if (!this.burning.length) return;
   const m = this.w.map;
@@ -36,9 +80,9 @@ export function updateFire(this: Ecology): void {
       const x = (k % m.w) * TILE + 8;
       const y = Math.floor(k / m.w) * TILE + 8;
       this.nearby(x, y, 1, (o) => {
-        if (o.dead || o.away || [Kind.Dragon, Kind.Golem, Kind.Worm, Kind.Ghost, Kind.Salamander].includes(o.k)) return;
+        if (o.dead || o.away || FIREPROOF.includes(o.k)) return;
         if (this.airborne(o)) return;
-        if (Math.abs(o.x - x) < 9 && Math.abs(o.y - y) < 9) this.die(o, 'burned', Kind.Dragon);
+        if (Math.abs(o.x - x) < 9 && Math.abs(o.y - y) < 9) this.burnHurt(o, Math.max(2, this.maxHp(o) * FLOOR_BURN), Kind.Dragon);
       });
       this.webs = this.webs.filter((wb) => Math.abs(wb.x - x) > 10 || Math.abs(wb.y - y) > 10);
     }
@@ -74,13 +118,19 @@ export function breathe(this: Ecology, c: Cr, tx: number, ty: number, t: number)
       this.ignite(k, 30 + (ih(k, this.step, 130) % 20));
       if (!lit.includes(k)) lit.push(k);
     }
-  // 飛んでいる者（コウモリ、ワイバーン、ウィスプ）は、床に燃え残った火では焼けないが、吐いている炎そのものに当たれば焼ける
+  // 吐いている炎の先（この回に火がついたマス）にいる者は、ドラゴンの強さに応じた傷を負う（打ち合いの一打ちと同じくらい。炎が進む間に1〜2回当たる）。
+  // 飛んでいる者（コウモリ、ワイバーン、ウィスプ）は、床に燃え残った火では焼けないが、吐いている炎そのものには当たる。
+  // （以前は、飛んでいる者は炎に当たるとその場で焼け死に、地面にいる者は燃えるマスに立つとその場で焼け死んでいた）
+  const hit = new Set<Cr>();
   for (const k of lit) {
     const x = (k % m.w) * TILE + 8;
     const y = Math.floor(k / m.w) * TILE + 8;
     this.nearby(x, y, 1, (o) => {
-      if (o.dead || o.away || o === c || !this.airborne(o)) return;
-      if (Math.abs(o.x - x) < 9 && Math.abs(o.y - y) < 9) this.die(o, 'burned', Kind.Dragon);
+      if (o.dead || o.away || o === c || hit.has(o) || FIREPROOF.includes(o.k)) return;
+      if (Math.abs(o.x - x) < 9 && Math.abs(o.y - y) < 9) {
+        hit.add(o);
+        this.burnHurt(o, this.str(c) * (0.6 + ((ih(c.id, o.id ^ this.step, 162) % 1000) / 1000) * 0.6), Kind.Dragon);
+      }
     });
   }
 }
@@ -95,8 +145,10 @@ declare module '../ecology' {
     ignite: typeof ignite;
     updateFire: typeof updateFire;
     breathe: typeof breathe;
+    burnHurt: typeof burnHurt;
+    scorchMoss: typeof scorchMoss;
     airborne: typeof airborne;
   }
 }
 
-Object.assign(Ecology.prototype, { ignite, updateFire, breathe, airborne });
+Object.assign(Ecology.prototype, { ignite, updateFire, breathe, burnHurt, scorchMoss, airborne });
