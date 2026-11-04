@@ -574,6 +574,16 @@ export function buildAtlas(): Atlas {
   for (let d = 0; d < 8; d++) addFx(`arrow2:${d}`, fxArrow2(d) as RawFrame);
   for (let kind = 0; kind < 5; kind++) for (let col = 0; col < 8; col++) for (let f = 0; f < 4; f++) addFx(`bit:${kind}:${col}:${f}`, fxBit(kind, col, f) as RawFrame);
   for (let v = 0; v < 3; v++) addFx(`crack:${v}`, fxCrack(v) as RawFrame);
+  // クモの糸の繭（クモの巣にかかった獲物を巻いたもの）：0 大、1 中、2 小（食べられて細っていく）
+  {
+    const silk = { W: [236, 232, 220], w: [170, 164, 154], o: [70, 66, 62] };
+    const cocoons = [
+      ['..ooo..', '.oWWWo.', 'oWwWwWo', 'oWWwWWo', 'oWwWwWo', 'oWWwWWo', 'oWwWwWo', '.oWWWo.', '..ooo..'],
+      ['.ooo.', 'oWWWo', 'owWwo', 'oWWWo', 'owWwo', 'oWWWo', '.ooo.'],
+      ['.o.', 'oWo', 'owo', 'oWo', '.o.'],
+    ];
+    cocoons.forEach((rows, v) => addFx(`cocoon:${v}`, pattern(rows, silk, rows[0].length >> 1, rows.length - 1)));
+  }
   for (let k = 0; k < 3; k++) for (let v = 0; v < 3; v++) addFx(`stain:${k}:${v}`, fxStain(k, v) as RawFrame);
   // 気づいた印と、当たった印
   const markFrames: Record<string, number> = {};

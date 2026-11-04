@@ -648,6 +648,10 @@ export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
   // 獲物の体のマナは、食べた者へ受け渡される（食物連鎖で濃くなる）
   pred.mana += prey.mana;
   prey.mana = 0;
+  if (!prey.dead) {
+    this.fxEats.push({ t: this.w.tick, id: prey.id, k: prey.k, sp: prey.sp, by: pred.id, bk: pred.k, x: prey.x, y: prey.y, slain });
+    if (this.fxEats.length > 80) this.fxEats.splice(0, 20);
+  }
   const quick = prey.dead !== 0 || [Kind.Wisp, Kind.Slime, Kind.Ghost, Kind.Myconid].includes(prey.k) || pred.k === Kind.Worm || pred.k === Kind.Mimic || total <= 4;
   if (!quick) {
     this.record('deaths', { t: this.w.tick, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(slain ? { slain: 1 } : {}), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(this.inCamp(prey) ? { camp: 1 } : {}) } as never);
