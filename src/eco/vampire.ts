@@ -113,10 +113,15 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       // 火の明かりの中の獲物は狙わない。冒険者の焚き火は、細るのを待つ（src/eco/night.ts の campFire）
       return !(this.fireNear(o.x, o.y) && !this.weakCampAt(o.x, o.y));
     };
+    // 獲物を決めた（またはあきらめた）step を lure に持つ。決めてから生き物の更新240回たっても仕留められなければあきらめ、
+    // そのあと60回は次の獲物を探さない（明るい所の手前で待ち続けて、コウモリに群がられた獲物がいつまでも足止めされていた）
     let prey: Cr | null = c.ref ? this.byId.get(c.ref) ?? null : null;
-    if (prey && !ok(prey)) prey = null;
+    if (prey && (!ok(prey) || this.step - c.lure > 240)) {
+      if (ok(prey)) c.lure = this.step;
+      prey = null;
+    }
     if (!prey) c.ref = 0;
-    if (!prey && this.step % 10 === c.id % 10) {
+    if (!prey && this.step % 10 === c.id % 10 && this.step - c.lure > 60) {
       let fol = 0;
       for (const b of this.list) if (b.k === Kind.Bat && !b.dead && !b.away && b.ref2 === c.id) fol++;
       const R = 10 + 4 * Math.min(5, fol);
@@ -132,6 +137,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       });
       if (prey) {
         c.ref = (prey as Cr).id;
+        c.lure = this.step;
         // 分析用：コウモリ（2匹以上）が見つけた獲物の上を旋回しはじめた
         if (fol >= 2) this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'scout', id: c.id, n: (prey as Cr).k, x: Math.round((prey as Cr).x), y: Math.round((prey as Cr).y) } as never);
       }

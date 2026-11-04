@@ -1207,7 +1207,7 @@ export class CreatureView {
         // 眷属の目：いつも赤く光る（ときどきまばたき）
         const ph = Math.floor(t * 2 + c.id * 0.37) % 9;
         pushSprite(x + (flip ? -1 : 1) * (dir === 2 ? 1 : 0), yy + 0.05, lift + Math.max(4, (Ecology.bodySize(sp) || 6) * 1.5), false, A.redEyes(ph === 8 ? 3 : ph & 1), 0, 0);
-      } else if (hidden || (!isCorpse && (c.lure || (sp === Kind.Goblin && c.st === 17)) && !c.dead && c.act === 0 && !eco.isLit(c))) {
+      } else if (hidden || (!isCorpse && ((c.lure && sp !== Kind.Vampire) || (sp === Kind.Goblin && c.st === 17)) && !c.dead && c.act === 0 && !eco.isLit(c))) {
         const ph = Math.floor(t * 2 + c.id * 0.37) % 7;
         pushSprite(x, yy + 0.05, lift + (sp === Kind.Goblin ? 14 : 7), false, A.eyes(ph === 6 ? 3 : ph & 1), 0, 0);
       }
