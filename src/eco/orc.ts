@@ -16,7 +16,7 @@ export function pickLair(this: Ecology, near?: { x: number; y: number }): number
     const y = Math.floor(t.y / TILE) + (((h >>> 6) & 63) % 41) - 20;
     if (x < 2 || y < 2 || x >= m.w - 2 || y >= m.h - 2) continue;
     const k = y * m.w + x;
-    if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 20 || m.maze[k]) continue;
+    if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 20 || this.inLair(x * TILE + 8, y * TILE + 8)) continue;
     if (Math.abs(x - t.x / TILE) + Math.abs(y - t.y / TILE) < 12) continue;
     if ((ih(this.step, i, 209) % 100) / 100 < this.presenceAt(x * TILE + 8, y * TILE + 8) * 1.3) continue;
     return k;

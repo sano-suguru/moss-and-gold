@@ -1,38 +1,136 @@
 /** Ecology のメソッド：ミノタウロス、トロール、バジリスク、ガーゴイル、ミミック、ゴーレム、ワーム（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
-import { lineOfSight, TILE } from '../mapgen';
+import { LAIR_R, lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
 
-export function mazeTiles(this: Ecology): number[] {
+/** (x, y) がミノタウロスの縄張り（寝床から LAIR_R マスの内）か。x, y はピクセル */
+export function inLair(this: Ecology, x: number, y: number): boolean {
+  const L = this.w.map.lair;
+  return L.x >= 0 && sq(x / TILE - (L.x + 0.5)) + sq(y / TILE - (L.y + 0.5)) <= LAIR_R * LAIR_R;
+}
+
+/** 縄張りの床：寝床から、縄張りの中だけを通って歩いて行ける床（地形が変わったら作り直す） */
+export function lairTiles(this: Ecology): number[] {
   const m = this.w.map;
+  if (m.lair.x < 0) return [];
+  if (this.lairVer === this.w.digs.length) return this.lairTilesCache;
+  this.lairVer = this.w.digs.length;
   const out: number[] = [];
-  for (let k = 0; k < m.w * m.h; k++) if (m.maze[k] && !m.solid[k]) out.push(k);
+  const start = m.lair.y * m.w + m.lair.x;
+  if (!m.solid[start]) {
+    const seen = new Set<number>([start]);
+    const q = [start];
+    for (let h = 0; h < q.length; h++) {
+      const c = q[h];
+      out.push(c);
+      for (const d of NB4) {
+        const n = c + d[0] + d[1] * m.w;
+        if (seen.has(n) || m.solid[n] || m.lava[n]) continue;
+        seen.add(n);
+        if (sq((n % m.w) - m.lair.x) + sq(Math.floor(n / m.w) - m.lair.y) > LAIR_R * LAIR_R) continue;
+        q.push(n);
+      }
+    }
+  }
+  this.lairTilesCache = out;
   return out;
 }
 
+/** 獲物を引きずるのをあきらめるまでの、獲物が倒れてからの生き物の更新の回数（狩りに出た先の MINO_FAR マスから、引きずる速さで帰り着ける長さ） */
+export const MINO_DRAG = 1800;
+/** 引きずられる死骸と、ミノタウロスの体のあいだ（px。死骸が体に隠れず、引きずっている様子が見える長さ） */
+export const MINO_TAIL = 12;
+
+/** 寝床の中心（ピクセル）。仕留めた獲物はここまで引きずってから食べ、骨はここに積もる */
+export const LAIR_BED = 2.5 * TILE;
+
+/**
+ * ミノタウロスが縄張りの外へ狩りに出るのは、最後に食べてから生き物の更新 MINO_PROWL 回たってから。
+ * 狩りに出ると、寝床から MINO_FAR マスの内を歩き回り、ふだんより遠く（8マス）の獲物に気づく
+ */
+export const MINO_PROWL = 600;
+export const MINO_FAR = 30;
+
+/**
+ * ミノタウロス：寝床（マップ生成で決めた、深部の暗い行き止まりの奥）のまわりの縄張りを徘徊し、縄張りの中か、そのすぐ外で、何でも襲う。
+ * 腹が減ると（最後に食べてから MINO_PROWL 回）、寝床から MINO_FAR マスの内まで狩りに出る。
+ * 縄張りの主なので、飢えても外へ出ていかない（ほかの大物の leaveIfStarving を使わず、飢え死にするまで狩りを続ける）。
+ * 仕留めた獲物は寝床まで引きずっていってから食べる（feeding の dragToLair）。食べ残しの骨は寝床に積もる
+ */
 export function minotaur(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Minotaur];
-  if (this.leaveIfStarving(c)) return;
   if (c.act === 2 && c.actT < 5) return;
   const m = this.w.map;
-  const k = this.tileOf(c.x, c.y);
-  const inMaze = k >= 0 && m.maze[k] === 1;
-  // 迷路の中か、迷路のすぐ外で、何でも襲う
-  const nearMaze = inMaze || sq(c.x - c.hx) + sq(c.y - c.hy) < 16 * TILE * 16 * TILE;
-  if (nearMaze && this.hunt(c, inMaze ? 5 : 3, HUNT3, s.speed * 1.3)) return;
-  // 迷路の中を徘徊する
+  const home = this.inLair(c.x, c.y);
+  const prowl = c.sinceMeal > MINO_PROWL;
+  // 縄張りの中か、寝床から16マス（狩りに出ているときは MINO_FAR マス）の内で、何でも襲う
+  const far = prowl ? MINO_FAR : 16;
+  const nearHome = home || sq(c.x - c.hx) + sq(c.y - c.hy) < far * TILE * far * TILE;
+  if (nearHome && this.hunt(c, prowl ? 8 : home ? 5 : 3, HUNT3, s.speed * 1.3)) return;
+  // 縄張りの中を徘徊する（狩りに出ているときは、寝床から MINO_FAR マスの内の床を）
   c.act = 1;
   if (c.tx <= 0 || sq(c.tx - c.x) + sq(c.ty - c.y) < 10 * 10 || c.actT > 1200) {
-    const mz = this.mazeTiles();
-    if (!mz.length) return;
-    const t = mz[ih(c.id, this.step, 101) % mz.length];
+    let t = -1;
+    if (prowl && m.lair.x >= 0) {
+      for (let i = 0; i < 12 && t < 0; i++) {
+        const h = ih(c.id, this.step, 102 + i);
+        const x = m.lair.x + (h % (MINO_FAR * 2 + 1)) - MINO_FAR;
+        const y = m.lair.y + ((h >>> 8) % (MINO_FAR * 2 + 1)) - MINO_FAR;
+        if (x < 1 || y < 1 || x >= m.w - 1 || y >= m.h - 1) continue;
+        const k = y * m.w + x;
+        if (!m.solid[k] && !m.sealed[k] && !m.lava[k] && this.w.water[k] <= 20 && this.regionOf(k) === this.regionOf(m.lair.y * m.w + m.lair.x)) t = k;
+      }
+    }
+    if (t < 0) {
+      const lt = this.lairTiles();
+      if (!lt.length) return;
+      t = lt[ih(c.id, this.step, 101) % lt.length];
+    }
     c.tx = (t % m.w) * TILE + 8;
     c.ty = Math.floor(t / m.w) * TILE + 8;
     c.actT = 0;
   }
   this.goTo(c, c.tx, c.ty, s.speed);
+}
+
+/**
+ * ミノタウロスが、仕留めた獲物の死骸 d を寝床まで引きずる（生き物の更新ごと、ふだんの6割の速さで）。
+ * 死骸は、ミノタウロスの体の MINO_TAIL px うしろを付いてくる（そこが岩なら、ミノタウロスが動く前にいた所＝必ず歩ける床へ）。寝床に着いたか、
+ * 倒れてから生き物の更新 MINO_DRAG 回たっても着かなければ（道がふさがっているなど）、引きずるのをやめてその場で食べる。true なら今は引きずっている
+ */
+export function dragToLair(this: Ecology, c: Cr, d: Cr): boolean {
+  const m = this.w.map;
+  if (c.k !== Kind.Minotaur || m.lair.x < 0) return false;
+  const bx = m.lair.x * TILE + 8;
+  const by = m.lair.y * TILE + 8;
+  if (sq(d.x - bx) + sq(d.y - by) < LAIR_BED * LAIR_BED) return false;
+  // 死骸の actT は倒れてからの生き物の更新の回数（引きずるのは仕留めた直後からなので、引きずった回数とほぼ同じ）
+  if (d.actT > MINO_DRAG) return false;
+  const x0 = c.x;
+  const y0 = c.y;
+  c.act = 1;
+  this.goTo(c, bx, by, SPEC[c.k].speed * 0.6);
+  const dx = c.x - d.x;
+  const dy = c.y - d.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (sq(c.x - x0) + sq(c.y - y0) > 0.01 && dist > MINO_TAIL) {
+    const f = (dist - MINO_TAIL) / dist;
+    const nx = d.x + dx * f;
+    const ny = d.y + dy * f;
+    const k = this.tileOf(nx, ny);
+    if (k >= 0 && !m.solid[k]) {
+      d.x = nx;
+      d.y = ny;
+    } else {
+      d.x = x0;
+      d.y = y0;
+    }
+    // 寝床に着いた（分析用に記録する。n は獲物の種）
+    if (sq(d.x - bx) + sq(d.y - by) < LAIR_BED * LAIR_BED) this.record('settle', { t: this.w.tick, k: Kind.Minotaur, id: c.id, ev: 'drag', n: d.k, x: Math.round(d.x), y: Math.round(d.y) } as never);
+  }
+  return true;
 }
 
 export function troll(this: Ecology, c: Cr, day: number): void {
@@ -348,7 +446,9 @@ export function worm(this: Ecology, c: Cr): void {
 
 declare module '../ecology' {
   interface Ecology {
-    mazeTiles: typeof mazeTiles;
+    inLair: typeof inLair;
+    lairTiles: typeof lairTiles;
+    dragToLair: typeof dragToLair;
     minotaur: typeof minotaur;
     troll: typeof troll;
     basilisk: typeof basilisk;
@@ -359,4 +459,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { mazeTiles, minotaur, troll, basilisk, gargoyle, mimic, golem, worm });
+Object.assign(Ecology.prototype, { inLair, lairTiles, dragToLair, minotaur, troll, basilisk, gargoyle, mimic, golem, worm });

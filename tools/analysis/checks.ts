@@ -331,6 +331,19 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // ミノタウロス（src/eco/monsters.ts）：深部の行き止まりの縄張りで暮らし、仕留めた獲物を寝床まで引きずる（settle の drag）。
+    // 迷路をなくした変更のコードで0日目から実行すると、abc・seed30・seed5 は25日のうちに何度も引きずる（16シード×25日で14シード）
+    name: 'ミノタウロスが獲物を仕留めて寝床まで引きずる（abc・seed30・seed5 の合計で仕留める3回・引きずる1回以上）',
+    seeds: ['abc', 'seed30', 'seed5'],
+    from: 10,
+    to: 18,
+    test: (rs) => {
+      const kill = rs.map((r) => r.deaths.filter((x) => x.by === 15 && (x.cause === 'eaten' || x.cause === 'fight')).length);
+      const drag = rs.map((r) => r.settle.filter((x) => x.k === 15 && x.ev === 'drag').length);
+      return { ok: sum(kill) >= 3 && sum(drag) >= 1, value: rs.map((r, i) => `${r.seed} 仕留めた${kill[i]}・引きずった${drag[i]}`).join('、') };
+    },
+  },
+  {
     name: '四つの保存則がずれない',
     ...RUN_A,
     test: (rs) => {

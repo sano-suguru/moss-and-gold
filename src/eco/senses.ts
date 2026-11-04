@@ -430,7 +430,7 @@ export function pester(this: Ecology, c: Cr): boolean {
   return false;
 }
 
-/** 倒した獲物の死骸を、数秒かけて食べる（生き物の更新4回に1回、一口）。ほかの者に襲われたら食べるのをやめる（仕留める間の獲物の打ち返しは数えない）。true なら今は食べている */
+/** 倒した獲物の死骸を、数秒かけて食べる（生き物の更新4回に1回、一口。ミノタウロスは寝床まで引きずってから）。ほかの者に襲われたら食べるのをやめる（仕留める間の獲物の打ち返しは数えない）。true なら今は食べている */
 export function feeding(this: Ecology, c: Cr): boolean {
   if (!c.feed) return false;
   const d = this.byId.get(c.feed);
@@ -439,6 +439,8 @@ export function feeding(this: Ecology, c: Cr): boolean {
     c.feed = 0;
     return false;
   }
+  // ミノタウロスは、まず寝床まで引きずっていく（src/eco/monsters.ts）
+  if (this.dragToLair(c, d)) return true;
   c.dir = Math.abs(d.x - c.x) > Math.abs(d.y - c.y) ? (d.x > c.x ? 2 : 3) : d.y > c.y ? 0 : 1;
   if (this.step % 4 === c.id % 4) {
     const t = Math.min(5, d.units, s.cap - c.food);

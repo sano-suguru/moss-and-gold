@@ -218,9 +218,9 @@ export function decay(this: Ecology, c: Cr): void {
     if (c.actT > 8) c.dead = 2;
     return;
   }
-  // 何もされなければ、死骸はとてもゆっくり朽ちて土に返る。骨はさらに長く残る
+  // 何もされなければ、死骸はとてもゆっくり朽ちて土に返る。骨はさらに長く残る（ミノタウロスの縄張りの骨は、その4倍。寝床に骨が積もる）
   const stage = this.corpseStage(c);
-  const every = stage === 2 ? 400 : 60;
+  const every = stage === 2 ? (this.inLair(c.x, c.y) ? 1600 : 400) : 60;
   if (c.units > 0 && this.step % every === c.id % every) {
     c.units--;
     this.deposit(c.x, c.y, 1);

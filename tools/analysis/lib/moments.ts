@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-const K = { Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Dragon: 24, Adventurer: 25, Armor: 29 };
+const K = { Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29 };
 
 export interface Moment {
   key: string;
@@ -47,6 +47,9 @@ export const MOMENTS: Moment[] = [
   { key: 'cacheRaid', label: '置き場が大ネズミにあさられた' },
   { key: 'manaBirth', label: 'マナからの出現（幼竜を除く）' },
   { key: 'hatch', label: '幼竜の孵化' },
+  { key: 'minoBirth', label: 'ミノタウロス：縄張りでマナから生まれた' },
+  { key: 'minoKill', label: 'ミノタウロス：縄張りのそばで獲物を仕留めた（寝床から16マスの内でしか狩らない）' },
+  { key: 'minoDrag', label: 'ミノタウロス：仕留めた獲物を寝床まで引きずった' },
   { key: 'march', label: '大ネズミの引っ越しの列' },
   { key: 'hear', label: '聞き耳で止まる（一行が物音に立ち止まった）' },
   { key: 'trophyHome', label: '戦利品を持ち帰った' },
@@ -183,6 +186,9 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     cacheRaid: ev(K.Rat, 'cache').length,
     manaBirth: b.filter((x) => x.origin === 'mana' && x.k !== K.Dragon).length,
     hatch: b.filter((x) => x.origin === 'mana' && x.k === K.Dragon).length,
+    minoBirth: b.filter((x) => x.origin === 'mana' && x.k === K.Minotaur).length,
+    minoKill: d.filter((x) => x.by === K.Minotaur && (x.cause === 'eaten' || x.cause === 'fight')).length,
+    minoDrag: ev(K.Minotaur, 'drag').length,
     march: ev(K.Rat, 'march').length,
     abandon: s.filter((x) => (x.k === K.Kobold || x.k === K.Goblin) && x.ev === 'abandon').length,
     gobArrive: ev(K.Goblin, 'found').filter((y) => y.how === 'arrive').length,

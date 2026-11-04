@@ -18,7 +18,7 @@ export function pickWaterSite(this: Ecology, exclude: number): number {
   let bv = 1500;
   for (let i = 0; i < 160; i++) {
     const k = ih(this.step, i, 98) % (m.w * m.h);
-    if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 20 || m.maze[k]) continue;
+    if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 20 || this.inLair((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8)) continue;
     const x = k % m.w;
     const y = Math.floor(k / m.w);
     if (this.camps.some((o) => o.id !== exclude && Math.abs(o.x / TILE - x) + Math.abs(o.y / TILE - y) < 20)) continue;
