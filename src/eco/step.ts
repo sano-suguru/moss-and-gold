@@ -43,6 +43,11 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       this.metabolism(c);
       continue;
     }
+    // ヴァンパイアは、昼は住処の棺の中で眠る（src/eco/vampire.ts の vampCoffin）
+    if (c.k === Kind.Vampire && this.vampCoffin(c)) {
+      this.metabolism(c);
+      continue;
+    }
     // コウモリの群れにばらけたヴァンパイアは、住処へ飛ぶだけ（src/eco/vampire.ts の vampFly）
     if (c.k === Kind.Vampire && c.st === VAMP_SCATTER) {
       this.vampFly(c);

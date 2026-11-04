@@ -7,6 +7,8 @@ import type { World } from '../world';
 
 /** ヴァンパイアの状態（st）：コウモリの群れにばらけて飛んでいる */
 export const VAMP_SCATTER = 40;
+/** ヴァンパイアの状態（st）：昼のあいだ、住処の棺の中で眠っている */
+export const VAMP_COFFIN = 41;
 /** ばらけて逃げられる間隔（生き物の更新の回数。ゲーム内の1日） */
 const SCATTER_EVERY = DAY_TICKS_ECO / CR_EVERY;
 
@@ -260,6 +262,52 @@ export function vampFly(this: Ecology, c: Cr): void {
 }
 
 /**
+ * 棺：昼、住処（hx, hy）に戻ったヴァンパイアは棺に入って蓋を閉め、日が暮れると出てくる。
+ * 棺の中の間は誰にも狙われない（away として扱う）。ただし、僧侶か竜殺しの冒険者が棺のそば（2マス以内）まで来ると、
+ * 蓋が暴かれて、ヴァンパイアはその場で起き上がって打ち合う。棺はヴァンパイアが生きている間、住処にある（描画は src/creatureView.ts）。
+ * true なら、今は棺の中（ほかの行いをしない）
+ */
+export function vampCoffin(this: Ecology, c: Cr): boolean {
+  if (c.st === VAMP_COFFIN) {
+    let opener: Cr | null = null;
+    this.nearby(c.x, c.y, 2, (o) => {
+      if (o.k === Kind.Adventurer && !o.dead && !o.away && o.sleep === 0 && (o.sp === Job.Priest || o.sp === Job.Slayer) && sq(o.x - c.x) + sq(o.y - c.y) < sq(2 * TILE)) opener = o;
+    });
+    if (this.dayNow > 0.05 && !opener) {
+      c.sleep = 2;
+      c.act = 0;
+      return true;
+    }
+    c.st = 0;
+    c.away = false;
+    c.sleep = 0;
+    c.act = 0;
+    if (opener) {
+      const o = opener as Cr;
+      c.foe = o.id;
+      c.hitAt = this.w.tick;
+      this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'coffinOpened', id: c.id, n: o.sp, x: Math.round(c.x), y: Math.round(c.y) } as never);
+      this.log(c.x, c.y, `冒険者が{k:${Kind.Vampire}}の棺を暴いた`);
+    }
+    return false;
+  }
+  if (c.st === 0 && !c.dead && !c.away && this.dayNow > 0.05 && (c.hx || c.hy) && sq(c.hx - c.x) + sq(c.hy - c.y) < 14 * 14 && this.w.tick - c.hitAt > 120) {
+    c.st = VAMP_COFFIN;
+    c.away = true;
+    c.x = c.hx;
+    c.y = c.hy;
+    c.ref = 0;
+    c.feed = 0;
+    c.flee = 0;
+    c.sleep = 2;
+    c.act = 0;
+    this.paths.delete(c.id);
+    return true;
+  }
+  return false;
+}
+
+/**
  * ヴァンパイアの住処：縦穴 (tx, ty) から40マス以内で、歩いて洞窟の本体へ出られる、壁を背にした、昼でも暗い床のマス（まっすぐ測っていちばん近いもの）。
  * 従うコウモリがその天井にぶら下がる。なければ -1
  */
@@ -319,7 +367,8 @@ declare module '../ecology' {
     vampCanScatter: typeof vampCanScatter;
     vampScatter: typeof vampScatter;
     vampFly: typeof vampFly;
+    vampCoffin: typeof vampCoffin;
   }
 }
 
-Object.assign(Ecology.prototype, { vampire, batPinned, vampLair, vampCanScatter, vampScatter, vampFly });
+Object.assign(Ecology.prototype, { vampire, batPinned, vampLair, vampCanScatter, vampScatter, vampFly, vampCoffin });

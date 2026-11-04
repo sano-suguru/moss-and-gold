@@ -1,4 +1,4 @@
-import { heroSprite, heroBed, graveMarker, prayLight, adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache } from './sprites';
+import { heroSprite, heroBed, graveMarker, prayLight, adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -50,6 +50,7 @@ export interface Atlas {
   larder: (kind: number, tier: number) => number;
   /** 物資の置き場：0 空の残骸、1 減った、2 たっぷり */
   supply: (tier: number) => number;
+  coffin: (open: boolean) => number;
   furrow: (grown: number) => number;
   eyes: (f: number) => number;
   redEyes: (f: number) => number;
@@ -686,6 +687,8 @@ export function buildAtlas(): Atlas {
   raws.push(goblinCamp() as RawFrame);
   const hutFrame = raws.length;
   raws.push(reedHut() as RawFrame);
+  const coffinFrames = [raws.length, raws.length + 1];
+  raws.push(coffin(false) as RawFrame, coffin(true) as RawFrame);
   const cacheFrames: number[] = [];
   for (let tier = 0; tier < 3; tier++) {
     cacheFrames.push(raws.length);
@@ -868,6 +871,7 @@ export function buildAtlas(): Atlas {
     banner: bannerFrame,
     larder: (kind, tier) => larderFrames[kind][Math.max(0, Math.min(2, tier))],
     supply: (tier) => cacheFrames[Math.max(0, Math.min(2, tier))],
+    coffin: (open) => coffinFrames[open ? 1 : 0],
     furrow: (g) => furrowFrames[g ? 1 : 0],
     eyes: (f) => eyeFrames[f & 3],
     redEyes: (f) => redEyeFrames[f & 3],

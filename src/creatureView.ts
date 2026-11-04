@@ -2,7 +2,7 @@ import type { Atlas } from './atlas';
 import { BLOOD, Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
 import { RANK_AT, unpackLook } from './eco/roster';
-import { VAMP_SCATTER } from './eco/vampire';
+import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
 
 const MAX_SPRITES = 4096;
@@ -569,6 +569,16 @@ export class CreatureView {
     }
     // 物資の置き場：木箱と寝具（食料が減ると中身が減り、空になれば残骸）
     for (const o of eco.caches) if (inView(o.x, o.y, 24)) pushSprite(o.x, o.y + 6, 0, false, A.supply(o.food <= 0 ? 0 : o.food < 60 ? 1 : 2), 0, 2);
+    // ヴァンパイアの住処：棺（昼は蓋が閉じて中で眠り、夜は蓋がずれて空）と、まわりに残る血の跡（src/eco/vampire.ts の vampCoffin）
+    for (const v of eco.list) {
+      if (v.k !== Kind.Vampire || v.dead || !(v.hx || v.hy) || !inView(v.hx, v.hy, 40)) continue;
+      for (let i = 0; i < 5; i++) {
+        const a = ((v.id * 7 + i * 37) % 100) / 100 * 6.283;
+        const r = 10 + ((v.id + i * 13) % 9);
+        pushSprite(v.hx + Math.cos(a) * r, v.hy + 4 + Math.sin(a) * r * 0.5, 0, i % 2 === 1, A.blood(0, (v.id + i) & 3), 0, 2);
+      }
+      pushSprite(v.hx, v.hy + 2, 0, false, A.coffin(v.st !== VAMP_COFFIN), 0, 2);
+    }
     // コボルトの住処：畑の畝、奥の寝床、入口の飾り柱、罠
     for (const wr of eco.warrens) {
       if (wr.id < 0 || !inView(wr.x, wr.y, 96)) continue;
