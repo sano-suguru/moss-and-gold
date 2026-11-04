@@ -9,8 +9,16 @@
  * 近くで大きな音がしたとき（音の届く範囲の4割の内。src/eco/sleep.ts の wakeByNoise）。
  * 一行が起きている期間の終わり（wakeT、step 番号）のあいだは、眠りの印を付けない（syncLongSleep）。
  * 起きている期間が終わったとき、そのあいだに死者が出たか、一行の体力の平均が半分を切っていれば、焚き火を消して発つ。
+ *
+ * 夜襲（二歩目）：焚き火は休みの最後の3分の1で細る（campFire。火の怖さの届く範囲と光の輪が小さくなる）。
+ * 火を怖がる大物のうちトロールは、3割ほど飢えていれば細った焚き火の縁を越え、眠っている者を好んで狙う（src/eco/combat.ts の hunt）。
+ * 遠くの焚き火へ寄っていく動きは入れていない（トロールとヴァンパイアに60マス先の焚き火へ寄らせると、住処の外を出歩くことで生き物の流れが変わり、
+ * 16シード×25日でコボルトの飢え死にが約2倍になった）。夜襲を担うのは、焚き火の近くにいるトロールと、灯りに潜むオークが主。
+ * オークと住処を持たないコボルトは、焚き火の灯りのそばの暗がりに潜み、見張りがうとうとする隙に眠っている者を襲う（src/eco/senses.ts の lurk）。
+ * 眠る一行に忍び寄っているオークは唸らない。一行が起こされたら、一行の皆の強さで見極め、かなわなければ唸って退く（src/eco/orc.ts の orcWary）。
+ * ヴァンパイアは眠っている者を好んで血を吸う。眠っている者への最初の一打ちは1.5倍で、その打ち合いでは打ち返されない（寝込みの一打ち、nightHit）。
  */
-import { Cr, Ecology, Job, Kind, Party, ih, sq } from '../ecology';
+import { Cr, Ecology, Job, Kind, Party, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 起こされてから、敵が見えなくなっても構えている長さ（生き物の更新の回数。通常速度で約30秒） */
@@ -148,6 +156,88 @@ export function campWatch(this: Ecology, p: Party, alive: Cr[]): void {
   }
 }
 
+/**
+ * 焚き火の強さ（1 から 0.375）：休みの最後の3分の1で、火の怖さの届く範囲（4マス）が約1.5マスまで細り、光の輪も小さくなる。
+ * 休み始め（campAt）と休み終わりの予定（campUntil）の step 番号から決める（ロードし直しても同じ）
+ */
+export function campFire(this: Ecology, p: Party): number {
+  if ((p.camp ?? -1) < 0 || p.campAt === undefined) return 1;
+  const len = Math.max(1, (p.campUntil ?? 0) - p.campAt);
+  const f = (this.step - p.campAt) / len;
+  return f <= 2 / 3 ? 1 : Math.max(0.375, 1 - (f - 2 / 3) * 3 * 0.625);
+}
+
+/**
+ * 夜襲に出る火を怖がる大物（トロール）か：3割ほど飢えていれば、細った焚き火の縁を越える。
+ * （飢えが6割を超えた大物は、入口から出ていく＝leaveIfStarving に移って狩りをしないので、それより手前から）
+ * ミノタウロスは迷路のそばでしか狩らないので、迷路の近くで休む一行だけを繰り返し襲ってしまう（16シード×25日で seed41 だけで6人）。
+ * バジリスクは冒険者を獲物にしない。どちらも焚き火を怖がるまま
+ */
+export function nightRaider(this: Ecology, c: Cr): boolean {
+  return c.k === Kind.Troll && c.st !== 9 && c.sinceMeal > SPEC[c.k].starve * 0.3;
+}
+
+/** (x, y) を照らす火のうち、細った焚き火（冒険者の）があるか */
+export function weakCampAt(this: Ecology, x: number, y: number, r = 0): boolean {
+  const m = this.w.map;
+  for (const p of this.parties) {
+    if ((p.camp ?? -1) < 0 || this.campFire(p) >= 1) continue;
+    const fx = ((p.camp as number) % m.w) * TILE + 8;
+    const fy = Math.floor((p.camp as number) / m.w) * TILE + 8;
+    const R = Math.max(r, 4 * this.campFire(p)) * TILE;
+    if (sq(fx - x) + sq(fy - y) < R * R) return true;
+  }
+  return false;
+}
+
+/** c が (x, y) の火を怖がるか（夜襲に出る大物は、細った焚き火なら怖がらない） */
+export function fireDaunts(this: Ecology, c: Cr, x: number, y: number): boolean {
+  if (!this.fireNear(x, y)) return false;
+  if (this.nightRaider(c) && this.weakCampAt(x, y)) {
+    // 細った焚き火のほかに、怖い火がなければ越える
+    for (const f of this.fires()) {
+      if (sq(f[0] - x) + sq(f[1] - y) >= f[2] * f[2]) continue;
+      if (!this.weakCampAt(f[0], f[1])) return true;
+    }
+    return false;
+  }
+  return true;
+}
+
+/** 焚き火で眠っている冒険者か（夜襲の獲物。見張りのうとうとも含む） */
+export function campSleeper(this: Ecology, o: Cr): boolean {
+  if (o.k !== Kind.Adventurer || o.sleep <= 0 || o.dead) return false;
+  return (this.parties.find((q) => q.id === o.party)?.camp ?? -1) >= 0;
+}
+
+/**
+ * 眠る一行の強さの見積もり（オークの見極め）：一行が起きていなければ、起きている者（見張り、手当て中の僧侶）の分だけ。
+ * 眠っている一行は弱く見えるので、オークは威嚇して退かずに近づく。起こされた一行は、ふだんどおり全員の強さ
+ */
+export function campMight(this: Ecology, p: Party): number {
+  if ((p.camp ?? -1) < 0 || this.campAwake(p)) return this.partyMight(p);
+  let s = 0;
+  for (const id of p.members) {
+    const o = this.byId.get(id);
+    if (!o || o.dead || o.sleep > 0) continue;
+    s += this.str(o) * (o.hp > 0 ? o.hp / this.maxHp(o) : 1);
+  }
+  return s;
+}
+
+/** 寝込みの一打ち（fight から、打つ前に）：眠っている冒険者への最初の一打ちを記録する。true なら寝込み（重く打ち、打ち返されない） */
+export function nightHit(this: Ecology, a: Cr, d: Cr): boolean {
+  if (a.k === Kind.Adventurer || !this.campSleeper(d)) return false;
+  const p = this.parties.find((q) => q.id === d.party) as Party;
+  this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'nightHit', n: a.k, doze: this.watchDozing(p) ? 1 : 0, night: this.isNight() ? 1 : 0, x: Math.round(d.x), y: Math.round(d.y) } as never);
+  return true;
+}
+
+/** 焚き火で休む一行の者か（死の記録の camp の印。src/eco/move.ts） */
+export function inCamp(this: Ecology, o: Cr): boolean {
+  return o.k === Kind.Adventurer && (this.parties.find((q) => q.id === o.party)?.camp ?? -1) >= 0;
+}
+
 /** 一行が焚き火で起きているか（起こされて構えている間） */
 export function campAwake(this: Ecology, p: Party): boolean {
   return (p.camp ?? -1) >= 0 && (p.wakeT ?? 0) > this.step;
@@ -161,7 +251,15 @@ declare module '../ecology' {
     campPetty: typeof campPetty;
     campWatch: typeof campWatch;
     campAwake: typeof campAwake;
+    campFire: typeof campFire;
+    nightRaider: typeof nightRaider;
+    weakCampAt: typeof weakCampAt;
+    fireDaunts: typeof fireDaunts;
+    campSleeper: typeof campSleeper;
+    campMight: typeof campMight;
+    nightHit: typeof nightHit;
+    inCamp: typeof inCamp;
   }
 }
 
-Object.assign(Ecology.prototype, { campFoe, campWake, campHit, campPetty, campWatch, campAwake });
+Object.assign(Ecology.prototype, { campFoe, campWake, campHit, campPetty, campWatch, campAwake, campFire, nightRaider, weakCampAt, fireDaunts, campSleeper, campMight, nightHit, inCamp });

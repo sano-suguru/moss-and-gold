@@ -115,12 +115,14 @@ export function hunt(this: Ecology, c: Cr, R: number, kinds: Kind[], speed: numb
     if (!this.canSense(c, o)) return;
     // ゴブリンはコボルトの縄張りの中の獲物を追わない
     if (c.k === Kind.Goblin && this.inKoboldLand(o.x, o.y)) return;
-    if (Ecology.FEARS_FIRE.has(c.k) && c.sinceMeal < SPEC[c.k].starve * 0.85 && this.fireNear(o.x, o.y)) return;
+    // （夜襲に出る大物は、3割ほど飢えていれば、細った焚き火のそばの獲物も狙う。src/eco/night.ts）
+    if (Ecology.FEARS_FIRE.has(c.k) && c.sinceMeal < SPEC[c.k].starve * 0.85 && this.fireDaunts(c, o.x, o.y)) return;
     // 知性ある者は勝てない相手を避け、狡猾な者は自分より強い相手には挑まない
     const ts = this.str(o) * (o.hp > 0 ? o.hp / this.maxHp(o) : 1);
     if (tier >= 3 && ts > me * 1.1) return;
     if (tier === 2 && ts > me * 1.6) return;
-    const d = sq(o.x - c.x) + sq(o.y - c.y);
+    // 焚き火で眠っている冒険者は、近くにいるものとして好んで狙う（寝込みを襲う）
+    const d = (sq(o.x - c.x) + sq(o.y - c.y)) * (this.campSleeper(o) ? 0.25 : 1);
     if (d < bd) {
       bd = d;
       prey = o;
@@ -132,7 +134,8 @@ export function hunt(this: Ecology, c: Cr, R: number, kinds: Kind[], speed: numb
   c.act = 1;
   const d2 = sq(p.x - c.x) + sq(p.y - c.y);
   if (d2 < 11 * 11) {
-    if (STR[p.k] * 2 < STR[c.k]) this.eat(c, p);
+    // 焚き火で休む冒険者は、一口で食べずに打ち合う（寝込みの一打ちと、飛び起きた一行の応戦を見せる。src/eco/night.ts）
+    if (STR[p.k] * 2 < STR[c.k] && !this.inCamp(p)) this.eat(c, p);
     else this.fight(c, p);
   } else if (c.k === Kind.Minotaur && d2 > 2 * TILE * 2 * TILE) {
     // 一直線に突進し、壁にぶつかると一瞬よろめく
@@ -206,13 +209,15 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
   a.act = 2;
   a.actT = 0;
   if (a.hp <= 0) a.hp = this.maxHp(a);
-  if (this.strike(a, d)) {
+  // 寝込みの一打ち：焚き火で眠っている冒険者への最初の一打ちは重く（1.5倍）、その打ち合いでは打ち返されない（src/eco/night.ts）
+  const asleep = this.nightHit(a, d);
+  if (this.strike(a, d, asleep ? 1.5 : 1)) {
     if (a.k === Kind.Skeleton || a.k === Kind.Lich || a.k === Kind.Dwarf || a.k === Kind.Golem || a.k === Kind.Gargoyle || (a.k === Kind.Adventurer && d.k !== Kind.Rat)) this.die(d, 'fight', a.k);
     else this.eat(a, d);
     return true;
   }
-  // 打ち返し（逃げている者は打ち返さない）
-  if (d.flee <= 0 && this.str(d) > 0) {
+  // 打ち返し（逃げている者と、寝込みを打たれて飛び起きたばかりの者は打ち返さない）
+  if (d.flee <= 0 && this.str(d) > 0 && !asleep) {
     d.act = 2;
     d.actT = 0;
     if (this.strike(d, a, 0.8)) {

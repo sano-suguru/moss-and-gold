@@ -647,7 +647,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr): void {
   prey.mana = 0;
   const quick = prey.dead !== 0 || [Kind.Wisp, Kind.Slime, Kind.Ghost, Kind.Myconid].includes(prey.k) || pred.k === Kind.Goblin || pred.k === Kind.Worm || pred.k === Kind.Mimic || total <= 4;
   if (!quick) {
-    this.record('deaths', { t: this.w.tick, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}) } as never);
+    this.record('deaths', { t: this.w.tick, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(this.inCamp(prey) ? { camp: 1 } : {}) } as never);
     this.noteDeath(prey, 'eaten', pred.k, pred);
     this.raiseAlarm(prey, pred);
     this.paths.delete(prey.id);
@@ -674,7 +674,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr): void {
   }
   prey.units = 0;
   if (!prey.dead) {
-    this.record('deaths', { t: this.w.tick, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}) } as never);
+    this.record('deaths', { t: this.w.tick, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(this.inCamp(prey) ? { camp: 1 } : {}) } as never);
     // 仲間が食べられたら、群れに警戒が伝わる
     this.raiseAlarm(prey, pred);
   }
@@ -718,7 +718,7 @@ export function die(this: Ecology, c: Cr, cause = '', by = -1): void {
       near = -1;
       for (let q = 0; q < d.length; q++) if (d[q] >= 0 && Math.max(this.w.moss[q], this.w.fungus[q]) >= 20 && (near < 0 || d[q] < near)) near = d[q];
     }
-    this.record('deaths', { t: this.w.tick, k: c.k, cause, by, x: Math.round(c.x), y: Math.round(c.y), ...(near !== undefined ? { near } : {}), ...(c.k === Kind.Rat && c.st === 11 ? { march: 1 } : {}) } as never);
+    this.record('deaths', { t: this.w.tick, k: c.k, cause, by, x: Math.round(c.x), y: Math.round(c.y), ...(near !== undefined ? { near } : {}), ...(c.k === Kind.Rat && c.st === 11 ? { march: 1 } : {}), ...(this.inCamp(c) ? { camp: 1 } : {}) } as never);
     this.noteDeath(c, cause, by);
     // 住処の仲間が襲われて倒れたら、群れは覚えている（何度も続けば住処を捨てる）
     if (c.k === Kind.Kobold && by >= 0 && by !== Kind.Kobold && cause !== 'starve') {

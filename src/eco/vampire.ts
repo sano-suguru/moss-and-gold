@@ -40,7 +40,8 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
     this.nearby(c.x, c.y, 10, (o) => {
       if (o.dead || o.away || ![Kind.Rat, Kind.Goblin, Kind.Kobold, Kind.Lizardman, Kind.Adventurer].includes(o.k)) return;
       if (lightAt(this.tileOf(o.x, o.y)) > 60) return;
-      const d = sq(o.x - c.x) + sq(o.y - c.y);
+      // 焚き火で眠っている冒険者は、近くにいるものとして好んで狙う（src/eco/night.ts）
+      const d = (sq(o.x - c.x) + sq(o.y - c.y)) * (this.campSleeper(o) ? 0.25 : 1);
       if (d < bd) {
         bd = d;
         prey = o;
@@ -50,7 +51,8 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       const p = prey as Cr;
       c.act = 1;
       if (sq(p.x - c.x) + sq(p.y - c.y) < 11 * 11) {
-        const won = STR[p.k] * 2 < STR[c.k] ? (this.eat(c, p), true) : this.fight(c, p);
+        // 焚き火で休む冒険者は、一口で食べずに打ち合う（src/eco/night.ts）
+        const won = STR[p.k] * 2 < STR[c.k] && !this.inCamp(p) ? (this.eat(c, p), true) : this.fight(c, p);
         // 獲物の分け前を、従うコウモリに与える
         if (won) {
           this.nearby(c.x, c.y, 6, (b) => {

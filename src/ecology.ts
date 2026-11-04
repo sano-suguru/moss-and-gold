@@ -178,6 +178,8 @@ export interface Party {
   wakeN?: number;
   wakeX?: number;
   wakeY?: number;
+  /** 焚き火を囲みはじめた step 番号（焚き火が細るのを決める。src/eco/night.ts の campFire） */
+  campAt?: number;
   /** 最後に盗みを働いたゴブリンの集落（番号と、その時の場所）。生還者が町に伝える（盗みの噂）。robTold は伝えたか */
   robCamp?: number;
   robCX?: number;
