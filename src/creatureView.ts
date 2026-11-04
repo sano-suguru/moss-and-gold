@@ -508,11 +508,35 @@ export class CreatureView {
     }
   }
 
-  /** リビングアーマーの姿の種類：手の武器（大剣＞剣＞鎚矛＞短剣）、盾、3つ以上取り込んだら肩当て（atlas.ts の 'armor'） */
-  private armorLook(eco: Ecology, c: Cr): number {
-    const hand = eco.armorHand(c);
-    const w = hand.includes(10) ? 4 : hand.includes(2) ? 3 : hand.includes(5) ? 2 : hand.includes(6) ? 1 : 0;
-    return w + (hand.includes(3) ? 5 : 0) + (hand.length >= 3 ? 10 : 0);
+  /**
+   * リビングアーマーの武具の置き方（描画専用）：取り込んだ武器と盾が、芯（宙に浮く胸当てと冑）の周りをゆっくり巡る。
+   * 体になった武具は芯に溶け込んでいるので描かない（誕生のとき、芯へ寄り集まる演出で見せる）。
+   * 攻めるときは、最初に取り込んだ武具が向いている方へ飛び出して戻る。front は芯より手前に描くか
+   */
+  private armorGear(eco: Ecology, A: Atlas, c: Cr, x: number, y: number, lift: number, t: number): { x: number; y: number; lift: number; flip: boolean; frame: number; front: boolean }[] {
+    const kit = eco.armorKit.get(c.id) ?? [0];
+    const hand = kit.slice(1 + kit[0]);
+    const out: { x: number; y: number; lift: number; flip: boolean; frame: number; front: boolean }[] = [];
+    const ph = c.id * 0.731;
+    const n = hand.length;
+    const dir = [[0, 1], [0, -1], [1, 0], [-1, 0]][c.dir] ?? [0, 1];
+    const fly = c.act === 2 && c.actT < 4 ? [5, 11, 15, 8][c.actT] : 0;
+    hand.forEach((kd, i) => {
+      const a = t * 0.9 + (i * 6.2832) / n + ph;
+      const s = Math.sin(a);
+      let gx = x + Math.cos(a) * 13;
+      let gy = y + s * 4;
+      let gl = lift + 10 + Math.sin(t * 2.1 + i * 1.7) * 1.5;
+      let front = s >= 0;
+      if (i === 0 && fly) {
+        gx = x + dir[0] * fly;
+        gy = y + dir[1] * fly * 0.6 + 0.1;
+        gl = lift + 9;
+        front = true;
+      }
+      out.push({ x: gx, y: gy + (front ? 0.08 : -0.08), lift: gl, flip: Math.cos(a) < 0, frame: A.item(kd, Math.floor(t * 6) + i), front });
+    });
+    return out;
   }
 
   build(eco: Ecology, view: { x0: number; y0: number; x1: number; y1: number }, t: number, alpha: number, night: boolean): CreatureFrame {
@@ -971,6 +995,8 @@ export class CreatureView {
       if (sp === Kind.Zombie && act === 1) f = Math.floor(t * 4.5 + seed) & 3;
       if (sp === Kind.Ghost) lift = 6 + (Math.floor(t * 1.5 + seed) & 1);
       if (sp === Kind.Gargoyle && act !== 0 && !c.dead) lift = 10;
+      // リビングアーマーは宙に浮く
+      if (sp === Kind.Armor && !c.dead) lift = 5;
       if (sp === Kind.Wyvern && !c.dead) lift = 18 + (Math.floor(t * 2 + seed) & 1);
       if (sp === Kind.Dragon && c.st === 2 && !c.dead) lift = 20;
       if (sp === Kind.Dragon && c.away) continue;
@@ -1082,7 +1108,7 @@ export class CreatureView {
       const hidden = eco.isHidden(c);
       const isCorpse = c.dead === 1 && c.actT >= 4 && sp !== Kind.Wisp && sp !== Kind.Slime && sp !== Kind.Ghost && sp !== Kind.Myconid;
       const eliteName = ['', 'firespirit', 'pknight', '', '', '', 'wspirit', 'lspirit', '', 'mlord'][c.elite] ?? '';
-      let frame = !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : c.sp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Adventurer ? (c.sp >= 4 ? 8 + c.sp - 4 : c.sp * 2 + (c.torch > 0 && c.sp !== 1 ? 1 : 0)) : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][c.sp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? c.sp : sp === Kind.Armor ? this.armorLook(eco, c) : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
+      let frame = !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : c.sp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Adventurer ? (c.sp >= 4 ? 8 + c.sp - 4 : c.sp * 2 + (c.torch > 0 && c.sp !== 1 ? 1 : 0)) : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][c.sp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? c.sp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
       // 名簿の冒険者：一人ひとりの姿と位の装備（src/eco/roster.ts、src/sprites.ts の heroSprite）
       if (sp === Kind.Adventurer && !isCorpse) {
         const h = eco.heroOf(c);
@@ -1184,7 +1210,11 @@ export class CreatureView {
       }
       // 傷を受けた瞬間は白く光る
       const flash = !isCorpse && eco.w.tick - c.hitAt < 2 ? 20 : 0;
+      // リビングアーマーの武具（芯の後ろ側の分。手前の分は芯のあと）
+      const armorGear = sp === Kind.Armor && !c.dead && veil === 0 ? this.armorGear(eco, A, c, x, yy, lift, t) : null;
+      if (armorGear) for (const g of armorGear) if (!g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
       pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0), (c.id * 0.6180339) % 1);
+      if (armorGear) for (const g of armorGear) if (g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
       // 糸の繭を抱えて食べるクモ：体の手前に繭、巻き始めは白い糸の粒が繭のまわりを回る
       {
         const cc = this.eatCocoon.get(c.id);

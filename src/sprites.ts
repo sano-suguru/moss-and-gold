@@ -3045,9 +3045,9 @@ function fireSpirit(act,f){
  return {...fr,ax:12,ay:H-2};
 }
 /**
- * リビングアーマー：錆びかけた灰色の全身鎧で、中身は空。冑の覗き穴に青白い光が灯る（光を帯びたときに光る模様の点。
- * 描画が強さを渡して、マナが減ると光がちらつく。src/creatureView.ts）。
- * weapon：手に取り込んだ武器（none|dagger|mace|sword|greatsword）、shield：盾を持つか、pad：武具を3つ以上取り込んで肩当てが増えたか
+ * リビングアーマー：人の形をしていない。胸当てと冑だけが宙に浮く芯で、手足は無い。継ぎ目と胸当ての下の空洞から青白いマナの光が漏れる
+ * （光を帯びたときに光る模様の点。描画が強さを渡して、マナが減るとちらつく。src/creatureView.ts）。
+ * 体になった武具と、取り込んだ武器・盾は、描画のときに床の道具の絵を芯のまわりに重ねる（下にぶら下がる・周りを巡る。src/creatureView.ts）
  */
 const ARMOR_EYE=[52,70,92],ARMOR_RUST=[[110,62,36],[140,84,48]];
 function armorHelm(eyes){return(dir,P,x,y,dead,open,k)=>{
@@ -3066,65 +3066,38 @@ function armorHelm(eyes){return(dir,P,x,y,dead,open,k)=>{
   eyes.push([x-1.2*K,y-0.6*K],[x+1.2*K,y-0.6*K]);
  }
 }}
-function livingArmor(weapon,shield,pad,dir,act,f){
- // 人の形に組まれているが、首も腕も無い：冑・胴・籠手・脚甲がそれぞれ宙に浮き、隙間から青白いマナの光が漏れる。
- // 胴は色と錆の違う板金の継ぎはぎ。歩くと部品が少しずつずれて揺れる（冑は胴より遅れて上下する）
- const W=30,H=37,cx=15,feet=35,q=mod(f,4),mv=act==='move',at=act==='attack',K=1.4;
+function livingArmor(dir,act,f){
+ const W=24,H=28,cx=12,base=26,q=mod(f,4),mv=act==='move',at=act==='attack';
  const P=[],glows=[],eyes=[];
- const tool={none:null,dagger,mace,sword,greatsword}[weapon],off=shield?shieldOff:null;
- const finish=()=>{const fr=raster(W,H,P);for(const [gx,gy] of [...glows,...eyes]){const x=Math.round(gx),y=Math.round(gy);if(x<0||y<0||x>=W||y>=H)continue;const p=y*W+x;fr.px[p*4]=ARMOR_EYE[0];fr.px[p*4+1]=ARMOR_EYE[1];fr.px[p*4+2]=ARMOR_EYE[2];fr.px[p*4+3]=255;fr.mat[p]='glw'}return {...fr,ax:cx,ay:feet}};
+ const band=(x0,x1,y)=>{for(let x=Math.round(x0);x<=Math.round(x1);x++)glows.push([x,y])};
+ const finish=()=>{const fr=raster(W,H,P);for(const [gx,gy] of [...glows,...eyes]){const x=Math.round(gx),y=Math.round(gy);if(x<0||y<0||x>=W||y>=H)continue;const p=y*W+x;fr.px[p*4]=ARMOR_EYE[0];fr.px[p*4+1]=ARMOR_EYE[1];fr.px[p*4+2]=ARMOR_EYE[2];fr.px[p*4+3]=255;fr.mat[p]='glw'}return {...fr,ax:cx,ay:base}};
  if(act==='death'){
-  // 崩れて床に積み重なった部品（光は消えている）
+  // 床に落ちた胸当てと、転がった冑（光は消えている）
   const sl=q===0?0:1;
-  P.push(C(cx-6,feet-1,cx-2,feet-1.6,1.4,'iron'),C(cx+2,feet-0.8,cx+6,feet-1.2,1.4,'iron'));
-  P.push(E(cx-1+sl,feet-3-(1-sl)*3,4.4,3-(sl*0.6),'plate',{ol:1}),PL([[cx-4.6+sl,feet-3.6],[cx-1+sl,feet-5.4],[cx-1+sl,feet-1.2],[cx-4+sl,feet-1.4]],'iron',2));
-  P.push(E(cx+6,feet-2.2,1.6,1.4,'iron',{ol:1}),E(cx-7,feet-1.6,1.5,1.2,'iron',{ol:1}));
-  armorHelm([])('side',P,cx+3+sl*3,feet-4.6-(1-sl)*6,true,false,1.15);
+  P.push(E(cx-1,base-2.4-(1-sl)*2,5,2.6-sl*0.4,'plate',{ol:1}),PL([[cx-5.6,base-3],[cx-1,base-5],[cx-1,base-0.6],[cx-5,base-0.8]],'iron',2));
+  armorHelm([])('side',P,cx+4+sl*2,base-3.6-(1-sl)*4,true,false,1.1);
   return finish();
  }
  const side=dir==='side',back=dir==='up';
- const lA=mv?[-1,0,1,0][q]:0,step=mv?[1.4,0,-1.4,0][q]:0;
- const bob=mv?[0,-1,0,-1][q]:[0,-0.5,-1,-0.5][q];
- const hb=mv?[-1,-1,0,0][q]:[0,0,-1,-1][q];
- const gb=mv?[0,0.6,0,-0.6][q]:[0,-0.6,-1,-0.6][q];
- const hip=feet-11.5+bob,ty=hip-6.4,helmY=ty-11+hb;
- // 光の帯（x0〜x1 の横一列）
- const band=(x0,x1,y)=>{for(let x=Math.round(x0);x<=Math.round(x1);x++)glows.push([x,y])};
- const ar=at?[0,-5,-1,0][q]:0,swing=at?[0,-1,1,0.5][q]:0;
- const legs=(x,lift,m)=>{P.push(C(x,feet-1+lift,x,feet-6.6+lift,1.5,m,{ol:1}),E(x+(side?0.8:0),feet-0.8+lift,side?2.2:1.9,1.1,m,{ol:1}));band(x-0.5,x+0.5,feet-9.2+lift)};
- const fauld=()=>{if(side)P.push(PL([[cx-2.8,hip-1.2],[cx+2.8,hip-1.2],[cx+3.2,hip+1.6],[cx-3,hip+1.6]],'iron',2,{ol:1}));else{P.push(PL([[cx-4,hip-1.2],[cx+4,hip-1.2],[cx+4.6,hip+1.6],[cx-4.6,hip+1.6]],'iron',2,{ol:1}),LN(cx-1.4,hip-1,cx-1.6,hip+1.6,'boot',1,{no:1}),LN(cx+1.4,hip-1,cx+1.6,hip+1.6,'boot',1,{no:1}))}
-  if(side)band(cx-2,cx+2,hip-2.2);else band(cx-3,cx+3,hip-2.2)};
- const torso=()=>{
-  if(side){P.push(E(cx,ty,3.4,4.4,'plate',{ol:1}),PL([[cx-3.2,ty-1.6],[cx-0.6,ty-3.8],[cx-0.6,ty+4.2],[cx-2.8,ty+3]],'iron',2),LN(cx+2.2,ty-2.6,cx+2.6,ty+2.4,'plate',4,{no:1}),D(cx-1.6,ty+1,ARMOR_RUST[1]),D(cx+1,ty-2.4,ARMOR_RUST[0]))}
-  else{P.push(E(cx,ty,4.6,4.4,'plate',{ol:1}));if(!back)P.push(PL([[cx-4.4,ty-1.6],[cx-0.4,ty-3.8],[cx-0.4,ty+4.2],[cx-3.6,ty+3]],'iron',2),LN(cx,ty-3.4,cx,ty+3,'plate',4,{no:1}),LN(cx-3.2,ty-1,cx-1,ty+0.6,'iron',1,{no:1}),D(cx+2.2,ty+1.6,ARMOR_RUST[0]),D(cx-2,ty-2,ARMOR_RUST[1]),D(cx+1.4,ty-2.6,ARMOR_RUST[0]));else P.push(LN(cx,ty-3.4,cx,ty+3,'iron',1,{no:1}),D(cx-1.6,ty+1,ARMOR_RUST[0]))}
-  if(side)band(cx-0.6,cx+1.8,ty-6);else band(cx-1.6,cx+1.6,ty-6);
-  if(!side){band(cx-5.6,cx-5,ty-2.2);band(cx+5,cx+5.6,ty-2.2);if(pad)P.push(E(cx-5.8,ty-3.4,2.3,1.7,'plate',{ol:1}),E(cx+5.8,ty-3.4,2.3,1.7,'plate',{ol:1}),D(cx-5.8,ty-4.2,ARMOR_RUST[1]))}
-  else{band(cx,cx+0.8,ty-2.4);if(pad)P.push(E(cx+0.4,ty-3.6,2.6,1.8,'plate',{ol:1}))}
- };
- const gaunt=(x,y,m)=>{P.push(C(x,y-1.8,x,y-3.2,1.1,m,{ol:1}),E(x,y,1.5,1.5,m,{ol:1}));band(x-0.4,x+0.4,y-5)};
- if(side){
-  const hx=cx+5+(at?[0,-2,3,1.5][q]:0)+step*0.3,hy=ty+4.6+gb+ar;
-  const bx=cx-4.8-step*0.3,by=ty+4.6-gb;
-  if(off)off('side',P,bx,by,K,q);
-  else gaunt(bx,by,'iron');
-  legs(cx-0.6-step,lA>0?-1:0,'iron');
-  if(tool&&!at)tool('side',P,hx,hy,0,true,K);
-  fauld();torso();
-  legs(cx+0.6+step,lA<0?-1:0,'iron');
-  armorHelm(eyes)('side',P,cx+0.4,helmY,false,false,1.3);
-  gaunt(hx,hy,'iron');
-  if(tool&&at)tool('side',P,hx,hy,swing,false,K);
-  return finish();
- }
- const hx=cx+7.6,hy=ty+4.6+gb+ar,lx=cx-7.6,ly=ty+4.6-gb;
- if(tool&&(!at||back))tool(back?'up':'down',P,hx,hy,0,true,K);
- if(back&&off)off('up',P,lx,ly,K,q);
- legs(cx-2.4,lA>0?-1:0,'iron');legs(cx+2.4,lA<0?-1:0,'iron');
- fauld();torso();
- gaunt(lx,ly,'iron');gaunt(hx,hy,'iron');
- if(!back&&off)off('down',P,lx,ly,K,q);
- armorHelm(eyes)(back?'up':'down',P,cx,helmY,false,false,1.3);
- if(tool&&at&&!back)tool('down',P,hx,hy,swing,false,K);
+ // 宙に浮いて上下する。冑は胸当てより遅れて動く。攻めるときは前へ傾いて突き出る
+ const bob=mv?[0,-1,-1.5,-1][q]:[0,-0.6,-1,-0.6][q];
+ const hb=mv?[-1,0,-1,-1.5][q]:[-0.4,0,-0.6,-1][q];
+ const lean=at?[0,-1,2,1][q]:0;
+ const ty=base-9+bob,helmY=ty-9+hb;
+ const tx=cx+(side?lean:0),tyy=ty+(side?0:lean*0.5);
+ // 胸当ての下から垂れる草摺の板（ばらばらに浮く）と、空洞から漏れる光
+ const tassets=side?[[-1.6,0],[1.4,0.6]]:[[-3.2,0],[0,0.6],[3.2,0]];
+ for(const [dx,dy] of tassets){const sw=mv?[0.4,0,-0.4,0][(q+Math.round(dx))&3]:0;P.push(PL([[tx+dx-1.4+sw,tyy+5.6+dy],[tx+dx+1.4+sw,tyy+5.6+dy],[tx+dx+1.1+sw*1.5,tyy+8.4+dy],[tx+dx-1.1+sw*1.5,tyy+8.4+dy]],'iron',2,{ol:1}))}
+ // 肩当て：胸当ての脇に、離れて浮く
+ const pd=[[-6.4,-3.2],[6.4,-3.2]];
+ if(!side)for(const [dx,dy] of pd)P.push(E(tx+dx,tyy+dy+(mv?[0,0.5,0,-0.5][q]*(dx<0?1:-1):0),2.2,1.6,'plate',{ol:1}));
+ else P.push(E(tx-0.6,tyy-3.4,2.4,1.6,'plate',{ol:1}));
+ // 胸当て：色と錆の違う板金の継ぎはぎ
+ if(side){P.push(E(tx,tyy,3.4,4.4,'plate',{ol:1}),PL([[tx-3.2,tyy-1.6],[tx-0.6,tyy-3.8],[tx-0.6,tyy+4.2],[tx-2.8,tyy+3]],'iron',2),LN(tx+2.2,tyy-2.6,tx+2.6,tyy+2.4,'plate',4,{no:1}),D(tx-1.6,tyy+1,ARMOR_RUST[1]))}
+ else{P.push(E(tx,tyy,4.6,4.4,'plate',{ol:1}));if(!back)P.push(PL([[tx-4.4,tyy-1.6],[tx-0.4,tyy-3.8],[tx-0.4,tyy+4.2],[tx-3.6,tyy+3]],'iron',2),LN(tx,tyy-3.4,tx,tyy+3,'plate',4,{no:1}),D(tx+2.2,tyy+1.6,ARMOR_RUST[0]),D(tx-2,tyy-2,ARMOR_RUST[1]),D(tx+1.4,tyy-2.6,ARMOR_RUST[0]));else P.push(LN(tx,tyy-3.4,tx,tyy+3,'iron',1,{no:1}),D(tx-1.6,tyy+1,ARMOR_RUST[0]))}
+ // 光：首の隙間、胸当ての下の空洞、肩の付け根
+ if(side){band(tx-0.6,tx+1.8,tyy-6);band(tx-2,tx+2,tyy+5.2)}else{band(tx-1.6,tx+1.6,tyy-6);band(tx-3,tx+3,tyy+5);band(tx-1,tx+1,tyy+4.2);band(tx-4.6,tx-4.2,tyy-3.4);band(tx+4.2,tx+4.6,tyy-3.4)}
+ armorHelm(eyes)(back?'up':side?'side':'down',P,tx+(side?0.4+lean*0.5:0),helmY+(side?0:lean*0.4),false,false,1.3);
  return finish();
 }
 /** 亡霊の騎士：青白く透ける鎧の騎士。兜の覗き穴が光り、裾は点描で透けて消える。剣を持つ。act attack は剣を振り上げる */

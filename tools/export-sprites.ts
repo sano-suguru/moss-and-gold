@@ -52,8 +52,8 @@ SPECIES.forEach((s, si) =>
     }),
   ),
 );
-for (const [name, nv] of [['zrat', 1], ['zlizard', 1], ['slime', 3], ['ghost', 1], ['myconid', 1], ['ant', 2], ['kobold', 1], ['salamander', 1], ['goblin', 3], ['orc', 2], ['lizardman', 1], ['minotaur', 1], ['troll', 1], ['basilisk', 1], ['gargoyle', 1], ['vampire', 1], ['golem', 1], ['mimic', 1], ['worm', 1], ['wyvern', 1], ['dragon', 2], ['adv', 8], ['adv2', 3], ['skel', 7], ['lich', 1], ['dwarf', 3], ['armor', 20]] as [string, number][])
-  DIRS.forEach((d, di) => ACTS.forEach((ac, ai) => { for (let f = 0; f < 4; f++) for (let v = 0; v < nv; v++) index[`${name}/${d}/${ac}/${f}${nv > 1 ? '/' + (name === 'armor' ? `look${v}` : (name === 'ant' ? ['empty', 'carrying'] : ['small', 'mid', 'large'])[v]) : ''}`] = a.frames[a.named(name, di, ai, f, v)]; }));
+for (const [name, nv] of [['zrat', 1], ['zlizard', 1], ['slime', 3], ['ghost', 1], ['myconid', 1], ['ant', 2], ['kobold', 1], ['salamander', 1], ['goblin', 3], ['orc', 2], ['lizardman', 1], ['minotaur', 1], ['troll', 1], ['basilisk', 1], ['gargoyle', 1], ['vampire', 1], ['golem', 1], ['mimic', 1], ['worm', 1], ['wyvern', 1], ['dragon', 2], ['adv', 8], ['adv2', 3], ['skel', 7], ['lich', 1], ['dwarf', 3], ['armor', 1]] as [string, number][])
+  DIRS.forEach((d, di) => ACTS.forEach((ac, ai) => { for (let f = 0; f < 4; f++) for (let v = 0; v < nv; v++) index[`${name}/${d}/${ac}/${f}${nv > 1 ? '/' + (name === 'ant' ? ['empty', 'carrying'] : ['small', 'mid', 'large'])[v] : ''}`] = a.frames[a.named(name, di, ai, f, v)]; }));
 for (const [si, name] of [[1, 'bat'], [2, 'rat'], [3, 'lizard'], [4, 'spider'], [9, 'ant'], [10, 'kobold'], [11, 'salamander'], [12, 'goblin'], [13, 'orc'], [14, 'lizardman'], [15, 'minotaur'], [16, 'troll'], [17, 'basilisk'], [18, 'gargoyle'], [19, 'vampire'], [20, 'mimic'], [21, 'golem'], [23, 'wyvern'], [24, 'dragon'], [25, 'adventurer'], [26, 'skeleton'], [27, 'lich'], [28, 'dwarf']] as [number, string][])
   ['fresh', 'rotting', 'bones'].forEach((st, i) => { index[`corpse/${name}/${st}`] = a.frames[a.corpse(si, i)]; });
 index['web'] = a.frames[a.web];

@@ -360,8 +360,8 @@ export function buildAtlas(): Atlas {
     // スケルトン：v = 0 素手、1 戦士、2 盗賊、3 僧侶、4 狩人、5 吟遊詩人、6 竜殺しの装備
     ['skel', 7, (d, a, f, v) => skeleton(['none', 'warrior', 'thief', 'priest', 'hunter', 'bard', 'slayer'][v], d, a, f) as RawFrame],
     ['lich', 1, (d, a, f) => lich(d, a, f) as RawFrame],
-    // リビングアーマー：v = 武器（0 素手、1 短剣、2 鎚矛、3 剣、4 大剣）＋ 5×盾 ＋ 10×肩当て
-    ['armor', 20, (d, a, f, v) => livingArmor(['none', 'dagger', 'mace', 'sword', 'greatsword'][v % 5], ((v / 5) | 0) % 2 === 1, v >= 10, d, a, f) as RawFrame],
+    // リビングアーマー：宙に浮く胸当てと冑（武具は描画のときに重ねる。src/creatureView.ts）
+    ['armor', 1, (d, a, f) => livingArmor(d, a, f) as RawFrame],
     ['pup', 1, (d, a, f) => ratPup(d, a, f) as RawFrame],
     // ドワーフ：v = 0 坑夫、1 鍛冶屋、2 戦士
     ['dwarf', 3, (d, a, f, v) => dwarf(['miner', 'smith', 'warrior'][v], d, a, f) as RawFrame],
