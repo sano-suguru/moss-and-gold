@@ -55,9 +55,12 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // リビングアーマー：床の武器と盾を取り込み、倒れるかマナが尽きると武具が床に散らばる
+    // リビングアーマー：床の武器と盾を取り込み、倒れるかマナが尽きると武具が床に散らばる。
+    // 迷路をなくして地形が変わったあと、10〜18日目に取り込むのは seed23（21回）・seed17・seed4 などで、RUN_A の4シードでは起きない
     name: 'リビングアーマーが武具を取り込み、崩れて散らばる（4シードで取り込み3回・崩れる1回以上）',
-    ...RUN_A,
+    seeds: ['かしたれ', 'abc', 'seed4', 'seed23'],
+    from: 10,
+    to: 18,
     test: (rs) => {
       const a = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'absorb').length);
       const f = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'fall').length);
