@@ -36,9 +36,10 @@ const RUN_A = { seeds: ['かしたれ', 'seed8', 'abc', 'seed7'], from: 10, to: 
 /** オークの取り立て：縄張りが長く続くシード（オークのいる日数が上限1でも2でも16日ほど） */
 const RUN_ORC = { seeds: ['かしたれ', 'seed27'], from: 10, to: 18 };
 // オークの取り立ては、従う集落に蓄えがたまったときだけ起きるまれな出来事（16シード×25日で約25回、起きるのは6シードほど）。
-// いまのコードで10〜18日目に起きているシードを選ぶ（main の16シード×25日の結果で abc 11.0日目、seed41 13.6・14.2日目、seed18 12.8日目）。
-// 以前の かしたれ・seed27 は、六歩目（#16）のあと18日目までに起きなくなった
-const RUN_TRIB = { seeds: ['abc', 'seed41', 'seed18'], from: 10, to: 18 };
+// いまのコードで10〜18日目に起きているシードを選ぶ。焚き火の夜襲の二歩目（#29）のコードで、
+// 0日目から実行すると abc 11.7日目・seed27 15.5日目から何度も、#28 の main の10日目から続けると seed23 15.8日目ほか（どちらでも起きるシードはない）。
+// 以前の かしたれ は六歩目（#16）のあと、seed41・seed18 は焚き火の眠り（#28）のあと、18日目までに起きなくなった
+const RUN_TRIB = { seeds: ['abc', 'seed27', 'seed23'], from: 10, to: 18 };
 
 export const CHECKS: Check[] = [
   {
@@ -166,7 +167,7 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'オークが貢ぎ物を取り立てる（abc・seed41・seed18 で1回以上）',
+    name: 'オークが貢ぎ物を取り立てる（abc・seed27・seed23 で1回以上）',
     ...RUN_TRIB,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'tribute').length);
