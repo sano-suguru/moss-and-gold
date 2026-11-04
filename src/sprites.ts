@@ -13,8 +13,8 @@ const RAMP={
  lizB:[[64,58,34],[122,112,66],[168,158,100],[202,194,138],[228,220,170]],
  spi:[[14,10,16],[34,26,38],[58,46,62],[90,74,92],[126,108,128]],
  spiD:[[10,8,12],[24,18,28],[40,32,44],[60,50,62],[82,70,84]],
- bat:[[20,14,24],[42,30,48],[68,50,74],[98,76,102],[132,106,134]],
- mem:[[36,20,30],[66,36,52],[96,58,74],[126,84,96],[152,110,118]],
+ bat:[[16,10,18],[34,24,40],[58,42,66],[110,90,124],[176,150,186]],
+ mem:[[28,14,24],[50,26,40],[74,40,58],[110,70,90],[150,104,120]],
  memD:[[26,14,22],[48,26,38],[68,40,54],[88,56,68],[106,72,82]],
  // 段階4
  zfur:[[30,30,26],[56,60,48],[84,92,70],[114,122,94],[144,152,120]],
@@ -355,12 +355,12 @@ function bat(dir,act,f){
   if(act==='attack'&&q>0)P.push(D(16,8+dy,COL.white),D(15,8+dy,COL.gum));
   const W=wp[pose].map(([x,y])=>[x,y+dy]);
   P.push(PL(W,'mem',2,{ol:1}));
-  P.push(LN(W[0][0],W[0][1],W[1][0],W[1][1],'bat',1,{no:1,glw:1}),LN(W[1][0],W[1][1],W[2][0],W[2][1],'bat',1,{no:1,glw:1}),LN(W[1][0],W[1][1],W[4][0],W[4][1],'bat',1,{no:1,glw:1}),LN(W[1][0],W[1][1],W[6][0],W[6][1],'bat',1,{no:1,glw:1}));
+  P.push(LN(W[0][0],W[0][1],W[1][0],W[1][1],'bat',4,{no:1,glw:1}),LN(W[1][0],W[1][1],W[2][0],W[2][1],'bat',4,{no:1,glw:1}),LN(W[1][0],W[1][1],W[4][0],W[4][1],'bat',4,{no:1,glw:1}),LN(W[1][0],W[1][1],W[6][0],W[6][1],'bat',4,{no:1,glw:1}));
   P.push(D(W[1][0],W[1][1],RAMP.bat[3]));
   return {...raster(20,13,P),ax:10,ay:12};
  }
  const back=dir==='up',mm=back?'memD':'mem';
- const wing=(sx)=>{const X=(x)=>sx>0?x:20-x;const pts=[[X(10.6),4.6+dy],[X(w.e[0]),w.e[1]+dy],[X(w.t[0]),w.t[1]+dy],...w.tr.map(([x,y])=>[X(x),y+dy])];P.push(PL(pts,mm,2,{ol:1}));P.push(LN(X(11),5+dy,X(w.e[0]),w.e[1]+dy,'bat',back?2:1,{no:1,glw:1}),LN(X(w.e[0]),w.e[1]+dy,X(w.t[0]),w.t[1]+dy,'bat',back?2:1,{no:1,glw:1}));[w.tr[0],w.tr[2]].forEach(([x,y])=>P.push(LN(X(w.e[0]),w.e[1]+dy,X(x),y+dy,'bat',back?2:1,{no:1,glw:1})))};
+ const wing=(sx)=>{const X=(x)=>sx>0?x:20-x;const pts=[[X(10.6),4.6+dy],[X(w.e[0]),w.e[1]+dy],[X(w.t[0]),w.t[1]+dy],...w.tr.map(([x,y])=>[X(x),y+dy])];P.push(PL(pts,mm,2,{ol:1}));P.push(LN(X(11),5+dy,X(w.e[0]),w.e[1]+dy,'bat',4,{no:1,glw:1}),LN(X(w.e[0]),w.e[1]+dy,X(w.t[0]),w.t[1]+dy,'bat',4,{no:1,glw:1}));[w.tr[0],w.tr[2]].forEach(([x,y])=>P.push(LN(X(w.e[0]),w.e[1]+dy,X(x),y+dy,'bat',4,{no:1,glw:1})))};
  wing(1);wing(-1);
  P.push(E(10,7.4+dy,2.5,3,'bat',{ol:1}),E(10,4.5+dy,2.4,2,'bat',{ol:1}));
  P.push(PL([[7.6,4+dy],[7.8,0.4+dy],[9.6,3+dy]],'bat',2,{ol:1}),PL([[12.4,4+dy],[12.2,0.4+dy],[10.4,3+dy]],'bat',2,{ol:1}));
@@ -962,11 +962,12 @@ function vampHead(dir,P,x,y,dead,open,k){
 }
 function vampCape(dir,P,cx,sh,hip,feet,q,mv,k){
  const fl=mv?[0,1,2,1][q]:0;
- if(dir==='side'){P.push(PL([[cx-1,sh-1],[cx-4-fl*1.4,feet-1],[cx-6-fl*1.6,feet-2],[cx+1,feet-0.6],[cx+2,sh]],'cape',2,{ol:1}));return}
+ // 横向きでも、マントを背中側へ大きく広げて、細い線に見えないようにする（裏地の赤を少し見せる）
+ if(dir==='side'){P.push(PL([[cx-1*k,sh-1.4*k],[cx-5.4*k-fl*1.4,hip],[cx-7.4*k-fl*1.6,feet-1.4*k],[cx-3*k,feet],[cx+1.4*k,feet-0.4*k],[cx+2*k,sh]],'cape',2,{ol:1}),PL([[cx-1.6*k,sh+0.4*k],[cx-5*k-fl*1.2,hip+0.6*k],[cx-6.6*k-fl*1.4,feet-1.6*k],[cx-4.6*k-fl*0.6,feet-1.2*k]],'capeR',2));return}
  if(dir==='down'){P.push(PL([[cx-4.2*k,sh-1],[cx-6*k-fl*0.4,feet],[cx-3*k,feet-1],[cx-3.2*k,sh+2]],'capeR',2,{ol:1}),PL([[cx+4.2*k,sh-1],[cx+6*k+fl*0.4,feet],[cx+3*k,feet-1],[cx+3.2*k,sh+2]],'capeR',2,{ol:1}));return}
  P.push(PL([[cx-4.4*k,sh-1],[cx+4.4*k,sh-1],[cx+6*k+fl*0.4,feet],[cx+2,feet-1+fl*0.3],[cx-2,feet-1-fl*0.3],[cx-6*k-fl*0.4,feet]],'cape',2,{ol:1}));
 }
-function vampire(dir,act,f){return humanoid(dir,act,f,{s:1.15,skin:'pale',skinD:'pale',cloth:'cape',head:vampHead,cape:vampCape,leg:6,bw:3,bh:3.8,hh:9.2})}
+function vampire(dir,act,f){return humanoid(dir,act,f,{s:1.35,skin:'pale',skinD:'pale',cloth:'cape',head:vampHead,cape:vampCape,leg:6,bw:3,bh:3.8,hh:9.2})}
 
 /** 石像：その姿のまま石の色に変える（見本と書き出し用。ゲームではシェーダーで同じことをする） */
 function petrify(fr){

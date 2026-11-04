@@ -237,6 +237,7 @@ export class CreatureView {
       if (b && b.step === eco.step) continue;
       const L = Math.hypot(d.x - c.x, d.y - c.y) || 1;
       this.bites.set(c.id, { t: now, step: eco.step, ux: (d.x - c.x) / L, uy: (d.y - c.y) / L });
+      if (c.k === Kind.Vampire) continue; // 肉片は飛ばさない（血を吸う流れは下で描く）
       const col = fxCol(d.k);
       if (col < 0) continue;
       for (let i = 0; i < 3; i++) {
@@ -245,6 +246,17 @@ export class CreatureView {
       }
       if (b && now - b.t < 40) continue;
       this.bits.push({ x: d.x, y: d.y, z: 3, vx: 0, vy: 0, vz: 1.8, kind: 0, col: 0, t0: now, life: 12 });
+    }
+    // ヴァンパイアは肉を食いちぎらず、血を吸う：食べている間ずっと、死骸から赤い粒が弧を描いて口へ流れ込む
+    for (const c of eco.list) {
+      if (c.k !== Kind.Vampire || !c.feed || c.dead) continue;
+      const d = eco.byId.get(c.feed);
+      if (!d || d.dead !== 1 || !inView(d.x, d.y, 30)) continue;
+      const [vx, vy] = pos(c);
+      for (let i = 0; i < 8; i++) {
+        const p = ((now * 0.06 + i / 8) % 1 + 1) % 1;
+        push(lerp(d.x, vx, p), lerp(d.y, vy, p) + 0.2, lerp(2, 15, p) + Math.sin(p * Math.PI) * 5, false, A.fx('bit:2:5:0'), 0, 4);
+      }
     }
     for (const [id, b] of this.bites) {
       if (now - b.t > 60) this.bites.delete(id);
