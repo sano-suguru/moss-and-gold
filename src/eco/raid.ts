@@ -31,7 +31,7 @@ export function isNight(this: Ecology): boolean {
   return this.phaseNow > 0.79 || this.phaseNow < 0.18;
 }
 
-/** 盗みに出る（updateCamps から、通常速度で5秒ごと）：夜、蓄えの乏しい集落のそば（40マス）で一行が焚き火を囲んでいれば、1〜3匹が忍び出る */
+/** 盗みに出る（生き物の更新50回ごと＝通常速度で10秒ごと）：夜、蓄えの乏しい集落から10〜80マスの所で一行が焚き火を囲んでいれば、1〜3匹が忍び出る（出た者が戻るまで、次は出ない） */
 export function planRaids(this: Ecology): void {
   if (!this.isNight()) return;
   const m = this.w.map;
