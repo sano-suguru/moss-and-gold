@@ -283,15 +283,16 @@ export const CHECKS: Check[] = [
   },
   {
     // 若い竜の炎は口元から燃え始め（以前は口元から2.8マスに火がつかず、すぐそばの獲物へ吐き続けても焼けなかった）、
-    // 飛んでいるコウモリなども、吐いている炎そのものに当たれば焼ける（以前は飛んでいれば焼けなかった）。seed4 は 14〜17日目に若い竜がいる
-    name: 'ドラゴンの炎で飛ぶ者（コウモリ・ワイバーン・ウィスプ）が焼ける（seed4 で1回以上）',
-    seeds: ['seed4'],
+    // 飛んでいるコウモリなども、吐いている炎そのものに当たれば焼ける（以前は飛んでいれば焼けなかった）。
+    // #31 の main の10日目から続けると seed4 は 14〜17日目に若い竜がいる。狩りを打ち合いにした後（0日目から）は seed4 では起きず、seed7・seed23 で起きる。どちらのスナップショットから始めても通るよう、3シードの合計で見る
+    name: 'ドラゴンの炎で飛ぶ者（コウモリ・ワイバーン・ウィスプ）が焼ける（seed4・seed7・seed23 の合計で1回以上）',
+    seeds: ['seed4', 'seed7', 'seed23'],
     from: 10,
     to: 18,
     test: (rs) => {
       const all = rs.map((r) => r.deaths.filter((x) => x.cause === 'burned' && x.by === 24));
       const fly = all.map((a) => a.filter((x) => x.k === 1 || x.k === 23 || x.k === 0).length);
-      return { ok: fly.every((n) => n >= 1), value: rs.map((r, i) => `${r.seed} 炎で死んだ${all[i].length}（うち飛ぶ者${fly[i]}）`).join('、') };
+      return { ok: sum(fly) >= 1, value: rs.map((r, i) => `${r.seed} 炎で死んだ${all[i].length}（うち飛ぶ者${fly[i]}）`).join('、') };
     },
   },
   {
