@@ -82,7 +82,7 @@ export class CreatureView {
       if (rock(k)) {
         if (k >= 0 && !mounds.has(k)) {
           mounds.add(k);
-          push(sx, sy + 3, 0, false, A.wormMound(k, false), 0, 0);
+          push(sx, sy + 3, 0, false, A.wormMound(k, false, m.hard[k]), 0, 5);
         }
         continue;
       }
@@ -106,7 +106,7 @@ export class CreatureView {
     const hk = tileAt(x, yy);
     const inRock = rock(hk);
     if (inRock) {
-      push(x, yy + 4, 0, false, A.wormMound(hk + Math.floor(t * 2), true), 0, flash);
+      push(x, yy + 4, 0, false, A.wormMound(hk + Math.floor(t * 2), true, hk >= 0 ? m.hard[hk] : 1), 0, 5 + flash);
       for (let i = 0; i < 3; i++) {
         const ph = (t * 0.9 + i / 3) % 1;
         push(x + Math.cos(i * 2.1 + t) * 9, yy + 2, 2 + ph * 10, false, A.dust(Math.min(3, Math.floor(ph * 4))), 0, 2);

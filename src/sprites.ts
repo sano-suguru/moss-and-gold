@@ -38,6 +38,10 @@ const RAMP={
  iron:[[36,38,44],[70,74,84],[110,116,128],[152,158,170],[200,206,214]],
  ant:[[24,10,8],[60,24,18],[104,44,30],[150,72,48],[190,110,80]],
  antD:[[18,8,6],[44,18,14],[76,32,22],[108,52,36],[140,78,56]],
+ // 地形の岩と同じ色の段（src/shaders.ts の cK〜cd）。rockS は柔らかい層（茶色がかる）、rockH は硬い岩（青みがかる）。ワームが押し上げる岩 wormMound に使う
+ rock:[[20,16,24],[34,30,40],[52,46,60],[74,66,84],[100,92,110]],
+ rockS:[[24,16,18],[41,30,30],[63,46,44],[90,66,62],[122,92,81]],
+ rockH:[[15,13,26],[25,25,44],[38,39,66],[55,55,92],[74,77,121]],
  soil:[[34,26,22],[62,48,38],[94,74,58],[126,102,80],[156,130,104]],
  stem:[[70,62,70],[130,120,124],[176,166,166],[212,204,198],[236,230,222]],
  cap:[[40,20,52],[78,40,100],[118,66,150],[160,100,196],[200,150,230]],
@@ -1193,17 +1197,18 @@ function wormMouth(d,open){
 /**
  * 岩の下を掘り進むワームが押し上げた岩：盛り上がって割れた岩と、こぼれた小石。v 0〜2 は形の違い、big は頭の上（大きく割れる）
  */
-function wormMound(v,big){
+function wormMound(v,big,hard){
+ const M=['rockS','rock','rockH'][hard]??'rock',RM=RAMP[M];
  const W=big?30:22,H=big?20:15,cx=W/2,cy=H-5,P=[];
  const R=big?11:7.5;
- P.push(E(cx,cy,R,R*0.55,'soil',{ol:1}));
+ P.push(E(cx,cy,R,R*0.55,M,{ol:1}));
  // 割れ目で分かれた岩のかけら
  const k=big?5:3;
- for(let i=0;i<k;i++){const b=(i/k)*6.283+v*1.3;const rr=R*0.5;P.push(E(cx+Math.cos(b)*rr,cy+Math.sin(b)*rr*0.5-1.2,R*0.42,R*0.28,'soil',{ol:1}))}
+ for(let i=0;i<k;i++){const b=(i/k)*6.283+v*1.3;const rr=R*0.5;P.push(E(cx+Math.cos(b)*rr,cy+Math.sin(b)*rr*0.5-1.2,R*0.42,R*0.28,M,{ol:1}))}
  const fr=raster(W,H,P);
  // 割れ目（暗い線）と、まわりにこぼれた小石
- for(let i=0;i<k;i++){const b=(i/k)*6.283+v*1.3+0.6;for(let s=0;s<R*0.8;s+=0.7)setPx(fr,Math.round(cx+Math.cos(b)*s),Math.round(cy-1+Math.sin(b)*s*0.5),[20,18,24],false)}
- for(let i=0;i<(big?7:4);i++){const b=i*2.4+v;setPx(fr,Math.round(cx+Math.cos(b)*(R+1.5)),Math.round(cy+Math.sin(b)*(R*0.55+1)),RAMP.soil[1],false)}
+ for(let i=0;i<k;i++){const b=(i/k)*6.283+v*1.3+0.6;for(let s=0;s<R*0.8;s+=0.7)setPx(fr,Math.round(cx+Math.cos(b)*s),Math.round(cy-1+Math.sin(b)*s*0.5),RM[0],false)}
+ for(let i=0;i<(big?7:4);i++){const b=i*2.4+v;setPx(fr,Math.round(cx+Math.cos(b)*(R+1.5)),Math.round(cy+Math.sin(b)*(R*0.55+1)),RM[2],false)}
  return {...fr,ax:Math.round(cx),ay:H-1};
 }
 function wormSeg(kind,f){

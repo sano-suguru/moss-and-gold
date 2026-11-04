@@ -56,8 +56,8 @@ export interface Atlas {
   wormBody: (r: number, v: number) => number;
   /** ワームの頭（進む向き d 0〜7、口の開き open 0〜3） */
   wormMouth: (d: number, open: number) => number;
-  /** 岩の下を進むワームが押し上げた岩（形 v 0〜2、big は頭の上） */
-  wormMound: (v: number, big: boolean) => number;
+  /** 岩の下を進むワームが押し上げた岩（形 v 0〜2、big は頭の上、hard はマスの岩の硬さ 0 柔らかい・1 ふつう・2 硬い） */
+  wormMound: (v: number, big: boolean, hard: number) => number;
   /** ドラゴンの炎の柱（down = 正面向き） */
   breath: (down: boolean, f: number) => number;
   /** 若い竜の小さな炎（横向き） */
@@ -687,9 +687,9 @@ export function buildAtlas(): Atlas {
     raws.push(wormMouth(d, o) as RawFrame);
   }
   const moundFrames: number[] = [];
-  for (let b = 0; b < 2; b++) for (let v = 0; v < 3; v++) {
+  for (let h = 0; h < 3; h++) for (let b = 0; b < 2; b++) for (let v = 0; v < 3; v++) {
     moundFrames.push(raws.length);
-    raws.push(wormMound(v, b === 1) as RawFrame);
+    raws.push(wormMound(v, b === 1, h) as RawFrame);
   }
   const web = raws.length;
   raws.push(makeWeb());
@@ -842,7 +842,7 @@ export function buildAtlas(): Atlas {
     wormSeg: (kind) => segFrames[kind],
     wormBody: (r, v) => bodyFrames[(Math.max(3, Math.min(12, Math.round(r))) - 3) * 2 + (v & 1)],
     wormMouth: (d, open) => wormMouthFrames[(d & 7) * 4 + Math.max(0, Math.min(3, open))],
-    wormMound: (v, big) => moundFrames[(big ? 3 : 0) + (((v % 3) + 3) % 3)],
+    wormMound: (v, big, hard) => moundFrames[Math.max(0, Math.min(2, hard)) * 6 + (big ? 3 : 0) + (((v % 3) + 3) % 3)],
     breath: (down, f) => breathFrames[(down ? 4 : 0) + (f & 3)],
     breathYoung: (f) => breathYoungFrames[f & 3],
     item: (kind, f) => (kind === 11 ? packFrame : itemFrames[kind * 4 + (f & 3)] ?? itemFrames[0]),

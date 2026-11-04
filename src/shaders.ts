@@ -772,6 +772,9 @@ void main() {
   // 攻撃の演出（kind 4）：ふつうの小物と同じく照らされるが、暗がりでも半分ほどは自ら見える
   bool fxLit = kind > 3.5 && kind < 4.5;
   if (fxLit) kind = 2.0;
+  // 地形の一部として描くもの（kind 5。ワームが押し上げた岩）：地形の岩と同じく、暗がりでの明るさの下限を、生き物の下限ではなく地形の岩の上面と同じにする
+  bool terrLit = kind > 4.5 && kind < 5.5;
+  if (terrLit) kind = 2.0;
   // 石像：その姿のまま石の色に（光る部分も光らない）
   if (kind > 2.5) {
     float l = dot(tx.rgb, vec3(0.3, 0.5, 0.2));
@@ -810,7 +813,11 @@ void main() {
   float lum = (q.r + q.g + q.b) / 3.0;
   vec3 col = tx.rgb * q * 1.15;
   // 暗がりでも、姿は青く沈んだ色でいつも見える
-  {
+  if (terrLit) {
+    // （地形の岩の上面と同じ下限：光がなくても地層の色と模様が読める明るさ）
+    float ga = dot(tx.rgb, vec3(0.3, 0.5, 0.2));
+    col = max(col, mix(vec3(ga), tx.rgb, 0.8) * vec3(0.74, 0.74, 0.82));
+  } else {
     float ga = dot(tx.rgb, vec3(0.3, 0.5, 0.2));
     col = max(col, mix(vec3(ga), tx.rgb, 0.75) * vec3(0.72, 0.74, 0.86));
   }
