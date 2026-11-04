@@ -187,6 +187,7 @@ export function updateParties(this: Ecology): void {
       if ((p.camp ?? -1) >= 0 && (p.goal !== 0 || foodAvg < 0.3)) this.endCamp(p);
       if ((p.camp ?? -1) >= 0 && this.step >= (p.campUntil ?? 0)) this.endCamp(p);
       if ((p.camp ?? -1) >= 0) this.watchDoze(p);
+      if ((p.camp ?? -1) >= 0) this.campWatch(p, alive);
       if (held >= cap * 0.7 || hungry || tooLong || fewer || dark || ((p.saw & 8) !== 0 && !slayer)) {
         p.goal = 1;
         if ((p.camp ?? -1) >= 0) this.endCamp(p);
@@ -376,6 +377,11 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     }
     // 知っている宝の区画に来たのに宝がなければ、もうないと覚える
     if ((p.goldCells ?? []).includes(cell) && !this.piles.some((pl) => this.cellOf(pl.x, pl.y) === cell) && !(p.goneGold ??= []).includes(cell)) p.goneGold.push(cell);
+  }
+  // 焚き火で眠っている者（うとうとしている見張りも）は、物を見ず、敵を探さない。起きるのは打たれたか、起こされたか、物音がしたとき（src/eco/night.ts）
+  if (c.sleep > 0 && (p.camp ?? -1) >= 0) {
+    c.act = 0;
+    return;
   }
   // 見たものを噂の種に
   if (this.step % 20 === c.id % 20) {
@@ -588,7 +594,9 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     }
     c.act = 0;
     const watch = idx === 0;
-    c.dir = watch ? (Math.cos(a) > 0 ? 2 : 3) : Math.abs(fx - c.x) > Math.abs(fy - c.y) ? (fx > c.x ? 2 : 3) : fy > c.y ? 0 : 1;
+    // 起こされて構えている間は、気づいた敵のいた方を向く
+    if (this.campAwake(p) && (p.wakeX || p.wakeY)) c.dir = Math.abs((p.wakeX ?? 0) - c.x) > Math.abs((p.wakeY ?? 0) - c.y) ? ((p.wakeX ?? 0) > c.x ? 2 : 3) : (p.wakeY ?? 0) > c.y ? 0 : 1;
+    else c.dir = watch ? (Math.cos(a) > 0 ? 2 : 3) : Math.abs(fx - c.x) > Math.abs(fy - c.y) ? (fx > c.x ? 2 : 3) : fy > c.y ? 0 : 1;
     // 僧侶は、傷ついた者がいる間だけ起きていて、生き物の更新15回に1回ずつ癒やす（皆が治ったら、僧侶も眠る。syncLongSleep）
     if (c.sp === Job.Priest && this.step % 15 === c.id % 15 && this.campWounded(p)) {
       for (const id of p.members) {

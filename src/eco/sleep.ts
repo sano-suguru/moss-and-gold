@@ -100,7 +100,9 @@ export function syncLongSleep(this: Ecology): void {
       const p = this.parties.find((q) => q.id === c.party);
       // 僧侶は、傷ついた仲間を癒やしている間は起きている（癒やす動作のたびに起きたり寝たりして見えないように）
       const tending = c.sp === Job.Priest && !!p && this.campWounded(p);
-      if (p && (p.camp ?? -1) >= 0 && p.members[0] !== c.id && c.act === 0 && !tending) z = 2;
+      // 起こされて構えている一行と、打たれたばかりの者（コウモリに血を吸われた者など）は眠らない（src/eco/night.ts）
+      if (p && (this.campAwake(p) || this.w.tick - c.hitAt < 150)) z = 0;
+      else if (p && (p.camp ?? -1) >= 0 && p.members[0] !== c.id && c.act === 0 && !tending) z = 2;
       // 焚き火の見張りがうとうとしている間は、浅い眠り（小さな z）
       else if (p && p.members[0] === c.id && c.act === 0 && this.watchDozing(p) && !tending) z = 1;
     }
@@ -186,7 +188,13 @@ export function wakeByNoise(this: Ecology): void {
     this.nearby(n.x, n.y, n.r, (c) => {
       if (c.sleep <= 0) return;
       const r = c.sleep === 2 ? n.r * 0.4 : c.sleep === 3 ? n.r * 1.2 : n.r * 0.8;
-      if (sq(c.x - n.x) + sq(c.y - n.y) < r * TILE * r * TILE) c.sleep = 0;
+      if (sq(c.x - n.x) + sq(c.y - n.y) >= r * TILE * r * TILE) return;
+      c.sleep = 0;
+      // 焚き火で眠る冒険者が物音で目を覚ましたら、一行を起こす（src/eco/night.ts）
+      if (c.k === Kind.Adventurer) {
+        const p = this.parties.find((q) => q.id === c.party);
+        if (p && (p.camp ?? -1) >= 0) this.campWake(p, 'noise', undefined, c);
+      }
     });
   }
 }

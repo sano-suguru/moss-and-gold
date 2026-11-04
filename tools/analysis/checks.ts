@@ -42,6 +42,15 @@ const RUN_TRIB = { seeds: ['abc', 'seed41', 'seed18'], from: 10, to: 18 };
 
 export const CHECKS: Check[] = [
   {
+    // 焚き火の夜（src/eco/night.ts）：焚き火で眠る一行が、見張り・盗賊に起こされるか、寝込みを打たれて飛び起きる
+    name: '焚き火で眠る一行が、敵に気づいた見張りか、寝込みの一打ちで起こされる（4シードで1回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'wake' && x.how !== 'noise').length);
+      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
     // 冒険者の作り直しの三歩目：焚き火の見張りはときどきうとうとする（焚き火を囲むたびに何度か）
     name: '焚き火の見張りがうとうとする（4シードで4回以上）',
     ...RUN_A,

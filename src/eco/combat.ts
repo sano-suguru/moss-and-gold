@@ -186,12 +186,15 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1): boolean {
   d.hitAt = this.w.tick;
   d.foe = a.id;
   d.sleep = 0;
+  // 焚き火で休む冒険者が打たれた：手強い敵なら一行が飛び起きる（src/eco/night.ts）
+  if (d.k === Kind.Adventurer) this.campHit(d, a);
   this.fxHits.push({ t: this.w.tick, x: d.x, y: d.y, ax: a.x, ay: a.y, id: d.id });
   if (this.fxHits.length > 120) this.fxHits.splice(0, 40);
   this.pushAttackFx(a, d, dmg > this.maxHp(d) * 0.4, d.hp <= 0);
   this.raiseAlarm(d, a);
   this.bleed(d, 1);
-  this.noise(d.x, d.y, 9);
+  // 焚き火のそばの小物との小競り合い（コウモリに血を吸われて払うなど）は、一行の皆を起こすほどの音を立てない
+  if (!this.campPetty(a, d)) this.noise(d.x, d.y, 9);
   return d.hp <= 0;
 }
 

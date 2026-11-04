@@ -173,6 +173,11 @@ export interface Party {
   /** 焚き火の見張りのうとうと：うとうとしている期間の終わり（step 番号。それまで、見張りは眠りの印を出して、忍び寄る者に気づかない）、次にうとうとしはじめる step 番号 */
   dozeT?: number;
   dozeNext?: number;
+  /** 焚き火の夜（src/eco/night.ts）：起こされて構えている期間の終わり（step 番号。0 なら眠っている）、起きたときの人数、気づいた敵のいた所 */
+  wakeT?: number;
+  wakeN?: number;
+  wakeX?: number;
+  wakeY?: number;
   /** 最後に盗みを働いたゴブリンの集落（番号と、その時の場所）。生還者が町に伝える（盗みの噂）。robTold は伝えたか */
   robCamp?: number;
   robCX?: number;
