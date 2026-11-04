@@ -1,4 +1,4 @@
-import { heroSprite, heroBed, graveMarker, prayLight, adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache } from './sprites';
+import { livingArmor, heroSprite, heroBed, graveMarker, prayLight, adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -360,6 +360,8 @@ export function buildAtlas(): Atlas {
     // スケルトン：v = 0 素手、1 戦士、2 盗賊、3 僧侶、4 狩人、5 吟遊詩人、6 竜殺しの装備
     ['skel', 7, (d, a, f, v) => skeleton(['none', 'warrior', 'thief', 'priest', 'hunter', 'bard', 'slayer'][v], d, a, f) as RawFrame],
     ['lich', 1, (d, a, f) => lich(d, a, f) as RawFrame],
+    // リビングアーマー：v = 武器（0 素手、1 短剣、2 鎚矛、3 剣、4 大剣）＋ 5×盾 ＋ 10×肩当て
+    ['armor', 20, (d, a, f, v) => livingArmor(['none', 'dagger', 'mace', 'sword', 'greatsword'][v % 5], ((v / 5) | 0) % 2 === 1, v >= 10, d, a, f) as RawFrame],
     ['pup', 1, (d, a, f) => ratPup(d, a, f) as RawFrame],
     // ドワーフ：v = 0 坑夫、1 鍛冶屋、2 戦士
     ['dwarf', 3, (d, a, f, v) => dwarf(['miner', 'smith', 'warrior'][v], d, a, f) as RawFrame],

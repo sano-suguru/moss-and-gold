@@ -98,7 +98,7 @@ export function ghost(this: Ecology, c: Cr, day: number): void {
     let foe: Cr | null = null;
     let bd = 4 * TILE * 4 * TILE;
     this.nearby(c.x, c.y, 4, (o) => {
-      if (o.dead || o.away || [Kind.Ghost, Kind.Zombie, Kind.Skeleton, Kind.Lich, Kind.Wisp, Kind.Golem, Kind.Gargoyle].includes(o.k) || STR[o.k] < 2) return;
+      if (o.dead || o.away || [Kind.Ghost, Kind.Zombie, Kind.Skeleton, Kind.Lich, Kind.Wisp, Kind.Golem, Kind.Gargoyle, Kind.Armor].includes(o.k) || STR[o.k] < 2) return;
       if (sq(o.hx - c.hx) + sq(o.hy - c.hy) > 9 * TILE * 9 * TILE && sq(o.x - c.hx) + sq(o.y - c.hy) > 6 * TILE * 6 * TILE) return;
       const d = sq(o.x - c.x) + sq(o.y - c.y);
       if (d < bd) {
@@ -214,6 +214,8 @@ export function raiseUndead(this: Ecology, c: Cr, manyDead: boolean): void {
     const near = this.gear.filter((it) => kinds.includes(it.kind) && sq(it.x - c.x) + sq(it.y - c.y) < 24 * 24);
     if (near.length) {
       found = true;
+      // 装備に宿っていた未練（マナ）は、起き上がった骨の体へ移る（src/eco/armor.ts）
+      for (const it of near) this.takeRemnant(c, it);
       const ids = new Set(near.map((it) => it.id));
       this.gear = this.gear.filter((it) => !ids.has(it.id));
     }
@@ -346,6 +348,8 @@ export function scavenge(this: Ecology, c: Cr): boolean {
     if (it.kind === ItemKind.Torch) c.torch = it.fuel;
     else if (it.kind === ItemKind.Stub) c.torch = -1;
     else c.party = it.kind;
+    // 武器に宿っていた未練（マナ）は、拾った者の体へ移る（src/eco/armor.ts）
+    this.takeRemnant(c, it);
     this.gear = this.gear.filter((o) => o !== it);
     c.ref2 = 0;
     c.act = 2;

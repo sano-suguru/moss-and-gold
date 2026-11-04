@@ -25,6 +25,7 @@ Each creature follows simple rules, but together they do things I didn't expect.
 - Settlers. Kobolds and goblins build warrens and camps, fight over food with their neighbors, and sometimes end up working for someone stronger.
 - Adventurers and dwarves from outside. Adventurers travel back and forth to town, so the same ones come back again and again.
 - Further down there are bigger monsters, such as golems and dragons.
+- Where the gear of fallen adventurers piles up, an empty suit of armor may rise on its own and wander off collecting weapons.
 
 The settlers take a while to show up, so it helps to fast-forward.
 

@@ -1,6 +1,7 @@
 import type { Atlas } from './atlas';
 import { BLOOD, Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
+import { ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
 import { RANK_AT, unpackLook } from './eco/roster';
 import { MAX_DYN } from './shaders';
 
@@ -501,9 +502,17 @@ export class CreatureView {
       case Kind.Skeleton: return A.named('skel', dir, act, f, v);
       case Kind.Lich: return A.named('lich', dir, act, f);
       case Kind.Dwarf: return A.named('dwarf', dir, act, f, v);
+      case Kind.Armor: return A.named('armor', dir, act, f, v);
       case Kind.Rat: return v === 1 ? A.named('pup', dir, act === 1 ? 1 : 0, f) : A.index(sp, dir, act, f, bright);
       default: return A.index(sp, dir, act, f, bright);
     }
+  }
+
+  /** リビングアーマーの姿の種類：手の武器（大剣＞剣＞鎚矛＞短剣）、盾、3つ以上取り込んだら肩当て（atlas.ts の 'armor'） */
+  private armorLook(eco: Ecology, c: Cr): number {
+    const hand = eco.armorHand(c);
+    const w = hand.includes(10) ? 4 : hand.includes(2) ? 3 : hand.includes(5) ? 2 : hand.includes(6) ? 1 : 0;
+    return w + (hand.includes(3) ? 5 : 0) + (hand.length >= 3 ? 10 : 0);
   }
 
   build(eco: Ecology, view: { x0: number; y0: number; x1: number; y1: number }, t: number, alpha: number, night: boolean): CreatureFrame {
@@ -866,7 +875,15 @@ export class CreatureView {
     }
     // 床に落ちた道具（松明は燃え、金属は光が当たるときらめく）
     const itf = Math.floor(t * 6);
-    for (const it of eco.gear) if (inView(it.x, it.y, 16)) pushSprite(it.x, it.y + 2, 0, false, it.kind === 12 ? A.trophy(TROPHY[it.fuel]?.[1] ?? 'fang') : A.item(it.kind, itf + it.id), 0, 2);
+    for (const it of eco.gear) {
+      if (!inView(it.x, it.y, 16)) continue;
+      pushSprite(it.x, it.y + 2, 0, false, it.kind === 12 ? A.trophy(TROPHY[it.fuel]?.[1] ?? 'fang') : A.item(it.kind, itf + it.id), 0, 2);
+      // 持ち主の未練（マナ）が宿った武具：青白い粒がかすかに立ちのぼる（未練が濃いほど頻く。src/eco/armor.ts）
+      if (isJobItem(it.kind) && it.fuel > 0) {
+        const ph = (t * 0.45 + it.id * 0.137) % 1;
+        if (ph < Math.min(1, it.fuel / 24)) pushSprite(it.x + Math.sin(ph * 6 + it.id) * 3, it.y + 2.05, 2 + ph * 12, false, A.manaMote(Math.min(3, Math.floor(ph * 4))), 0, 2);
+      }
+    }
     // 宝の山：量に応じた大きさ。光が当たるときらめく
     const tf = Math.floor(t * 3);
     // 宝：溜まった量で五段階（1〜9、10〜39、40〜99、100〜249、250〜）、持ち主で飾りを変える
@@ -1011,6 +1028,33 @@ export class CreatureView {
           }
         }
       }
+      // リビングアーマーの組み上がり（描画専用。st 10 の間）：散らばった武具が震え、寄り集まって浮き上がり、白い光の中で甲冑の形になる
+      if (sp === Kind.Armor && c.st === 10 && !c.dead) {
+        const age = Math.min(ARMOR_RISE, c.actT + alpha);
+        const p = age / ARMOR_RISE;
+        // 武具は床にあった位置から寄り集まる（ロードし直した直後など、その記録が無ければ、まわりに散らした位置から）
+        const rec = eco.fxArmorRise.find((e) => e.id === c.id);
+        const kit = eco.armorKit.get(c.id) ?? [0];
+        const parts: [number, number, number][] = rec ? rec.parts : kit.slice(1, 1 + kit[0]).map((kd, i) => {
+          const ang = i * 2.399 + c.id * 0.7;
+          const r0 = 14 + ((i * 7 + c.id) % 12);
+          return [kd, Math.cos(ang) * r0 * 1.2, Math.sin(ang) * r0 * 0.6];
+        });
+        if (p < 0.85)
+          parts.forEach(([kd, dx, dy], i) => {
+            const g = p < 0.4 ? 0 : Math.min(1, (p - 0.4) / 0.4);
+            const k2 = 1 - g * g;
+            const shake = (Math.floor(t * 18 + i * 3) % 2 ? 1 : -1) * (p < 0.4 ? 0.4 + p * 2 : 0.4);
+            pushSprite(c.x + dx * k2 + shake, c.y + dy * k2 + 2, g * 10, false, A.item(kd, 0), 0, 2);
+          });
+        if (p > 0.3 && p < 0.9)
+          for (let i = 0; i < 6; i++) {
+            const ph = (t * 0.9 + i / 6) % 1;
+            pushSprite(x + Math.cos(i * 2.4 + t * 3) * (8 - ph * 6), yy + 0.05, 2 + ph * 18, false, A.manaMote(Math.min(3, Math.floor(ph * 4))), 0, 2);
+          }
+        if (p < 0.8) veil = 1;
+        else if (p < 0.9) veil = 3;
+      }
       if (veil === 1) continue;
       // クモの巣の糸の中：捕まった者はもがいて小刻みに揺れ、足を取られた者は糸を引きずって揺れる。どちらも白い糸がまとわりつく
       if (!c.dead && eco.webs.length && (c.caught || (eco.webEffect(c) === 2 && eco.inWeb(c)))) {
@@ -1038,7 +1082,7 @@ export class CreatureView {
       const hidden = eco.isHidden(c);
       const isCorpse = c.dead === 1 && c.actT >= 4 && sp !== Kind.Wisp && sp !== Kind.Slime && sp !== Kind.Ghost && sp !== Kind.Myconid;
       const eliteName = ['', 'firespirit', 'pknight', '', '', '', 'wspirit', 'lspirit', '', 'mlord'][c.elite] ?? '';
-      let frame = !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : c.sp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Adventurer ? (c.sp >= 4 ? 8 + c.sp - 4 : c.sp * 2 + (c.torch > 0 && c.sp !== 1 ? 1 : 0)) : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][c.sp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? c.sp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
+      let frame = !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : c.sp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Adventurer ? (c.sp >= 4 ? 8 + c.sp - 4 : c.sp * 2 + (c.torch > 0 && c.sp !== 1 ? 1 : 0)) : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][c.sp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? c.sp : sp === Kind.Armor ? this.armorLook(eco, c) : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
       // 名簿の冒険者：一人ひとりの姿と位の装備（src/eco/roster.ts、src/sprites.ts の heroSprite）
       if (sp === Kind.Adventurer && !isCorpse) {
         const h = eco.heroOf(c);
@@ -1060,7 +1104,9 @@ export class CreatureView {
           }
         }
       }
-      const glow = c.glow / 255;
+      let glow = c.glow / 255;
+      // リビングアーマーの冑の覗き穴の光：マナが十分なら灯り続け、少なくなるとちらつく（描画専用）
+      if (sp === Kind.Armor && !c.dead) glow = c.mana < ARMOR_LOW ? ((Math.floor(t * 6) * 7 + c.id * 13) % 5 < 2 ? 0 : 0.3) : 0.8;
       // 起きているワーム：頭の跡に沿ったひと続きの胴と、進む向きに口を開く頭（drawWorm）
       if (sp === Kind.Worm && !c.dead && c.sleep !== 2) {
         this.drawWorm(eco, A, c, x, yy, t, pushSprite);

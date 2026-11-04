@@ -3044,6 +3044,46 @@ function fireSpirit(act,f){
  setPx(fr,10,12,[60,16,10],false);setPx(fr,14,12,[60,16,10],false);if(at){setPx(fr,11,15,[60,16,10],false);setPx(fr,12,15,[60,16,10],false);setPx(fr,13,15,[60,16,10],false)}
  return {...fr,ax:12,ay:H-2};
 }
+/**
+ * リビングアーマー：錆びかけた灰色の全身鎧で、中身は空。冑の覗き穴に青白い光が灯る（光を帯びたときに光る模様の点。
+ * 描画が強さを渡して、マナが減ると光がちらつく。src/creatureView.ts）。
+ * weapon：手に取り込んだ武器（none|dagger|mace|sword|greatsword）、shield：盾を持つか、pad：武具を3つ以上取り込んで肩当てが増えたか
+ */
+const ARMOR_EYE=[52,70,92],ARMOR_RUST=[[110,62,36],[140,84,48]];
+function armorHelm(eyes){return(dir,P,x,y,dead,open,k)=>{
+ const side=dir==='side',back=dir==='up',K=k,o=side?0.4*K:0;
+ // 天辺の平らな大兜：裾がわずかに広がり、目の高さに横長の覗き穴、その下に通気の穴
+ P.push(PL([[x+o-3*K,y+2.6*K],[x+o-2.8*K,y-2.4*K],[x+o-2*K,y-3.2*K],[x+o+2*K,y-3.2*K],[x+o+2.8*K,y-2.4*K],[x+o+3*K,y+2.6*K]],'plate',2,{ol:1}));
+ P.push(LN(x+o-2.6*K,y-2.6*K,x+o+2.6*K,y-2.6*K,'plate',4,{no:1}),LN(x+o-2.8*K,y+2.2*K,x+o+2.8*K,y+2.2*K,'iron',1,{no:1}));
+ P.push(D(x+o+(side?-1.6:1.9)*K,y-2*K,ARMOR_RUST[0]));
+ if(back){P.push(LN(x,y-2.4*K,x,y+2*K,'iron',2,{no:1}));return}
+ if(side){
+  P.push(LN(x+o+0.8*K,y-0.6*K,x+o+3*K,y-0.6*K,'boot',0,{no:1}),D(x+o+2.2*K,y+1.2*K,RAMP.boot[0]));
+  eyes.push([x+o+2*K,y-0.6*K]);
+ }else{
+  P.push(LN(x-2.4*K,y-0.6*K,x+2.4*K,y-0.6*K,'boot',0,{no:1}),LN(x-2.4*K,y-0.6*K+1,x+2.4*K,y-0.6*K+1,'boot',0,{no:1}),LN(x,y-0.6*K+1,x,y+2*K,'plate',4,{no:1}));
+  [[-1.2,1.4],[1.2,1.4]].forEach(([a,b])=>P.push(D(x+a*K,y+b*K,RAMP.boot[0])));
+  eyes.push([x-1.2*K,y-0.6*K],[x+1.2*K,y-0.6*K]);
+ }
+}}
+function armorDecor(v,P,cx,hip,sh,bw,bh,k){
+ // 胸当ての稜線、首と腰の継ぎ目の暗い隙間（中身が空）、腰に垂れる破れた布、錆の斑点
+ const rag=(x0,x1)=>{const n=4;const pts=[[x0,hip-0.6*k],[x1,hip-0.6*k]];for(let i=n;i>=0;i--){const x=x0+(x1-x0)*i/n;pts.push([x,hip+(i%2?2.6:3.8)*k])}P.push(PL(pts,'cloth',2,{ol:1}))};
+ if(v==='up'){P.push(LN(cx,sh+0.4*k,cx,hip,'plate',1,{no:1}),D(cx-1*k,sh+2*k,ARMOR_RUST[0]));rag(cx-bw*0.9,cx+bw*0.9);return}
+ if(v==='side'){P.push(LN(cx+1.2*k,sh+0.6*k,cx+1.4*k,hip-1*k,'plate',4,{no:1}),LN(cx-2*k,hip-0.6*k,cx+2.2*k,hip-0.6*k,'boot',0,{no:1}),D(cx-0.6*k,sh+1.6*k,ARMOR_RUST[1]));rag(cx-1.6*k,cx+1.4*k);return}
+ P.push(LN(cx,sh+0.6*k,cx,hip-1.2*k,'plate',4,{no:1}),LN(cx-bw+0.6*k,sh+1.4*k,cx-0.6*k,sh+2.8*k,'plate',1,{no:1}),LN(cx+bw-0.6*k,sh+1.4*k,cx+0.6*k,sh+2.8*k,'plate',1,{no:1}));
+ P.push(LN(cx-bw+0.4*k,hip-0.6*k,cx+bw-0.4*k,hip-0.6*k,'boot',0,{no:1}),LN(cx-1.2*k,sh-0.2*k,cx+1.2*k,sh-0.2*k,'boot',0,{no:1}));
+ rag(cx-bw*0.7,cx+bw*0.5);
+ P.push(D(cx-1.4*k,sh+2.2*k,ARMOR_RUST[0]),D(cx+1.8*k,hip-1.6*k,ARMOR_RUST[1]),D(cx+0.8*k,sh+1*k,ARMOR_RUST[0]));
+}
+function livingArmor(weapon,shield,pad,dir,act,f){
+ const eyes=[];
+ const tool={none:null,dagger,mace,sword,greatsword}[weapon];
+ const fr=humanoid(dir,act,f,{s:1.4,leg:5.4,bw:3.2,bh:3.6,hh:9,limb:0.95,skin:'iron',skinD:'iron',cloth:'plate',boot:'iron',hand:'iron',head:armorHelm(eyes),tool,off:shield?shieldOff:null,pad:pad?'plate':null,decor:armorDecor});
+ // 冑の覗き穴の光：光を帯びたときに光る模様の点（光らないときは暗い青）
+ if(act!=='death')for(const [ex,ey] of eyes){const x=Math.round(ex),y=Math.round(ey);if(x<0||y<0||x>=fr.W||y>=fr.H)continue;const p=y*fr.W+x;fr.px[p*4]=ARMOR_EYE[0];fr.px[p*4+1]=ARMOR_EYE[1];fr.px[p*4+2]=ARMOR_EYE[2];fr.px[p*4+3]=255;fr.mat[p]='glw'}
+ return fr;
+}
 /** 亡霊の騎士：青白く透ける鎧の騎士。兜の覗き穴が光り、裾は点描で透けて消える。剣を持つ。act attack は剣を振り上げる */
 function phantomKnight(act,f){
  const q=mod(f,4),W=26,H=34,fr=blank(W,H),at=act==='attack';
@@ -3213,4 +3253,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

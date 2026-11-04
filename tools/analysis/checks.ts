@@ -46,6 +46,25 @@ const RUN_TRIB = { seeds: ['seed23', 'seed41', 'seed30'], from: 10, to: 18 };
 
 export const CHECKS: Check[] = [
   {
+    // リビングアーマー（src/eco/armor.ts）：倒れた冒険者の武具に未練が宿り、溜まり場で甲冑が立ち上がる
+    name: 'リビングアーマーが武具の溜まり場から立ち上がる（4シードで2回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.births.filter((x) => x.k === 29 && x.origin === 'gear').length);
+      return { ok: sum(n) >= 2, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // リビングアーマー：床の武器と盾を取り込み、倒れるかマナが尽きると武具が床に散らばる
+    name: 'リビングアーマーが武具を取り込み、崩れて散らばる（4シードで取り込み3回・崩れる1回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const a = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'absorb').length);
+      const f = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'fall').length);
+      return { ok: sum(a) >= 3 && sum(f) >= 1, value: rs.map((r, i) => `${r.seed} 取り込み${a[i]}・崩れる${f[i]}`).join('、') };
+    },
+  },
+  {
     // 焚き火の夜（src/eco/night.ts）：焚き火で眠る一行が、見張り・盗賊に起こされるか、寝込みを打たれて飛び起きる
     name: '焚き火で眠る一行が、敵に気づいた見張りか、寝込みの一打ちで起こされる（4シードで1回以上）',
     ...RUN_A,
