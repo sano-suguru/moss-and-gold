@@ -5,7 +5,9 @@
 #     preview … npm run build → wrangler versions upload（本番には出さないバージョン）→ プレビューの URL を PR にコメント
 #               （同じ PR では一つのコメントを書き換える。URL はバージョンごとのものと、PR ごとに変わらない pr-<番号> のエイリアス）
 #               フォークからの PR では Secrets を使えないので、プレビューは作らない。
-# - main への push：typecheck → npm test → npm run build → wrangler deploy（本番）
+#               PR が閉じられたら（マージしたときも）、プレビューのバージョンは preview-cleanup.yml が消す。
+# - main への push：typecheck → npm test → npm run build → wrangler deploy（本番）→ 閉じた PR のプレビューの残りを消す
+#               （マージの直後は PR のプレビューがいちばん新しいバージョンで消せないので、本番の公開のあとに消す）
 #
 # 要るもの：リポジトリの Secrets に CLOUDFLARE_API_TOKEN と CLOUDFLARE_ACCOUNT_ID。無ければ公開だけ飛ばす。
 # プレビューの URL は wrangler.jsonc の workers_dev と preview_urls（どちらも true）で有効にしてある。
@@ -126,6 +128,9 @@ jobs:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read # 閉じた PR のプレビューを消すとき、開いている PR を調べる
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -142,6 +147,12 @@ jobs:
       - name: 本番へ公開
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: npx wrangler deploy
+      - name: 閉じた PR のプレビューの残りを消す（tools/preview-cleanup.mjs）
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        continue-on-error: true # 消せなくても本番の公開は済んでいるので、失敗にしない
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/preview-cleanup.mjs --closed
       - name: Secrets が無いので公開を飛ばした
         if: env.CLOUDFLARE_API_TOKEN == ''
         run: echo "::notice::CLOUDFLARE_API_TOKEN が無いので公開を飛ばしました（ビルドまでは通っています）"

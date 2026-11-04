@@ -74,12 +74,13 @@ export function salamander(this: Ecology, c: Cr): void {
 /** 空きのある巣穴を使い、なければ壁際の乾いた床で苔に近い所に新しく作る */
 export function pickBurrow(this: Ecology): Burrow {
   const m = this.w.map;
-  const residents = this.burrows.map((b) => this.list.filter((c) => c.k === Kind.Rat && !c.dead && c.hx === b.x && c.hy === b.y).length);
-  // 誰も住んでいない巣穴は崩れて消える（見つけやすさのため数を抑える）
+  let residents = this.burrows.map((b) => this.list.filter((c) => c.k === Kind.Rat && !c.dead && c.hx === b.x && c.hy === b.y).length);
+  // 巣穴が12を超えたら、誰も住んでいない巣穴は崩れて消える（見つけやすさのため数を抑える）。
+  // 全部に住んでいて一つも消えないこともある（分家で24まで増える）ので、消したあと選び直すときに自分を呼び直さない
+  // （以前は呼び直していて、13以上の巣穴が全部埋まっていると無限に呼び続けてスタックが溢れた）
   if (this.burrows.length > 12) {
-    const keep = this.burrows.filter((_, i) => residents[i] > 0);
-    this.burrows = keep;
-    return this.pickBurrow();
+    this.burrows = this.burrows.filter((_, i) => residents[i] > 0);
+    residents = residents.filter((n) => n > 0);
   }
   for (let i = 0; i < this.burrows.length; i++) if (residents[i] > 0 && residents[i] < 8) return this.burrows[i];
   let best = -1;
