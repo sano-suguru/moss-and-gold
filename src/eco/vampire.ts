@@ -106,6 +106,8 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
     const ok = (o: Cr) => {
       if (o.dead || o.away) return false;
       if (!VAMP_PREY.has(o.k) && !((o.k === Kind.Orc || o.k === Kind.Dwarf) && withThralls())) return false;
+      // 大ネズミは、飢えが進んでから（3割を超えてから）狙う。小さな獲物ばかり狩って、大ネズミが絶える日が増えていた
+      if (o.k === Kind.Rat && c.sinceMeal < s.starve * 0.3) return false;
       if (lightAt(this.tileOf(o.x, o.y)) > 60) return false;
       // 火の明かりの中の獲物は狙わない。冒険者の焚き火は、細るのを待つ（src/eco/night.ts の campFire）
       return !(this.fireNear(o.x, o.y) && !this.weakCampAt(o.x, o.y));
