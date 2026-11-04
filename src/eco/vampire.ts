@@ -31,9 +31,11 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
   const lightAt = (q: number) => (q < 0 ? 0 : this.w.lightBase[q] * day + this.w.mossGlow[q] * 500 + this.w.lavaGlow[q] * 1500);
   // 歩くときに手前で止まるのは、日の光だけ（夜に光る苔や溶岩の照り返しの手前で止まると、住処へ帰れずにその場で動けなくなっていた）
   const sunAt = (q: number) => (q < 0 ? 0 : this.w.lightBase[q] * day);
-  if (lightAt(k) > 60) {
+  // 明るい所（日の光か溶岩の照り返し）にいたら、暗い方へ逃げる。光る苔のほのかな明かりからは逃げない（苔の道で一歩進んでは戻り、足踏みしていた）
+  const glare = (q: number) => (q < 0 ? 0 : sunAt(q) + this.w.lavaGlow[q] * 1500);
+  if (glare(k) > 60) {
     let best = k;
-    for (const q of [k + 1, k - 1, k + m.w, k - m.w]) if (q >= 0 && q < m.solid.length && !m.solid[q] && lightAt(q) < lightAt(best)) best = q;
+    for (const q of [k + 1, k - 1, k + m.w, k - m.w]) if (q >= 0 && q < m.solid.length && !m.solid[q] && glare(q) < glare(best)) best = q;
     c.act = 1;
     this.moveToward(c, (best % m.w) * TILE + 8, Math.floor(best / m.w) * TILE + 8, s.speed * 1.3);
     return;
@@ -54,26 +56,16 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
   // 起きている冒険者の一行（7マス以内）からは、打ちかかられる前に退く（死ぬのはたいてい、松明を持つ一行に見つかったとき）。
   // 焚き火で眠っている者は避けない（寝込みを狙う）。打たれて間もないときは、退かずに打ち合う
   if (this.w.tick - c.hitAt > 60) {
-    let ax = 0;
-    let ay = 0;
     let n = 0;
     this.nearby(c.x, c.y, 7, (o) => {
       if (o.k !== Kind.Adventurer || o.dead || o.away || o.sleep > 0 || sq(o.x - c.x) + sq(o.y - c.y) > sq(7 * TILE)) return;
-      ax += o.x;
-      ay += o.y;
       n++;
     });
-    if (n) {
-      ax /= n;
-      ay /= n;
-      const L = Math.hypot(c.x - ax, c.y - ay) || 1;
+    // 退くときは、住処への道をたどる（一行から離れる向きへ一歩ずつ動くと、壁に当たって住処の向きと行き来し、その場で足踏みしていた）
+    if (n && sq(c.hx - c.x) + sq(c.hy - c.y) > sq(2 * TILE)) {
       c.act = 1;
       c.ref = 0;
-      const x0 = c.x;
-      const y0 = c.y;
-      this.tryMove(c, ((c.x - ax) / L) * s.speed * 1.3, ((c.y - ay) / L) * s.speed * 1.3);
-      // 行き止まりなら住処の方へ
-      if (c.x === x0 && c.y === y0) this.goTo(c, c.hx, c.hy, s.speed * 1.3);
+      this.goTo(c, c.hx, c.hy, s.speed * 1.3);
       return;
     }
   }

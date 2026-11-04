@@ -59,7 +59,8 @@ export function presenceAt(this: Ecology, x: number, y: number): number {
 
 /** 強いモンスターは、気配の濃い所から少しずつ離れる（追っているとき、戦っているとき、逃げているときは気にしない） */
 export function shyOfPeople(this: Ecology, c: Cr): boolean {
-  if (STR[c.k] < 7 || [Kind.Adventurer, Kind.Dwarf, Kind.Golem, Kind.Dragon, Kind.Worm, Kind.Mimic, Kind.Gargoyle, Kind.Lich].includes(c.k)) return false;
+  // ヴァンパイアは、起きている冒険者から自分で退く（src/eco/vampire.ts）。ここでも避けると、住処への帰り道と引っ張り合って入口のそばで足踏みしていた
+  if (STR[c.k] < 7 || [Kind.Adventurer, Kind.Dwarf, Kind.Golem, Kind.Dragon, Kind.Worm, Kind.Mimic, Kind.Gargoyle, Kind.Lich, Kind.Vampire].includes(c.k)) return false;
   const st = this.str(c);
   if (st < 10 || c.act === 2 || c.flee > 0 || c.sleep > 0 || this.w.tick - c.hitAt < 300) return false;
   // 夜襲に出る大物は、細った焚き火のまわり（12マス）の気配を避けない（src/eco/night.ts）
