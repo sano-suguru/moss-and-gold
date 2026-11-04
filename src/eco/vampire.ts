@@ -47,6 +47,32 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
     this.tryMove(c, ((c.x - f[0]) / L) * s.speed * 1.3, ((c.y - f[1]) / L) * s.speed * 1.3);
     return;
   }
+  // 起きている冒険者の一行（7マス以内）からは、打ちかかられる前に退く（死ぬのはたいてい、松明を持つ一行に見つかったとき）。
+  // 焚き火で眠っている者は避けない（寝込みを狙う）。打たれて間もないときは、退かずに打ち合う
+  if (this.w.tick - c.hitAt > 60) {
+    let ax = 0;
+    let ay = 0;
+    let n = 0;
+    this.nearby(c.x, c.y, 7, (o) => {
+      if (o.k !== Kind.Adventurer || o.dead || o.away || o.sleep > 0 || sq(o.x - c.x) + sq(o.y - c.y) > sq(7 * TILE)) return;
+      ax += o.x;
+      ay += o.y;
+      n++;
+    });
+    if (n) {
+      ax /= n;
+      ay /= n;
+      const L = Math.hypot(c.x - ax, c.y - ay) || 1;
+      c.act = 1;
+      c.ref = 0;
+      const x0 = c.x;
+      const y0 = c.y;
+      this.tryMove(c, ((c.x - ax) / L) * s.speed * 1.3, ((c.y - ay) / L) * s.speed * 1.3);
+      // 行き止まりなら住処の方へ
+      if (c.x === x0 && c.y === y0) this.goTo(c, c.hx, c.hy, s.speed * 1.3);
+      return;
+    }
+  }
   if (day > 0.05) {
     if (sq(c.hx - c.x) + sq(c.hy - c.y) > 12 * 12) {
       c.act = 1;
@@ -66,7 +92,9 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
   // 夜は暗がりを歩いて、温かい血の生き物を狩る。
   // 偵察：従えるコウモリが多いほど遠くの獲物まで見つける（コウモリ1匹ごとに4マス、10マスから30マスまで）。
   // 獲物を決めたら（c.ref に獲物の番号）、コウモリはまずその上を旋回し、ヴァンパイアが近づくと獲物に群がって足止めする（batPinned）
-  if (c.food < s.cap * 0.7) {
+  // 夜明け前（1日の 0.1〜0.2）には狩りをやめて住処へ帰りはじめる（夜が明けると、帰り道の明るい所の手前で動けなくなり、そこで冒険者に見つかっていた）
+  const predawn = this.phaseNow >= 0.1 && this.phaseNow < 0.2;
+  if (c.food < s.cap * 0.7 && !predawn) {
     // 眷属を連れている間は、強い獲物（オーク、ドワーフ）も狙う
     let thr = -1;
     const withThralls = () => {
@@ -148,7 +176,8 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       let bd = 1e18;
       c.tx = 0;
       for (const o of this.list) {
-        if (!ok(o)) continue;
+        // 遠出は住処から45マス以内の獲物まで（遠くへ行くほど、夜明けまでに帰れなくなる）
+        if (!ok(o) || sq(o.x - c.hx) + sq(o.y - c.hy) > sq(45 * TILE)) continue;
         const d = sq(o.x - c.x) + sq(o.y - c.y);
         if (d < bd) {
           bd = d;
@@ -171,8 +200,8 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
     }
   } else c.ref = 0;
   c.act = 1;
-  // 腹が満ちていて住処から遠ければ、暗がりを通って住処へ帰る（明るい所の手前では待つ）。飢えていれば、暗がりをさまよって獲物を探す
-  if (c.food >= s.cap * 0.7 && sq(c.hx - c.x) + sq(c.hy - c.y) > sq(8 * TILE)) {
+  // 腹が満ちているか夜明け前で、住処から遠ければ、暗がりを通って住処へ帰る（明るい所の手前では待つ）。飢えていれば、暗がりをさまよって獲物を探す
+  if ((c.food >= s.cap * 0.7 || predawn) && sq(c.hx - c.x) + sq(c.hy - c.y) > sq(8 * TILE)) {
     const x0 = c.x;
     const y0 = c.y;
     this.goTo(c, c.hx, c.hy, s.speed);
