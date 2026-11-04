@@ -35,6 +35,9 @@ export interface Atlas {
   /** 種・向き・動作・コマ（ウィスプは明るさの段階も）からコマ番号を引く */
   index: (species: number, dir: number, act: number, f: number, bright?: number) => number;
   web: number;
+  /** 大きなクモの巣（半径32px）と、引き裂かれた巣 */
+  webBig: number;
+  webTorn: number;
   burrow: number;
   anthill: number;
   /** コボルトの住処：罠（鉄の歯の板）、入口の骨の飾り柱、奥の寝床（わら）、キノコの畑（0 芽、1 育った）、暗がりで光る目（コマ 0〜3、3 はまばたき） */
@@ -126,12 +129,16 @@ const GEN = [
   (d: string, a: string, f: number) => spider(d, a, f),
 ];
 
-function makeWeb(): RawFrame {
-  const W = 35;
-  const H = 35;
+/**
+ * クモの巣：中心から放射する縦糸と、それを結ぶ横糸の輪。R は外側の縦糸の長さ（px）。
+ * torn は引き裂かれた巣（縦糸の半分ほどと横糸の多くが切れ、残りが下へ垂れる）
+ */
+function makeWeb(R = 16, torn = false): RawFrame {
+  const W = Math.ceil(R * 2 + 3);
+  const H = W;
   const px = new Uint8ClampedArray(W * H * 4);
   const mat: (string | null)[] = new Array(W * H).fill(null);
-  const c = 17;
+  const c = Math.floor(W / 2);
   const put = (x: number, y: number) => {
     x = Math.round(x);
     y = Math.round(y);
@@ -147,14 +154,24 @@ function makeWeb(): RawFrame {
     const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
     for (let i = 0; i <= n; i++) put(x0 + ((x1 - x0) * i) / n, y0 + ((y1 - y0) * i) / n);
   };
-  const N = 9;
-  const pts = (r: number) => [...Array(N)].map((_, i) => [c + Math.cos((i / N) * 6.283 + 0.2) * r * 1.0, c + Math.sin((i / N) * 6.283 + 0.2) * r * 0.85]);
-  const outer = pts(16);
-  outer.forEach(([x, y]) => line(c, c, x, y));
-  for (const r of [4, 7.5, 11, 14.5]) {
-    const p = pts(r);
-    for (let i = 0; i < N; i++) line(p[i][0], p[i][1], p[(i + 1) % N][0], p[(i + 1) % N][1]);
-  }
+  const N = R > 20 ? 12 : 9;
+  // 切れた糸は、外ほど下へ垂れる
+  const sag = (r: number) => (torn ? (r / R) * (r / R) * R * 0.35 : 0);
+  const pts = (r: number) => [...Array(N)].map((_, i) => [c + Math.cos((i / N) * 6.283 + 0.2) * r * 1.0, c + Math.sin((i / N) * 6.283 + 0.2) * r * 0.85 + sag(r)]);
+  const outer = pts(R);
+  const cut = (i: number) => torn && (i * 7) % 5 < 2;
+  outer.forEach(([x, y], i) => {
+    if (cut(i)) line(c, c, c + (x - c) * 0.35, c + (y - c) * 0.35);
+    else line(c, c, x, y);
+  });
+  const rings = R > 20 ? [0.18, 0.34, 0.5, 0.66, 0.82, 0.95] : [0.25, 0.47, 0.69, 0.9];
+  rings.forEach((f, j) => {
+    const p = pts(R * f);
+    for (let i = 0; i < N; i++) {
+      if (torn && (cut(i) || cut((i + 1) % N) || (i + j * 3) % 4 === 0)) continue;
+      line(p[i][0], p[i][1], p[(i + 1) % N][0], p[(i + 1) % N][1]);
+    }
+  });
   return { W, H, px, mat, ax: c, ay: c };
 }
 
@@ -693,6 +710,10 @@ export function buildAtlas(): Atlas {
   }
   const web = raws.length;
   raws.push(makeWeb());
+  const webBig = raws.length;
+  raws.push(makeWeb(32));
+  const webTorn = raws.length;
+  raws.push(makeWeb(32, true));
   const burrow = raws.length;
   raws.push(makeBurrow());
   const trapFrame = raws.length;
@@ -827,6 +848,8 @@ export function buildAtlas(): Atlas {
     data,
     frames,
     web,
+    webBig,
+    webTorn,
     burrow,
     index: (s, d, a, f, b = 0) => keyIndex.get(`${s},${d},${a},${f & 3},${s === 0 ? b : 0}`) ?? 0,
     anthill: anthillFrame,

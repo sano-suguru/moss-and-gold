@@ -37,7 +37,8 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
     if (!c.away) this.unbury(c);
     if (c.caught) {
       c.act = 1;
-      if (ih(c.id, this.step, 41) % (c.k === Kind.Bat ? 70 : 160) === 0) c.caught = false;
+      // もがいて抜け出す（コウモリは70分の1、大ネズミとアリは60分の1、ウィスプは160分の1。生き物の更新ごと）。抜け出したら巣の外へ跳び出す（escapeWeb）
+      if (ih(c.id, this.step, 41) % (c.k === Kind.Bat ? 70 : c.k === Kind.Rat || c.k === Kind.Ant ? 60 : 160) === 0) this.escapeWeb(c);
       this.metabolism(c);
       continue;
     }

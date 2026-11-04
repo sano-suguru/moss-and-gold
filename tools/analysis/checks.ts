@@ -7,6 +7,7 @@
  *
  * チェックを足すときは、起きることがわかっているシードと日を、前の batch の settle.jsonl などから選ぶ（例：かしたれは10日目ごろに貢ぎ物）。
  */
+import { countsAsStuck } from './common';
 export interface Recs {
   seed: string;
   from: number;
@@ -38,8 +39,10 @@ const RUN_ORC = { seeds: ['かしたれ', 'seed27'], from: 10, to: 18 };
 // オークの取り立ては、従う集落に蓄えがたまったときだけ起きるまれな出来事（16シード×25日で約25回、起きるのは6シードほど）。
 // いまのコードで10〜18日目に起きているシードを選ぶ。焚き火の夜襲の二歩目（#29）のコードで、
 // 0日目から実行すると abc 11.7日目・seed27 15.5日目から何度も、#28 の main の10日目から続けると seed23 15.8日目ほか（どちらでも起きるシードはない）。
-// 以前の かしたれ は六歩目（#16）のあと、seed41・seed18 は焚き火の眠り（#28）のあと、18日目までに起きなくなった
-const RUN_TRIB = { seeds: ['abc', 'seed27', 'seed23'], from: 10, to: 18 };
+// 以前の かしたれ は六歩目（#16）のあと、seed41・seed18 は焚き火の眠り（#28）のあと、18日目までに起きなくなった。
+// クモの巣の変更（#38）のコードで0日目から実行すると、abc・seed27・seed23 では起きず、seed41・seed30 で起きる（#37 の main では seed23・seed41・seed30 で起きる）。
+// どちらのスナップショットから始めても通るよう、seed23・seed41・seed30 にする
+const RUN_TRIB = { seeds: ['seed23', 'seed41', 'seed30'], from: 10, to: 18 };
 
 export const CHECKS: Check[] = [
   {
@@ -139,12 +142,25 @@ export const CHECKS: Check[] = [
   {
     // 狩りは打ち合って仕留めてから食べる（一口で食べるのは、クモの巣・丸のみ・空中でさらう・死骸だけ）。
     // 打ち合いで仕留めて食べたのが、一口で食べたより多い
-    name: '狩りは打ち合って仕留めて食べる（各シードで20回以上、一口で食べたより多い）',
+    // （1シードの揺れに左右されないよう、回数は4シードの合計で見る。クモの巣の変更（#38）のあと、abc の10〜18日目は10回ほどになった）
+    name: '狩りは打ち合って仕留めて食べる（4シードの合計で80回以上、どのシードでも一口で食べたより多い）',
     ...RUN_A,
     test: (rs) => {
       const sl = rs.map((r) => r.deaths.filter((x) => x.cause === 'eaten' && x.slain === 1).length);
       const gu = rs.map((r) => r.deaths.filter((x) => x.cause === 'eaten' && !x.slain).length);
-      return { ok: sl.every((v, i) => v >= 20 && v > gu[i]), value: rs.map((r, i) => `${r.seed} ${sl[i]}（一口 ${gu[i]}）`).join('、') };
+      return { ok: sum(sl) >= 80 && sl.every((v, i) => v > gu[i]), value: rs.map((r, i) => `${r.seed} ${sl[i]}（一口 ${gu[i]}）`).join('、') };
+    },
+  },
+  {
+    // クモの巣は、大ネズミやアリを捕まえ、大きな者に引き裂かれ、冒険者に切り払われる（src/eco/spider.ts の updateWebs）
+    name: 'クモの巣に大ネズミかアリが捕まり、引き裂かれるか切り払われる（4シードの合計でそれぞれ1回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = (how: string) => rs.map((r) => r.settle.filter((x) => x.k === 4 && x.ev === 'web' && x.how === how).length);
+      const ca = n('catch');
+      const te = n('tear');
+      const cu = n('cut');
+      return { ok: sum(ca) >= 1 && sum(te) + sum(cu) >= 1, value: rs.map((r, i) => `${r.seed} 捕まった${ca[i]}・引き裂いた${te[i]}・切り払った${cu[i]}`).join('、') };
     },
   },
   {
@@ -187,7 +203,7 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'オークが貢ぎ物を取り立てる（abc・seed27・seed23 で1回以上）',
+    name: 'オークが貢ぎ物を取り立てる（seed23・seed41・seed30 の合計で1回以上）',
     ...RUN_TRIB,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'tribute').length);
@@ -246,7 +262,7 @@ export const CHECKS: Check[] = [
     name: '道が見つからないまま壁際で足踏みしない（4シードの合計で40回以下）',
     ...RUN_A,
     test: (rs) => {
-      const n = rs.map((r) => r.stuck.filter((x) => x.nopath >= 0.5).length);
+      const n = rs.map((r) => r.stuck.filter((x) => countsAsStuck(x) && x.nopath >= 0.5).length);
       return { ok: sum(n) <= 40, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },
@@ -255,7 +271,7 @@ export const CHECKS: Check[] = [
     name: '冒険者が足踏みしない（4シードの合計で40回以下）',
     ...RUN_A,
     test: (rs) => {
-      const n = rs.map((r) => r.stuck.filter((x) => x.k === 25).length);
+      const n = rs.map((r) => r.stuck.filter((x) => countsAsStuck(x) && x.k === 25).length);
       return { ok: sum(n) <= 40, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },

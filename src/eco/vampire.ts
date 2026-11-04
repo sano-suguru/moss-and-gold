@@ -29,7 +29,16 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
   if (day > 0.05) {
     if (sq(c.hx - c.x) + sq(c.hy - c.y) > 12 * 12) {
       c.act = 1;
+      const x0 = c.x;
+      const y0 = c.y;
       this.goTo(c, c.hx, c.hy, s.speed);
+      // 帰り道の次の一歩が明るい所なら、進まずに暗がりで日が落ちるのを待つ
+      // （以前は明るい所へ一歩出ては光を嫌って戻り、その場で行ったり来たりしていた）
+      if (lightAt(this.tileOf(c.x, c.y)) > 60) {
+        c.x = x0;
+        c.y = y0;
+        c.act = 0;
+      }
     } else c.act = 0;
     return;
   }
