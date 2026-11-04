@@ -1148,6 +1148,64 @@ function wormHead(dir,act,f){
  teeth.forEach(([x,y])=>{x=Math.round(x);y=Math.round(y);const p=y*W+x;fr.px[p*4]=236;fr.px[p*4+1]=226;fr.px[p*4+2]=200;fr.px[p*4+3]=255});
  return {...fr,ax:cx,ay:31};
 }
+/**
+ * ワームの胴の一節（上から少し斜めに見た、太い環形の胴の輪切り）。r は太さ（半径、3〜12）。
+ * v 0 は節の膨らみ（明るい）、v 1 は節と節の間のくびれ（暗い溝）。胴の跡に沿って交互に重ねて、ひと続きの体にする（src/creatureView.ts の drawWorm）
+ */
+function wormBody(r,v){
+ const W=Math.ceil(r*2+5),H=Math.ceil(r*1.7+6),cx=W/2,cy=r*0.8+2.5,P=[];
+ if(v===0){
+  P.push(E(cx,cy,r,r*0.8,'worm',{ol:1}));
+  // 背の淡い帯と、てかり
+  P.push(E(cx,cy-r*0.12,r*0.78,r*0.42,'wormB',{flat:1}));
+  P.push(E(cx-r*0.28,cy-r*0.34,r*0.34,r*0.16,'wormB',{flat:3}));
+  // 両脇の短い剛毛
+  if(r>=6)for(const sx of [-1,1])P.push(LN(cx+sx*r*0.98,cy+r*0.1,cx+sx*(r+1.6),cy+r*0.3,'wormD',1,{no:1}));
+ }else{
+  P.push(E(cx,cy,r*0.94,r*0.74,'wormD',{ol:1}));
+  P.push(E(cx,cy-r*0.1,r*0.6,r*0.3,'worm',{flat:1}));
+ }
+ return {...raster(W,H,P),ax:Math.round(cx),ay:Math.round(cy+r*0.8)};
+}
+/**
+ * ワームの頭：胴の先の太い輪と、進む向き（d 0〜7、右から時計回りに45°ずつ）の側に開く円い口。open 0〜3 で口が開き、牙の輪と喉の奥が見える。
+ * 目はない。上から少し斜めに見た姿（胴の節 wormBody と同じ見方と色）
+ */
+function wormMouth(d,open){
+ const r=12,W=34,H=32,cx=17,cy=14,P=[];
+ const a=d*Math.PI/4,ux=Math.cos(a),uy=Math.sin(a)*0.8;
+ const o=[0.12,0.45,0.75,1][open];
+ P.push(E(cx,cy,r,r*0.82,'worm',{ol:1}));
+ P.push(E(cx-ux*2,cy-uy*2-1.5,r*0.75,r*0.4,'wormB',{flat:1}));
+ // 口の縁（向きの側へ寄った、肉の厚いひだの輪）
+ const mx=cx+ux*r*0.48,my=cy+uy*r*0.48+(uy<0?-0.5:0.5);
+ const mr=3.2+o*3.8;
+ P.push(E(mx,my,mr+1.6,(mr+1.6)*0.82,'wormD',{ol:1}));
+ P.push(E(mx,my,mr,mr*0.8,'maw',{flat:o>0.5?0:1}));
+ if(o>0.6)P.push(E(mx+ux*0.6,my+uy*0.6,mr*0.5,mr*0.38,'maw',{flat:0}));
+ const fr=raster(W,H,P);
+ // 牙の輪（開くほど多く、内側にもう一列）
+ const n=o<0.3?6:10;
+ for(let i=0;i<n;i++){const b=i/n*6.283;setPx(fr,Math.round(mx+Math.cos(b)*(mr-0.4)),Math.round(my+Math.sin(b)*(mr-0.4)*0.8),[236,226,200],false)}
+ if(o>0.6)for(let i=0;i<6;i++){const b=i/6*6.283+0.5;setPx(fr,Math.round(mx+Math.cos(b)*mr*0.5),Math.round(my+Math.sin(b)*mr*0.4),[214,204,180],false)}
+ return {...fr,ax:cx,ay:Math.round(cy+r*0.82)};
+}
+/**
+ * 岩の下を掘り進むワームが押し上げた岩：盛り上がって割れた岩と、こぼれた小石。v 0〜2 は形の違い、big は頭の上（大きく割れる）
+ */
+function wormMound(v,big){
+ const W=big?30:22,H=big?20:15,cx=W/2,cy=H-5,P=[];
+ const R=big?11:7.5;
+ P.push(E(cx,cy,R,R*0.55,'soil',{ol:1}));
+ // 割れ目で分かれた岩のかけら
+ const k=big?5:3;
+ for(let i=0;i<k;i++){const b=(i/k)*6.283+v*1.3;const rr=R*0.5;P.push(E(cx+Math.cos(b)*rr,cy+Math.sin(b)*rr*0.5-1.2,R*0.42,R*0.28,'soil',{ol:1}))}
+ const fr=raster(W,H,P);
+ // 割れ目（暗い線）と、まわりにこぼれた小石
+ for(let i=0;i<k;i++){const b=(i/k)*6.283+v*1.3+0.6;for(let s=0;s<R*0.8;s+=0.7)setPx(fr,Math.round(cx+Math.cos(b)*s),Math.round(cy-1+Math.sin(b)*s*0.5),[20,18,24],false)}
+ for(let i=0;i<(big?7:4);i++){const b=i*2.4+v;setPx(fr,Math.round(cx+Math.cos(b)*(R+1.5)),Math.round(cy+Math.sin(b)*(R*0.55+1)),RAMP.soil[1],false)}
+ return {...fr,ax:Math.round(cx),ay:H-1};
+}
 function wormSeg(kind,f){
  const P=[],W=28,H=24,cx=14,base=20;
  const r=kind===1?6:10;
@@ -3150,4 +3208,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
