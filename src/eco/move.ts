@@ -436,6 +436,11 @@ export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
     mx *= 0.6;
     my *= 0.6;
   }
+  // クモの巣の糸に足を取られる者（強さ2〜5の地面を行く者。src/eco/spider.ts の webEffect）は、巣の中では半分の速さ
+  if (this.webs.length && (mx || my) && this.webEffect(c) === 2 && this.inWeb(c)) {
+    mx *= 0.5;
+    my *= 0.5;
+  }
   // 列の間合い：同じ群れの仲間がすぐ前にいれば歩みをゆるめる（細い通路で一列になっても重ならない）
   if (mx || my) {
     const key = this.groupKey(c);

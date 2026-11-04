@@ -18,6 +18,9 @@ export interface Moment {
 export const MOMENTS: Moment[] = [
   { key: 'slainEat', label: '狩り：打ち合って仕留めて食べた' },
   { key: 'webEat', label: '狩り：クモが巣にかかった獲物を食べた' },
+  { key: 'webCatch', label: 'クモの巣：大ネズミかアリが捕まった' },
+  { key: 'webTear', label: 'クモの巣：大きな者が引き裂いた' },
+  { key: 'webCut', label: 'クモの巣：冒険者が切り払った' },
   { key: 'swallow', label: '狩り：ワームかミミックが丸のみにした' },
   { key: 'airSnatch', label: '狩り：ワイバーンかガーゴイルが飛ぶコウモリをさらった' },
   { key: 'snatch', label: '通路での掠め取り：盗んだ' },
@@ -143,6 +146,9 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
   return {
     slainEat: d.filter((y) => y.cause === 'eaten' && y.slain === 1).length,
     webEat: gulp([K.Spider]),
+    webCatch: ev(K.Spider, 'web').filter((y) => y.how === 'catch').length,
+    webTear: ev(K.Spider, 'web').filter((y) => y.how === 'tear').length,
+    webCut: ev(K.Spider, 'web').filter((y) => y.how === 'cut').length,
     swallow: gulp([K.Worm, K.Mimic]),
     airSnatch: gulp([K.Wyvern, K.Gargoyle]),
     snatch: rob.filter((x) => x.how === 'snatch').length,

@@ -837,6 +837,8 @@ export class Ecology {
   litMapTick = -1;
 
   /** 火を怖がる野の獣 */
+  /** クモの巣の大きさ（半径 px。2×2マスほど。通路をまたいでふさぐ） */
+  static WEB_R = 32;
   static FEARS_FIRE = new Set<number>([Kind.Rat, Kind.Lizard, Kind.Spider, Kind.Bat, Kind.Ant, Kind.Troll, Kind.Basilisk, Kind.Minotaur]);
 
   fireList: [number, number, number][] = [];
@@ -888,6 +890,8 @@ export class Ecology {
    * 捕食の演出の記録（描画専用）：生きている獲物が食べられた瞬間ごとに、獲物（id、種 k、位置）と食べた者（by、種 bk）、
    * 打ち合いで仕留めてから食べたか（slain）。シミュレーションの判断には使わない（セーブには、映像のために直前の6秒分だけ残す）。src/creatureView.ts が、くわえて振る・繭・丸のみ・さらう・消え方を描く
    */
+  /** 引き裂かれた巣の演出の記録（描画専用。破れた巣が垂れて消え、糸くずが舞う） */
+  fxWebTears: { t: number; x: number; y: number; r: number }[] = [];
   fxEats: { t: number; id: number; k: number; sp: number; by: number; bk: number; x: number; y: number; slain: boolean }[] = [];
   /** 大ネズミの巣穴の引っ越し（描画専用：列の先頭が新しい巣穴に着くまで、古い場所に穴を描く。判断に使わない） */
   fxMarch: { t: number; x: number; y: number; tx: number; ty: number }[] = [];

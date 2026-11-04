@@ -585,7 +585,19 @@ export class CreatureView {
       const ty = Math.floor(tr.k / eco.mapW) * 16 + 11;
       if (inView(tx, ty, 16)) pushSprite(tx, ty, 0, false, A.trap, 0, 2);
     }
-    for (const w of eco.webs) if (inView(w.x, w.y, 24)) pushSprite(w.x, w.y, 0, false, A.web, 0, 2);
+    for (const w of eco.webs) if (inView(w.x, w.y, w.r + 8)) pushSprite(w.x, w.y, 0, false, w.r >= 28 ? A.webBig : A.web, 0, 2);
+    // 引き裂かれた巣（描画専用）：破れて垂れた巣が3秒ほど残って消え、裂けた瞬間に糸くずが舞う
+    for (const tw of eco.fxWebTears) {
+      const age = eco.w.tick - tw.t;
+      if (age < 0 || age > 40 || !inView(tw.x, tw.y, tw.r + 8)) continue;
+      if (age < 28 || (age & 1)) pushSprite(tw.x, tw.y + age * 0.08, 0, false, A.webTorn, 0, 2);
+      if (age < 16)
+        for (let i = 0; i < 8; i++) {
+          const a = i * 0.785 + (tw.t % 5);
+          const r = 6 + age * 1.2 + (i % 3) * 3;
+          pushSprite(tw.x + Math.cos(a) * r, tw.y + Math.sin(a) * r * 0.6, 6 + Math.sin(age * 0.3 + i) * 3 - age * 0.3, false, A.fx('bit:3:7:0'), 0, 4);
+        }
+    }
     for (const c of eco.colonies) if (inView(c.x, c.y, 24)) pushSprite(c.x, c.y + 4, 0, false, A.anthill, 0, 2);
     for (const c of eco.camps) {
       if (!inView(c.x, c.y, 32)) continue;
@@ -1000,6 +1012,16 @@ export class CreatureView {
         }
       }
       if (veil === 1) continue;
+      // クモの巣の糸の中：捕まった者はもがいて小刻みに揺れ、足を取られた者は糸を引きずって揺れる。どちらも白い糸がまとわりつく
+      if (!c.dead && eco.webs.length && (c.caught || (eco.webEffect(c) === 2 && eco.inWeb(c)))) {
+        const k = c.caught ? 1.2 : 0.6;
+        x += Math.sin(t * 31 + c.id) * k;
+        const fh = Ecology.bodySize(sp) || 6;
+        for (let i = 0; i < (c.caught ? 3 : 2); i++) {
+          const a = t * 2.3 + i * 2.1 + c.id;
+          pushSprite(x + Math.cos(a) * fh * 0.5, yy + 0.1, lift + 2 + ((i * 3 + Math.floor(t * 4)) % Math.max(2, Math.round(fh * 0.8))), false, A.fx('bit:3:7:0'), 0, 4);
+        }
+      }
       // 捕食の演出（drawEats）：繭やさらわれた姿で描く獲物は、ふつうには描かない。くわえて振られている獲物は口元に。食べたミミックは跳ねる
       if (this.eatHide.has(c.id)) continue;
       {

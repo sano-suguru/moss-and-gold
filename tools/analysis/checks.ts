@@ -148,6 +148,18 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // クモの巣は、大ネズミやアリを捕まえ、大きな者に引き裂かれ、冒険者に切り払われる（src/eco/spider.ts の updateWebs）
+    name: 'クモの巣に大ネズミかアリが捕まり、引き裂かれるか切り払われる（4シードの合計でそれぞれ1回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = (how: string) => rs.map((r) => r.settle.filter((x) => x.k === 4 && x.ev === 'web' && x.how === how).length);
+      const ca = n('catch');
+      const te = n('tear');
+      const cu = n('cut');
+      return { ok: sum(ca) >= 1 && sum(te) + sum(cu) >= 1, value: rs.map((r, i) => `${r.seed} 捕まった${ca[i]}・引き裂いた${te[i]}・切り払った${cu[i]}`).join('、') };
+    },
+  },
+  {
     // 大ネズミの巣穴の引っ越しは、群れが一列になって歩いていく
     name: '大ネズミが一列になって巣穴を引っ越す（4シードで1回以上）',
     ...RUN_A,
