@@ -57,7 +57,7 @@ export const MINO_FAR = 30;
  * ミノタウロス：寝床（マップ生成で決めた、深部の暗い行き止まりの奥）のまわりの縄張りを徘徊し、縄張りの中か、そのすぐ外で、何でも襲う。
  * 腹が減ると（最後に食べてから MINO_PROWL 回）、寝床から MINO_FAR マスの内まで狩りに出る。
  * 縄張りの主なので、飢えても外へ出ていかない（ほかの大物の leaveIfStarving を使わず、飢え死にするまで狩りを続ける）。
- * 仕留めた獲物は寝床まで引きずっていってから食べる（feeding の dragToLair）。食べ残しの骨は寝床に積もる
+ * 仕留めた獲物は寝床まで引きずっていってから食べる（feeding の dragToLair）。骨になるところまでしか食べず（feeding）、骨は寝床に積もる
  */
 export function minotaur(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Minotaur];
@@ -69,9 +69,11 @@ export function minotaur(this: Ecology, c: Cr): void {
   const far = prowl ? MINO_FAR : 16;
   const nearHome = home || sq(c.x - c.hx) + sq(c.y - c.hy) < far * TILE * far * TILE;
   if (nearHome && this.hunt(c, prowl ? 8 : home ? 5 : 3, HUNT3, s.speed * 1.3)) return;
-  // 縄張りの中を徘徊する（狩りに出ているときは、寝床から MINO_FAR マスの内の床を）
+  // 縄張りの中を徘徊する（狩りに出ているときは、寝床から MINO_FAR マスの内の、人の気配の薄い床を。
+  // 気配の濃い所へ向かうと、強い魔物が気配から離れる shyOfPeople に押し戻されて行き来し続けるので避け、
+  // 生き物の更新400回たっても着かなければ選び直す）
   c.act = 1;
-  if (c.tx <= 0 || sq(c.tx - c.x) + sq(c.ty - c.y) < 10 * 10 || c.actT > 1200) {
+  if (c.tx <= 0 || sq(c.tx - c.x) + sq(c.ty - c.y) < 10 * 10 || c.actT > (prowl ? 400 : 1200)) {
     let t = -1;
     if (prowl && m.lair.x >= 0) {
       for (let i = 0; i < 12 && t < 0; i++) {
@@ -80,7 +82,9 @@ export function minotaur(this: Ecology, c: Cr): void {
         const y = m.lair.y + ((h >>> 8) % (MINO_FAR * 2 + 1)) - MINO_FAR;
         if (x < 1 || y < 1 || x >= m.w - 1 || y >= m.h - 1) continue;
         const k = y * m.w + x;
-        if (!m.solid[k] && !m.sealed[k] && !m.lava[k] && this.w.water[k] <= 20 && this.regionOf(k) === this.regionOf(m.lair.y * m.w + m.lair.x)) t = k;
+        if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 20 || this.regionOf(k) !== this.regionOf(m.lair.y * m.w + m.lair.x)) continue;
+        if (this.presenceAt(x * TILE + 8, y * TILE + 8) > 0.2) continue;
+        t = k;
       }
     }
     if (t < 0) {
@@ -97,7 +101,7 @@ export function minotaur(this: Ecology, c: Cr): void {
 
 /**
  * ミノタウロスが、仕留めた獲物の死骸 d を寝床まで引きずる（生き物の更新ごと、ふだんの6割の速さで）。
- * 死骸は、ミノタウロスの体の MINO_TAIL px うしろを付いてくる（そこが岩なら、ミノタウロスが動く前にいた所＝必ず歩ける床へ）。寝床に着いたか、
+ * 死骸は、ミノタウロスの体の MINO_TAIL px うしろ（手前へ歩くときは体の横）を付いてくる（そこが岩なら、ミノタウロスが動く前にいた所＝必ず歩ける床へ）。寝床に着いたか、
  * 倒れてから生き物の更新 MINO_DRAG 回たっても着かなければ（道がふさがっているなど）、引きずるのをやめてその場で食べる。true なら今は引きずっている
  */
 export function dragToLair(this: Ecology, c: Cr, d: Cr): boolean {
@@ -112,13 +116,19 @@ export function dragToLair(this: Ecology, c: Cr, d: Cr): boolean {
   const y0 = c.y;
   c.act = 1;
   this.goTo(c, bx, by, SPEC[c.k].speed * 0.6);
-  const dx = c.x - d.x;
-  const dy = c.y - d.y;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  if (sq(c.x - x0) + sq(c.y - y0) > 0.01 && dist > MINO_TAIL) {
-    const f = (dist - MINO_TAIL) / dist;
-    const nx = d.x + dx * f;
-    const ny = d.y + dy * f;
+  const mx = c.x - x0;
+  const my = c.y - y0;
+  const ml = Math.sqrt(mx * mx + my * my);
+  if (ml > 0.1) {
+    // 進む向きの MINO_TAIL px うしろ。手前（下）へ歩くときは、うしろ（上）だと背の高い体に隠れるので、体の横（右）へずらす
+    // 向きが変わっても跳ばないよう、死骸が1回に動くのは 2.5px まで（ミノタウロスの引きずる速さより少し速い）
+    const down = my > Math.abs(mx);
+    const gx = c.x - (mx / ml) * (down ? 4 : MINO_TAIL) + (down ? 10 : 0);
+    const gy = c.y - (my / ml) * (down ? 4 : MINO_TAIL);
+    const gl = Math.sqrt(sq(gx - d.x) + sq(gy - d.y));
+    const f = gl > 2.5 ? 2.5 / gl : 1;
+    const nx = d.x + (gx - d.x) * f;
+    const ny = d.y + (gy - d.y) * f;
     const k = this.tileOf(nx, ny);
     if (k >= 0 && !m.solid[k]) {
       d.x = nx;

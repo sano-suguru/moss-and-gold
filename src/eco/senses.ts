@@ -439,8 +439,12 @@ export function feeding(this: Ecology, c: Cr): boolean {
     c.feed = 0;
     return false;
   }
-  // ミノタウロスは、まず寝床まで引きずっていく（src/eco/monsters.ts）
+  // ミノタウロスは、まず寝床まで引きずっていく。食べるのは骨になるところまでで、骨は寝床に残す（src/eco/monsters.ts）
   if (this.dragToLair(c, d)) return true;
+  if (c.k === Kind.Minotaur && this.corpseStage(d) === 2) {
+    c.feed = 0;
+    return false;
+  }
   c.dir = Math.abs(d.x - c.x) > Math.abs(d.y - c.y) ? (d.x > c.x ? 2 : 3) : d.y > c.y ? 0 : 1;
   if (this.step % 4 === c.id % 4) {
     const t = Math.min(5, d.units, s.cap - c.food);

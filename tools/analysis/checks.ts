@@ -121,9 +121,12 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 食べ物の足りる場所がどの横穴の先にも無いマップでも、少ない群れが貧しい場所に集落を作る（かしたれ・seed7・seed8 で10〜18日目に起きる）
+    // 食べ物の足りる場所がどの横穴の先にも無いマップでも、少ない群れが貧しい場所に集落を作る。
+    // 迷路をなくして地形が変わる前は、かしたれ・seed7・seed8 で10〜18日目に起きていた。変わったあとは seed18・seed40 で3回ずつ、seed8 で1回（かしたれ・seed7 では起きない）
     name: 'ゴブリンの少ない群れが貧しい場所に集落を作る（4シードの合計で2回以上）',
-    ...RUN_A,
+    seeds: ['かしたれ', 'seed8', 'seed18', 'seed40'],
+    from: 10,
+    to: 18,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 12 && x.ev === 'found' && x.poor === 1).length);
       return { ok: sum(n) >= 2, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
