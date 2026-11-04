@@ -59,7 +59,8 @@ export function presenceAt(this: Ecology, x: number, y: number): number {
 
 /** 強いモンスターは、気配の濃い所から少しずつ離れる（追っているとき、戦っているとき、逃げているときは気にしない） */
 export function shyOfPeople(this: Ecology, c: Cr): boolean {
-  if (STR[c.k] < 7 || [Kind.Adventurer, Kind.Dwarf, Kind.Golem, Kind.Dragon, Kind.Worm, Kind.Mimic, Kind.Gargoyle, Kind.Lich].includes(c.k)) return false;
+  // ヴァンパイアは、起きている冒険者から自分で退く（src/eco/vampire.ts）。ここでも避けると、住処への帰り道と引っ張り合って入口のそばで足踏みしていた
+  if (STR[c.k] < 7 || [Kind.Adventurer, Kind.Dwarf, Kind.Golem, Kind.Dragon, Kind.Worm, Kind.Mimic, Kind.Gargoyle, Kind.Lich, Kind.Vampire].includes(c.k)) return false;
   const st = this.str(c);
   if (st < 10 || c.act === 2 || c.flee > 0 || c.sleep > 0 || this.w.tick - c.hitAt < 300) return false;
   // 夜襲に出る大物は、細った焚き火のまわり（12マス）の気配を避けない（src/eco/night.ts）
@@ -436,6 +437,11 @@ export function feeding(this: Ecology, c: Cr): boolean {
   const d = this.byId.get(c.feed);
   const s = SPEC[c.k];
   if (!d || d.dead !== 1 || d.units <= 0 || c.food >= s.cap || (this.w.tick - c.hitAt < 30 && c.foe !== d.id) || sq(d.x - c.x) + sq(d.y - c.y) > 18 * 18) {
+    c.feed = 0;
+    return false;
+  }
+  // ヴァンパイアは、眷属として起き上がらせる亡骸からは、血を短く吸うだけで離れる（src/eco/thrall.ts）
+  if (c.k === Kind.Vampire && d.lure === c.id && this.step - d.lureAt > 15) {
     c.feed = 0;
     return false;
   }

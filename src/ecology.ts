@@ -42,6 +42,8 @@ export const enum Kind {
   Dwarf = 28,
   /** リビングアーマー（src/eco/armor.ts） */
   Armor = 29,
+  /** ヴァンパイアの眷属：ヴァンパイアに倒された者の亡骸が起き上がったもの（src/eco/thrall.ts） */
+  Thrall = 30,
 }
 
 /** ドワーフの住みか */
@@ -348,17 +350,17 @@ export interface Camp {
 }
 
 /** 種ごとの強さ（戦いの勝ち負けの確率に使う） */
-export const STR = [0, 1, 1, 5, 3, 2, 3, 0, 2, 1, 3, 4, 3, 10, 6, 20, 15, 8, 4, 12, 8, 30, 40, 25, 60, 5, 3, 18, 6, 6];
+export const STR = [0, 1, 1, 5, 3, 2, 3, 0, 2, 1, 3, 4, 3, 10, 6, 20, 15, 8, 4, 12, 8, 30, 40, 25, 60, 5, 3, 18, 6, 6, 3];
 /** ドワーフの強さ（坑夫、鍛冶屋、戦士） */
 export const DWARF_STR = [5, 6, 10];
 /**
  * 賢さの段階：0 本能だけ（傷ついても逃げない）、1 動物（体力が半分を切ると逃げる）、
  * 2 狡猾（不利なら退く。強い相手には仲間がいなければ挑まない）、3 知性（戦う前に見積もり、勝てない相手は避ける）
  */
-export const TIER = [1, 1, 1, 1, 1, 0, 0, 0, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 0, 3, 0, 0, 0, 1, 3, 3, 0, 3, 3, 0];
+export const TIER = [1, 1, 1, 1, 1, 0, 0, 0, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 0, 3, 0, 0, 0, 1, 3, 3, 0, 3, 3, 0, 2];
 export const FLEE_AT = [0, 0.5, 0.35, 0.4];
 /** 血の色：0 赤、1 暗い赤（爬虫類・竜）、2 緑（虫）、3 石のかけら、-1 なし */
-export const BLOOD = [-1, 0, 0, 1, 2, -1, -1, -1, -1, 2, 0, 1, 0, 0, 1, 0, 0, 1, 3, 0, -1, 3, 0, 1, 1, 0, -1, -1, 0, -1];
+export const BLOOD = [-1, 0, 0, 1, 2, -1, -1, -1, -1, 2, 0, 1, 0, 0, 1, 0, 0, 1, 3, 0, -1, 3, 0, 1, 1, 0, -1, -1, 0, -1, -1];
 /** 冒険者の強さ（職業）と、一行の格（駆け出し・手練れ・精鋭） */
 export const JOB_STR = [8, 5, 4, 5, 3, 6, 20];
 export const TIER_MUL = [0.7, 1.1, 1.6];
@@ -452,7 +454,8 @@ export const SPEC: Spec[] = [
   { body: 150, cap: 250, meta: 40, starve: 6000, speed: 0.85, glowDecay: 1 },
   { body: 60, cap: 100, meta: 50, starve: 5000, speed: 0.5, glowDecay: 1 },
   { body: 20, cap: 40, meta: 200, starve: 20000, speed: 1.6, glowDecay: 1 },
-  { body: 50, cap: 100, meta: 50, starve: 6000, speed: 0.9, glowDecay: 1 },
+  // ヴァンパイア：血を吸えば長くもつ（住処に数日は居つくように。以前は半日ほどで飢えて去っていた）
+  { body: 50, cap: 100, meta: 100, starve: 16000, speed: 0.9, glowDecay: 1 },
   { body: 10, cap: 60, meta: 120, starve: 40000, speed: 0.4, glowDecay: 1 },
   { body: 0, cap: 0, meta: 1e9, starve: 1e9, speed: 0.6, glowDecay: 1 },
   { body: 300, cap: 300, meta: 400, starve: 1e9, speed: 2, glowDecay: 1 },
@@ -464,6 +467,8 @@ export const SPEC: Spec[] = [
   { body: 50, cap: 80, meta: 90, starve: 30000, speed: 0.8, glowDecay: 1 },
   // リビングアーマー：中身は空の鎧で、体（養分）を持たず、食べない。マナで動く（src/eco/armor.ts）
   { body: 0, cap: 0, meta: 1e9, starve: 1e9, speed: 0.55, glowDecay: 1 },
+  // 眷属：ものを食べず、飢えない（体は起き上がった亡骸の残りの分）
+  { body: 0, cap: 0, meta: 1e9, starve: 1e9, speed: 0.85, glowDecay: 1 },
 ];
 
 export interface Cr {
@@ -602,7 +607,7 @@ export class Ecology {
   exported = 0;
   /** 生き物の更新の通し番号（step 番号。CR_EVERY tick ごとに1増える。セーブに入れる） */
   step = 0;
-  counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   /** ドワーフの住みか（一つまで）、坑道のランプ、外に伝わった話（1 = ゴーレムの宝物庫は危ない） */
   hold: Hold | null = null;
   lamps: number[] = [];

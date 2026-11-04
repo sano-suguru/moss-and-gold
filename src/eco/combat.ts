@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
+import { thrallStr } from './thrall';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
 import { ARMOR_HAND_MAX, ARMOR_HP_MUL } from './armor';
@@ -13,6 +14,7 @@ export function str(this: Ecology, c: Cr): number {
   // スケルトンは生前の装備で強さが決まる。武器を拾ったゴブリンとオークは強くなる
   if (c.k === Kind.Skeleton) return c.init ? JOB_STR[c.sp] * 1.2 : 3;
   if (c.k === Kind.Dwarf) return DWARF_STR[c.sp];
+  if (c.k === Kind.Thrall) return thrallStr(c);
   // リビングアーマーは、手に取り込んだ武器と盾1つごとに強くなる（src/eco/armor.ts）
   if (c.k === Kind.Armor) return STR[c.k] + 3 * Math.min(ARMOR_HAND_MAX, this.armorHand(c).length);
   if ((c.k === Kind.Goblin || c.k === Kind.Orc) && c.party) return STR[c.k] * 1.6;
@@ -190,6 +192,12 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1): boolean {
   const sa = this.str(a) * (1 + 0.4 * allies(a));
   const dmg = sa * (1.2 + (ih(a.id, d.id ^ this.step, 161) % 1000) / 1000 * 1.2) * mul;
   d.hp -= dmg;
+  // やられそうになったヴァンパイアは、コウモリの群れにばらけて逃げる（1日に1回、光の中ではできない。src/eco/vampire.ts）
+  let scatter = false;
+  if (d.k === Kind.Vampire && d.hp < this.maxHp(d) * 0.35 && this.vampCanScatter(d)) {
+    d.hp = Math.max(1, d.hp);
+    scatter = true;
+  }
   if (d.k === Kind.Adventurer && d.hp > 0) this.heroHurt(d);
   d.hitAt = this.w.tick;
   d.foe = a.id;
@@ -203,6 +211,9 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1): boolean {
   this.bleed(d, 1);
   // 焚き火のそばの小物との小競り合い（コウモリに血を吸われて払うなど）は、一行の皆を起こすほどの音を立てない
   if (!this.campPetty(a, d)) this.noise(d.x, d.y, 9);
+  if (scatter) this.vampScatter(d);
+  // 分析用：光の中で追い詰められ、コウモリにばらけられずに倒されたヴァンパイア
+  else if (d.k === Kind.Vampire && d.hp <= 0 && this.step - d.lureAt >= DAY_TICKS_ECO / CR_EVERY) this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'lightKill', id: d.id, n: a.k, x: Math.round(d.x), y: Math.round(d.y) } as never);
   return d.hp <= 0;
 }
 
@@ -217,16 +228,20 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
   // 寝込みの一打ち：焚き火で眠っている冒険者への最初の一打ちは重く（1.5倍）、その打ち合いでは打ち返されない（src/eco/night.ts）
   const asleep = this.nightHit(a, d);
   if (this.strike(a, d, asleep ? 1.5 : 1)) {
-    if (a.k === Kind.Skeleton || a.k === Kind.Lich || a.k === Kind.Dwarf || a.k === Kind.Golem || a.k === Kind.Gargoyle || a.k === Kind.Armor || (a.k === Kind.Adventurer && d.k !== Kind.Rat)) this.die(d, 'fight', a.k);
+    if (a.k === Kind.Skeleton || a.k === Kind.Lich || a.k === Kind.Dwarf || a.k === Kind.Golem || a.k === Kind.Gargoyle || a.k === Kind.Armor || a.k === Kind.Thrall || (a.k === Kind.Adventurer && d.k !== Kind.Rat)) this.die(d, 'fight', a.k);
     else this.eat(a, d, true);
+    // ヴァンパイアが倒した者は、眷属として起き上がることがある（src/eco/thrall.ts）
+    if (a.k === Kind.Vampire) this.vampClaim(a, d);
     return true;
   }
   // 打ち返し（逃げている者と、寝込みを打たれて飛び起きたばかりの者は打ち返さない）
   if (d.flee <= 0 && this.str(d) > 0 && !asleep) {
     d.act = 2;
     d.actT = 0;
-    if (this.strike(d, a, 0.8)) {
+    // コウモリに群がられている者の打ち返しは弱い（src/eco/vampire.ts の batPinned）
+    if (this.strike(d, a, this.batPinned(d) ? 0.4 : 0.8)) {
       this.die(a, 'fight', d.k);
+      if (d.k === Kind.Vampire) this.vampClaim(d, a);
       // リビングアーマーは、打ち返しで倒した相手も覚える（その落とし物を「奪って」取り込む。src/eco/armor.ts）
       if (d.k === Kind.Armor) {
         d.ref = a.id;

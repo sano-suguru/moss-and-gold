@@ -3,6 +3,7 @@ import { BLOOD, Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
 import { ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
 import { RANK_AT, unpackLook } from './eco/roster';
+import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
 
 const MAX_SPRITES = 4096;
@@ -238,6 +239,7 @@ export class CreatureView {
       if (b && b.step === eco.step) continue;
       const L = Math.hypot(d.x - c.x, d.y - c.y) || 1;
       this.bites.set(c.id, { t: now, step: eco.step, ux: (d.x - c.x) / L, uy: (d.y - c.y) / L });
+      if (c.k === Kind.Vampire) continue; // 肉片は飛ばさない（血を吸う流れは下で描く）
       const col = fxCol(d.k);
       if (col < 0) continue;
       for (let i = 0; i < 3; i++) {
@@ -246,6 +248,17 @@ export class CreatureView {
       }
       if (b && now - b.t < 40) continue;
       this.bits.push({ x: d.x, y: d.y, z: 3, vx: 0, vy: 0, vz: 1.8, kind: 0, col: 0, t0: now, life: 12 });
+    }
+    // ヴァンパイアは肉を食いちぎらず、血を吸う：食べている間ずっと、死骸から赤い粒が弧を描いて口へ流れ込む
+    for (const c of eco.list) {
+      if (c.k !== Kind.Vampire || !c.feed || c.dead) continue;
+      const d = eco.byId.get(c.feed);
+      if (!d || d.dead !== 1 || !inView(d.x, d.y, 30)) continue;
+      const [vx, vy] = pos(c);
+      for (let i = 0; i < 8; i++) {
+        const p = ((now * 0.06 + i / 8) % 1 + 1) % 1;
+        push(lerp(d.x, vx, p), lerp(d.y, vy, p) + 0.2, lerp(2, 15, p) + Math.sin(p * Math.PI) * 5, false, A.fx('bit:2:5:0'), 0, 4);
+      }
     }
     for (const [id, b] of this.bites) {
       if (now - b.t > 60) this.bites.delete(id);
@@ -589,6 +602,16 @@ export class CreatureView {
     }
     // 物資の置き場：木箱と寝具（食料が減ると中身が減り、空になれば残骸）
     for (const o of eco.caches) if (inView(o.x, o.y, 24)) pushSprite(o.x, o.y + 6, 0, false, A.supply(o.food <= 0 ? 0 : o.food < 60 ? 1 : 2), 0, 2);
+    // ヴァンパイアの住処：棺（昼は蓋が閉じて中で眠り、夜は蓋がずれて空）と、まわりに残る血の跡（src/eco/vampire.ts の vampCoffin）
+    for (const v of eco.list) {
+      if (v.k !== Kind.Vampire || v.dead || !(v.hx || v.hy) || !inView(v.hx, v.hy, 40)) continue;
+      for (let i = 0; i < 5; i++) {
+        const a = ((v.id * 7 + i * 37) % 100) / 100 * 6.283;
+        const r = 10 + ((v.id + i * 13) % 9);
+        pushSprite(v.hx + Math.cos(a) * r, v.hy + 4 + Math.sin(a) * r * 0.5, 0, i % 2 === 1, A.blood(0, (v.id + i) & 3), 0, 2);
+      }
+      pushSprite(v.hx, v.hy + 2, 0, false, A.coffin(v.st !== VAMP_COFFIN), 0, 2);
+    }
     // コボルトの住処：畑の畝、奥の寝床、入口の飾り柱、罠
     for (const wr of eco.warrens) {
       if (wr.id < 0 || !inView(wr.x, wr.y, 96)) continue;
@@ -927,6 +950,23 @@ export class CreatureView {
     // 生き物は足元の位置で前後を決める
     this.order.length = 0;
     for (const c of eco.list) {
+      // コウモリの群れにばらけたヴァンパイア：姿の代わりに、8匹のコウモリが渦を巻きながら住処へ飛ぶ（src/eco/vampire.ts の vampScatter）
+      if (c.k === Kind.Vampire && c.st === VAMP_SCATTER && !c.dead) {
+        const a = eco.moveAlpha(c, alpha);
+        const x = c.px + (c.x - c.px) * a;
+        const y = c.py + (c.y - c.py) * a;
+        if (inView(x, y, 60)) {
+          const t = eco.w.tick + alpha;
+          const age = eco.step - c.lureAt;
+          const spread = Math.min(1, age / 15);
+          for (let i = 0; i < 8; i++) {
+            const ang = t * 0.25 + i * 0.785;
+            const r = (4 + (i % 3) * 5) * (0.4 + spread * 0.6);
+            pushSprite(x + Math.cos(ang) * r, y + Math.sin(ang) * r * 0.5, 10 + (i % 4) * 3 + Math.sin(t * 0.3 + i) * 2, Math.cos(ang) < 0, A.index(1, 2, 1, (Math.floor(t * 0.5) + i) & 3), 0, 3);
+          }
+        }
+        continue;
+      }
       if (c.dead === 2 || c.away) continue;
       const a = eco.moveAlpha(c, alpha);
       const x = c.px + (c.x - c.px) * a;
@@ -952,7 +992,10 @@ export class CreatureView {
       const c = ord.c;
       let x = ord.x;
       let yy = ord.yy;
-      const sp = c.k;
+      // ヴァンパイアの眷属は、元の種の姿で描き、青白く塗り替える（シェーダーの kind 6。src/eco/thrall.ts）。冒険者の眷属は生前の姿のまま
+      const thrallOf = c.k === Kind.Thrall && !c.dead;
+      const sp = thrallOf ? c.sp : c.k;
+      const csp = thrallOf ? (c.sp === Kind.Adventurer ? Math.max(0, c.lure - 1) : 0) : c.sp;
       // 隠れている者は、こちら（暗がりの外）を向いて潜む（目が見えるように）
       let dir = c.dir === 0 || eco.isHidden(c) ? 0 : c.dir === 1 ? 1 : 2;
       let flip = c.dir === 3;
@@ -1007,6 +1050,8 @@ export class CreatureView {
         if (roosting) {
           act = 0;
           dir = 0;
+          // ヴァンパイアに従うコウモリは、主の住処の床のマスの上端にいる。絵は壁の面にぶら下がって見えるよう持ち上げる
+          if (c.ref2) lift = 18;
         } else if (!c.dead && !c.caught) {
           lift = 16;
           if (act === 0) {
@@ -1108,11 +1153,11 @@ export class CreatureView {
       const hidden = eco.isHidden(c);
       const isCorpse = c.dead === 1 && c.actT >= 4 && sp !== Kind.Wisp && sp !== Kind.Slime && sp !== Kind.Ghost && sp !== Kind.Myconid;
       const eliteName = ['', 'firespirit', 'pknight', '', '', '', 'wspirit', 'lspirit', '', 'mlord'][c.elite] ?? '';
-      let frame = !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : c.sp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Adventurer ? (c.sp >= 4 ? 8 + c.sp - 4 : c.sp * 2 + (c.torch > 0 && c.sp !== 1 ? 1 : 0)) : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][c.sp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? c.sp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
+      let frame = !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : csp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Adventurer ? (csp >= 4 ? 8 + csp - 4 : csp * 2 + (c.torch > 0 && csp !== 1 ? 1 : 0)) : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][csp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? csp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
       // 名簿の冒険者：一人ひとりの姿と位の装備（src/eco/roster.ts、src/sprites.ts の heroSprite）
       if (sp === Kind.Adventurer && !isCorpse) {
-        const h = eco.heroOf(c);
-        if (h) frame = this.atlas.hero(c.sp, c.torch > 0 && c.sp !== 1 && c.sp < 4, h.look, h.rank, dir, act, f);
+        const h = thrallOf ? eco.roster.find((q) => q.cid === c.id) ?? null : eco.heroOf(c);
+        if (h) frame = this.atlas.hero(csp, !thrallOf && c.torch > 0 && csp !== 1 && csp < 4, h.look, h.rank, dir, act, f);
         // 位が上がって初めての遠征：入ってきてしばらく、金の光の粒が体のまわりを立ちのぼる（「見違えた」）
         const pt = h && h.rank > 0 && h.ret === RANK_AT[h.rank] ? eco.parties.find((q) => q.id === c.party) : undefined;
         if (pt && eco.step - pt.since < 400) {
@@ -1139,7 +1184,7 @@ export class CreatureView {
         continue;
       }
       // 影
-      if (o.nShadows < MAX_SPRITES && sp !== Kind.Wisp && sp !== Kind.Ghost && !isCorpse && !(sp === Kind.Bat && act === 0 && lift === 0)) {
+      if (o.nShadows < MAX_SPRITES && sp !== Kind.Wisp && sp !== Kind.Ghost && !isCorpse && !(sp === Kind.Bat && act === 0 && (lift === 0 || c.ref2 > 0))) {
         const fr = this.atlas.frames[frame];
         const k = o.nShadows * 4;
         o.shadows[k] = x;
@@ -1153,7 +1198,7 @@ export class CreatureView {
       if (!isCorpse && c.sleep === 2) {
         if (sp === Kind.Dragon) frame = A.sleep(c.elite === 8 ? 'dragonB' : ['dragonH', 'dragonY', 'dragon'][Math.min(2, c.sp)], sf);
         else if (sp === Kind.Worm) frame = A.sleep('worm', sf);
-        else if (sp === Kind.Bat && lift === 0) frame = A.sleep('bat', sf);
+        else if (sp === Kind.Bat && (lift === 0 || (c.ref2 > 0 && act === 0))) frame = A.sleep('bat', sf);
         else if (sp === Kind.Adventurer) {
           const h = eco.heroOf(c);
           frame = h ? A.heroBed(c.sp, h.look, h.rank, sf) : A.sleep('bed-' + ['warrior', 'wizard', 'thief', 'priest', 'bard', 'hunter', 'slayer'][c.sp], sf);
@@ -1213,7 +1258,7 @@ export class CreatureView {
       // リビングアーマーの武具（芯の後ろ側の分。手前の分は芯のあと）
       const armorGear = sp === Kind.Armor && !c.dead && veil === 0 ? this.armorGear(eco, A, c, x, yy, lift, t) : null;
       if (armorGear) for (const g of armorGear) if (!g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
-      pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0), (c.id * 0.6180339) % 1);
+      pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0) + (thrallOf && !hidden && veil !== 2 ? 6 : 0), (c.id * 0.6180339) % 1);
       if (armorGear) for (const g of armorGear) if (g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
       // 糸の繭を抱えて食べるクモ：体の手前に繭、巻き始めは白い糸の粒が繭のまわりを回る
       {
@@ -1234,7 +1279,11 @@ export class CreatureView {
         if (cl) pushSprite(x + (flip ? -3 : 3) + Math.sin(cl.age * 1.3) * 1.5, yy + 0.05, lift + (sp === Kind.Wyvern ? 2 : 0) + Math.abs(Math.sin(cl.age * 0.9)) * 1.5, flip, cl.frame, 0, 0);
       }
       // 隠れている者の目：影の姿の上で光る（ときどきまばたき）。暗がりで灯りを狙って潜む者（待ち伏せのゴブリンなど）も、暗ければ目だけ光る
-      if (hidden || (!isCorpse && (c.lure || (sp === Kind.Goblin && c.st === 17)) && !c.dead && c.act === 0 && !eco.isLit(c))) {
+      if (thrallOf && !hidden) {
+        // 眷属の目：いつも赤く光る（ときどきまばたき）
+        const ph = Math.floor(t * 2 + c.id * 0.37) % 9;
+        pushSprite(x + (flip ? -1 : 1) * (dir === 2 ? 1 : 0), yy + 0.05, lift + Math.max(4, (Ecology.bodySize(sp) || 6) * 1.5), false, A.redEyes(ph === 8 ? 3 : ph & 1), 0, 0);
+      } else if (hidden || (!isCorpse && ((c.lure && sp !== Kind.Vampire) || (sp === Kind.Goblin && c.st === 17)) && !c.dead && c.act === 0 && !eco.isLit(c))) {
         const ph = Math.floor(t * 2 + c.id * 0.37) % 7;
         pushSprite(x, yy + 0.05, lift + (sp === Kind.Goblin ? 14 : 7), false, A.eyes(ph === 6 ? 3 : ph & 1), 0, 0);
       }

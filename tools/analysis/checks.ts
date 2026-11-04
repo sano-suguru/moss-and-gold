@@ -35,6 +35,9 @@ export interface Check {
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 const RUN_A = { seeds: ['かしたれ', 'seed8', 'abc', 'seed7'], from: 10, to: 18 };
 /** オークの取り立て：縄張りが長く続くシード（オークのいる日数が上限1でも2でも16日ほど） */
+// リビングアーマーは、冒険者が倒れて武具の溜まった所でしか生まれず、どのシードで起きるかが版ごとに入れ替わる
+// （main の 16シード×25日で、10〜18日目の取り込みは abc・seed4・seed23 などの数シードに偏っていた）。1シードの展開で項目が揺れないよう、出やすいシードを広く並べる
+const RUN_ARMOR = { seeds: ['abc', 'seed4', 'seed23', 'seed5', 'かしたれ', 'はじまりの洞窟'], from: 10, to: 18 };
 const RUN_ORC = { seeds: ['かしたれ', 'seed27'], from: 10, to: 18 };
 // オークの取り立ては、従う集落に蓄えがたまったときだけ起きるまれな出来事（16シード×25日で約25回、起きるのは6シードほど）。
 // いまのコードで10〜18日目に起きているシードを選ぶ。焚き火の夜襲の二歩目（#29）のコードで、
@@ -46,9 +49,19 @@ const RUN_TRIB = { seeds: ['seed23', 'seed41', 'seed30'], from: 10, to: 18 };
 
 export const CHECKS: Check[] = [
   {
-    // リビングアーマー（src/eco/armor.ts）：倒れた冒険者の武具に未練が宿り、溜まり場で甲冑が立ち上がる
-    name: 'リビングアーマーが武具の溜まり場から立ち上がる（4シードで2回以上）',
+    // ヴァンパイア（src/eco/vampire.ts、src/eco/thrall.ts）：コウモリが獲物を見つけ、倒された者が眷属として起き上がる
+    name: 'ヴァンパイアのコウモリが獲物の上を旋回し、倒された者が眷属として起き上がる（4シードで旋回1回・眷属1体以上）',
     ...RUN_A,
+    test: (rs) => {
+      const sc = rs.map((r) => r.settle.filter((x) => x.k === 19 && x.ev === 'scout').length);
+      const th = rs.map((r) => r.births.filter((x) => x.k === 30).length);
+      return { ok: sum(sc) >= 1 && sum(th) >= 1, value: rs.map((r, i) => `${r.seed} 旋回${sc[i]}・眷属${th[i]}`).join('、') };
+    },
+  },
+  {
+    // リビングアーマー（src/eco/armor.ts）：倒れた冒険者の武具に未練が宿り、溜まり場で甲冑が立ち上がる
+    name: 'リビングアーマーが武具の溜まり場から立ち上がる（6シードで2回以上）',
+    ...RUN_ARMOR,
     test: (rs) => {
       const n = rs.map((r) => r.births.filter((x) => x.k === 29 && x.origin === 'gear').length);
       return { ok: sum(n) >= 2, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
@@ -56,8 +69,8 @@ export const CHECKS: Check[] = [
   },
   {
     // リビングアーマー：床の武器と盾を取り込み、倒れるかマナが尽きると武具が床に散らばる
-    name: 'リビングアーマーが武具を取り込み、崩れて散らばる（4シードで取り込み3回・崩れる1回以上）',
-    ...RUN_A,
+    name: 'リビングアーマーが武具を取り込み、崩れて散らばる（6シードで取り込み3回・崩れる1回以上）',
+    ...RUN_ARMOR,
     test: (rs) => {
       const a = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'absorb').length);
       const f = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'fall').length);

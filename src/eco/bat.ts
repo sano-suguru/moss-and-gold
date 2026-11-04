@@ -18,8 +18,24 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
       c.food += add;
       this.imported += add;
     }
+    // ヴァンパイアに従うコウモリは、主の住処の天井にぶら下がる（主の眠る所の真上に、黒い房のように）
+    const lord0 = c.ref2 ? this.byId.get(c.ref2) : undefined;
+    if (lord0 && !lord0.dead && lord0.k === Kind.Vampire && (lord0.hx || lord0.hy)) {
+      if (this.step % 20 === c.id % 20) {
+        const g = this.groups.get(`v${lord0.id}`);
+        const mates = (g ? g.members : [c]).filter((o) => o.k === Kind.Bat).sort((a, b) => a.id - b.id);
+        const i = Math.max(0, mates.indexOf(c));
+        // 主の左右に交互に、天井ぎわ（住処のマスの上端）に並ぶ。壁の中になるなら主の真上へ寄せる
+        const side = i % 2 ? 1 : -1;
+        const x = lord0.hx + side * (12 + Math.floor(i / 2) * 7) + ((c.id % 3) - 1);
+        const y = lord0.hy - 7 + (Math.floor(i / 2) % 2) * 2;
+        const ok = this.tilePassable(c, this.tileOf(x, y));
+        c.hx = ok ? x : lord0.hx + side * 3;
+        c.hy = ok ? y : lord0.hy - 7;
+      }
+    }
     // ぶら下がる場所は、いまねぐらにいる仲間の並び順で決め直す（同じ場所に重ならないように）
-    {
+    else {
       const g = this.groups.get(this.groupKey(c) ?? '');
       if (g && this.step % 20 === c.id % 20) {
         const mates = g.members.filter((o) => o.k === Kind.Bat && !o.ref2).sort((a, b) => a.id - b.id);
@@ -48,9 +64,27 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
   if (lord && !lord.dead && lord.k === Kind.Vampire && !c.away) {
     if (c.st === 0 || c.st === 2) c.st = 1;
     c.act = 1;
-    const a = (this.step * 0.02 + c.id * 1.7) % 6.283;
-    const r = 20 + (c.id % 3) * 8;
-    this.moveToward(c, lord.x + Math.cos(a) * r, lord.y - 10 + Math.sin(a) * r * 0.6, s.speed);
+    // 主が獲物を決めていれば、その上を旋回して居場所を示し（偵察）、主が近づくと獲物に群がる（足止め。src/eco/vampire.ts の batPinned）。
+    // 決めていなければ、主の周りを回る
+    const prey = lord.ref ? this.byId.get(lord.ref) : undefined;
+    const x0 = c.x;
+    const y0 = c.y;
+    let cx = lord.x;
+    let cy = lord.y;
+    if (prey && !prey.dead && sq(prey.x - lord.x) + sq(prey.y - lord.y) < sq(40 * TILE)) {
+      const close = sq(prey.x - lord.x) + sq(prey.y - lord.y) < sq(6 * TILE);
+      const a = (this.step * (close ? 0.09 : 0.05) + c.id * 1.7) % 6.283;
+      const r = close ? 7 + (c.id % 3) * 3 : 16 + (c.id % 3) * 6;
+      cx = prey.x;
+      cy = prey.y;
+      this.moveToward(c, prey.x + Math.cos(a) * r, prey.y - (close ? 4 : 14) + Math.sin(a) * r * 0.6, s.speed * 1.2);
+    } else {
+      const a = (this.step * 0.02 + c.id * 1.7) % 6.283;
+      const r = 20 + (c.id % 3) * 8;
+      this.moveToward(c, lord.x + Math.cos(a) * r, lord.y - 10 + Math.sin(a) * r * 0.6, s.speed);
+    }
+    // 回る点が壁の向こうで進めなければ、道を探して中心（主か獲物）へ寄る（壁に押しつけられて止まらないように）
+    if (c.x === x0 && c.y === y0 && sq(cx - c.x) + sq(cy - c.y) > sq(TILE)) this.goTo(c, cx, cy, s.speed);
     const k0 = this.tileOf(c.x, c.y);
     if (c.food < s.cap && k0 >= 0 && this.w.moss[k0] > 20) this.eatMoss(c, 2);
     return;

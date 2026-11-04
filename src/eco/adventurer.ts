@@ -446,7 +446,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     c.dir = Math.abs(bx - c.x) > Math.abs(by - c.y) ? (bx > c.x ? 2 : 3) : by > c.y ? 0 : 1;
     return;
   }
-  const ENEMY = [Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Lizardman, Kind.Minotaur, Kind.Troll, Kind.Vampire, Kind.Zombie, Kind.Basilisk, Kind.Skeleton, Kind.Lich, Kind.Armor];
+  const ENEMY = [Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Lizardman, Kind.Minotaur, Kind.Troll, Kind.Vampire, Kind.Thrall, Kind.Zombie, Kind.Basilisk, Kind.Skeleton, Kind.Lich, Kind.Armor];
   // ウィスプは剣では払えない光なので、雑魚に含めない（誘われても追いかけて迷うだけ。魔法使いは瓶に捕まえる）
   const MINOR = [Kind.Rat, Kind.Bat, Kind.Ant, Kind.Myconid, Kind.Salamander, Kind.Lizard, Kind.Spider, Kind.Slime];
   if (c.sp === Job.Slayer) ENEMY.push(Kind.Dragon, Kind.Wyvern, Kind.Worm);

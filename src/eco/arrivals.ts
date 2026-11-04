@@ -335,15 +335,34 @@ export function arrivals(this: Ecology, day: number): void {
     this.lastArrival[Kind.Basilisk] = this.step;
     enter(Kind.Basilisk, 60, 60);
   }
-  // ヴァンパイア：コウモリが十分に増えると、1体だけ
-  if (this.canEnter(Kind.Vampire) && n[Kind.Bat] >= 18 && n[Kind.Vampire] === 0 && cool(Kind.Vampire) && ih(this.step, 15, 71) % 40 === 0) {
+  // ヴァンパイア：コウモリが十分に増えると、1体だけ、コウモリの群れ（5匹）を連れて夜に入ってくる。来る時刻はマップごとにずらす（シードが違っても同じ時刻に来ていた）。
+  // 住処は、いちばん大きなコウモリのねぐらに近い、歩いて行ける暗がりの壁ぎわ（src/eco/vampire.ts の vampLair）。昼は従うコウモリがその天井にぶら下がり、ヴァンパイアはその下で眠る。
+  // （コウモリの群れの多くは、縦穴の下の閉じた空洞をねぐらにしていて、歩くヴァンパイアはそこへ行けない）
+  if (this.canEnter(Kind.Vampire) && n[Kind.Bat] >= 18 && n[Kind.Vampire] === 0 && this.dayNow <= 0.05 && cool(Kind.Vampire) && ih(this.step, 15 + m.entrance.x * 131 + (m.shafts[0]?.y ?? 0), 71) % 40 === 0) {
+    const roosts = new Map<number, number>();
+    for (const b of this.list) if (b.k === Kind.Bat && !b.dead && b.tx > 0 && !b.ref2) roosts.set(b.ty * 4096 + b.tx, (roosts.get(b.ty * 4096 + b.tx) ?? 0) + 1);
+    let best = -1;
+    let bn = 0;
+    for (const [key, cnt] of roosts) if (cnt > bn || (cnt === bn && key < best)) [best, bn] = [key, cnt];
     next();
     this.lastArrival[Kind.Vampire] = this.step;
     const v = enter(Kind.Vampire, 50, 80);
-    const lair = this.pickDark(1, 80);
-    if (lair >= 0) {
-      v.hx = (lair % m.w) * TILE + 8;
-      v.hy = Math.floor(lair / m.w) * TILE + 8;
+    const lair = best >= 0 ? this.vampLair(best % 4096, Math.floor(best / 4096)) : -1;
+    const home = lair >= 0 ? lair : this.pickDark(1, 80);
+    if (home >= 0) {
+      v.hx = (home % m.w) * TILE + 8;
+      v.hy = Math.floor(home / m.w) * TILE + 8;
+    }
+    for (let i = 0; i < 5; i++) {
+      this.imported += 10 + 20;
+      this.originNext = 'mouth';
+      const b = this.spawn(Kind.Bat, v.x + ((i % 3) - 1) * 6, v.y - 12 - (i % 2) * 6, 10, 20);
+      b.ref2 = v.id;
+      b.st = 1;
+      if (best >= 0) {
+        b.tx = best % 4096;
+        b.ty = Math.floor(best / 4096);
+      }
     }
   }
   // ワイバーン：コウモリやガーゴイルが増えると、夕暮れに裂け目から降りてくる
