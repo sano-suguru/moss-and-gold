@@ -106,49 +106,80 @@ export function updateFire(this: Ecology): void {
   if (this.step % 4 === 0) this.w.fxDirty = true;
 }
 
-/** 炎の吐息：口元から向きに沿って扇形に、手前から順に火をつける */
+/** 炎の口元：体の中心から、向いている側へこのマス数だけ先（若い竜は横向き、成竜は横向きと縦向きで絵の口元の位置が違う） */
+const MOUTH_YOUNG = 1.5;
+const MOUTH_SIDE = 2.5;
+const MOUTH_FRONT = 1;
+/** 炎の先が生き物の更新1回に進むマス数と、口元での扇の半分の幅、1マス進むごとに広がる半分の幅（炎の先の幅は、若い竜で3マス、成竜で5マス） */
+const BREATH_STEP = 0.6;
+const BREATH_HALF0 = 0.25;
+const BREATH_SPREAD = 0.25;
+/** 燃える床の燃え続ける長さ（生き物の更新の回数。16〜28回。通常速度で3〜6秒） */
+const BURN_MIN = 16;
+const BURN_RANGE = 13;
+
+/** ドラゴン c が炎を吐くときの向き（上下左右。若い竜は左右だけ）と口元。breathe と breathCovers で同じものを使う */
+function breathAxis(c: Cr, tx: number): { ux: number; uy: number; mx: number; my: number; young: boolean; dir: number } {
+  const young = c.sp < 2 && c.elite !== 8;
+  const dir = young ? (tx >= c.x ? 2 : 3) : c.dir;
+  const ux = dir === 2 ? 1 : dir === 3 ? -1 : 0;
+  const uy = ux ? 0 : dir === 1 ? -1 : 1;
+  const mouth = young ? MOUTH_YOUNG : ux ? MOUTH_SIDE : MOUTH_FRONT;
+  return { ux, uy, mx: c.x + ux * mouth * TILE, my: c.y + uy * mouth * TILE, young, dir };
+}
+
+/** ドラゴン c が今の向きで炎を吐けば、(x, y) が炎の扇の中に入るか（吐き終わるまでに炎の先が届く範囲。若い竜は左右だけを向く） */
+export function breathCovers(this: Ecology, c: Cr, x: number, y: number): boolean {
+  const a = breathAxis(c, x);
+  const d = ((x - a.mx) * a.ux + (y - a.my) * a.uy) / TILE;
+  const w = Math.abs((x - a.mx) * -a.uy + (y - a.my) * a.ux) / TILE;
+  const reach = 0.5 + (a.young ? 6 : 11) * BREATH_STEP;
+  return d >= -0.5 && d <= reach && w <= BREATH_HALF0 + Math.max(0, d) * BREATH_SPREAD + 0.5;
+}
+
+/**
+ * 炎の吐息：口元から、向いている向きに沿って扇形に、手前から順に火をつける。
+ * 向きは絵の向きに合わせる（若い竜は横向きの絵しかないので左右だけ、成竜は上下左右）。斜めに吐くと、絵の炎の柱と燃える場所がずれていた。
+ * 扇は体の中心ではなく口元から始まる（以前は体の中心から1マス先で燃え始め、ドラゴンの足元や体の横から火が湧いたように見えていた）
+ */
 export function breathe(this: Ecology, c: Cr, tx: number, ty: number, t: number): void {
   const m = this.w.map;
-  const dx = tx - c.x;
-  const dy = ty - c.y;
-  const d = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-  const ux = dx / d;
-  const uy = dy / d;
+  const { ux, uy, mx, my, dir } = breathAxis(c, tx);
+  // 若い竜は、いつも獲物のいる側の左右を向く（絵の向きも合わせる）
+  c.dir = dir;
   // t は 0 から（成竜は 0..11、若い竜は 0..6）。先へ行くほど広く
-  const reach = 1 + t * 0.6;
-  const half = 0.6 + t * 0.25;
-  const lit: number[] = [];
-  for (let s2 = Math.max(1, reach - 1.2); s2 <= reach; s2 += 0.5)
-    for (let w = -half; w <= half; w += 0.5) {
-      const x = c.x + (ux * s2 - uy * w) * TILE;
-      const y = c.y + (uy * s2 + ux * w) * TILE;
-      const k = this.tileOf(x, y);
-      if (k < 0 || m.solid[k]) continue;
-      if (!lineOfSight(m, c.x, c.y, (k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8)) continue;
-      this.ignite(k, 30 + (ih(k, this.step, 130) % 20));
-      if (!lit.includes(k)) lit.push(k);
+  const reach = 0.5 + t * BREATH_STEP;
+  const halfAt = (d: number) => BREATH_HALF0 + d * BREATH_SPREAD;
+  // 扇の中の、口元からの遠さ d・横のずれ w のマス（体の中心から見通せるものだけ）を順に渡す
+  const fan = (d0: number, fn: (k: number) => void) => {
+    for (let d = d0; d <= reach; d += 0.5) {
+      // 横のずれは、0 を中心に半マスずつ左右対称に（口元の近くは1マス幅の線になる。以前は片側へ寄って、体の横や下にも火がついていた）
+      const hw = Math.floor(halfAt(d) * 2) / 2;
+      for (let w = -hw; w <= hw; w += 0.5) {
+        const k = this.tileOf(mx + (ux * d - uy * w) * TILE, my + (uy * d + ux * w) * TILE);
+        if (k < 0 || m.solid[k]) continue;
+        if (!lineOfSight(m, c.x, c.y, (k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8)) continue;
+        fn(k);
+      }
     }
+  };
+  // 床に火をつけるのは炎の先の帯だけ。炎が地面に届くのは口元の半マス先から（口元の真下の、ドラゴンの頭の下には火がつかない）
+  fan(Math.max(0.5, reach - 1.2), (k) => this.ignite(k, BURN_MIN + (ih(k, this.step, 130) % BURN_RANGE)));
   // 扇の全体（口元から炎の先まで）にいる者は、炎を吐く間、生き物の更新ごとにドラゴンの強さの4〜8割の傷を負う（居続けると打ち合いの2〜3回分。逃げれば助かる）。
-  // 飛んでいる者（コウモリ、ワイバーン、ウィスプ）は、床に燃え残った火では焼けないが、吐いている炎そのものには当たる。床に火をつけるのは炎の先だけ（上の lit）。
+  // 飛んでいる者（コウモリ、ワイバーン、ウィスプ）は、床に燃え残った火では焼けないが、吐いている炎そのものには当たる。
   // （以前は、飛んでいる者は炎の先に当たるとその場で焼け死に、地面にいる者は燃えるマスに立つとその場で焼け死んでいた）
   const hit = new Set<Cr>();
-  for (let s2 = 1; s2 <= reach; s2 += 0.5) {
-    const hw = 0.6 + ((s2 - 1) / 0.6) * 0.25;
-    for (let w = -hw; w <= hw; w += 0.5) {
-      const k = this.tileOf(c.x + (ux * s2 - uy * w) * TILE, c.y + (uy * s2 + ux * w) * TILE);
-      if (k < 0 || m.solid[k]) continue;
-      const kx = (k % m.w) * TILE + 8;
-      const ky = Math.floor(k / m.w) * TILE + 8;
-      if (!lineOfSight(m, c.x, c.y, kx, ky)) continue;
-      this.nearby(kx, ky, 1, (o) => {
-        if (o.dead || o.away || o === c || hit.has(o) || FIREPROOF.includes(o.k)) return;
-        if (Math.abs(o.x - kx) < 9 && Math.abs(o.y - ky) < 9) {
-          hit.add(o);
-          this.burnHurt(o, this.str(c) * (BREATH_MIN + ((ih(c.id, o.id ^ this.step, 162) % 1000) / 1000) * BREATH_RANGE), Kind.Dragon);
-        }
-      });
-    }
-  }
+  fan(0, (k) => {
+    const kx = (k % m.w) * TILE + 8;
+    const ky = Math.floor(k / m.w) * TILE + 8;
+    this.nearby(kx, ky, 1, (o) => {
+      if (o.dead || o.away || o === c || hit.has(o) || FIREPROOF.includes(o.k)) return;
+      if (Math.abs(o.x - kx) < 9 && Math.abs(o.y - ky) < 9) {
+        hit.add(o);
+        this.burnHurt(o, this.str(c) * (BREATH_MIN + ((ih(c.id, o.id ^ this.step, 162) % 1000) / 1000) * BREATH_RANGE), Kind.Dragon);
+      }
+    });
+  });
 }
 
 /** 宙にいて、床に燃え残った火では焼けない者（飛んでいるコウモリ、ワイバーン、ウィスプ） */
@@ -161,10 +192,11 @@ declare module '../ecology' {
     ignite: typeof ignite;
     updateFire: typeof updateFire;
     breathe: typeof breathe;
+    breathCovers: typeof breathCovers;
     burnHurt: typeof burnHurt;
     scorchMoss: typeof scorchMoss;
     airborne: typeof airborne;
   }
 }
 
-Object.assign(Ecology.prototype, { ignite, updateFire, breathe, burnHurt, scorchMoss, airborne });
+Object.assign(Ecology.prototype, { ignite, updateFire, breathe, breathCovers, burnHurt, scorchMoss, airborne });

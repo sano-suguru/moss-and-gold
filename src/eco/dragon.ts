@@ -296,7 +296,10 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
       if (c.sp === 0 && d < 16) {
         // 幼竜はまだ炎を吐けず、噛みつく
         this.fight(c, f);
-      } else if (c.sp > 0 && d < (c.sp === 1 ? 4 : 6) * TILE && lineOfSight(m, c.x, c.y, f.x, f.y)) {
+      } else if (c.sp > 0 && d < 3 * TILE && !this.breathCovers(c, f.x, f.y)) {
+        // 若い竜と成竜は、口元より手前のすぐそばの相手からは一歩下がって間合いを取る（炎は口元から先にしか届かない）。下がれなければ噛みつく
+        if (!this.dragonStepBack(c, f.x, f.y) && d < 20) this.fight(c, f);
+      } else if (c.sp > 0 && d < (c.sp === 1 ? 4 : 6) * TILE && lineOfSight(m, c.x, c.y, f.x, f.y) && this.breathCovers(c, f.x, f.y)) {
         c.act = 2;
         c.actT = 0;
         c.ref2 = c.sp === 1 ? 7 : 12;
@@ -386,7 +389,10 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
       c.dir = Math.abs(p.x - c.x) > Math.abs(p.y - c.y) ? (p.x > c.x ? 2 : 3) : p.y > c.y ? 0 : 1;
       if (c.sp === 0 && d < 16) {
         this.fight(c, p);
-      } else if (c.sp > 0 && d < (c.sp === 1 ? 4 : 6) * TILE && lineOfSight(m, c.x, c.y, p.x, p.y)) {
+      } else if (c.sp > 0 && d < 3 * TILE && !this.breathCovers(c, p.x, p.y)) {
+        if (!this.dragonStepBack(c, p.x, p.y) && d < 20) this.fight(c, p);
+      } else if (c.sp > 0 && d < (c.sp === 1 ? 4 : 6) * TILE && lineOfSight(m, c.x, c.y, p.x, p.y) && this.breathCovers(c, p.x, p.y)) {
+        // （炎は口元から上下左右に吐くので、炎の扇に入る向きにいる相手にだけ吐く。斜めにいる相手には寄っていく。src/eco/fire.ts の breathCovers）
         if (this.step - (this.lastLogged[Kind.Dragon] ?? -99999) > 2000) {
           this.lastLogged[Kind.Dragon] = this.step;
           this.log(c.x, c.y, `{k:${Kind.Dragon}}が炎を吐き、あたりが燃え上がった`);
@@ -442,6 +448,20 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
   this.tryMove(c, j[0] * s.speed * 0.5, j[1] * s.speed * 0.5);
 }
 
+/** ドラゴン c が、(x, y) にいる相手から一歩下がる（相手の方を向いたまま）。下がれたら true */
+export function dragonStepBack(this: Ecology, c: Cr, x: number, y: number): boolean {
+  const dx = c.x - x;
+  const dy = c.y - y;
+  const L = Math.sqrt(dx * dx + dy * dy) || 1;
+  const x0 = c.x;
+  const y0 = c.y;
+  const dir = c.dir;
+  c.act = 1;
+  this.tryMove(c, (dx / L) * SPEC[Kind.Dragon].speed, (dy / L) * SPEC[Kind.Dragon].speed);
+  c.dir = dir;
+  return c.x !== x0 || c.y !== y0;
+}
+
 declare module '../ecology' {
   interface Ecology {
     wyvern: typeof wyvern;
@@ -451,7 +471,8 @@ declare module '../ecology' {
     dragonSide: typeof dragonSide;
     dragonFlightGoal: typeof dragonFlightGoal;
     dragon: typeof dragon;
+    dragonStepBack: typeof dragonStepBack;
   }
 }
 
-Object.assign(Ecology.prototype, { wyvern, pickDragonHoard, pileOwner, dragonLightSleep, dragonSide, dragonFlightGoal, dragon });
+Object.assign(Ecology.prototype, { wyvern, pickDragonHoard, pileOwner, dragonLightSleep, dragonSide, dragonFlightGoal, dragon, dragonStepBack });
