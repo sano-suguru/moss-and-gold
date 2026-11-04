@@ -71,8 +71,6 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       }
       return;
     }
-    // 獲物が見つからなければ、眠る一行の焚き火の暗がりへ寄っていく（src/eco/night.ts）
-    if (this.campProwl(c, s.speed)) return;
   }
   c.act = 1;
   const j = DIR16[ih(c.id, this.step >> 5, 114) & 15];

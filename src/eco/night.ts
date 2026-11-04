@@ -12,7 +12,8 @@
  *
  * 夜襲（二歩目）：焚き火は休みの最後の3分の1で細る（campFire。火の怖さの届く範囲と光の輪が小さくなる）。
  * 火を怖がる大物のうちトロールは、3割ほど飢えていれば細った焚き火の縁を越え、眠っている者を好んで狙う（src/eco/combat.ts の hunt）。
- * トロールと腹の空いたヴァンパイアは、夜、焚き火の匂いに寄っていく（campProwl）。
+ * 遠くの焚き火へ寄っていく動きは入れていない（トロールとヴァンパイアに60マス先の焚き火へ寄らせると、住処の外を出歩くことで生き物の流れが変わり、
+ * 16シード×25日でコボルトの飢え死にが約2倍になった）。夜襲を担うのは、焚き火の近くにいるトロールと、灯りに潜むオークが主。
  * オークと住処を持たないコボルトは、焚き火の灯りのそばの暗がりに潜み、見張りがうとうとする隙に眠っている者を襲う（src/eco/senses.ts の lurk）。
  * 眠る一行に忍び寄っているオークは唸らない。一行が起こされたら、一行の皆の強さで見極め、かなわなければ唸って退く（src/eco/orc.ts の orcWary）。
  * ヴァンパイアは眠っている者を好んで血を吸う。眠っている者への最初の一打ちは1.5倍で、その打ち合いでは打ち返されない（寝込みの一打ち、nightHit）。
@@ -232,50 +233,6 @@ export function nightHit(this: Ecology, a: Cr, d: Cr): boolean {
   return true;
 }
 
-/** 焚き火の匂いに寄る遠さ（マス） */
-const PROWL_R = 60;
-
-/**
- * 焚き火に寄る（夜、トロールとヴァンパイアの狩りから。獲物が近くに見つからなかったとき）：
- * 3割ほど飢えたトロールは、60マス内の焚き火（眠っている一行の）の匂いに寄っていく。焚き火が細るまでは、火の怖さの届く外（約6マス）で待ち、
- * 細ったら近づく（眠っている者に気づけば、狩り＝hunt が寝込みを襲う）。腹の空いたヴァンパイアは、焚き火の暗がりへまっすぐ寄る。
- * true なら今は焚き火に寄っている
- */
-export function campProwl(this: Ecology, c: Cr, speed: number): boolean {
-  if (!this.isNight()) return false;
-  const raider = this.nightRaider(c);
-  if (!raider && c.k !== Kind.Vampire) return false;
-  const m = this.w.map;
-  let best: Party | null = null;
-  let bd = PROWL_R * TILE * PROWL_R * TILE;
-  for (const p of this.parties) {
-    if ((p.camp ?? -1) < 0 || this.campAwake(p)) continue;
-    const fx = ((p.camp as number) % m.w) * TILE + 8;
-    const fy = Math.floor((p.camp as number) / m.w) * TILE + 8;
-    const d = sq(fx - c.x) + sq(fy - c.y);
-    if (d < bd) {
-      bd = d;
-      best = p;
-    }
-  }
-  if (!best) return false;
-  const fx = ((best.camp as number) % m.w) * TILE + 8;
-  const fy = Math.floor((best.camp as number) / m.w) * TILE + 8;
-  const d = Math.sqrt(bd) || 1;
-  c.act = 1;
-  if (raider && this.campFire(best) >= 1) {
-    // 火の怖さの届く外（約6マス）で、焚き火が細るのを待つ
-    if (d > 6.5 * TILE) this.goTo(c, fx + ((c.x - fx) / d) * 6 * TILE, fy + ((c.y - fy) / d) * 6 * TILE, speed);
-    else {
-      c.act = 0;
-      c.dir = Math.abs(fx - c.x) > Math.abs(fy - c.y) ? (fx > c.x ? 2 : 3) : fy > c.y ? 0 : 1;
-    }
-    return true;
-  }
-  this.goTo(c, fx, fy, speed);
-  return true;
-}
-
 /** 焚き火で休む一行の者か（死の記録の camp の印。src/eco/move.ts） */
 export function inCamp(this: Ecology, o: Cr): boolean {
   return o.k === Kind.Adventurer && (this.parties.find((q) => q.id === o.party)?.camp ?? -1) >= 0;
@@ -302,8 +259,7 @@ declare module '../ecology' {
     campMight: typeof campMight;
     nightHit: typeof nightHit;
     inCamp: typeof inCamp;
-    campProwl: typeof campProwl;
   }
 }
 
-Object.assign(Ecology.prototype, { campFoe, campWake, campHit, campPetty, campWatch, campAwake, campFire, nightRaider, weakCampAt, fireDaunts, campSleeper, campMight, nightHit, inCamp, campProwl });
+Object.assign(Ecology.prototype, { campFoe, campWake, campHit, campPetty, campWatch, campAwake, campFire, nightRaider, weakCampAt, fireDaunts, campSleeper, campMight, nightHit, inCamp });

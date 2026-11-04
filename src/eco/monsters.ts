@@ -56,8 +56,6 @@ export function troll(this: Ecology, c: Cr, day: number): void {
   // 夜は何でも食う
   if (c.food < s.cap * 0.8) {
     if (this.hunt(c, 10, HUNT4, s.speed * 1.15)) return;
-    // 3割ほど飢えていれば、焚き火の匂いに寄っていく（src/eco/night.ts）
-    if (this.campProwl(c, s.speed)) return;
     let best: Cr | null = null;
     let bd = 10 * TILE * 10 * TILE;
     for (const o of this.corpses) {
