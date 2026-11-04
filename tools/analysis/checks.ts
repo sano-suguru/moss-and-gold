@@ -137,6 +137,17 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 狩りは打ち合って仕留めてから食べる（一口で食べるのは、クモの巣・丸のみ・空中でさらう・死骸だけ）。
+    // 打ち合いで仕留めて食べたのが、一口で食べたより多い
+    name: '狩りは打ち合って仕留めて食べる（各シードで20回以上、一口で食べたより多い）',
+    ...RUN_A,
+    test: (rs) => {
+      const sl = rs.map((r) => r.deaths.filter((x) => x.cause === 'eaten' && x.slain === 1).length);
+      const gu = rs.map((r) => r.deaths.filter((x) => x.cause === 'eaten' && !x.slain).length);
+      return { ok: sl.every((v, i) => v >= 20 && v > gu[i]), value: rs.map((r, i) => `${r.seed} ${sl[i]}（一口 ${gu[i]}）`).join('、') };
+    },
+  },
+  {
     // 大ネズミの巣穴の引っ越しは、群れが一列になって歩いていく
     name: '大ネズミが一列になって巣穴を引っ越す（4シードで1回以上）',
     ...RUN_A,

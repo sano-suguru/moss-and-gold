@@ -636,18 +636,21 @@ export function eatMoss(this: Ecology, c: Cr, n: number): boolean {
   return true;
 }
 
-/** 捕食：獲物の体と胃の中身をすべて取り込む（入りきらない分は食べ残しとして土へ） */
-export function eat(this: Ecology, pred: Cr, prey: Cr): void {
+/**
+ * 捕食：獲物の体と胃の中身をすべて取り込む（入りきらない分は食べ残しとして土へ）。
+ * slain は、打ち合いで仕留めてから食べる（fight から）。そうでなければ一口で食べる場面（クモの巣・ワーム・空中でさらう・ミミック・死骸）
+ */
+export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
   const s = SPEC[pred.k];
   const total = prey.body + prey.food + prey.units;
   // 倒した獲物は、まず死骸になり、捕食者がその上で数秒かけて食べる（食べ残しは死骸として残る）。
-  // はかない種（ウィスプ、スライム、ゴースト、マイコニド）と、ゴブリン、ワーム、すでに死骸のものは、これまでどおりその場で食べる
+  // はかない種（ウィスプ、スライム、ゴースト、マイコニド）と、丸のみにするワームとミミック、すでに死骸のものは、その場で食べる
   // 獲物の体のマナは、食べた者へ受け渡される（食物連鎖で濃くなる）
   pred.mana += prey.mana;
   prey.mana = 0;
-  const quick = prey.dead !== 0 || [Kind.Wisp, Kind.Slime, Kind.Ghost, Kind.Myconid].includes(prey.k) || pred.k === Kind.Goblin || pred.k === Kind.Worm || pred.k === Kind.Mimic || total <= 4;
+  const quick = prey.dead !== 0 || [Kind.Wisp, Kind.Slime, Kind.Ghost, Kind.Myconid].includes(prey.k) || pred.k === Kind.Worm || pred.k === Kind.Mimic || total <= 4;
   if (!quick) {
-    this.record('deaths', { t: this.w.tick, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(this.inCamp(prey) ? { camp: 1 } : {}) } as never);
+    this.record('deaths', { t: this.w.tick, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(slain ? { slain: 1 } : {}), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(this.inCamp(prey) ? { camp: 1 } : {}) } as never);
     this.noteDeath(prey, 'eaten', pred.k, pred);
     this.raiseAlarm(prey, pred);
     this.paths.delete(prey.id);
@@ -674,7 +677,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr): void {
   }
   prey.units = 0;
   if (!prey.dead) {
-    this.record('deaths', { t: this.w.tick, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(this.inCamp(prey) ? { camp: 1 } : {}) } as never);
+    this.record('deaths', { t: this.w.tick, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(slain ? { slain: 1 } : {}), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(this.inCamp(prey) ? { camp: 1 } : {}) } as never);
     // 仲間が食べられたら、群れに警戒が伝わる
     this.raiseAlarm(prey, pred);
   }

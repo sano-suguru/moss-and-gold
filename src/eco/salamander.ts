@@ -56,7 +56,7 @@ export function salamander(this: Ecology, c: Cr): void {
   if (prey) {
     const p = prey as Cr;
     c.act = 1;
-    if (this.moveToward(c, p.x, p.y, s.speed * 1.4) || sq(p.x - c.x) + sq(p.y - c.y) < 9 * 9) this.eat(c, p);
+    if (this.moveToward(c, p.x, p.y, s.speed * 1.4) || sq(p.x - c.x) + sq(p.y - c.y) < 9 * 9) this.fight(c, p);
     return;
   }
   // 熱の中を這い回る

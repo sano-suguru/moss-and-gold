@@ -293,7 +293,9 @@ export function advInteract(this: Ecology, c: Cr, p: Party, lights: Cr[]): boole
       this.log(c.x, c.y, '冒険者（僧侶）がゴーストを祓った');
     }
   } else if (c.sp === Job.Hunter) {
-    if (this.strike(c, t)) this.eat(c, t);
+    // 大ネズミとは打ち合って仕留める（ほかの狩りと同じ）。止まり木で眠るコウモリは打ち返さないので、射落として拾う
+    if (t.k === Kind.Rat) this.fight(c, t);
+    else if (this.strike(c, t)) this.eat(c, t, true);
   }
   return true;
 }

@@ -328,7 +328,7 @@ export function kobold(this: Ecology, c: Cr): void {
       const p = prey as Cr;
       c.act = 1;
       if (sq(p.x - c.x) + sq(p.y - c.y) < 10 * 10) {
-        this.eat(c, p);
+        this.fight(c, p);
         return;
       }
       this.goTo(c, p.x, p.y, s.speed * 1.2);

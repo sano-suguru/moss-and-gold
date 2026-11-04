@@ -134,9 +134,9 @@ export function hunt(this: Ecology, c: Cr, R: number, kinds: Kind[], speed: numb
   c.act = 1;
   const d2 = sq(p.x - c.x) + sq(p.y - c.y);
   if (d2 < 11 * 11) {
-    // 焚き火で休む冒険者は、一口で食べずに打ち合う（寝込みの一打ちと、飛び起きた一行の応戦を見せる。src/eco/night.ts）
-    if (STR[p.k] * 2 < STR[c.k] && !this.inCamp(p)) this.eat(c, p);
-    else this.fight(c, p);
+    // 狩りは、相手が小さくても一口では食べず、打ち合って仕留めてから食べる（攻撃のエフェクトを見せる）。
+    // 一口で食べるのは、クモの巣・ワームの丸のみ・空中でさらう・ミミックの丸のみ・死骸を食べる、の場面だけ
+    this.fight(c, p);
   } else if (c.k === Kind.Minotaur && d2 > 2 * TILE * 2 * TILE) {
     // 一直線に突進し、壁にぶつかると一瞬よろめく
     const x0 = c.x;
@@ -213,7 +213,7 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
   const asleep = this.nightHit(a, d);
   if (this.strike(a, d, asleep ? 1.5 : 1)) {
     if (a.k === Kind.Skeleton || a.k === Kind.Lich || a.k === Kind.Dwarf || a.k === Kind.Golem || a.k === Kind.Gargoyle || (a.k === Kind.Adventurer && d.k !== Kind.Rat)) this.die(d, 'fight', a.k);
-    else this.eat(a, d);
+    else this.eat(a, d, true);
     return true;
   }
   // 打ち返し（逃げている者と、寝込みを打たれて飛び起きたばかりの者は打ち返さない）
