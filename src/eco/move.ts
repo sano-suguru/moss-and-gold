@@ -140,7 +140,8 @@ export function findPathAvoid(this: Ecology, c: Cr, from: number, to: number, av
 /** 道筋をたどって目的地へ。着いたら true */
 export function goTo(this: Ecology, c: Cr, tx: number, ty: number, speed: number): boolean {
   // 本能だけの種は道筋を探さず、まっすぐ向かう。壁に引っかかったら、しばらく別の向きへ歩いてから向き直る
-  if (TIER[c.k] === 0 && c.k !== Kind.Worm && c.k !== Kind.Golem) {
+  // （リビングアーマーは巡回のために道筋を探す）
+  if (TIER[c.k] === 0 && c.k !== Kind.Worm && c.k !== Kind.Golem && c.k !== Kind.Armor) {
     if (c.gait > 0) {
       const v = DIR16[c.gait & 15];
       const x0 = c.x;

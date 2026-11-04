@@ -51,8 +51,27 @@ export const CHECKS: Check[] = [
     ...RUN_A,
     test: (rs) => {
       const sc = rs.map((r) => r.settle.filter((x) => x.k === 19 && x.ev === 'scout').length);
-      const th = rs.map((r) => r.births.filter((x) => x.k === 29).length);
+      const th = rs.map((r) => r.births.filter((x) => x.k === 30).length);
       return { ok: sum(sc) >= 1 && sum(th) >= 1, value: rs.map((r, i) => `${r.seed} 旋回${sc[i]}・眷属${th[i]}`).join('、') };
+    },
+  },
+  {
+    // リビングアーマー（src/eco/armor.ts）：倒れた冒険者の武具に未練が宿り、溜まり場で甲冑が立ち上がる
+    name: 'リビングアーマーが武具の溜まり場から立ち上がる（4シードで2回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.births.filter((x) => x.k === 29 && x.origin === 'gear').length);
+      return { ok: sum(n) >= 2, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // リビングアーマー：床の武器と盾を取り込み、倒れるかマナが尽きると武具が床に散らばる
+    name: 'リビングアーマーが武具を取り込み、崩れて散らばる（4シードで取り込み3回・崩れる1回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const a = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'absorb').length);
+      const f = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'fall').length);
+      return { ok: sum(a) >= 3 && sum(f) >= 1, value: rs.map((r, i) => `${r.seed} 取り込み${a[i]}・崩れる${f[i]}`).join('、') };
     },
   },
   {

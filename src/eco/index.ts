@@ -48,4 +48,5 @@ import './myconid';
 import './ant';
 import './kobold';
 import './salamander';
+import './armor';
 import './save';

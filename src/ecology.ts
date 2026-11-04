@@ -40,8 +40,10 @@ export const enum Kind {
   Skeleton = 26,
   Lich = 27,
   Dwarf = 28,
+  /** リビングアーマー（src/eco/armor.ts） */
+  Armor = 29,
   /** ヴァンパイアの眷属：ヴァンパイアに倒された者の亡骸が起き上がったもの（src/eco/thrall.ts） */
-  Thrall = 29,
+  Thrall = 30,
 }
 
 /** ドワーフの住みか */
@@ -348,17 +350,17 @@ export interface Camp {
 }
 
 /** 種ごとの強さ（戦いの勝ち負けの確率に使う） */
-export const STR = [0, 1, 1, 5, 3, 2, 3, 0, 2, 1, 3, 4, 3, 10, 6, 20, 15, 8, 4, 12, 8, 30, 40, 25, 60, 5, 3, 18, 6, 3];
+export const STR = [0, 1, 1, 5, 3, 2, 3, 0, 2, 1, 3, 4, 3, 10, 6, 20, 15, 8, 4, 12, 8, 30, 40, 25, 60, 5, 3, 18, 6, 6, 3];
 /** ドワーフの強さ（坑夫、鍛冶屋、戦士） */
 export const DWARF_STR = [5, 6, 10];
 /**
  * 賢さの段階：0 本能だけ（傷ついても逃げない）、1 動物（体力が半分を切ると逃げる）、
  * 2 狡猾（不利なら退く。強い相手には仲間がいなければ挑まない）、3 知性（戦う前に見積もり、勝てない相手は避ける）
  */
-export const TIER = [1, 1, 1, 1, 1, 0, 0, 0, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 0, 3, 0, 0, 0, 1, 3, 3, 0, 3, 3, 2];
+export const TIER = [1, 1, 1, 1, 1, 0, 0, 0, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 0, 3, 0, 0, 0, 1, 3, 3, 0, 3, 3, 0, 2];
 export const FLEE_AT = [0, 0.5, 0.35, 0.4];
 /** 血の色：0 赤、1 暗い赤（爬虫類・竜）、2 緑（虫）、3 石のかけら、-1 なし */
-export const BLOOD = [-1, 0, 0, 1, 2, -1, -1, -1, -1, 2, 0, 1, 0, 0, 1, 0, 0, 1, 3, 0, -1, 3, 0, 1, 1, 0, -1, -1, 0, -1];
+export const BLOOD = [-1, 0, 0, 1, 2, -1, -1, -1, -1, 2, 0, 1, 0, 0, 1, 0, 0, 1, 3, 0, -1, 3, 0, 1, 1, 0, -1, -1, 0, -1, -1];
 /** 冒険者の強さ（職業）と、一行の格（駆け出し・手練れ・精鋭） */
 export const JOB_STR = [8, 5, 4, 5, 3, 6, 20];
 export const TIER_MUL = [0.7, 1.1, 1.6];
@@ -463,6 +465,8 @@ export const SPEC: Spec[] = [
   { body: 30, cap: 0, meta: 1e9, starve: 1e9, speed: 0.7, glowDecay: 1 },
   { body: 60, cap: 0, meta: 1e9, starve: 1e9, speed: 0.5, glowDecay: 1 },
   { body: 50, cap: 80, meta: 90, starve: 30000, speed: 0.8, glowDecay: 1 },
+  // リビングアーマー：中身は空の鎧で、体（養分）を持たず、食べない。マナで動く（src/eco/armor.ts）
+  { body: 0, cap: 0, meta: 1e9, starve: 1e9, speed: 0.55, glowDecay: 1 },
   // 眷属：ものを食べず、飢えない（体は起き上がった亡骸の残りの分）
   { body: 0, cap: 0, meta: 1e9, starve: 1e9, speed: 0.85, glowDecay: 1 },
 ];
@@ -603,7 +607,7 @@ export class Ecology {
   exported = 0;
   /** 生き物の更新の通し番号（step 番号。CR_EVERY tick ごとに1増える。セーブに入れる） */
   step = 0;
-  counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   /** ドワーフの住みか（一つまで）、坑道のランプ、外に伝わった話（1 = ゴーレムの宝物庫は危ない） */
   hold: Hold | null = null;
   lamps: number[] = [];
@@ -639,6 +643,13 @@ export class Ecology {
   /** 一度でも光に照らされた種 */
   discovered = new Uint8Array(32);
   gear: Item[] = [];
+  /**
+   * リビングアーマーの持ち物（生き物の番号 → [体になった武具の数, 武具の種類…]）。先頭の数だけが体（生まれたときの材料）で、
+   * 残りが手に取り込んだ武器と盾。崩れるとすべて床に戻る（src/eco/armor.ts）。セーブに入れる
+   */
+  armorKit = new Map<number, number[]>();
+  /** リビングアーマーが崩れた所（[x, y, 生き物の更新の通し番号] を並べたもの。直近の8件。アンデッド祓いの戦利品を決めるのに使う。セーブに入れる） */
+  armorFalls: number[] = [];
   rumors: Rumors = { light: 0, gold: 0, undead: 0, beast: 0, dragon: 0, beastKind: 0, beastX: 0, beastY: 0, goblin: 0, goblinX: 0, goblinY: 0, dragonX: 0, dragonY: 0, goblinRobs: 0, goblinCamp: 0, goblinCampX: 0, goblinCampY: 0 };
   /** 外との金貨の出入り */
   goldIn = 0;
@@ -809,7 +820,7 @@ export class Ecology {
   static bodySize(k: number): number {
     if (k === Kind.Dragon || k === Kind.Worm) return 40;
     if (k === Kind.Golem || k === Kind.Troll || k === Kind.Minotaur || k === Kind.Wyvern) return 18;
-    if (k === Kind.Orc || k === Kind.Lizardman || k === Kind.Adventurer || k === Kind.Dwarf || k === Kind.Vampire || k === Kind.Skeleton || k === Kind.Lich || k === Kind.Basilisk || k === Kind.Lizard || k === Kind.Zombie) return 11;
+    if (k === Kind.Orc || k === Kind.Lizardman || k === Kind.Adventurer || k === Kind.Dwarf || k === Kind.Vampire || k === Kind.Skeleton || k === Kind.Lich || k === Kind.Armor || k === Kind.Basilisk || k === Kind.Lizard || k === Kind.Zombie) return 11;
     if (k === Kind.Rat || k === Kind.Ant || k === Kind.Bat || k === Kind.Kobold || k === Kind.Goblin || k === Kind.Spider || k === Kind.Myconid || k === Kind.Slime) return 8;
     return 0;
   }
@@ -832,7 +843,7 @@ export class Ecology {
     [Kind.Rat]: 'smell', [Kind.Ant]: 'smell', [Kind.Troll]: 'smell', [Kind.Zombie]: 'smell', [Kind.Minotaur]: 'smell', [Kind.Slime]: 'smell',
     [Kind.Spider]: 'vib', [Kind.Worm]: 'vib', [Kind.Mimic]: 'vib',
     [Kind.Bat]: 'echo',
-    [Kind.Ghost]: 'magic', [Kind.Lich]: 'magic', [Kind.Wisp]: 'magic', [Kind.Gargoyle]: 'magic', [Kind.Golem]: 'magic', [Kind.Skeleton]: 'magic', [Kind.Salamander]: 'magic',
+    [Kind.Ghost]: 'magic', [Kind.Lich]: 'magic', [Kind.Wisp]: 'magic', [Kind.Gargoyle]: 'magic', [Kind.Golem]: 'magic', [Kind.Skeleton]: 'magic', [Kind.Salamander]: 'magic', [Kind.Armor]: 'magic',
   };
 
   /** いまの tick に明るいマス（光源と、光る生き物の光が届く所。壁の遮りは見ない）。生き物の更新ごとに作り直す */
@@ -891,6 +902,8 @@ export class Ecology {
   fxMarks: { t: number; id: number; m: string }[] = [];
   /** マナから生まれた者（描画専用：生まれる場所にマナが集まって姿が現れる演出。セーブしない。シミュレーションの判断に使わない） */
   fxManaBorn: { id: number; t: number; k: number; x: number; y: number }[] = [];
+  /** リビングアーマーの組み上がり（描画専用：体になった武具の種類と、床にあった位置の、甲冑からのずれ px。セーブしない。シミュレーションの判断に使わない） */
+  fxArmorRise: { id: number; t: number; parts: [number, number, number][] }[] = [];
   /**
    * 捕食の演出の記録（描画専用）：生きている獲物が食べられた瞬間ごとに、獲物（id、種 k、位置）と食べた者（by、種 bk）、
    * 打ち合いで仕留めてから食べたか（slain）。シミュレーションの判断には使わない（セーブには、映像のために直前の6秒分だけ残す）。src/creatureView.ts が、くわえて振る・繭・丸のみ・さらう・消え方を描く

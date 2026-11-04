@@ -4,6 +4,8 @@ import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, 
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { heroTitle } from './roster';
+import { ARMOR_LOW } from './armor';
+import { ITEM_NAMES } from './inspect';
 import type { World } from '../world';
 
 /** 触れた場所のいちばん近い生き物（死骸は除く） */
@@ -51,6 +53,7 @@ export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]):
   else if (c.k === Kind.Goblin && c.st === 17) state = c.gait < 0 ? '一行の最後尾へ駆け寄って、荷を掠め取ろうとしている' : '通路を行く冒険者の一行の後ろを、暗がりからつけている';
   else if (c.k === Kind.Goblin && c.st === 16) state = c.units > 0 ? '盗んだ荷物を抱えて、集落へ逃げ帰っている' : '手ぶらで集落へ逃げ帰っている';
   else if (c.k === Kind.Golem) state = '宝物庫の入口を見張っている';
+  else if (c.k === Kind.Armor) state = c.st === 10 ? '散らばった武具が寄り集まり、組み上がろうとしている' : c.mana < ARMOR_LOW ? 'マナが尽きかけ、継ぎ目を軋ませてマナの濃い所へ向かっている' : c.st === 1 ? '立ち番をしている' : '巡回している';
   else if (c.k === Kind.Dragon) state = c.st === 2 ? '飛んでいる' : c.foe ? '宝を盗った者を追っている' : '目を覚まして獲物を探している';
   else if (party && (party.camp ?? -1) >= 0) state = party.members[0] === c.id ? '焚き火のそばで見張りをしている' : '焚き火で休んでいる';
   else if (party && (party.braceT ?? 0) > this.step) state = party.braceK === 1 ? '目標に着いて、武器を構えている' : party.braceK === 3 ? '荷を掠め取られて、振り返っている' : party.braceK === 4 ? (c.sp === Job.Priest ? '墓標の前で祈りを捧げている' : '墓標の前で立ち止まっている') : '住みかの気配に身構えている';
@@ -78,6 +81,13 @@ export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]):
     else lines.push('群れからはぐれている');
   } else if (Ecology.TERRITORY[c.k]) lines.push('一匹で縄張りを持って暮らしている');
   if (party) lines.push(this.aimLine(party));
+  if (c.k === Kind.Armor) {
+    const kit = this.armorKit.get(c.id) ?? [0];
+    const nm = (ks: number[]) => ks.map((k) => ITEM_NAMES[k] ?? '武具').join('・');
+    lines.push(`体：${nm(kit.slice(1, 1 + kit[0])) || 'なし'}`);
+    const hand = kit.slice(1 + kit[0]);
+    lines.push(hand.length ? `取り込んだ武具：${nm(hand)}` : 'まだ何も取り込んでいない');
+  }
   return { title, lines };
 }
 
@@ -134,6 +144,15 @@ export function attackStyle(this: Ecology, c: Cr): { style: string; col: number;
       return { style: 'smash', col: 6, size: 2 };
     case Kind.Dwarf:
       return { style: 'slash', col: 1, size: 1 };
+    case Kind.Armor: {
+      // リビングアーマー：手に取り込んだ武器で（素手なら籠手で殴る）。武具が増えるほど大きな技に
+      const hand = this.armorHand(c);
+      const size = hand.length >= 3 ? 2 : hand.length >= 1 ? 1 : 0;
+      if (hand.includes(10) || hand.includes(2)) return { style: 'slash', col: 7, size };
+      if (hand.includes(5)) return { style: 'smash', col: 7, size };
+      if (hand.includes(6)) return { style: 'stab', col: 7, size };
+      return { style: 'smash', col: 6, size: 0 };
+    }
     case Kind.Basilisk:
       return { style: 'beam', col: 6, size: 1 };
     case Kind.Vampire:

@@ -335,7 +335,7 @@ export function dwarf(this: Ecology, c: Cr): void {
     }
   }
   // 住みかを守る：ゴブリン、オーク、コボルト、トロール
-  if (c.sp === 2 && this.defend(c, hx, hy, [Kind.Goblin, Kind.Orc, Kind.Kobold, Kind.Troll, Kind.Skeleton])) return;
+  if (c.sp === 2 && this.defend(c, hx, hy, [Kind.Goblin, Kind.Orc, Kind.Kobold, Kind.Troll, Kind.Skeleton, Kind.Armor])) return;
   // 腹が減ったら、まず広間の蓄えを食べる。なければキノコ（畑のものも）か苔を食べ、大ネズミを狩る
   if ((c.hungry || c.food < s.cap * 0.3) && h.store > 0) {
     c.act = 1;

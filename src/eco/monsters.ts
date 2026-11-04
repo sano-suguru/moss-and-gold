@@ -179,7 +179,7 @@ export function mimic(this: Ecology, c: Cr): void {
   let prey: Cr | null = null;
   let bd = 20 * 20;
   this.nearby(c.x, c.y, 1, (o) => {
-    if (o === c || o.dead || o.away || [Kind.Mimic, Kind.Golem, Kind.Worm, Kind.Ghost, Kind.Wisp].includes(o.k)) return;
+    if (o === c || o.dead || o.away || [Kind.Mimic, Kind.Golem, Kind.Worm, Kind.Ghost, Kind.Wisp, Kind.Armor].includes(o.k)) return;
     if (o.k === Kind.Bat && o.st !== 0) return;
     // 振動で気づく：じっとしている者、眠っている者には気づかない
     if (!this.canSense(c, o)) return;
@@ -233,7 +233,7 @@ export function golem(this: Ecology, c: Cr): void {
   let foe: Cr | null = null;
   let fd = 1e18;
   this.nearby(c.tx, c.ty, 4, (o) => {
-    if (o.dead || o.away || o === c || [Kind.Golem, Kind.Dragon, Kind.Worm, Kind.Ghost, Kind.Wisp, Kind.Mimic, Kind.Gargoyle].includes(o.k)) return;
+    if (o.dead || o.away || o === c || [Kind.Golem, Kind.Dragon, Kind.Worm, Kind.Ghost, Kind.Wisp, Kind.Mimic, Kind.Gargoyle, Kind.Armor].includes(o.k)) return;
     if ((o.k === Kind.Bat || o.k === Kind.Wyvern) && o.st !== 0) return;
     const k = this.tileOf(o.x, o.y);
     const atDoor = sq(o.x - c.tx) + sq(o.y - c.ty) < 2 * TILE * 2 * TILE && STR[o.k] >= 3;

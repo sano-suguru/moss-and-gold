@@ -19,7 +19,7 @@ export interface Thing {
   id: number;
 }
 
-const ITEM_NAMES = ['松明', '燃えさし', '剣', '盾', '杖', '鎚矛', '短剣', '聖印', 'リュート', '弓', '大剣', '背負い袋と寝具', '戦利品'];
+export const ITEM_NAMES = ['松明', '燃えさし', '剣', '盾', '杖', '鎚矛', '短剣', '聖印', 'リュート', '弓', '大剣', '背負い袋と寝具', '戦利品'];
 const DWARF_JOBS = ['坑夫', '鍛冶屋', '戦士'];
 /** 死骸を残さない（ほどけて消える）種 */
 const FLEETING: Kind[] = [Kind.Wisp, Kind.Slime, Kind.Ghost, Kind.Myconid];
@@ -192,6 +192,8 @@ export function describeThing(this: Ecology, s: Thing): { title: string; lines: 
       else if (who && n?.cause === 'spent') lines.push(`${who}が捨てていった${when}`);
       else if (who) lines.push(`倒れた${who}が残していった${when}`);
       else lines.push('いきさつはわからない');
+      // 持ち主の未練（マナ）が宿っている（src/eco/armor.ts）
+      if (o.kind >= ItemKind.Sword && o.kind <= ItemKind.Greatsword && o.fuel > 0) lines.push(o.fuel >= 12 ? '持ち主の未練が宿り、青白くかすかに光っている' : '持ち主の未練が、薄れかけて残っている');
       return { title, lines };
     }
     case 'pile': {
