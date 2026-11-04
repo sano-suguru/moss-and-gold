@@ -1,6 +1,7 @@
 # PR が閉じられたら（マージしたときも）、その PR のプレビューのバージョンを Cloudflare から消す。
 # プレビューは deploy.yml が PR を作ったとき・push したときにアップロードする、本番に出さないバージョン（マージ前に確かめるためのもの）。
 # 消し方は tools/preview-cleanup.mjs の先頭のコメント。PR のプレビューのコメントも「消した」と書き換える。
+# いちばん新しいバージョンは消せないので残し、main を本番に公開したあとに deploy.yml が消す。
 # 手で実行（workflow_dispatch）すると、今開いていない PR のバージョンをすべて消す（溜まった分の掃除）。
 name: preview-cleanup
 
@@ -59,6 +60,7 @@ jobs:
         uses: actions/github-script@v8
         env:
           DELETED: ${{ steps.rm.outputs.deleted }}
+          KEPT: ${{ steps.rm.outputs.kept }}
         with:
           script: |
             const marker = '<!-- moss-and-gold-preview -->';
@@ -73,9 +75,10 @@ jobs:
               '### 🍂 プレビュー（消した）',
               '',
               `PR が${how}ので、この PR のプレビューのバージョン（${process.env.DELETED} 件）を Cloudflare から消しました。`,
+              Number(process.env.KEPT) > 0 ? `いちばん新しいバージョン（${process.env.KEPT} 件）は Cloudflare の決まりで今は消せないので、次に main を本番に公開したあとに消します。` : null,
               '',
               `<sub>${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC。PR を開き直すと、新しいプレビューが作られます。</sub>`,
-            ].join('\n');
+            ].filter((l) => l !== null).join('\n');
             await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
       - name: Secrets が無いので飛ばした
         if: env.CLOUDFLARE_API_TOKEN == ''
