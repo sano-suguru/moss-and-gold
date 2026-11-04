@@ -50,7 +50,7 @@ export function pickGoblinCamp(this: Ecology, avoid?: Camp, from?: [number, numb
   const pool = dist ? reach.length : 2000;
   for (let i = 0; i < pool; i++) {
     const k = dist ? reach[i] : ih(this.step, i, 90) % (m.w * m.h);
-    if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 10 || this.w.lightBase[k] > 60 || m.maze[k]) continue;
+    if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 10 || this.w.lightBase[k] > 60 || this.inLair((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8)) continue;
     const x = k % m.w;
     const y = Math.floor(k / m.w);
     if (Math.abs(x - m.entrance.x) + y < 15) continue;

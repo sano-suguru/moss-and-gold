@@ -431,7 +431,7 @@ export function pester(this: Ecology, c: Cr): boolean {
   return false;
 }
 
-/** 倒した獲物の死骸を、数秒かけて食べる（生き物の更新4回に1回、一口）。ほかの者に襲われたら食べるのをやめる（仕留める間の獲物の打ち返しは数えない）。true なら今は食べている */
+/** 倒した獲物の死骸を、数秒かけて食べる（生き物の更新4回に1回、一口。ミノタウロスは寝床まで引きずってから）。ほかの者に襲われたら食べるのをやめる（仕留める間の獲物の打ち返しは数えない）。true なら今は食べている */
 export function feeding(this: Ecology, c: Cr): boolean {
   if (!c.feed) return false;
   const d = this.byId.get(c.feed);
@@ -440,8 +440,10 @@ export function feeding(this: Ecology, c: Cr): boolean {
     c.feed = 0;
     return false;
   }
-  // ヴァンパイアは、眷属として起き上がらせる亡骸からは、血を短く吸うだけで離れる（src/eco/thrall.ts）
-  if (c.k === Kind.Vampire && d.lure === c.id && this.step - d.lureAt > 15) {
+  // ミノタウロスは、まず寝床まで引きずっていく。食べるのは骨になるところまでで、骨は寝床に残す（src/eco/monsters.ts）
+  if (this.dragToLair(c, d)) return true;
+  // ミノタウロスは骨になったら食べるのをやめる。ヴァンパイアは、眷属として起き上がらせる亡骸からは、血を短く吸うだけで離れる（src/eco/thrall.ts）
+  if ((c.k === Kind.Minotaur && this.corpseStage(d) === 2) || (c.k === Kind.Vampire && d.lure === c.id && this.step - d.lureAt > 15)) {
     c.feed = 0;
     return false;
   }

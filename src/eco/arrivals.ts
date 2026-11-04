@@ -305,17 +305,6 @@ export function arrivals(this: Ecology, day: number): void {
       for (let i = 0; i < k; i++) enter(Kind.Lizardman, 40, 80).ref = v.id;
     }
   }
-  // ミノタウロス：迷路があり獲物が十分いると、1頭だけ住み着きに来る
-  if (false && this.canEnter(Kind.Minotaur) && n[Kind.Minotaur] === 0 && n[Kind.Rat] + n[Kind.Goblin] + n[Kind.Kobold] >= 12 && ih(this.step, 11, 71) % 60 === 0) {
-    next();
-    const mz = this.mazeTiles();
-    if (mz.length) {
-      const k = mz[ih(this.step, 12, 71) % mz.length];
-      const t = enter(Kind.Minotaur, 120, 150);
-      t.hx = (k % m.w) * TILE + 8;
-      t.hy = Math.floor(k / m.w) * TILE + 8;
-    }
-  }
   // トロール：食べ物が豊富になると、夜に迷い込む
   const night = this.dayNow < 0.05;
   const food = n[Kind.Rat] + n[Kind.Goblin] + n[Kind.Kobold] + this.corpses.length;

@@ -18,9 +18,9 @@
  * 体にした武具の未練が、甲冑の体のマナになる。同時にいる数は、地図の面積に比例した安全柵（192×144 マスで4体、armorCap）まで。
  * 生まれてから ARMOR_RISE 回の更新のあいだは、その場で組み上がる（描画は、散らばった武具が寄り集まって立ち上がる演出）。
  *
- * 生き方：体のマナは、生き物の更新 ARMOR_LEAK 回ごとに1ずつ足もとの土へ漏れる。土のマナが濃い所（巡回する宝物庫・迷路など）では
+ * 生き方：体のマナは、生き物の更新 ARMOR_LEAK 回ごとに1ずつ足もとの土へ漏れる。土のマナが濃い所（巡回する宝物庫など）では
  * 土から吸って補い（ARMOR_MANA_MAX まで）、取り込んだ武具の未練でも補う。マナが尽きると崩れる。マナが少ないと動きが鈍る。
- * 巡回：生まれた場所（hx, hy）と、今ある石畳の構造（宝物庫・迷路）のあいだを行き来し、着いた所でしばらく立ち番をする。
+ * 巡回：生まれた場所（hx, hy）と宝物庫のあいだを行き来し、着いた所でしばらく立ち番をする。
  * マナが少なくなると、土のマナが濃いほうへ向かう。
  * 襲う相手：武具を持つ侵入者（冒険者、ドワーフ、武器を拾ったゴブリン・オーク）。アンデッド、獣や虫、他の番人は襲わない（番人の側も甲冑を襲わない）。
  * 賢さは本能だけで、逃げない。強さは6に、手に取り込んだ武器と盾1つごとに +3（ARMOR_HAND_MAX 個まで。src/eco/combat.ts の str）。
@@ -165,16 +165,11 @@ export function armorBirths(this: Ecology): void {
   }
 }
 
-/** 巡回先を決める：生まれた場所と、宝物庫・迷路のあいだを行き来する。マナが少なければ、土のマナの濃いほうへ */
+/** 巡回先を決める：生まれた場所と宝物庫のあいだを行き来する。マナが少なければ、土のマナの濃いほうへ */
 export function pickArmorPost(this: Ecology, c: Cr): void {
   const m = this.w.map;
   const posts: [number, number][] = [];
   if (m.vaultCenter.x >= 0) posts.push([m.vaultCenter.x * TILE + 8, m.vaultCenter.y * TILE + 8]);
-  const mz = this.mazeTiles();
-  if (mz.length) {
-    const t = mz[ih(c.id, this.step, 704) % mz.length];
-    posts.push([(t % m.w) * TILE + 8, Math.floor(t / m.w) * TILE + 8]);
-  }
   let tx = c.hx;
   let ty = c.hy;
   if (posts.length) {

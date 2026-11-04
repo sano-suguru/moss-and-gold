@@ -140,6 +140,35 @@ bool pavedAt(ivec2 t) { return (abits(t) & 128) != 0; }
 bool rubbleAt(ivec2 t) { return (abits(t) & 64) != 0; }
 bool sealedAt(ivec2 t) { return (abits(t) & 32) != 0; }
 
+// 壁（瓦礫を除く岩。地図の外も壁）。下が床の壁のマスは、上の CAP px が上面（天端）、残りが正面
+const int CAP = 5;
+bool wallAt(ivec2 t) { return solidAt(t) == 1 && !rubbleAt(t); }
+ivec2 tileOfPx(ivec2 p) { return ivec2(floor(vec2(p) / 16.0)); }
+// 点 p（ワールドのピクセル）が壁の上面か
+bool topPx(ivec2 p) {
+  ivec2 t = tileOfPx(p);
+  return wallAt(t) && (p.y - t.y * 16 < CAP || wallAt(t + ivec2(0, 1)));
+}
+// 点 p が壁の正面か
+bool facePx(ivec2 p) {
+  ivec2 t = tileOfPx(p);
+  return wallAt(t) && p.y - t.y * 16 >= CAP && !wallAt(t + ivec2(0, 1));
+}
+// 上面の点（マス t の中の位置 l）が、石畳の床の縁を囲む切り石の天端か：石積みの正面の天端と、石畳の床から CAP px の内の上面
+bool copingPx(ivec2 t, ivec2 l) {
+  if (!wallAt(t + ivec2(0, 1)) && pavedAt(t + ivec2(0, 1))) return true;
+  for (int dy = -1; dy <= 1; dy++)
+    for (int dx = -1; dx <= 1; dx++) {
+      if (dx == 0 && dy == 0) continue;
+      ivec2 n = t + ivec2(dx, dy);
+      if (wallAt(n) || !pavedAt(n)) continue;
+      int ddx = dx < 0 ? l.x + 1 : dx > 0 ? 16 - l.x : 0;
+      int ddy = dy < 0 ? l.y + 1 : dy > 0 ? 16 - l.y : 0;
+      if (max(ddx, ddy) <= CAP) return true;
+    }
+  return false;
+}
+
 // 石のひび割れ模様（セル状ノイズ）。x: 最も近い石までの距離, y: 二番目, z: 石ごとの値, w: 石の中での上下左右の位置
 vec4 stones(vec2 p, vec2 cs, uint salt) {
   vec2 g = floor(p / cs);
@@ -245,10 +274,43 @@ void main() {
   float glint = 0.0;
 
   if (s == 1 && !rub) {
-    if (sS == 0) {
-      if (pavedAt(t + ivec2(0, 1))) {
-        // 石積みの壁
-        idx = faceIdx(l);
+    // 壁の上面と正面（周りのマスを見て、縁と角を点ごとに描く。上面の範囲は topPx、正面の範囲は facePx）
+    bool top = topPx(w);
+    bool brick = !top && pavedAt(t + ivec2(0, 1));
+    bool cope = top && copingPx(t, l);
+    if (top) {
+      if (cope) {
+        // 切り石の天端：8px 角の石を並べる
+        ivec2 b = w / 8;
+        ivec2 bl = w - b * 8;
+        float bh = h01(b, 47u);
+        idx = bh < 0.3 ? 2 : 3;
+        if (bl.x == 7 || bl.y == 7) idx = 1;
+        else if (bl.x == 0 || bl.y == 0) idx = 4;
+        else if (h > 0.95) idx = 4;
+      } else {
+        // 自然の岩の上面（大きめの岩塊）
+        vec4 st = stones(wp + 0.5, vec2(11.0, 9.0), 41u);
+        if (st.y - st.x < 1.0) idx = 0;
+        else {
+          idx = st.z < 0.4 ? 1 : 2;
+          if (st.w < -0.45 && h > 0.4) idx += 1;
+          if (h > 0.96) idx += 1;
+        }
+      }
+      bool up = topPx(w - ivec2(0, 1));
+      bool lf = topPx(w - ivec2(1, 0));
+      bool rt = topPx(w + ivec2(1, 0));
+      bool dn = topPx(w + ivec2(0, 1));
+      // 床と接する縁は黒い線。正面へ落ちる縁（天端の手前の角）は明るい線
+      if (!up || !lf || !rt) idx = 0;
+      else if (!dn) idx = cope ? 5 : 4;
+      tkind = 2;
+      edgeLine = !up || !lf || !rt || !dn;
+    } else {
+      if (brick) {
+        // 石積みの壁（いちばん下の段の下端がマスの下端にそろうよう、行をずらす）
+        idx = faceIdx(ivec2(l.x, l.y - CAP + 1));
         if (idx == 3 && h < 0.12) idx = 4;
         if (idx == 3 && h > 0.92) idx = 2;
       } else {
@@ -260,29 +322,19 @@ void main() {
           if (st.w < -0.35) idx += 1;
           else if (st.w > 0.4) idx -= 1;
         }
-        if (l.y < 2 && idx > 1) idx = 4;
       }
+      // 天端のすぐ下は影、足もとは暗く
+      if (l.y == CAP) idx = min(idx, 2);
       if (l.y >= 13) idx -= 1;
-      if ((sW == 0 && l.x == 0) || (sE == 0 && l.x == 15) || (sN == 0 && l.y == 0)) idx = 0;
+      bool lf = facePx(w - ivec2(1, 0));
+      bool rt = facePx(w + ivec2(1, 0));
+      if (!lf || !rt) idx = 0;
       tkind = 1;
-      edgeLine = l.y == 0 || l.y == 15 || (sW == 0 && l.x == 0) || (sE == 0 && l.x == 15);
-    } else {
-      // 岩の上面（大きめの岩塊）
-      vec4 st = stones(wp + 0.5, vec2(11.0, 9.0), 41u);
-      if (st.y - st.x < 1.0) idx = 0;
-      else {
-        idx = st.z < 0.4 ? 1 : 2;
-        if (st.w < -0.45 && h > 0.4) idx += 1;
-        if (h > 0.96) idx += 1;
-      }
-      if (solidAt(t + ivec2(0, 2)) == 0 && l.y == 15) idx = 4;
-      if ((sN == 0 && l.y == 0) || (sW == 0 && l.x == 0) || (sE == 0 && l.x == 15)) idx = 0;
-      tkind = 2;
-      edgeLine = (sN == 0 && l.y == 0) || (sW == 0 && l.x == 0) || (sE == 0 && l.x == 15) || (solidAt(t + ivec2(0, 2)) == 0 && l.y == 15);
+      edgeLine = l.y == 15 || !lf || !rt;
     }
     alb = ramp(idx);
-    // 岩の硬さ：柔らかい層は茶色がかった細かい肌、硬い岩は青みがかった暗い大きな岩肌
-    {
+    // 岩の硬さ：柔らかい層は茶色がかった細かい肌、硬い岩は青みがかった暗い大きな岩肌（石積みと切り石は人の手のものなので色を分けない）
+    if (!brick && !cope) {
       int hb = abits(t);
       if ((hb & 8) != 0) {
         alb *= vec3(1.22, 1.0, 0.74);

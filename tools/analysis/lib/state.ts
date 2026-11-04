@@ -28,7 +28,7 @@ export type Saved = Record<string, any> & { seed: string; tick: number; n: numbe
 
 export function encodeState(w: World): Saved {
   return {
-    v: 3, n: w.map.w * w.map.h, seed: w.map.seed, tick: w.tick, cam: { x: w.map.entrance.x * 16, y: 200, zoom: 2 }, speed: 1,
+    v: 4, n: w.map.w * w.map.h, seed: w.map.seed, tick: w.tick, cam: { x: w.map.entrance.x * 16, y: 200, zoom: 2 }, speed: 1,
     seen: bits(w.seen), water: b64(new Uint8Array(w.water.buffer)), nutr: b64(new Uint8Array(w.nutr.buffer)), moss: b64(w.moss), fungus: b64(w.fungus),
     burn: b64(w.burn), ash: b64(w.ash), mat: b64(w.mat), born: w.born, washed: w.washed, mana: b64(new Uint8Array(w.mana.buffer)), manaBorn: w.manaBorn, manaLeaked: w.manaLeaked, manaFaded: w.manaFaded, digs: w.digs.slice(), eco: w.eco.serialize(),
   };

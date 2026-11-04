@@ -6,8 +6,13 @@
  *   npm run check -- --base HEAD~2    出発点のスナップショットを作るベース（既定 HEAD。そのコミットで0日目から from 日目まで実行した状態）
  *
  * チェックの中身は tools/analysis/checks.ts。目安に届かないものがあれば終了コードを 1 にする。
+ *
+ * 地形の作り方（src/mapgen.ts と、それが使う src/rng.ts）がベースと作業ツリーで違うときは、ベースのスナップショットを使わず、
+ * 作業ツリーで0日目から実行する。地形はセーブせずシードから作り直すので、ベースのスナップショットを新しい地形に載せると、
+ * 生き物が岩の中に置かれるなど、ありえない状態から始まってしまうため（迷路をなくした変更で、埋まった生き物を床へ出すチェックが落ちた）。
  */
 import { cpus } from 'os';
+import { execFileSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { parseArgs } from './common';
@@ -29,12 +34,20 @@ async function main() {
   const ver = await getBin('sim');
   const base = await getBin('sim', a.base || 'HEAD');
   const adv = defaultAdv();
+  // 地形の作り方が違えば、ベースのスナップショットからは始めない（上のコメント）
+  let sameMap = true;
+  try {
+    execFileSync('git', ['diff', '--quiet', a.base || 'HEAD', '--', 'src/mapgen.ts', 'src/rng.ts'], { stdio: 'ignore' });
+  } catch {
+    sameMap = false;
+  }
+  if (!sameMap) console.log('地形の作り方（src/mapgen.ts・src/rng.ts）がベースと違うので、ベースのスナップショットを使わず、作業ツリーで0日目から実行する');
   const jobsMap = new Map<string, { seed: string; from: number; to: number }>();
   for (const c of checks) for (const s of c.seeds) jobsMap.set(`${s}|${c.from}|${c.to}`, { seed: s, from: c.from, to: c.to });
   console.log(`チェック ${checks.length} 件、実行するもの ${jobsMap.size}（ベース ${a.base || 'HEAD'}：${base.simHash}、作業ツリー：${ver.simHash}）`);
   const dirs = new Map<string, string>();
   await pool([...jobsMap].map(([k, j]) => ({ w: j.to - j.from, f: async () => {
-    dirs.set(k, await ensureRun({ seed: j.seed, days: j.to, adv, ver, fork: { day: j.from, base } }, (s) => console.log(s)));
+    dirs.set(k, await ensureRun({ seed: j.seed, days: j.to, adv, ver, fork: sameMap ? { day: j.from, base } : undefined }, (s) => console.log(s)));
   } })), jobs);
   let bad = 0;
   console.log('');

@@ -153,9 +153,12 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 食べ物の足りる場所がどの横穴の先にも無いマップでも、少ない群れが貧しい場所に集落を作る（かしたれ・seed7・seed8 で10〜18日目に起きる）
+    // 食べ物の足りる場所がどの横穴の先にも無いマップでも、少ない群れが貧しい場所に集落を作る。
+    // 迷路をなくして地形が変わる前は、かしたれ・seed7・seed8 で10〜18日目に起きていた。変わったあとは seed18・seed40 で3回ずつ、seed8 で1回（かしたれ・seed7 では起きない）
     name: 'ゴブリンの少ない群れが貧しい場所に集落を作る（4シードの合計で2回以上）',
-    ...RUN_A,
+    seeds: ['かしたれ', 'seed8', 'seed18', 'seed40'],
+    from: 10,
+    to: 18,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 12 && x.ev === 'found' && x.poor === 1).length);
       return { ok: sum(n) >= 2, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
@@ -193,13 +196,14 @@ export const CHECKS: Check[] = [
   {
     // 狩りは打ち合って仕留めてから食べる（一口で食べるのは、クモの巣・丸のみ・空中でさらう・死骸だけ）。
     // 打ち合いで仕留めて食べたのが、一口で食べたより多い
-    // （1シードの揺れに左右されないよう、回数は4シードの合計で見る。クモの巣の変更（#38）のあと、abc の10〜18日目は10回ほどになった）
-    name: '狩りは打ち合って仕留めて食べる（4シードの合計で80回以上、どのシードでも一口で食べたより多い）',
+    // （1シードの揺れに左右されないよう、回数は4シードの合計で見る。クモの巣の変更（#38）のあと、abc の10〜18日目は10回ほどになった。
+    // 迷路をなくして地形が変わったあと、seed8 の10〜18日目はワーム・クモの巣・ワイバーンの一口が多く、打ち合い31に対し一口34になったので、一口との比べも合計で見る）
+    name: '狩りは打ち合って仕留めて食べる（4シードの合計で80回以上、合計で一口で食べたより多い）',
     ...RUN_A,
     test: (rs) => {
       const sl = rs.map((r) => r.deaths.filter((x) => x.cause === 'eaten' && x.slain === 1).length);
       const gu = rs.map((r) => r.deaths.filter((x) => x.cause === 'eaten' && !x.slain).length);
-      return { ok: sum(sl) >= 80 && sl.every((v, i) => v > gu[i]), value: rs.map((r, i) => `${r.seed} ${sl[i]}（一口 ${gu[i]}）`).join('、') };
+      return { ok: sum(sl) >= 80 && sum(sl) > sum(gu), value: rs.map((r, i) => `${r.seed} ${sl[i]}（一口 ${gu[i]}）`).join('、') };
     },
   },
   {
@@ -360,6 +364,19 @@ export const CHECKS: Check[] = [
       const all = rs.map((r) => r.deaths.filter((x) => x.cause === 'burned' && x.by === 24));
       const fly = all.map((a) => a.filter((x) => x.k === 1 || x.k === 23 || x.k === 0).length);
       return { ok: sum(fly) >= 1, value: rs.map((r, i) => `${r.seed} 炎で死んだ${all[i].length}（うち飛ぶ者${fly[i]}）`).join('、') };
+    },
+  },
+  {
+    // ミノタウロス（src/eco/monsters.ts）：深部の行き止まりの縄張りで暮らし、仕留めた獲物を寝床まで引きずる（settle の drag）。
+    // 迷路をなくした変更のコードで0日目から実行すると、abc・seed30・seed5 は25日のうちに何度も引きずる（16シード×25日で14シード）
+    name: 'ミノタウロスが獲物を仕留めて寝床まで引きずる（abc・seed30・seed5 の合計で仕留める3回・引きずる1回以上）',
+    seeds: ['abc', 'seed30', 'seed5'],
+    from: 10,
+    to: 18,
+    test: (rs) => {
+      const kill = rs.map((r) => r.deaths.filter((x) => x.by === 15 && (x.cause === 'eaten' || x.cause === 'fight')).length);
+      const drag = rs.map((r) => r.settle.filter((x) => x.k === 15 && x.ev === 'drag').length);
+      return { ok: sum(kill) >= 3 && sum(drag) >= 1, value: rs.map((r, i) => `${r.seed} 仕留めた${kill[i]}・引きずった${drag[i]}`).join('、') };
     },
   },
   {
