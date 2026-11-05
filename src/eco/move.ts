@@ -500,8 +500,11 @@ export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
         // 前の仲間がこちらへ向かってくる（向きが逆）なら、列ではなくすれ違い：ゆるめずに脇へよける
         // （以前は向かい合った二匹が互いにゆるめ合い、細い通路で押し戻し合って進めず、苔のそばで飢えていた）
         const od = o.dir === 0 ? [0, 1] : o.dir === 1 ? [0, -1] : o.dir === 2 ? [1, 0] : [-1, 0];
-        const oncoming = od[0] * hx + od[1] * hy < -0.3;
-        if (o.act === 1 && o.sleep <= 0 && !oncoming) slow = ahead < gap * 0.5 ? 0.15 : 0.5;
+        // 前の仲間が同じ向きへ進んでいるとき（列になっているとき）だけ歩みをゆるめる。横切っている、別の向きへ歩いている仲間は、脇へよけて追い越す
+        // （以前は向きが逆でなければゆるめていたので、仲間がいつもまわりにいるアリの巣のそばでは、横切る仲間のたびに歩みをゆるめ続け、
+        //  脚を動かしたままほとんど進まず、足踏みして見えていた）
+        const along = od[0] * hx + od[1] * hy;
+        if (o.act === 1 && o.sleep <= 0 && along > 0.5) slow = ahead < gap * 0.5 ? 0.15 : 0.5;
         else sidestep = cross > 0 ? -1 : cross < 0 ? 1 : c.id % 2 ? 1 : -1;
       });
       if (sidestep) {

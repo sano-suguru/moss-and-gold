@@ -111,9 +111,13 @@ export function ant(this: Ecology, c: Cr): void {
       if (kk >= 0) {
         c.ref2 = -1 - kk;
       } else {
-        c.act = 1;
-        const j = DIR16[ih(c.id, this.step >> 4, 66) & 15];
-        this.tryMove(c, j[0] * s.speed * 0.5, j[1] * s.speed * 0.5);
+        // 運ぶ物が見つからなければ、巣のそばで休む（巣から3マスより遠ければ巣へ戻る。蓄えが十分なときと同じ）。
+        // 以前は約3秒ごとに乱数で向きを選んで半分の速さでぶらつき、向きが戻るとほとんど進まずに足踏みして見えていた
+        c.act = sq(col.x - c.x) + sq(col.y - c.y) > 3 * TILE * 3 * TILE ? 1 : 0;
+        if (c.act === 1) {
+          const [ox, oy] = antSpot(c, 10);
+          this.goTo(c, col.x + ox, col.y + oy, s.speed);
+        }
         return;
       }
     }
