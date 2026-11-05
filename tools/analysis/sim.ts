@@ -19,6 +19,7 @@
  *   events.jsonl     ゲーム内ログ（画面の「記録」）に出る出来事
  *   trace.jsonl      --trace で指定した生き物の毎 tick の状態
  *   stuck.jsonl      足踏み：起きて歩く姿のまま、ゲーム内の2分（1200 tick）以上ほぼ同じ場所（12px 以内）にいた生き物（そうなった時点で1回記録。数えるときは、漂う種と巣に捕まっていた者を除く：common.ts の countsAsStuck）
+ *   hitch.jsonl      短い引っかかり：歩く姿のまま、ゲーム内の3秒で正味半タイル（8px）も進まない状態が続いた区間（終わった時点で1回記録。止まったままも、行ったり来たりも含む）
  *   snap/dNNN.json.gz 日次スナップショット（ゲームのセーブと同じ形。調査と、後から値を計算するのに使う）
  *   checkpoint.json  再開するためのチェックポイント（ゲームのセーブと同じ形）
  * 0日目から一つのバージョンだけで実行したもの（pure）は、日次スナップショットを runs/.cache/snap/<バージョン>/ にも置く（probe などが再利用する）。
@@ -27,6 +28,7 @@
 import { appendFileSync, existsSync, linkSync, mkdirSync, readFileSync, writeFileSync, cpSync } from 'fs';
 import { join } from 'path';
 import { DAY_TICKS, Ecology, World, tick } from './lib/engine';
+import { SPEC } from '../../src/ecology';
 import { decodeState, encodeState, readState, writeState } from './lib/state';
 import { dayName, SELF_BIN, SELF_SIM, snapDir } from './lib/runs';
 import { parseArgs } from './common';
@@ -56,7 +58,7 @@ if (args.resume && existsSync(join(out, 'checkpoint.json'))) {
   meta = { seed, days: +(args.days || 10), tick: 0, total0: 0, gold0: 0, trace: +(args.trace || 0), advMax: Ecology.ADV_MAX_PARTIES, lineage: [{ sim: SELF_SIM, from: 0 }] };
   meta.total0 = w.totalNutrients();
   meta.gold0 = w.eco.totalGold();
-  for (const f of ['samples', 'deaths', 'births', 'exits', 'moves', 'settle', 'events', 'trace', 'stuck']) writeFileSync(join(out, `${f}.jsonl`), '');
+  for (const f of ['samples', 'deaths', 'births', 'exits', 'moves', 'settle', 'events', 'trace', 'stuck', 'hitch']) writeFileSync(join(out, `${f}.jsonl`), '');
   console.log(`新しく：シード「${seed}」を ${meta.days} 日`);
 }
 meta.bin = SELF_BIN;
@@ -153,6 +155,113 @@ function watchStuck(): unknown[] {
   return rows;
 }
 
+/**
+ * 短い引っかかりを見つける：見る人の目に「引っかかっている」と映る瞬間を、原因を問わずに数える。
+ * 10 tick ごとに生きている生き物の位置を見て、直近の4回（ゲーム内の3秒）の間ずっと歩く姿（act 1。2 tick ごとに見て各10 tick の8割以上。巣に捕まっている者と眠っている者を除く）で、
+ * 3秒前の位置から正味で8px（半タイル）も離れておらず、しかも止まっているか行ったり来たりしているなら「引っかかっている」とみなす（ゆっくり進んでいるだけのものは除く。下の判定）。
+ * 歩き方の癖で立ち止まる番（大ネズミやクモ、一行の先頭が見回す番など）は act 0 になるので入らない。
+ * 引っかかりが2回続けて途切れたら区間を閉じて1行書く（1回だけの途切れは同じ区間とみなす。往復で端点がたまたま離れた瞬間を分けないため）。
+ * 書くもの：t（区間を閉じた tick）、t0（引っかかり始めた tick＝3秒の窓の始まり）、dur（tick 数）、walked（区間の間に歩いた道のり px。正味の移動に比べて大きければ往復）、
+ * nopath（道が見つからないまま歩いていた割合）、near（始まったときに1.5タイル以内にいた、生きている他の生き物の数）、wall（始まったときのマスの周り8マスのうち歩けないマスの数）。
+ * 読むだけで展開は変えない。状態はセーブしないので、再開した直後の3秒は数え始めからやり直し、実行の終わりで続いている区間は書かない
+ */
+const HITCH_EVERY = 10;
+const HITCH_N = 4;
+const HITCH_D2 = 8 * 8;
+type HitchRec = { xs: number[]; ys: number[]; ok: boolean[]; ep: null | { t0: number; x: number; y: number; st: number; near: number; wall: number; last: number; miss: number; n: number; nopath: number; walked: number; px: number; py: number } };
+const hitchMap = new Map<number, HitchRec>();
+/** 直近の 10 tick の間に、生き物の更新ごとに見て歩く姿だった回数と、見た回数（watchHitch が読んで空にする） */
+const hitchWalk = new Map<number, [number, number]>();
+function watchWalk(): void {
+  for (const c of w.eco.list) {
+    if (c.dead || c.away) continue;
+    let a = hitchWalk.get(c.id);
+    if (!a) hitchWalk.set(c.id, (a = [0, 0]));
+    if (c.act === 1) a[0]++;
+    a[1]++;
+  }
+}
+function watchHitch(): unknown[] {
+  const e = w.eco;
+  const m = w.map;
+  const rows: unknown[] = [];
+  const seen = new Set<number>();
+  const close = (c: { k: number; id: number }, r: HitchRec) => {
+    const p = r.ep!;
+    rows.push({ t: w.tick, t0: p.t0, k: c.k, id: c.id, st: p.st, x: Math.round(p.x), y: Math.round(p.y), dur: p.last - p.t0, walked: Math.round(p.walked), nopath: +(p.nopath / p.n).toFixed(2), near: p.near, wall: p.wall });
+    r.ep = null;
+  };
+  for (const c of e.list) {
+    if (c.dead || c.away) continue;
+    seen.add(c.id);
+    let r = hitchMap.get(c.id);
+    if (!r) hitchMap.set(c.id, (r = { xs: [], ys: [], ok: [], ep: null }));
+    r.xs.push(c.x);
+    r.ys.push(c.y);
+    // 姿は、10 tick の間の生き物の更新ごと（2 tick ごと）に見て、8割以上が歩く姿なら歩いていたとみなす
+    // （10 tick ごとの瞬間だけを見ると、大ネズミの「止まっては走る」の止まる番のように、画面ではほとんど立ち止まっている者を拾ってしまう）
+    const wa = hitchWalk.get(c.id);
+    r.ok.push(!!wa && wa[0] >= wa[1] * 0.8 && !c.caught && !(c.sleep > 0));
+    if (r.xs.length > HITCH_N) {
+      r.xs.shift();
+      r.ys.shift();
+      r.ok.shift();
+    }
+    let hit = false;
+    if (r.xs.length === HITCH_N && r.ok.every(Boolean)) {
+      const net2 = (c.x - r.xs[0]) ** 2 + (c.y - r.ys[0]) ** 2;
+      if (net2 < HITCH_D2) {
+        // ゆっくり歩く種（マイコニドなど）や、ぶらつくときに歩みをゆるめる者は、3秒で8px 進まなくても、体は少しずつ前へ進んでいて引っかかって見えない。
+        // そこで、止まっている（3秒で、その種の歩く速さで進める道のりの3割も進んでいない）か、行ったり来たりしている
+        // （3秒の間に歩いた道のりが、正味の移動の2倍＋12px 以上ある）ときだけ引っかかりとみなす
+        const net = Math.sqrt(net2);
+        let path = 0;
+        for (let i = 1; i < HITCH_N; i++) path += Math.sqrt((r.xs[i] - r.xs[i - 1]) ** 2 + (r.ys[i] - r.ys[i - 1]) ** 2);
+        const expect = (HITCH_EVERY * (HITCH_N - 1)) / 2 * (SPEC[c.k]?.speed ?? 1);
+        hit = net < expect * 0.3 || path >= net * 2 + 12;
+      }
+    }
+    if (hit) {
+      if (!r.ep) {
+        let near = 0;
+        for (const o of e.list) if (o !== c && !o.dead && !o.away && (o.x - c.x) ** 2 + (o.y - c.y) ** 2 < 24 * 24) near++;
+        const tx = Math.floor(c.x / 16);
+        const ty = Math.floor(c.y / 16);
+        let wall = 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const x = tx + dx;
+          const y = ty + dy;
+          if (x < 0 || y < 0 || x >= m.w || y >= m.h || !e.passable(c, x * 16 + 8, y * 16 + 8)) wall++;
+        }
+        r.ep = { t0: w.tick - HITCH_EVERY * (HITCH_N - 1), x: c.x, y: c.y, st: c.st, near, wall, last: w.tick, miss: 0, n: 0, nopath: 0, walked: 0, px: c.x, py: c.y };
+      }
+      r.ep.last = w.tick;
+      r.ep.miss = 0;
+    } else if (r.ep && ++r.ep.miss >= 2) close(c, r);
+    if (r.ep) {
+      const p = r.ep;
+      p.n++;
+      const pp = e.paths.get(c.id) as { miss?: number } | undefined;
+      if (pp && (pp.miss ?? 0) > 0) p.nopath++;
+      p.walked += Math.sqrt((c.x - p.px) ** 2 + (c.y - p.py) ** 2);
+      p.px = c.x;
+      p.py = c.y;
+    }
+  }
+  hitchWalk.clear();
+  for (const [id, r] of hitchMap) {
+    if (seen.has(id)) continue;
+    // 死んだ・外へ出た：続いていた区間はそこで閉じる
+    if (r.ep) {
+      const c = e.list.find((o) => o.id === id);
+      if (c) close(c, r);
+    }
+    hitchMap.delete(id);
+  }
+  return rows;
+}
+
 function sample() {
   const e = w.eco;
   const m = w.map;
@@ -211,6 +320,7 @@ const target = meta.days * DAY_TICKS;
 const Q = DAY_TICKS / 4;
 let stopped = false;
 const stuckRows: unknown[] = [];
+const hitchRows: unknown[] = [];
 while (w.tick < target) {
   const traceId = meta.trace;
   // ゲーム内の 1/4 日の区切り（tick が Q の倍数）まで進める。再開しても同じ区切りで記録する
@@ -218,6 +328,8 @@ while (w.tick < target) {
   while (w.tick < until) {
     tick(w);
     if (w.tick % 20 === 0) stuckRows.push(...watchStuck());
+    if (w.tick % 2 === 0) watchWalk();
+    if (w.tick % HITCH_EVERY === 0) hitchRows.push(...watchHitch());
     if (traceId) {
       const c = w.eco.list.find((o) => o.id === traceId);
       if (c && w.tick % 2 === 0) append('trace', [{ t: w.tick, k: c.k, x: +c.x.toFixed(1), y: +c.y.toFixed(1), act: c.act, st: c.st, hp: +c.hp.toFixed(1), food: c.food, flee: c.flee, dead: c.dead }]);
@@ -232,6 +344,7 @@ while (w.tick < target) {
   append('events', w.eco.events.filter((ev) => ev.t > lastEventT));
   if (w.eco.events.length) lastEventT = Math.max(lastEventT, w.eco.events[w.eco.events.length - 1].t);
   append('stuck', stuckRows.splice(0));
+  append('hitch', hitchRows.splice(0));
   append('samples', [sample()]);
   if (w.tick % DAY_TICKS === 0) snapshot(JSON.stringify(encodeState(w)), w.tick / DAY_TICKS);
   process.stdout.write(`\r${(w.tick / DAY_TICKS).toFixed(2)}日目  生き物${w.eco.list.filter((c) => !c.dead).length}  ${((Date.now() - started) / 1000).toFixed(0)}秒   `);
