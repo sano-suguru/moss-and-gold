@@ -368,7 +368,7 @@ export function kobold(this: Ecology, c: Cr): void {
         if (this.w.dig(wr.target)) {
           wr.len++;
           // 入口側と切り離されていた住処が、いま掘ったマスで入口側とつながった
-          if (this.islandIds.has(wr.id) && this.warrenRegion(wr) === this.mainRegion) this.markJoined(wr.id, wr.x, wr.y, Kind.Kobold, 1);
+          if (this.islandIds.has(wr.id) && this.regionOf(this.tileOf(wr.x, wr.y)) === this.mainRegion) this.markJoined(wr.id, wr.x, wr.y, Kind.Kobold, 1);
           // 横穴を掘り込んでいるなら、住処の中心を奥へ移す
           if ((wr.dir ?? -1) >= 0 && wr.target === this.tunnelNext(wr)) {
             wr.tun = (wr.tun ?? 0) + 1;
@@ -385,7 +385,7 @@ export function kobold(this: Ecology, c: Cr): void {
     }
     c.act = 1;
     // 岩の手前の床まで行く
-    const fl = this.floorNear(wr.target, this.warrenRegion(wr));
+    const fl = this.floorNear(wr.target);
     if (fl >= 0) this.goTo(c, (fl % m.w) * TILE + 8, Math.floor(fl / m.w) * TILE + 8, s.speed);
     else wr.target = -1;
     return;
@@ -404,59 +404,10 @@ export function kobold(this: Ecology, c: Cr): void {
   }
 }
 
-/**
- * 岩 k の上下左右で、立って作業できる床（なければ -1）。閉じた空洞の床は選ばない。
- * reg を渡したら、その領域（つながった洞窟、islands.ts の regionOf）の床だけを選ぶ。
- * 以前は壁の向こうの別の領域の床や、閉じた空洞の中の床を返し、掘る係がたどり着けずに作業が止まっていた
- * （入口側と切り離された住処で、掘る先に何日も止まっていた。かしたれ・seed30）
- */
-export function floorNear(this: Ecology, k: number, reg = -2): number {
+export function floorNear(this: Ecology, k: number): number {
   const m = this.w.map;
-  for (const q of [k + m.w, k - m.w, k + 1, k - 1]) {
-    if (q < 0 || q >= m.solid.length || m.solid[q] || m.lava[q] || m.sealed[q]) continue;
-    if (reg !== -2 && this.regionOf(q) !== reg) continue;
-    return q;
-  }
+  for (const q of [k + m.w, k - m.w, k + 1, k - 1]) if (q >= 0 && q < m.solid.length && !m.solid[q] && !m.lava[q]) return q;
   return -1;
-}
-
-/** 住処のある領域（つながった洞窟の番号）。住処の中心のマスが岩なら入口のマスで見る */
-export function warrenRegion(this: Ecology, wr: Warren): number {
-  let r = this.regionOf(this.tileOf(wr.x, wr.y));
-  if (r < 0 && (wr.door ?? -1) >= 0) r = this.regionOf(wr.door as number);
-  return r;
-}
-
-/**
- * 入口側と切り離された住処（その領域が入口側の領域と別）の掘る先：住処の領域の床に上下左右で接する岩のうち、
- * 入口側のいちばん近いマス（mainPt）に最も近いもの。掘るたびに縁が入口側へ一歩進むので、トンネルがまっすぐ延びていく。
- * 以前は住処のまわりの決まった範囲から選んでいたので、範囲が狭いうちは島の中の柱や縁を掘り、外へ延びていかなかった
- */
-export function frontierRock(this: Ecology, reg: number, mainPt: number): number {
-  const m = this.w.map;
-  const mx = mainPt % m.w;
-  const my = Math.floor(mainPt / m.w);
-  let best = -1;
-  let bv = 1e9;
-  for (let k = 0; k < m.solid.length; k++) {
-    if (!m.solid[k]) continue;
-    const x = k % m.w;
-    const y = (k / m.w) | 0;
-    if (x < 3 || y < 3 || x >= m.w - 3 || y >= m.h - 3) continue;
-    let edge = false;
-    let lava = false;
-    for (const q of [k + 1, k - 1, k + m.w, k - m.w]) {
-      if (m.lava[q]) lava = true;
-      else if (!m.solid[q] && !m.sealed[q] && this.regionMap[q] === reg) edge = true;
-    }
-    if (!edge || lava) continue;
-    const v = Math.abs(x - mx) + Math.abs(y - my);
-    if (v < bv) {
-      bv = v;
-      best = k;
-    }
-  }
-  return best;
 }
 
 /** 横穴の次に掘るマス（掘り込んでいなければ -1） */
@@ -634,12 +585,6 @@ export function updateWarrens(this: Ecology): void {
     const lonely = members.length < 2 && this.w.tick - (wr.alone as number) > DAY_TICKS_ECO;
     const reason = (wr.raids ?? 0) >= 4 ? 1 : dragonNear ? 3 : lonely ? 2 : (wr.empty ?? -1) >= 0 && this.w.tick - (wr.empty as number) > DAY_TICKS_ECO && members.every((c) => c.hungry > 0 || c.food < 10) ? 0 : -1;
     if (reason >= 0 && wr.hide !== 1 && this.abandonWarren(wr, reason)) continue;
-    // 掘る先が風化や崩落で岩でなくなったら、すぐに捨てる（以前は、止まった時間が上限に達するまで持ち続けていた）
-    if (wr.target >= 0 && !m.solid[wr.target]) {
-      wr.target = -1;
-      wr.prog = 0;
-      wr.stall = 0;
-    }
     if (wr.target >= 0) {
       if (wr.prog === (wr.lastProg ?? 0)) wr.stall = (wr.stall ?? 0) + 50;
       else wr.stall = 0;
@@ -658,21 +603,7 @@ export function updateWarrens(this: Ecology): void {
         wr.prog = 0;
       } else wr.dir = -1;
     }
-    const island = this.onIsland(wr.x, wr.y);
-    if (wr.target < 0 && island && wr.len < 90) {
-      const hx = Math.floor(wr.x / TILE);
-      const hy = Math.floor(wr.y / TILE);
-      const mainPt = this.nearestMain(hx, hy);
-      const reg = this.warrenRegion(wr);
-      if (mainPt >= 0 && reg >= 0) {
-        const k = this.frontierRock(reg, mainPt);
-        if (k >= 0) {
-          wr.target = k;
-          wr.prog = 0;
-        }
-      }
-    }
-    if (wr.target < 0 && (wr.len < 30 || (island && wr.len < 90))) {
+    if (wr.target < 0 && (wr.len < 30 || (this.onIsland(wr.x, wr.y) && wr.len < 90))) {
       const hx = Math.floor(wr.x / TILE);
       const hy = Math.floor(wr.y / TILE);
       const R = 3 + (wr.len >> 1);
@@ -687,7 +618,7 @@ export function updateWarrens(this: Ecology): void {
         const y = hy + (((h >>> 8) & 255) % (2 * R + 1)) - R;
         if (x < 3 || y < 3 || x >= m.w - 3 || y >= m.h - 3) continue;
         const k = y * m.w + x;
-        if (!m.solid[k] || this.floorNear(k, this.warrenRegion(wr)) < 0) continue;
+        if (!m.solid[k] || this.floorNear(k) < 0) continue;
         // 溶岩には掘り当てない
         let lavaNear = false;
         for (const q of [k + 1, k - 1, k + m.w, k - m.w]) if (m.lava[q]) lavaNear = true;
@@ -944,8 +875,6 @@ declare module '../ecology' {
     warrenOf: typeof warrenOf;
     kobold: typeof kobold;
     floorNear: typeof floorNear;
-    warrenRegion: typeof warrenRegion;
-    frontierRock: typeof frontierRock;
     tunnelNext: typeof tunnelNext;
     storeGoal: typeof storeGoal;
     inWarrenTunnel: typeof inWarrenTunnel;
@@ -963,4 +892,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { pickWarren, walkDist, warrenFood, checkKoboldMouths, tunnelDir, newWarren, warrenMembers, isHidden, atDoorOf, warrenOf, kobold, floorNear, warrenRegion, frontierRock, tunnelNext, storeGoal, inWarrenTunnel, leaveWithGroup, exitCreature, abandonWarren, updateWarrens, farmTiles, farmFungus, koboldTransit, underground, placeTrap, checkTraps, watchWarrens });
+Object.assign(Ecology.prototype, { pickWarren, walkDist, warrenFood, checkKoboldMouths, tunnelDir, newWarren, warrenMembers, isHidden, atDoorOf, warrenOf, kobold, floorNear, tunnelNext, storeGoal, inWarrenTunnel, leaveWithGroup, exitCreature, abandonWarren, updateWarrens, farmTiles, farmFungus, koboldTransit, underground, placeTrap, checkTraps, watchWarrens });
