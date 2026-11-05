@@ -35,10 +35,28 @@ export function pickNest(this: Ecology): number {
   return best;
 }
 
-/** 巣へ戻って休むアリが、個体ごとに少しずつずれて集まる点（中心からのずれ。半径 r の円の上、個体の番号で決まる） */
-function antSpot(c: Cr, r: number): [number, number] {
+/**
+ * 起きて巣のそばで休むアリ：巣のまわりの輪の上の、個体ごとの居場所（巣から12〜30px。向きと距離は個体の番号で決まる）へ歩き、着いたらそこで休む。
+ * 居場所が壁の中や、巣と歩いてつながっていない所なら、巣の真ん中にする。
+ * （以前は巣へ戻って納めたその場、つまり巣の真ん中で休み始めたので、十数匹が一点に重なって山になって見えた）
+ */
+export function antRest(this: Ecology, c: Cr, col: Colony): void {
   const a = (c.id * 2.39996) % 6.2832;
-  return [Math.cos(a) * r, Math.sin(a) * r * 0.75];
+  const r = 12 + (c.id % 4) * 6;
+  let x = col.x + Math.cos(a) * r;
+  let y = col.y + Math.sin(a) * r * 0.75;
+  const k = this.tileOf(x, y);
+  const kc = this.tileOf(col.x, col.y);
+  if (k < 0 || kc < 0 || this.w.map.solid[k] || this.regionOf(k) !== this.regionOf(kc)) {
+    x = col.x;
+    y = col.y;
+  }
+  if (sq(x - c.x) + sq(y - c.y) <= 3 * 3) {
+    c.act = 0;
+    return;
+  }
+  c.act = 1;
+  if (this.goTo(c, x, y, SPEC[Kind.Ant].speed)) c.act = 0;
 }
 
 export function colonyOf(this: Ecology, c: Cr): Colony | undefined {
@@ -81,8 +99,7 @@ export function ant(this: Ecology, c: Cr): void {
   }
   // 蓄えが十分なら巣のそばで休む
   if (col.store > 120 && c.units === 0) {
-    c.act = sq(col.x - c.x) + sq(col.y - c.y) > 3 * TILE * 3 * TILE ? 1 : 0;
-    if (c.act === 1) this.goTo(c, col.x, col.y, s.speed);
+    this.antRest(c, col);
     return;
   }
   // 運ぶ物を探す：巣に近い死骸、なければキノコや苔
@@ -109,11 +126,7 @@ export function ant(this: Ecology, c: Cr): void {
       } else {
         // 運ぶ物が見つからなければ、巣のそばで休む（巣から3マスより遠ければ巣へ戻る。蓄えが十分なときと同じ）。
         // 以前は約3秒ごとに乱数で向きを選んで半分の速さでぶらつき、向きが戻るとほとんど進まずに足踏みして見えていた
-        c.act = sq(col.x - c.x) + sq(col.y - c.y) > 3 * TILE * 3 * TILE ? 1 : 0;
-        if (c.act === 1) {
-          const [ox, oy] = antSpot(c, 10);
-          this.goTo(c, col.x + ox, col.y + oy, s.speed);
-        }
+        this.antRest(c, col);
         return;
       }
     }
@@ -216,6 +229,7 @@ export function updateColonies(this: Ecology): void {
 
 declare module '../ecology' {
   interface Ecology {
+    antRest: typeof antRest;
     pickNest: typeof pickNest;
     colonyOf: typeof colonyOf;
     ant: typeof ant;
@@ -224,4 +238,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { pickNest, colonyOf, ant, findFungus, updateColonies });
+Object.assign(Ecology.prototype, { antRest, pickNest, colonyOf, ant, findFungus, updateColonies });
