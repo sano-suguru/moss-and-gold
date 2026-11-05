@@ -73,6 +73,24 @@ check(fnv(generate('かしたれ').solid) !== fnv(generate('abc').solid), '別�
   let vs = 0;
   for (let i = 0; i < 30; i++) if (gen('seed' + i).vaultCenter.x >= 0) vs++;
   check(vs >= 28, `30個のシードのうち ${vs} 個に宝物庫がある`);
+  // 壁から床へ1マスだけ突き出た岩（上下左右の岩が1つだけ）は、ほとんど作られない（部屋の柱と、入口・横穴の口のそばは除く）
+  let spurs = 0;
+  let spurMax = 0;
+  for (let i = 0; i < 30; i++) {
+    const m = gen('seed' + i);
+    let n = 0;
+    for (let y = 4; y < m.h - 4; y++)
+      for (let x = 4; x < m.w - 4; x++) {
+        const k = y * m.w + x;
+        if (!m.solid[k] || m.lava[k]) continue;
+        const nb = [k + 1, k - 1, k + m.w, k - m.w];
+        if (nb.filter((q) => m.solid[q]).length !== 1 || nb.some((q) => m.paved[q])) continue;
+        n++;
+      }
+    spurs += n;
+    spurMax = Math.max(spurMax, n);
+  }
+  check(spurMax <= 6, `30個のシードで、床へ1マスだけ突き出た岩は合計 ${spurs} マス（1つの地図で最大 ${spurMax}）`);
 }
 
 }
