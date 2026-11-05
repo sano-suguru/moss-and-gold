@@ -42,9 +42,12 @@ const RUN_A = { seeds: ['かしたれ', 'seed8', 'abc', 'seed7'], from: 10, to: 
 // #42 を取り込んだ main の10〜18日目では、甲冑が立ち上がるのは16シードの合計で8回だけ（seed23 2・seed7 2・かしたれ 1・seed4 1・seed30 1・seed41 1）で、
 // 以前の組（かしたれ・seed5・seed17・seed23・seed8・seed40）では3回になり項目が落ちた。立ち上がったシードの組にする
 // （取り込みは かしたれ 7・seed23 8・seed4 2・seed7 2、崩れるのは6回。どのシードもほかの項目で実行しているので、実行するシードは増えない）
+// コボルトを住処へ歩いて行ける口から入れたコード（#45 のあと）では、かしたれと seed30 の展開が変わり、16シードを0日目から通しで実行したときの10〜18日目は、
+// 立ち上がるのが seed40 2・seed4 1・seed41 1（main は かしたれ 1・seed30 1 も）、取り込みは seed4 2 だけ（main は かしたれ 3・seed4 2・seed30 1）、崩れるのは seed40 2・seed4 1。
+// 25日を通した回数は変わらない（立ち上がる 21→22、取り込み 32→30、崩れる 20→20）が、この8日の間ではまれなので、seed40 を足し、取り込みの目安を下げた
 // スケルトンが装備を拾わなくなった（骨は体の未練、鎧は道具の未練）コードでは、取り込みは かしたれ 8・seed5 3・seed30 1、崩れるのは seed5 3・seed40 2・かしたれ 1
-// （0日目から作業ツリーで実行した10〜18日目）。立ち上がる方の組を残したまま、seed5 と seed40 を足す
-const RUN_ARMOR = { seeds: ['かしたれ', 'seed23', 'seed7', 'seed4', 'seed30', 'seed41', 'seed5', 'seed40'], from: 10, to: 18 };
+// （0日目から作業ツリーで実行した10〜18日目）。seed5 も足す
+const RUN_ARMOR = { seeds: ['かしたれ', 'seed23', 'seed7', 'seed4', 'seed30', 'seed41', 'seed40', 'seed5'], from: 10, to: 18 };
 // 僧侶が亡骸の前で祈る場面は、冒険者の亡骸があり、そのそばを僧侶のいる一行が安全に通るときだけ起きる（16シード×25日で13シード・30回ほど）。
 // 0日目から作業ツリーで実行した10〜18日目では seed5 2・seed17 2・seed4 1・seed6 1・seed27 1・seed30 1。RUN_A の4シードでは0回だった
 const RUN_BLESS = { seeds: ['seed5', 'seed17', 'seed4', 'seed6', 'seed27', 'seed30'], from: 10, to: 18 };
@@ -98,12 +101,12 @@ export const CHECKS: Check[] = [
   },
   {
     // リビングアーマー：床の武器と盾を取り込み、倒れるかマナが尽きると武具が床に散らばる
-    name: 'リビングアーマーが武具を取り込み、崩れて散らばる（8シードで取り込み6回以上・取り込みのあったシード2つ以上・崩れる2回以上）',
+    name: 'リビングアーマーが武具を取り込み、崩れて散らばる（8シードで取り込み2回以上・崩れる2回以上）',
     ...RUN_ARMOR,
     test: (rs) => {
       const a = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'absorb').length);
       const f = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'fall').length);
-      return { ok: sum(a) >= 6 && a.filter((n) => n > 0).length >= 2 && sum(f) >= 2, value: rs.map((r, i) => `${r.seed} 取り込み${a[i]}・崩れる${f[i]}`).join('、') };
+      return { ok: sum(a) >= 2 && sum(f) >= 2, value: rs.map((r, i) => `${r.seed} 取り込み${a[i]}・崩れる${f[i]}`).join('、') };
     },
   },
   {
@@ -449,6 +452,63 @@ export const CHECKS: Check[] = [
         return { pools, left };
       });
       return { ok: sum(res.map((x) => x.pools)) >= 1 && sum(res.map((x) => x.left)) === 0, value: rs.map((r, i) => `${r.seed} 開いた溜まり${res[i].pools}・残った${res[i].left}`).join('、') };
+    },
+  },
+  {
+    // 歩いて行ける場所の判定（src/eco/islands.ts の regionOf）：溶岩も壁とみなす。溶岩の溜まりをはさんだ二つの開いた場所は、別の領域になる
+    // （溶岩を通れる床として扱っていたときは同じ領域になり、溶岩の向こうのコボルトの住処が島とみなされず、入口から来たコボルトが溶岩の手前で立ち往生した）。
+    // 18日目の地形（日次スナップショットの掘削のログを作業ツリーのコードで再生したもの）で、まわりの床が二つ以上の領域に分かれる溶岩の溜まりを数える。
+    // main の16シードの18日目では seed18・seed27・seed30 で1つずつあった
+    name: '溶岩の溜まりをはさんだ場所が別の領域になる（seed18・seed27・seed30 の合計で、場所を分ける溶岩の溜まりが2つ以上）',
+    seeds: ['seed18', 'seed27', 'seed30'],
+    from: 10,
+    to: 18,
+    test: (rs) => {
+      const n = rs.map((r) => {
+        const w = new World(r.seed);
+        for (const op of (r.state(r.to)?.digs ?? []) as number[]) (w as any).replayOp(op);
+        const m = w.map;
+        const seen = new Uint8Array(m.solid.length);
+        let pools = 0;
+        for (let s = 0; s < m.solid.length; s++) {
+          if (!m.lava[s] || seen[s]) continue;
+          const q = [s];
+          seen[s] = 1;
+          const regs = new Set<number>();
+          for (let i = 0; i < q.length; i++) {
+            const c = q[i];
+            for (const nb of [c + 1, c - 1, c + m.w, c - m.w]) {
+              if (m.solid[nb]) continue;
+              if (m.lava[nb]) {
+                if (!seen[nb]) {
+                  seen[nb] = 1;
+                  q.push(nb);
+                }
+              } else {
+                const g = w.eco.regionOf(nb);
+                if (g >= 0) regs.add(g);
+              }
+            }
+          }
+          if (regs.size >= 2) pools++;
+        }
+        return pools;
+      });
+      return { ok: sum(n) >= 2, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // コボルトが住処に加わりに来るとき（src/eco/arrivals.ts）は、その住処へ歩いて行ける地表の横穴からだけ入る（pickDoor の reach）。
+    // 歩いて行けない横穴から入ると、住処を目指してさまよい、飢えていた。main の10〜18日目では seed30 で23匹、かしたれで14匹が飢え死にした
+    // （#45 のあとの main。直したコードで0日目から通しで実行すると、この間の飢え死にはどちらも0匹。
+    // main の10日目から始めると、10日目より前に行けない住処へ加わっていた者が seed30 で5匹ほど飢える）
+    name: 'コボルトが行けない住処を目指して飢えない（seed30・かしたれ の10〜18日目で、コボルトの飢え死にが合計10匹以下。main は37匹）',
+    seeds: ['seed30', 'かしたれ'],
+    from: 10,
+    to: 18,
+    test: (rs) => {
+      const n = rs.map((r) => r.deaths.filter((x) => x.k === 10 && x.cause === 'starve').length);
+      return { ok: sum(n) <= 10, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },
 ];
