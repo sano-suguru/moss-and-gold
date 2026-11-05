@@ -55,6 +55,13 @@ export function ant(this: Ecology, c: Cr): void {
     this.tryMove(c, j[0] * s.speed * 0.6, j[1] * s.speed * 0.6);
     return;
   }
+  // 住みかの印（逃げるときに逃げ帰る先。src/eco/combat.ts の woundsAndFlight）を巣に合わせる。
+  // 巣を作りに来たアリは、生み出されたとき住みかの印が入ってきた地表の口のままだったので、傷を負うと巣ではなく
+  // ダンジョンの入口までマップを横切って逃げていた（abc・seed27 の12日目では、働きアリの8割ほど）。すでにずれているアリもここで直す
+  if (c.hx !== col.x || c.hy !== col.y) {
+    c.hx = col.x;
+    c.hy = col.y;
+  }
   // 腹が減ったら、運んでいる物を少し食べる。何もなければ巣に戻って蓄えを食べる
   if (c.hungry && c.units > 0 && c.food < 3) {
     const t = Math.min(c.units, s.cap - c.food);
