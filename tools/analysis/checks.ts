@@ -189,6 +189,15 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 亡骸を清める：僧侶のいる一行が、冒険者の亡骸の前で立ち止まって祈る（清められた亡骸は起き上がらない。src/eco/roster.ts の blessBrace）
+    name: '僧侶が冒険者の亡骸の前で祈って清める（4シードの合計で1回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'bless').length);
+      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
     // 戦利品を担いで帰る：目標を果たした一行が、倒した相手にちなむ戦利品を手に入れる
     name: '目標を果たした一行が戦利品を手に入れる（4シードで1回以上）',
     ...RUN_A,

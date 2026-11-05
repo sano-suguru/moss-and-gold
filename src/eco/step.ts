@@ -282,7 +282,7 @@ export function decay(this: Ecology, c: Cr): void {
       return;
     }
   }
-  if ((c.k === Kind.Rat || c.k === Kind.Lizard) && stage < 2 && c.actT > 500 && c.ref === 0 && c.st !== 99) {
+  if ((c.k === Kind.Rat || c.k === Kind.Lizard) && stage < 2 && c.actT > 500 && c.ref === 0) {
     const k = this.tileOf(c.x, c.y);
     const boost = this.step % 50 === c.id % 50 && this.lichNear(c.x, c.y);
     if (k >= 0 && this.lit(k, this.day) < 0.15 && this.manaAround(k) >= 10 && (this.w.moist[k] >= 70 || boost) && ih(c.id, this.step, 51) % (boost ? 8 : 800) === 0) {
