@@ -119,7 +119,7 @@ export class Renderer {
     const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false, premultipliedAlpha: false });
     if (!gl) throw new Error('この端末やブラウザではWebGL2が使えないため、ダンジョンを描けません。最新のブラウザで開いてください。');
     this.gl = gl;
-    this.light = program(gl, FS_LIGHT, '光', ['uMap', 'uGlow', 'uFx', 'uMapSize', 'uLmOrigin', 'uNum', 'uL', 'uC', 'uAmbient', 'uMossCol', 'uLavaCol', 'uNumD', 'uDL', 'uDCol']);
+    this.light = program(gl, FS_LIGHT, '光', ['uMap', 'uGlow', 'uFx', 'uMapSize', 'uLmOrigin', 'uNum', 'uL', 'uC', 'uAmbient', 'uMossCol', 'uLavaCol', 'uNumD', 'uDL', 'uDCol', 'uTime']);
     this.sprite = program(gl, FS_SPRITE, '生き物', ['uOrigin', 'uArtSize', 'uAtlas', 'uLight', 'uLmOrigin', 'uLmSize', 'uTime'], VS_SPRITE);
     this.shadow = program(gl, FS_SHADOW, '影', ['uOrigin', 'uArtSize', 'uLight', 'uLmOrigin', 'uLmSize'], VS_SHADOW);
     this.atlasTex = makeTex(gl, gl.NEAREST);
@@ -360,10 +360,11 @@ export class Renderer {
     gl.uniform1i(u.uFx, 4);
     const gk = 255 / GLOW_SCALE;
     gl.uniform3f(u.uMossCol, 0.42 * 0.5 * gk, 0.98 * 0.5 * gk, 0.82 * 0.5 * gk);
-    gl.uniform3f(u.uLavaCol, 1.0 * 1.25 * gk, 0.45 * 1.25 * gk, 0.15 * 1.25 * gk);
+    gl.uniform3f(u.uLavaCol, 1.0 * 1.05 * gk, 0.47 * 1.05 * gk, 0.16 * 1.05 * gk);
     gl.uniform1i(u.uNumD, Math.min(MAX_DYN, f.nDyn));
     gl.uniform4fv(u.uDL, f.dyn);
     gl.uniform3f(u.uDCol, 0.66, 0.86, 1.0);
+    gl.uniform1f(u.uTime, f.time);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     // 2. 場面
