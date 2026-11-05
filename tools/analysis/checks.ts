@@ -35,9 +35,10 @@ export interface Check {
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 const RUN_A = { seeds: ['かしたれ', 'seed8', 'abc', 'seed7'], from: 10, to: 18 };
 /** オークの取り立て：縄張りが長く続くシード（オークのいる日数が上限1でも2でも16日ほど） */
-// リビングアーマーは、冒険者が倒れて武具の溜まった所でしか生まれず、どのシードで起きるかが版ごとに入れ替わる
-// （main の 16シード×25日で、10〜18日目の取り込みは abc・seed4・seed23 などの数シードに偏っていた）。1シードの展開で項目が揺れないよう、出やすいシードを広く並べる
-const RUN_ARMOR = { seeds: ['abc', 'seed4', 'seed23', 'seed5', 'かしたれ', 'はじまりの洞窟'], from: 10, to: 18 };
+// リビングアーマーは、冒険者が倒れて武具の溜まった所でしか生まれず、どのシードで起きるかが版ごとに入れ替わる。1シードの展開で項目が揺れないよう、出やすいシードを広く並べる。
+// 迷路をなくした（#41）main の10〜18日目の取り込みは かしたれ 24・seed23 20・seed5 5・seed17 3・seed40 1、
+// 炎を傷に変えたコード（#42。冒険者の倒れる数が減った）では かしたれ 16・seed5 14・seed17 8・seed8 5。どちらでも複数のシードで起きる組み合わせにする
+const RUN_ARMOR = { seeds: ['かしたれ', 'seed5', 'seed17', 'seed23', 'seed8', 'seed40'], from: 10, to: 18 };
 const RUN_ORC = { seeds: ['かしたれ', 'seed27'], from: 10, to: 18 };
 // オークの取り立ては、従う集落に蓄えがたまったときだけ起きるまれな出来事（16シード×25日で約25回、起きるのは6シードほど）。
 // いまのコードで10〜18日目に起きているシードを選ぶ。焚き火の夜襲の二歩目（#29）のコードで、
@@ -59,22 +60,41 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // ヴァンパイア（src/eco/vampire.ts、src/eco/bat.ts）：日暮れにコウモリを呼び寄せ、コウモリに群がられて足止めされた獲物に打ちかかる
+    name: 'ヴァンパイアが日暮れにコウモリを呼び寄せ、コウモリに群がられた獲物に打ちかかる（4シードで呼び寄せ1回・足止め2回以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const ca = rs.map((r) => r.settle.filter((x) => x.k === 19 && x.ev === 'callBats').length);
+      const pin = rs.map((r) => r.settle.filter((x) => x.k === 19 && x.ev === 'pin').length);
+      return { ok: sum(ca) >= 1 && sum(pin) >= 2, value: rs.map((r, i) => `${r.seed} 呼び寄せ${ca[i]}・足止め${pin[i]}`).join('、') };
+    },
+  },
+  {
+    // ヴァンパイア（src/eco/vampire.ts の vampRaiseFallen）：倒れた冒険者の亡骸にかがみ込み、眷属として起き上がらせる
+    name: '倒れた冒険者がヴァンパイアの眷属として起き上がる（4シードで1体以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.births.filter((x) => x.k === 30 && x.from === 25).length);
+      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
     // リビングアーマー（src/eco/armor.ts）：倒れた冒険者の武具に未練が宿り、溜まり場で甲冑が立ち上がる
-    name: 'リビングアーマーが武具の溜まり場から立ち上がる（6シードで2回以上）',
+    name: 'リビングアーマーが武具の溜まり場から立ち上がる（6シードで4回以上）',
     ...RUN_ARMOR,
     test: (rs) => {
       const n = rs.map((r) => r.births.filter((x) => x.k === 29 && x.origin === 'gear').length);
-      return { ok: sum(n) >= 2, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+      return { ok: sum(n) >= 4, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },
   {
     // リビングアーマー：床の武器と盾を取り込み、倒れるかマナが尽きると武具が床に散らばる
-    name: 'リビングアーマーが武具を取り込み、崩れて散らばる（6シードで取り込み3回・崩れる1回以上）',
+    name: 'リビングアーマーが武具を取り込み、崩れて散らばる（6シードで取り込み6回以上・取り込みのあったシード2つ以上・崩れる2回以上）',
     ...RUN_ARMOR,
     test: (rs) => {
       const a = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'absorb').length);
       const f = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'fall').length);
-      return { ok: sum(a) >= 3 && sum(f) >= 1, value: rs.map((r, i) => `${r.seed} 取り込み${a[i]}・崩れる${f[i]}`).join('、') };
+      return { ok: sum(a) >= 6 && a.filter((n) => n > 0).length >= 2 && sum(f) >= 2, value: rs.map((r, i) => `${r.seed} 取り込み${a[i]}・崩れる${f[i]}`).join('、') };
     },
   },
   {
@@ -334,17 +354,18 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 若い竜の炎は口元から燃え始め（以前は口元から2.8マスに火がつかず、すぐそばの獲物へ吐き続けても焼けなかった）、
-    // 飛んでいるコウモリなども、吐いている炎そのものに当たれば焼ける（以前は飛んでいれば焼けなかった）。
-    // #31 の main の10日目から続けると seed4 は 14〜17日目に若い竜がいる。狩りを打ち合いにした後（0日目から）は seed4 では起きず、seed7・seed23 で起きる。どちらのスナップショットから始めても通るよう、3シードの合計で見る
-    name: 'ドラゴンの炎で飛ぶ者（コウモリ・ワイバーン・ウィスプ）が焼ける（seed4・seed7・seed23 の合計で1回以上）',
-    seeds: ['seed4', 'seed7', 'seed23'],
+    // ドラゴンの炎（src/eco/fire.ts）：口元から細い扇で吐き、扇の中と燃える床で焼かれた者が倒れる。
+    // 以前は飛ぶ者（コウモリ・ワイバーン・ウィスプ）が炎に当たると即死していたのでそれを見ていたが、炎を口元から細い扇で吐くようにしたあと（#42）、
+    // 迷路をなくした（#41）main の10日目から続けると、飛ぶ者が焼けるのは16シードで seed7 の3回だけになった。焼け死ぬ者すべてで見る。
+    // main（abc 41・seed7 22・seed41 42・seed4 37）でも、細い扇のコード（abc 7・seed7 7・seed41 12・seed4 1）でも起きるシードを並べる
+    name: 'ドラゴンの炎で焼け死ぬ（abc・seed7・seed41・seed4 の合計で3回以上・焼け死んだシード2つ以上）',
+    seeds: ['abc', 'seed7', 'seed41', 'seed4'],
     from: 10,
     to: 18,
     test: (rs) => {
       const all = rs.map((r) => r.deaths.filter((x) => x.cause === 'burned' && x.by === 24));
       const fly = all.map((a) => a.filter((x) => x.k === 1 || x.k === 23 || x.k === 0).length);
-      return { ok: sum(fly) >= 1, value: rs.map((r, i) => `${r.seed} 炎で死んだ${all[i].length}（うち飛ぶ者${fly[i]}）`).join('、') };
+      return { ok: sum(all.map((a) => a.length)) >= 3 && all.filter((a) => a.length > 0).length >= 2, value: rs.map((r, i) => `${r.seed} 炎で死んだ${all[i].length}（うち飛ぶ者${fly[i]}）`).join('、') };
     },
   },
   {

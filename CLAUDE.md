@@ -47,7 +47,8 @@ npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 
 ## コマンドと分析の流れ
 
 分析ツールはすべて `node tools/analysis/launch.mjs <ツール名>` から起動する（npm run も同じ）。**各ツールの使い方は、そのファイルの先頭のコメント**（tools/analysis/*.ts）にある。
-実行結果と日次スナップショットは、シミュレーションのソースのハッシュごとのキャッシュ `runs/.cache/` に残り、ソースとシードが同じならどのツールからも再利用される（しくみは docs/rework-tools.md。大きくなったら消してよい）。クラウドのセッションでは、SessionStart フックが main のキャッシュを GitHub Release「sim-cache」からバックグラウンドで取得する（ログは runs/.cache/fetched/log.txt。マージ直後で Actions が終わっていなければ取得できないので、手元で実行される）。
+実行結果と日次スナップショットは、シミュレーションのソースのハッシュごとのキャッシュ `runs/.cache/` に残り、ソースとシードが同じならどのツールからも再利用される（しくみは docs/rework-tools.md。大きくなったら消してよい）。クラウドのセッションでは、SessionStart フックが main のキャッシュを GitHub Release「sim-cache」からバックグラウンドで取得する（ログは runs/.cache/fetched/log.txt）。
+- **main のキャッシュは手元で作らずに待つ**：マージ直後で Release に無ければ、Actions の simcache の実行が終わるのを待つ（数分で終わる。手元の4コアで16シード×25日を流すとずっと長くかかり、できるものは中身のハッシュで決まるので同じ）。ログの「Release にまだない」はフックが動いた時点の話なので、Actions の実行の状態を見て、終わっていたら `node tools/analysis/simcache.mjs fetch --ref origin/main` で取得し直す。
 
 ```bash
 npm install                       # 初回のみ（クラウドのセッションでは SessionStart フックが入れる）
@@ -58,6 +59,7 @@ npm run build                     # dist/index.html（外部依存なしの1フ�
 
 通常の作業の流れ：
 
+0. main と比べる前に、`git fetch origin main` で main を最新にし、作業ブランチに最新の main が入っているかを確かめる（`git merge-base --is-ancestor origin/main HEAD`。入っていなければ取り込む）。ずれていると、ほかの PR の変更まで差に混ざり、main のキャッシュも使われず、CI の check（main の10日目から）とも結果が合わない。
 1. 変更したら `npm test` と `npm run check`。check は、固定のスナップショットから実行して、新しい挙動が実際に起きるかを確かめる短いテスト（約1分。項目は tools/analysis/checks.ts）。新しい挙動を足したら、その項目を checks.ts に足す。項目に使うシードは、その挙動がどの版でも複数のシードで起きるものを選ぶ（1シードの出来事だけで決まる項目は、ほかの変更で展開が分かれただけで落ちる）。
 2. `npm run ab -- --preset quick`：8シードについて、HEAD の10日目のスナップショットから、HEAD と作業ツリーのそれぞれで18日目まで実行し、同じシード同士で比べる（結果は `runs/ab-quick-<日時>/compare.md`）。**判定が「はっきり」の行だけを効果とみなす**。「ばらつきの内」は、シードごとの展開のばらつきで説明できる程度の差という意味。1シードの出来事に引っ張られていないか「1シードの寄与」の列も見る。1シードだけでは効果は判断できない。
    「はっきり」は差があるという意味で、問題があるという意味ではない。差が問題かどうかは、下の「差が問題かどうかの見分け方」で判断し、その判断を PR の説明に書く。

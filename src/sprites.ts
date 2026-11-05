@@ -2228,6 +2228,20 @@ function dust(f){
 }
 
 
+// ===== ヴァンパイアの黒い霧（コウモリにばらける瞬間と、姿を戻す瞬間） =====
+/** f は広がって薄れていく段（0〜3）。暗い紫の、裂けた縁の霧に、裏地と同じ赤の粒が少し混じる */
+function vampMist(f){
+ const q=mod(f,4),W=22,H=16,P=[];
+ const r=[4.5,6.5,8.2,9.4][q];
+ P.push(E(11,9,r,r*0.7,'cape',{flat:[4,4,3,2][q]}));
+ const fr=raster(W,H,P);
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=y*W+x;if(!fr.px[p*4+3])continue;const d=Math.hypot(x-11,(y-9)/0.7)/r;if(hz(x,y,q+70)<q*0.2+d*0.4)fr.px[p*4+3]=0}
+ // 赤い粒（裏地の色）
+ const red=RAMP.capeR[3-q>0?3-q:0];
+ for(let i=0;i<4-q;i++){const x=Math.round(11+Math.cos(i*2.3+q)*r*0.6),y=Math.round(9+Math.sin(i*2.3+q)*r*0.4);setPx(fr,x,y,red,q<2)}
+ return {...fr,ax:11,ay:13};
+}
+
 // ===== 段階7c：ドワーフと、その住みか =====
 const LAMP=[[255,246,200],[255,222,140],[240,180,90]];
 const BEARDS={miner:'dbeard',smith:'dbeardK',warrior:'dbeardW'};
@@ -3284,4 +3298,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

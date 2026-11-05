@@ -914,6 +914,10 @@ export class Ecology {
   /** 引き裂かれた巣の演出の記録（描画専用。破れた巣が垂れて消え、糸くずが舞う） */
   fxWebTears: { t: number; x: number; y: number; r: number }[] = [];
   fxEats: { t: number; id: number; k: number; sp: number; by: number; bk: number; x: number; y: number; slain: boolean }[] = [];
+  /** ヴァンパイアがコウモリにばらけた瞬間（how 0）と、姿を戻した瞬間（how 1）の黒い霧の演出（描画専用。シミュレーションの判断に使わない。セーブには、映像のために直前の4秒分だけ残す） */
+  fxVampMist: { t: number; x: number; y: number; how: number }[] = [];
+  /** 炎に焼かれた瞬間（描画専用：焼かれた者に小さな炎がまとわりつく。シミュレーションの判断に使わない。セーブには、映像のために直前の4秒分だけ残す。src/eco/fire.ts の burnHurt） */
+  fxBurns: { t: number; id: number }[] = [];
   /** 大ネズミの巣穴の引っ越し（描画専用：列の先頭が新しい巣穴に着くまで、古い場所に穴を描く。判断に使わない） */
   fxMarch: { t: number; x: number; y: number; tx: number; ty: number }[] = [];
   noticed = new Map<number, number>();

@@ -93,6 +93,8 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
   // 獲物を決めたら（c.ref に獲物の番号）、コウモリはまずその上を旋回し、ヴァンパイアが近づくと獲物に群がって足止めする（batPinned）
   // 夜明け前（1日の 0.1〜0.2）には狩りをやめて住処へ帰りはじめる（夜が明けると、帰り道の明るい所の手前で動けなくなり、そこで冒険者に見つかっていた）
   const predawn = this.phaseNow >= 0.1 && this.phaseNow < 0.2;
+  // 冒険者の亡骸があれば、腹の減り方にかかわらず、そこへ歩いてかがみ込み、眷属として起き上がらせる（獲物を追っている途中は除く。vampRaiseFallen）
+  if (!predawn && !c.ref && this.vampRaiseFallen(c, day)) return;
   if (c.food < s.cap * HUNT_BELOW && !predawn) {
     // 眷属を連れている間は、強い獲物（オーク、ドワーフ）も狙う
     let thr = -1;
@@ -109,8 +111,18 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       // 大ネズミは、飢えが進んでから（3割を超えてから）狙う。小さな獲物ばかり狩って、大ネズミが絶える日が増えていた
       if (o.k === Kind.Rat && c.sinceMeal < s.starve * 0.3) return false;
       if (lightAt(this.tileOf(o.x, o.y)) > 60) return false;
-      // 火の明かりの中の獲物は狙わない。冒険者の焚き火は、細るのを待つ（src/eco/night.ts の campFire）
-      return !(this.fireNear(o.x, o.y) && !this.weakCampAt(o.x, o.y));
+      // 火（松明、焚き火、かがり火）の明かりの輪の3マス外までにいる獲物は狙わない。冒険者の焚き火は、細るのを待つ（src/eco/night.ts の campFire）。
+      // ヴァンパイアは明かりの輪の2マス外までに入ると火から離れて獲物をあきらめるので、以前は、ゴブリンの集落の焚き火のそばの獲物を選んでは
+      // 近づく途中で追い返され、それを繰り返して、シードによっては25日で数匹しか仕留められなかった
+      for (const f of this.fires()) if (sq(o.x - f[0]) + sq(o.y - f[1]) < sq(f[2] + 3 * TILE) && !this.weakCampAt(f[0], f[1])) return false;
+      // 起きている冒険者のそば（7マス以内）にいる、冒険者でない獲物は狙わない。ヴァンパイアは起きている冒険者に近づくと退いて獲物をあきらめるので、
+      // 以前は、冒険者の近くのゴブリンなどを選んでは退くのを繰り返していた（冒険者そのものは、退いても隙をうかがって狙い続ける）
+      if (o.k === Kind.Adventurer) return true;
+      let awake = false;
+      this.nearby(o.x, o.y, 8, (a) => {
+        if (!awake && a !== o && a.k === Kind.Adventurer && !a.dead && !a.away && a.sleep === 0 && sq(a.x - o.x) + sq(a.y - o.y) < sq(7 * TILE)) awake = true;
+      });
+      return !awake;
     };
     // 獲物を決めた（またはあきらめた）step を lure に持つ。決めてから生き物の更新240回たっても仕留められなければあきらめ、
     // そのあと60回は次の獲物を探さない（明るい所の手前で待ち続けて、コウモリに群がられた獲物がいつまでも足止めされていた）
@@ -182,9 +194,11 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
     if (this.step % 50 === c.id % 50 || !c.tx) {
       let bd = 1e18;
       c.tx = 0;
+      // 遠出は住処から45マス以内の獲物まで（遠くへ行くほど、夜明けまでに帰れなくなる）。飢えが進むほど遠くまで行く（最後に食べてから
+      // 飢え死にまでの4割で80マスまで）。住処の近くに獲物がいないマップでは、狩りに出られないまま飢えて去っていた
+      const far = 45 + 35 * Math.min(1, c.sinceMeal / (s.starve * 0.4));
       for (const o of this.list) {
-        // 遠出は住処から45マス以内の獲物まで（遠くへ行くほど、夜明けまでに帰れなくなる）
-        if (!ok(o) || sq(o.x - c.hx) + sq(o.y - c.hy) > sq(45 * TILE)) continue;
+        if (sq(o.x - c.hx) + sq(o.y - c.hy) > sq(far * TILE) || !ok(o)) continue;
         const d = sq(o.x - c.x) + sq(o.y - c.y);
         if (d < bd) {
           bd = d;
@@ -251,6 +265,7 @@ export function vampScatter(this: Ecology, c: Cr): void {
   c.feed = 0;
   c.act = 1;
   this.paths.delete(c.id);
+  this.vampMistFx(c.x, c.y, 0);
   this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'scatter', id: c.id, x: Math.round(c.x), y: Math.round(c.y) } as never);
   this.log(c.x, c.y, `追い詰められた{k:${Kind.Vampire}}が、コウモリの群れにばらけて飛び去った`);
 }
@@ -267,8 +282,15 @@ export function vampFly(this: Ecology, c: Cr): void {
     c.hp = Math.max(c.hp, this.maxHp(c) * 0.5);
     c.act = 0;
     this.paths.delete(c.id);
+    this.vampMistFx(c.x, c.y, 1);
     this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'reform', id: c.id, x: Math.round(c.x), y: Math.round(c.y) } as never);
   }
+}
+
+/** 黒い霧の演出を残す（描画専用。src/creatureView.ts） */
+export function vampMistFx(this: Ecology, x: number, y: number, how: number): void {
+  this.fxVampMist.push({ t: this.w.tick, x, y, how });
+  if (this.fxVampMist.length > 12) this.fxVampMist.splice(0, 4);
 }
 
 /**
@@ -294,6 +316,7 @@ export function vampCoffin(this: Ecology, c: Cr): boolean {
     c.away = false;
     c.sleep = 0;
     c.act = 0;
+    if (!opener) this.vampCallBats(c);
     if (opener) {
       const o = opener as Cr;
       c.foe = o.id;
@@ -317,6 +340,171 @@ export function vampCoffin(this: Ecology, c: Cr): boolean {
     return true;
   }
   return false;
+}
+
+/** 倒れた冒険者の亡骸を探す遠さ（住処からのマス） */
+const RAISE_R = 70;
+
+/**
+ * 倒れた冒険者を眷属にする：夜、住処から70マス以内の歩いて行ける所に、骨になる前の冒険者の亡骸があれば、いちばん近いものへ歩いて行き、
+ * かがみ込んで血を短く吸い、眷属として起き上がる印を付ける（src/eco/thrall.ts の vampClaim。少しして起き上がる）。
+ * ヴァンパイア自身が倒した者でなくてよい（冒険者を倒す数を増やさずに、倒れた冒険者が眷属になる場面を見せる。以前は25日で6シードほどだった）。
+ * 冒険者が倒れるのは、ヴァンパイアのいない間や、昼（棺で眠っている間）、住処から遠い所が多いので、倒れてからの長さでは絞らず（骨になる前なら選ぶ）、
+ * 遠さは住処から70マス以内と、遠出（45マス）より広くとる（住処から45マス・倒れて半日以内に絞ると25日で5回ほどだった。
+ * 遠さの上限をなくすと、遠くの亡骸へ歩く間に狩りをしなくなり、コウモリの足止めが減った）。獲物を追っている途中は向かわない。
+ * 明かりの中の亡骸、僧侶に清められた亡骸、骨になった亡骸（残りの養分が30未満も含む）、もう印の付いた亡骸、住処から歩いて行けない所の亡骸、
+ * 起きている冒険者がそばにいる亡骸は選ばない。目当ての亡骸の番号は ref2 に持つ。
+ * true なら、この回は亡骸へ向かったか印を付けた
+ */
+export function vampRaiseFallen(this: Ecology, c: Cr, day: number): boolean {
+  const s = SPEC[Kind.Vampire];
+  const ok = (o: Cr) => {
+    if (o.k !== Kind.Adventurer || o.dead !== 1 || o.st === 99 || o.units < 30 || this.corpseStage(o) === 2) return false;
+    if (o.lure && this.byId.get(o.lure)?.k === Kind.Vampire) return false;
+    const q = this.tileOf(o.x, o.y);
+    if (q < 0 || this.w.lightBase[q] * day + this.w.lavaGlow[q] * 1500 > 60) return false;
+    if (this.fireNear(o.x, o.y) && !this.weakCampAt(o.x, o.y)) return false;
+    if (sq(o.x - c.hx) + sq(o.y - c.hy) > sq(RAISE_R * TILE)) return false;
+    // 住処から歩いて行けない所の亡骸は選ばない（閉じた空洞や水の向こうの亡骸を目当てにして、着けないまま立ち尽くしていた）
+    const home = this.tileOf(c.hx, c.hy);
+    if (home < 0 || this.regionOf(q) !== this.regionOf(home)) return false;
+    // 起きている冒険者がそば（7マス以内）にいる亡骸は、去るまで待つ（近づくと退くので、行っては戻るのを繰り返していた）
+    let awake = false;
+    this.nearby(o.x, o.y, 8, (a) => {
+      if (!awake && a.k === Kind.Adventurer && !a.dead && !a.away && a.sleep === 0 && sq(a.x - o.x) + sq(a.y - o.y) < sq(7 * TILE)) awake = true;
+    });
+    return !awake && this.thrallRoomForAdv(c, o);
+  };
+  let d = c.ref2 ? this.byId.get(c.ref2) : undefined;
+  if (d && !ok(d)) d = undefined;
+  if (!d) c.ref2 = 0;
+  if (!d && this.step % 10 === c.id % 10) {
+    let bd = 1e18;
+    for (const o of this.list) {
+      if (!ok(o)) continue;
+      const dd = sq(o.x - c.x) + sq(o.y - c.y);
+      if (dd < bd) {
+        bd = dd;
+        d = o;
+      }
+    }
+    if (d) c.ref2 = d.id;
+  }
+  if (!d) return false;
+  c.ref = 0;
+  c.act = 1;
+  if (sq(d.x - c.x) + sq(d.y - c.y) < 11 * 11) {
+    c.ref2 = 0;
+    if (this.vampClaim(c, d)) {
+      // 血を短く吸う（src/eco/senses.ts の feeding。印を付けた亡骸からは生き物の更新15回で離れる）
+      c.feed = d.id;
+      c.act = 2;
+      c.actT = 0;
+      c.dir = Math.abs(d.x - c.x) > Math.abs(d.y - c.y) ? (d.x > c.x ? 2 : 3) : d.y > c.y ? 0 : 1;
+      this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'raiseFallen', id: c.id, n: d.sp, x: Math.round(d.x), y: Math.round(d.y) } as never);
+      this.log(d.x, d.y, `{k:${Kind.Vampire}}が、倒れた冒険者の亡骸にかがみ込んだ`);
+    }
+    return true;
+  }
+  const x0 = c.x;
+  const y0 = c.y;
+  this.goTo(c, d.x, d.y, s.speed * 1.1);
+  // 明るい所へは踏み込まない（手前で待つ）
+  const k = this.tileOf(c.x, c.y);
+  if (k >= 0 && this.w.lightBase[k] * day > 60) {
+    c.x = x0;
+    c.y = y0;
+    c.act = 0;
+  }
+  return true;
+}
+
+/** 日暮れに呼び寄せるコウモリの数の上限（従うコウモリと合わせて）と、呼び寄せる遠さ（住処からのマス） */
+const CALL_BATS = 5;
+const CALL_R = 40;
+/** コウモリの状態（st）：ヴァンパイアに呼ばれ、閉じた空洞のねぐらから縦穴で外へ出て、入口か縦穴から入り直すところ（その間は away） */
+export const BAT_CALLED = 5;
+/** 呼ばれたコウモリが外を回って入り直すまで（生き物の更新の回数） */
+const CALL_OUTSIDE = 60;
+
+/**
+ * 日暮れに棺から出たヴァンパイアが、従うコウモリが5匹に満たなければ、住処から40マス以内の、まだ誰にも従っていないコウモリを、
+ * 近い順に5匹になるまで呼び寄せる。住処と飛んでつながった所にいるコウモリは、そのまま住処へ飛んでくる。
+ * 閉じた空洞のねぐらにいるコウモリ（多くのねぐらは縦穴の下の閉じた空洞にある）は、縦穴から外へ出て、住処とつながった入口か縦穴から入り直し、
+ * そこから住処へ飛んでくる（batCalled）。従うコウモリは、飢えやクモの巣、ワイバーンで減っていき、以前は数日で1匹もいなくなっていた
+ */
+export function vampCallBats(this: Ecology, c: Cr): void {
+  let fol = 0;
+  for (const b of this.list) if (b.k === Kind.Bat && !b.dead && b.ref2 === c.id) fol++;
+  if (fol >= CALL_BATS) return;
+  const home = this.tileOf(c.hx, c.hy);
+  const reg = home >= 0 ? this.regionOf(home) : -1;
+  if (reg < 0) return;
+  const cand: [number, Cr][] = [];
+  for (const b of this.list) {
+    if (b.k !== Kind.Bat || b.dead || b.away || b.caught || b.ref2) continue;
+    const d2 = sq(b.x - c.hx) + sq(b.y - c.hy);
+    if (d2 <= sq(CALL_R * TILE)) cand.push([d2, b]);
+  }
+  cand.sort((a, b) => a[0] - b[0] || a[1].id - b[1].id);
+  let n = 0;
+  let out = 0;
+  for (const [, b] of cand) {
+    if (fol + n >= CALL_BATS) break;
+    b.ref2 = c.id;
+    b.ref = 0;
+    n++;
+    // ねぐらでぶら下がるコウモリは天井ぎわ（壁のマス）にいることがあるので、ねぐらの場所（tx, ty）でも見る
+    const k = this.tileOf(b.x, b.y);
+    const kr = this.tileOf(b.tx, b.ty);
+    if ((k >= 0 && this.regionOf(k) === reg) || (kr >= 0 && this.regionOf(kr) === reg)) b.st = 1;
+    else {
+      b.st = BAT_CALLED;
+      b.away = true;
+      b.lureAt = this.step;
+      out++;
+    }
+  }
+  // 分析用：日暮れにコウモリを呼び寄せた（out は外を回って来る数）
+  if (n) this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'callBats', id: c.id, n, out, x: Math.round(c.x), y: Math.round(c.y) } as never);
+}
+
+/**
+ * 呼ばれて外を回るコウモリ（st が BAT_CALLED）：生き物の更新60回たったら、主の住処とつながった入口か縦穴のうち、住処にいちばん近い所から入り直す
+ * （そこからは従うコウモリとして住処へ飛ぶ）。主がもういなければ、元のねぐらへ戻る
+ */
+export function batCalled(this: Ecology, c: Cr): void {
+  const lord = this.byId.get(c.ref2);
+  if (!lord || lord.dead || lord.k !== Kind.Vampire) {
+    c.ref2 = 0;
+    c.st = 0;
+    c.away = false;
+    c.x = c.px = c.tx;
+    c.y = c.py = c.ty;
+    return;
+  }
+  if (this.step - c.lureAt < CALL_OUTSIDE) return;
+  const m = this.w.map;
+  const home = this.tileOf(lord.hx, lord.hy);
+  const reg = home >= 0 ? this.regionOf(home) : -1;
+  const ops: [number, number][] = [[m.entrance.x, 1], ...m.shafts.map((sh) => [sh.x, sh.y] as [number, number])];
+  let best: [number, number] | null = null;
+  let bd = 1e18;
+  for (const [x, y] of ops) {
+    const k = y * m.w + x;
+    if (k < 0 || k >= m.solid.length || this.regionOf(k) !== reg) continue;
+    const d = sq(x * TILE + 8 - lord.hx) + sq(y * TILE + 8 - lord.hy);
+    if (d < bd) {
+      bd = d;
+      best = [x, y];
+    }
+  }
+  const [ox, oy] = best ?? [m.entrance.x, 1];
+  c.x = c.px = ox * TILE + 8;
+  c.y = c.py = oy * TILE + 8;
+  c.away = false;
+  c.st = 1;
+  this.paths.delete(c.id);
 }
 
 /**
@@ -347,15 +535,19 @@ export function vampLair(this: Ecology, tx: number, ty: number): number {
   return best;
 }
 
+/** コウモリが獲物に群がって足止めしはじめる、ヴァンパイアと獲物の近さ（マス。以前は6マスで、ヴァンパイアが近づく前に獲物が逃げることが多かった） */
+export const PIN_R = 8;
+
 /** いま獲物を決めているヴァンパイアの番号（生き物の更新ごとに、その回で最初に聞かれたときに探す。セーブしない） */
 const lordCache = new WeakMap<Ecology, { step: number; id: number }>();
 
 /**
- * o がコウモリに群がられて足止めされているか：ヴァンパイアが o を獲物に決めていて、6マス以内まで近づき、
+ * o がコウモリに群がられて足止めされているか：ヴァンパイアが o を獲物に決めていて、8マス以内（PIN_R）まで近づき、
  * 従えるコウモリが2匹以上 o にまとわりついている（20px 以内）。足止めされた者は逃げられず（src/eco/step.ts）、打ち返しも弱い（src/eco/combat.ts の fight）
  */
 export function batPinned(this: Ecology, o: Cr): boolean {
-  if (!this.counts[Kind.Vampire] || !VAMP_PREY.has(o.k) || o.dead) return false;
+  // （獲物の種は問わない：眷属を連れたヴァンパイアが狙うオークとドワーフも、群がられれば足止めされる）
+  if (!this.counts[Kind.Vampire] || o.dead || o.k === Kind.Vampire || o.k === Kind.Bat) return false;
   let lc = lordCache.get(this);
   if (!lc || lc.step !== this.step) {
     lc = { step: this.step, id: 0 };
@@ -363,7 +555,7 @@ export function batPinned(this: Ecology, o: Cr): boolean {
     lordCache.set(this, lc);
   }
   const v = lc.id ? this.byId.get(lc.id) : undefined;
-  if (!v || v.dead || v.ref !== o.id || sq(v.x - o.x) + sq(v.y - o.y) > sq(6 * TILE)) return false;
+  if (!v || v.dead || v.ref !== o.id || sq(v.x - o.x) + sq(v.y - o.y) > sq(PIN_R * TILE)) return false;
   let n = 0;
   this.nearby(o.x, o.y, 2, (b) => {
     if (b.k === Kind.Bat && !b.dead && b.ref2 === v.id && sq(b.x - o.x) + sq(b.y - o.y) < 20 * 20) n++;
@@ -380,7 +572,11 @@ declare module '../ecology' {
     vampScatter: typeof vampScatter;
     vampFly: typeof vampFly;
     vampCoffin: typeof vampCoffin;
+    vampCallBats: typeof vampCallBats;
+    batCalled: typeof batCalled;
+    vampRaiseFallen: typeof vampRaiseFallen;
+    vampMistFx: typeof vampMistFx;
   }
 }
 
-Object.assign(Ecology.prototype, { vampire, batPinned, vampLair, vampCanScatter, vampScatter, vampFly, vampCoffin });
+Object.assign(Ecology.prototype, { vampire, batPinned, vampLair, vampCanScatter, vampScatter, vampFly, vampCoffin, vampCallBats, batCalled, vampRaiseFallen, vampMistFx });
