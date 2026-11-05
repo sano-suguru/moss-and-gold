@@ -174,7 +174,8 @@ bool wallAt(ivec2 t) {
   return m.r > 0.5 && (int(m.a * 255.0 + 0.5) & 64) == 0;
 }
 ivec2 tileOfPx(ivec2 p) { return ivec2(floor(vec2(p) / 16.0)); }
-// マスごとの描き方の情報（renderer.ts の tileInfo が求める）。r：壁と角の丸め方（bit0 壁か、bit1〜4 左上・右上・左下・右下の角を丸めるか）、
+// マスごとの描き方の情報（renderer.ts の tileInfo が求める）。r：壁と角の丸め方（bit0 壁か、bit1〜4 左上・右上・左下・右下の角を丸めるか、
+// bit5・bit6 左・右の縁が自然の壁と床の境目か）、
 // g：床の材質の番号（src/floors.ts。壁は 255）、b：高さの違う縁（bit0〜3 北東南西の隣がこのマスより下の床、bit4〜7 上の床）、
 // a：bit0 自然の型の縁を求めるか、bit1 掘りたての床か、bit2 まわりに掘りたてかどうかが違う床がある
 ${floorGlsl()}
@@ -222,16 +223,41 @@ ivec2 cnH(ivec2 p) { ivec2 t = tileOfPx(p); return t + ivec2(p.x - t.x * 16 < 8 
 // 点 p が、見た目の壁か（真上から見た岩の足もとの形）。シミュレーションはマス単位のままで、描画だけ自然の岩壁の角を丸める：
 // 出っ張った角は削って床を見せ、へこんだ角は床の上へ岩を張り出させる（どの角を丸めるかは cornerAt）。
 // 丸める半径は角ごとに 3〜6px、縁には小さなごつごつした凹凸
+// 自然の壁と床の左右の境目を、どれだけ床の側へ張り出させるか（px。負なら壁の側へ引っ込む）。境目の列 bx と、縦の位置 y で決まる。
+// 4px ごとの値をなめらかにつなぐ（1px だけの突き出しができない）。マス t の縁が上下の隣のマスへ続いていない端では、
+// 端から 6px までは 0 にし、12px で元に戻す（角の丸めの半径は 6px までなので、丸めた角とずれずにつながる）
+float edgeOff(ivec2 t, bool self, int bit, int bx, float y, float ly) {
+  float u = y / 4.0;
+  float k = floor(u);
+  float f = u - k;
+  f = f * f * (3.0 - 2.0 * f);
+  float o = (mix(h01(ivec2(bx, int(k)), 851u), h01(ivec2(bx, int(k) + 1), 851u), f) - 0.5) * 7.0;
+  int s = self ? 1 : 0;
+  int up = cornerAt(t - ivec2(0, 1));
+  int dn = cornerAt(t + ivec2(0, 1));
+  float g = 1.0;
+  if ((up & bit) == 0 || (up & 1) != s) g = min(g, (ly - 6.0) / 6.0);
+  if ((dn & bit) == 0 || (dn & 1) != s) g = min(g, (10.0 - ly) / 6.0);
+  return o * clamp(g, 0.0, 1.0);
+}
+// 左右の縁のふらつき（縁から 4px の内だけ。張り出しは最大 3.5px）。縁が無ければ self のまま
+bool edgePx(ivec2 p, ivec2 t, ivec2 l, int b, bool self) {
+  int bit = l.x < 4 ? 32 : l.x > 11 ? 64 : 0;
+  if (bit == 0 || (b & bit) == 0) return self;
+  float d = bit == 32 ? float(l.x) + 0.5 : 15.5 - float(l.x);
+  float o = edgeOff(t, self, bit, bit == 32 ? t.x : t.x + 1, float(p.y) + 0.5, float(l.y) + 0.5);
+  return self ? d > -o : d < o;
+}
 bool wallPxB(ivec2 p, ivec2 t, int b) {
   bool self = (b & 1) != 0;
   ivec2 l = p - t * 16;
   int q = (l.x < 8 ? 0 : 1) + (l.y < 8 ? 0 : 2);
-  if ((b & (2 << q)) == 0) return self;
+  if ((b & (2 << q)) == 0) return edgePx(p, t, l, b, self);
   // 角からの距離（ピクセルの中心で 0.5〜7.5）
   ivec2 v = t + ivec2(q & 1, q >> 1);
   vec2 a = abs(vec2(p - v * 16) + 0.5);
   float r = 3.0 + float(hash2(v, 811u) % 4u);
-  if (a.x >= r || a.y >= r) return self;
+  if (a.x >= r || a.y >= r) return edgePx(p, t, l, b, self);
   // 凹凸は、角から見た向き（a.x − a.y）に沿って 3px ごとの値をなめらかにつないだもの。半径の向きには一様なので、
   // 縁は一続きの線のままで、離れた点や1ピクセルだけの突き出しができない
   float u = (a.x - a.y) / 3.0 + 4.0;
