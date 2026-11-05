@@ -5,6 +5,13 @@ import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
 
+/** 一つの死骸に群がって食べられるスライムの数 */
+const SLIME_SHARE = 3;
+/** 床から養分を吸って溜められる食べた物の上限（体が育つのは食べた物が20を超えたときなので、それより少なくする） */
+const SLIME_SIP = 16;
+/** 水たまりが無くても、スライムが生まれられる床の湿り気の下限（world.moist。とても湿った床だけ） */
+const SLIME_DAMP = 180;
+
 export function slime(this: Ecology, c: Cr): void {
   // 水の精：生まれた水辺のまわり6マスを漂い、3マス以内に入った生きた者を冷たい水で打つ。飢えない
   if (c.elite === 6) {
@@ -53,20 +60,35 @@ export function slime(this: Ecology, c: Cr): void {
     target = null;
     let bd = 160 * 160;
     for (const o of this.corpses) {
-      if (o.ref !== 0 && o.ref !== c.id) continue;
       const ok = this.tileOf(o.x, o.y);
       if (ok < 0 || this.w.moist[ok] < 60) continue;
       const d = sq(o.x - c.x) + sq(o.y - c.y);
-      if (d < bd) {
-        bd = d;
-        target = o;
-      }
+      if (d >= bd) continue;
+      // 一つの死骸には、生きているスライムが3匹まで群がる（それより多いと、残りはほかの死骸を探す）。
+      // 以前は死骸の ref に1匹だけ予約を書いていた。その予約は、予約したスライムが死んでも消えなかった。
+      // そのうえ、生きていたときの番号（集落や巣穴など）も死骸に残っていたので、どのスライムも食べられない死骸ができた。
+      // 新しいスライムは死骸の近くで生まれるので、食べられない死骸のそばで生まれては飢え死にする、を繰り返していた
+      let eaters = 0;
+      this.nearby(o.x, o.y, 11, (q) => {
+        if (q !== c && q.k === Kind.Slime && !q.dead && q.ref === o.id) eaters++;
+      });
+      if (eaters >= SLIME_SHARE) continue;
+      bd = d;
+      target = o;
     }
     c.ref = target ? target.id : 0;
-    if (target) target.ref = c.id;
   }
   if (target) {
-    if (sq(target.x - c.x) + sq(target.y - c.y) < 7 * 7) {
+    // 群がるスライムは、死骸のまわりに少しずつずれて取りつく（同じ点に重なると、画面では1匹にしか見えない）
+    const a = ((c.id % 6) * Math.PI) / 3;
+    let ax = target.x + Math.cos(a) * 5;
+    let ay = target.y + Math.sin(a) * 4;
+    const ak = this.tileOf(ax, ay);
+    if (ak < 0 || this.w.map.solid[ak] || this.w.map.lava[ak]) {
+      ax = target.x;
+      ay = target.y;
+    }
+    if (sq(target.x - c.x) + sq(target.y - c.y) < 7 * 7 && sq(ax - c.x) + sq(ay - c.y) < 3 * 3) {
       // 包み込んで溶かす
       const t = Math.min(2, target.units, s.cap - c.food);
       if (t > 0) {
@@ -82,9 +104,16 @@ export function slime(this: Ecology, c: Cr): void {
       } else c.act = 0;
     } else {
       c.act = 1;
-      this.goTo(c, target.x, target.y, s.speed);
+      this.goTo(c, ax, ay, s.speed);
     }
   } else {
+    // 死骸がなければ、湿って養分の溜まった床から養分を少しずつ吸って生きる（生き物の更新10回ごとに1。床の養分が体に移るだけなので、養分の総量は変わらない）。
+    // 吸うだけでは、食べた物は SLIME_SIP までしか溜まらず、体は育たない。育って二つに分かれるには死骸を食べる。
+    // 以前は食べ物が死骸だけで、死骸を食べ尽くすと続かず、スライムが画面から消えている時間が長かった
+    if (k >= 0 && c.food < SLIME_SIP && this.w.nutr[k] >= 20 && this.step % 10 === c.id % 10) {
+      this.w.nutr[k]--;
+      c.food++;
+    }
     c.act = c.actT % 40 < 20 ? 0 : 1;
     if (c.act === 1) {
       const j = DIR16[ih(c.id, this.step >> 3, 52) & 15];
@@ -96,6 +125,8 @@ export function slime(this: Ecology, c: Cr): void {
     c.food -= 15;
     const ch = this.spawn(Kind.Slime, c.x + 6, c.y, 15, 0);
     ch.ref = 0;
+    // 分かれた場面の記録（分析用のログだけ。シミュレーションの判断には使わない）
+    this.record('settle', { t: this.w.tick, k: Kind.Slime, id: c.id, ev: 'split', n: ch.id, x: Math.round(c.x), y: Math.round(c.y) } as never);
     this.counts[Kind.Slime]++;
   }
   // 食べた分は体になる
@@ -111,13 +142,14 @@ export function slimeSize(this: Ecology, c: Cr): number {
   return m < 20 ? 0 : m < 45 ? 1 : 2;
 }
 
-/** 水と養分の溜まった所からスライムが生まれる（死骸が多いほど生まれやすい） */
+/** 水と養分の溜まった所からスライムが生まれる（死骸が多いほど生まれやすい）。水たまりか、とても湿った床（SLIME_DAMP 以上）で生まれる */
 export function spawnSlimes(this: Ecology): void {
   const n = this.counts[Kind.Slime];
   if (n >= 40 || n > 3 + this.corpses.length) return;
   if (ih(this.step, 1, 53) % 3 !== 0) return;
   const m = this.w.map;
-  // 腐ったもの（死骸）の近く（6マス以内）の、湿って養分の溜まった開いた床だけで生まれる
+  // 腐ったもの（死骸）の近く（6マス以内）の、湿って養分の溜まった開いた床だけで生まれる。
+  // 以前は水たまり（water 30 以上）だけで、水たまりのそばに死骸の無いシード（seed4・seed6 など）では、ほとんど生まれなかった
   const near = new Uint8Array(m.w * m.h);
   for (const d of this.corpses) {
     const cx = Math.floor(d.x / TILE);
@@ -125,7 +157,7 @@ export function spawnSlimes(this: Ecology): void {
     for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) { const x = cx + dx; const y = cy + dy; if (x >= 0 && y >= 0 && x < m.w && y < m.h) near[y * m.w + x] = 1; }
   }
   const cands: number[] = [];
-  for (let k = 0; k < m.w * m.h; k++) if (near[k] && !m.solid[k] && !m.sealed[k] && !m.lava[k] && this.w.water[k] >= 30 && this.w.nutr[k] >= 30) cands.push(k);
+  for (let k = 0; k < m.w * m.h; k++) if (near[k] && !m.solid[k] && !m.sealed[k] && !m.lava[k] && (this.w.water[k] >= 30 || this.w.moist[k] >= SLIME_DAMP) && this.w.nutr[k] >= 30) cands.push(k);
   if (!cands.length) return;
   const k = cands[ih(this.step, 2, 54) % cands.length];
   this.w.nutr[k] -= 12;

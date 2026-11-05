@@ -31,7 +31,7 @@ const median = (a: number[]) => {
 };
 const f1 = (v: number) => (isFinite(v) ? v.toFixed(1) : '—');
 
-interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number; orcStarveExit: number; storeMean: number; storeMax: number; storePos: number; storeKnown: boolean; ratReenter: number; ratZero: number; splitDur: number[]; splitStore: number; stuck: number; stuckNoPath: number; stuckAdv: number; unbury: number; hitch: number; hitchSec: number; hitchLong: number; hitchOsc: number; hitchNear: number; hitchKnown: boolean; hitchKind: Record<number, number>; mo: Record<string, number>; kindsMean: number; kindsMin: number; kindShare: number[]; links: Map<string, number> }
+interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number; orcStarveExit: number; storeMean: number; storeMax: number; storePos: number; storeKnown: boolean; ratReenter: number; ratZero: number; slimeMax: number; slimeLast: number; slimeGone: boolean; slimeZero: number; slimeAfter5: number; slimeStarve: number; slimeBorn: number; splitDur: number[]; splitStore: number; stuck: number; stuckNoPath: number; stuckAdv: number; unbury: number; hitch: number; hitchSec: number; hitchLong: number; hitchOsc: number; hitchNear: number; hitchKnown: boolean; hitchKind: Record<number, number>; mo: Record<string, number>; kindsMean: number; kindsMin: number; kindShare: number[]; links: Map<string, number> }
 /** にぎわいで数えない種：冒険者とドワーフ（人の側。来訪の多さに数字が引っ張られないよう、モンスターと分ける） */
 const NOT_MONSTER = new Set([25, 28]);
 const MONSTER_KINDS = KIND_NAMES.map((_, k) => k).filter((k) => !NOT_MONSTER.has(k));
@@ -119,6 +119,7 @@ function measure(dir: string): M {
   const cnt = (a: { k: number }[], k: number, f: (x: any) => boolean = () => true) => a.filter((x) => x.k === k && f(x)).length;
   const ser = (k: number) => S.map((s) => s.counts[k] ?? 0);
   const rs = ser(2);
+  const ss = ser(5);
   let drift = 0;
   for (const s of S) drift = Math.max(drift, Math.abs(s.nutrientDrift), Math.abs(s.goldDrift), Math.abs(s.rockDrift), Math.abs(s.manaDrift ?? 0));
   return {
@@ -129,6 +130,11 @@ function measure(dir: string): M {
     ratStarve: cnt(D, 2, (d) => d.cause === 'starve'), ratArr: cnt(B, 2, (b) => b.origin !== 'born'), ratBorn: cnt(B, 2, (b) => b.origin === 'born'), ratDisp: cnt(X, 2, (x) => x.reason === 'dispersed'),
     ratLast: rs[rs.length - 1] ?? 0, ratMax: Math.max(0, ...rs), ratGone: (rs[rs.length - 1] ?? 0) === 0 && (rs[rs.length - 2] ?? 0) === 0, drift,
     ratMoves: MV.filter((x) => x.k === 2).length,
+    // スライム：最多と最後の数、絶えたか（一度でもいて、最後の2回のサンプルで0）、5日目より後に0匹だったサンプルの数、飢え死にと生まれた数
+    slimeMax: Math.max(0, ...ss), slimeLast: ss[ss.length - 1] ?? 0,
+    slimeGone: Math.max(0, ...ss) > 0 && (ss[ss.length - 1] ?? 0) === 0 && (ss[ss.length - 2] ?? 0) === 0,
+    slimeZero: S.filter((x) => x.day > 5 && (x.counts[5] ?? 0) === 0).length, slimeAfter5: S.filter((x) => x.day > 5).length,
+    slimeStarve: cnt(D, 5, (d) => d.cause === 'starve'), slimeBorn: cnt(B, 5),
     ...nigiwai(S),
     links: links(D, rd(dir, 'settle.jsonl')),
     // シードの豊かさ：5日目以降のサンプルの平均（口が開いていないサンプルは除く）
@@ -289,6 +295,8 @@ const METRICS: Record<string, (ms: M[]) => number> = {
   ratStarveShaft: (ms) => sum(ms, (m) => m.ratStarveShaft),
   ratReenter: (ms) => sum(ms, (m) => m.ratReenter),
   ratZeroDays: (ms) => sum(ms, (m) => m.ratZero) / 4,
+  slimeGoneSeeds: (ms) => ms.filter((m) => m.slimeGone).length,
+  slimeZeroDays: (ms) => sum(ms, (m) => m.slimeZero) / 4,
   ratStarveAll: (ms) => sum(ms, (m) => m.ratStarve),
   orcStarveExit: (ms) => sum(ms, (m) => m.orcStarveExit),
   lairMedian: (ms) => median(ms.flatMap((m) => m.lairDur)),
@@ -325,6 +333,7 @@ if (args.paired && all.length >= 2) {
     ['ゴブリン：集落の蓄えの平均', (m) => (m.storeKnown ? m.storeMean : NaN)], ['ゴブリン：蓄えが0でなかったサンプルの割合（％）', (m) => (m.storeKnown && m.camps ? m.storePos : NaN)],
     ['オーク：来た', (m) => m.orcArr], ['オーク：従えた集落', (m) => m.vassals], ['オーク：取り立て（回）', (m) => m.tributes], ['オーク：取り立てた食べ物', (m) => m.tributeFood], ['オーク：飢えて去った', (m) => m.orcStarveExit],
     ['大ネズミ：入り直し（回）', (m) => m.ratReenter], ['大ネズミ：絶えた（1＝最後の2回のサンプルで0）', (m) => (m.ratGone ? 1 : 0)], ['大ネズミ：0匹だった日数（5日目より後）', (m) => m.ratZero / 4],
+    ['スライム：絶えた（1＝一度でもいて、最後の2回のサンプルで0）', (m) => (m.slimeGone ? 1 : 0)], ['スライム：0匹だった日数（5日目より後）', (m) => m.slimeZero / 4], ['スライム：最後の数', (m) => m.slimeLast], ['スライム：飢え死に', (m) => m.slimeStarve], ['スライム：生まれた（分かれたものを含む）', (m) => m.slimeBorn],
     ['オーク：縄張りの日数の中央値', (m) => md(m.lairDur)], ['ゴブリン：5日以上続いた集落の割合（％）', (m) => (m.camps ? (100 * m.campDur.filter((d) => d >= 5).length) / m.camps : NaN)],
     ['ゴブリン：分かれてできた集落', (m) => m.splitDur.length], ['ゴブリン：分かれた集落の日数の中央値', (m) => md(m.splitDur)], ['ゴブリン：絶えた（1）', (m) => (m.gobGone ? 1 : 0)],
     ['ゴブリン：オークに倒された', (m) => m.gobByOrc], ['ゴブリン：コボルト・冒険者・オーク以外に倒された', (m) => m.gobByOther],
@@ -425,6 +434,10 @@ tbl('天井の裂け目から15マス以内での飢え死に', (m) => m.ratStar
 tbl('巣穴の引っ越し', (m) => m.ratMoves, (ms) => sum(ms, (m) => m.ratMoves));
 tbl('入り直し（地表の横穴が開いたあと、天井の割れ目から。回） / 0匹だった日数（5日目より後）', (m) => `${m.ratReenter} / ${m.ratZero / 4}`, (ms) => `${sum(ms, (m) => m.ratReenter)} / ${sum(ms, (m) => m.ratZero) / 4}`);
 tbl('最多 / 最後の数（✝ は最後の2回のサンプルで0）', (m) => `${m.ratMax} / ${m.ratLast}${m.ratGone ? ' ✝' : ''}`, (ms) => `絶えた ${ms.filter((m) => m.ratGone).length} シード`);
+L.push('## スライム', '');
+tbl('生まれた（分かれたものを含む） / 飢え死に', (m) => `${m.slimeBorn} / ${m.slimeStarve}`, (ms) => `${sum(ms, (m) => m.slimeBorn)} / ${sum(ms, (m) => m.slimeStarve)}`);
+tbl('0匹だった日数（5日目より後）', (m) => m.slimeZero / 4, (ms) => `${sum(ms, (m) => m.slimeZero) / 4}（全体の ${f1((100 * sum(ms, (m) => m.slimeZero)) / Math.max(1, sum(ms, (m) => m.slimeAfter5)))}％、最長 ${Math.max(0, ...ms.map((m) => m.slimeZero)) / 4}）`);
+tbl('最多 / 最後の数（✝ は最後の2回のサンプルで0）', (m) => `${m.slimeMax} / ${m.slimeLast}${m.slimeGone ? ' ✝' : ''}`, (ms) => `絶えた ${ms.filter((m) => m.slimeGone).length} シード`);
 L.push('## ゴブリン', '');
 tbl('集落が続いた日数（中央値 / 最長 / できた数）', (m) => `${f1(median(m.campDur))} / ${f1(Math.max(0, ...m.campDur))} / ${m.camps}`, (ms) => `中央値 ${f1(median(ms.flatMap((m) => m.campDur)))}`);
 tbl('5日以上続いた集落', (m) => `${m.campDur.filter((d) => d >= 5).length}/${m.camps}`, (ms) => `${sum(ms, (m) => m.campDur.filter((d) => d >= 5).length)}/${sum(ms, (m) => m.camps)}（${f1(METRICS.campShare5(ms))}％）`);
