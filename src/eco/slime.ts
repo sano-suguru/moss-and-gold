@@ -79,7 +79,16 @@ export function slime(this: Ecology, c: Cr): void {
     c.ref = target ? target.id : 0;
   }
   if (target) {
-    if (sq(target.x - c.x) + sq(target.y - c.y) < 7 * 7) {
+    // 群がるスライムは、死骸のまわりに少しずつずれて取りつく（同じ点に重なると、画面では1匹にしか見えない）
+    const a = ((c.id % 6) * Math.PI) / 3;
+    let ax = target.x + Math.cos(a) * 5;
+    let ay = target.y + Math.sin(a) * 4;
+    const ak = this.tileOf(ax, ay);
+    if (ak < 0 || this.w.map.solid[ak] || this.w.map.lava[ak]) {
+      ax = target.x;
+      ay = target.y;
+    }
+    if (sq(target.x - c.x) + sq(target.y - c.y) < 7 * 7 && sq(ax - c.x) + sq(ay - c.y) < 3 * 3) {
       // 包み込んで溶かす
       const t = Math.min(2, target.units, s.cap - c.food);
       if (t > 0) {
@@ -95,7 +104,7 @@ export function slime(this: Ecology, c: Cr): void {
       } else c.act = 0;
     } else {
       c.act = 1;
-      this.goTo(c, target.x, target.y, s.speed);
+      this.goTo(c, ax, ay, s.speed);
     }
   } else {
     // 死骸がなければ、湿って養分の溜まった床から養分を少しずつ吸って生きる（生き物の更新10回ごとに1。床の養分が体に移るだけなので、養分の総量は変わらない）。
