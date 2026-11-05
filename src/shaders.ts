@@ -167,19 +167,29 @@ float vnoise(vec2 p, uint salt) {
   return mix(mix(h01(c, salt), h01(c + ivec2(1, 0), salt), f.x), mix(h01(c + ivec2(0, 1), salt), h01(c + ivec2(1, 1), salt), f.x), f.y);
 }
 // 溶岩の広がり（p はワールドのピクセルの中心）。0.5 を超えれば溶岩。
-// まわり4マスの中心での「溶岩か」をなめらかに補間し、なめらかなノイズを足す。補間だけでは境目がマスの境目の直線になるので、
-// ノイズで岸を数 px ずつ内外へふらつかせ、角を丸める（離れた点や1ピクセルだけの突き出しができないよう、どちらのノイズもなめらかなもの）
+// 点のあるマスとまわり8マスの「溶岩か」を、マスの中心からの距離で重みを付けて平均し（重みは 20px で 0 になるなめらかな山。
+// 2マス先の中心は 24px 以上離れているので、9マスで足りる）、なめらかなノイズを足す。
+// まっすぐな岸はマスの境目にそろい、出っ張った角は丸く、へこんだ角は少し埋まる（4マスの補間だと、0.5 の境目が
+// 出っ張った角で内へ大きくえぐれ、1マスだけ突き出た所が尖る）。岸のあたりでは、値は 1px につき約 1/16 変わる。
+// 岸を数 px ずつ内外へふらつかせるには、値にノイズを足さず、調べる位置をなめらかなノイズでずらす
+// （値に足すと、値の変わり方がゆるい角や突き出しの先ほど岸が大きく動き、とげのように尖る。位置をずらせば、どこでも同じだけ動く）
 float lavaField(vec2 p) {
-  vec2 f = p / 16.0 - 0.5;
-  ivec2 i0 = ivec2(floor(f));
-  vec2 qf = f - floor(f);
-  float a = float((tileAt(i0).a >> 6) & 1);
-  float b = float((tileAt(i0 + ivec2(1, 0)).a >> 6) & 1);
-  float c = float((tileAt(i0 + ivec2(0, 1)).a >> 6) & 1);
-  float d = float((tileAt(i0 + ivec2(1, 1)).a >> 6) & 1);
-  if (a + b + c + d == 0.0) return 0.0;
-  float ls = mix(mix(a, b, qf.x), mix(c, d, qf.x), qf.y);
-  return ls + (vnoise(p / 9.0, 641u) - 0.5) * 0.42 + (vnoise(p / 3.0, 642u) - 0.5) * 0.1;
+  // ずらす量は、離れた点どうしのずれの差が点の間の距離より小さくなる程度にとどめる（大きいと形が折り返して、かぎ状の突起ができる）
+  p += (vec2(vnoise(p / 13.0, 641u), vnoise(p / 13.0, 645u)) - 0.5) * 6.0 + (vec2(vnoise(p / 4.0, 642u), vnoise(p / 4.0, 646u)) - 0.5) * 0.8;
+  ivec2 t = ivec2(floor(p / 16.0));
+  float sum = 0.0;
+  float wsum = 0.0;
+  for (int j = -1; j <= 1; j++)
+    for (int i = -1; i <= 1; i++) {
+      ivec2 c = t + ivec2(i, j);
+      vec2 d = (p - (vec2(c) * 16.0 + 8.0)) / 20.0;
+      float k = max(0.0, 1.0 - dot(d, d));
+      k *= k;
+      wsum += k;
+      sum += k * float((tileAt(c).a >> 6) & 1);
+    }
+  if (sum == 0.0) return 0.0;
+  return sum / wsum;
 }
 // 点 p にいちばん近いマスの角（格子点）をはさむ横の隣のマス
 ivec2 cnH(ivec2 p) { ivec2 t = tileOfPx(p); return t + ivec2(p.x - t.x * 16 < 8 ? -1 : 1, 0); }
