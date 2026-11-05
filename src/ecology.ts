@@ -711,11 +711,6 @@ export class Ecology {
    * 退き終えたら x を NaN にして、休みの終わりの更新の通し番号を持つ（その間は同じ理由で退かない）。セーブする
    */
   retreats = new Map<number, [number, number, number, number]>();
-  /**
-   * 逃げる先：生き物の id →［x, y, この生き物の更新の通し番号までに着けなければ選び直す］。
-   * 傷を負って逃げる者は、追っ手と反対へ一歩ずつ動くのではなく、歩いて行ける床で追っ手から遠い所を一つ決めて、着くまで走る（src/eco/combat.ts の fleeStep）。セーブする
-   */
-  fleeTo = new Map<number, [number, number, number]>();
   bq: Int32Array;
   bprev: Int32Array;
   bmark: Int32Array;

@@ -275,15 +275,10 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
   const tier = TIER[c.k] ?? 1;
   if (c.flee > 0) c.flee--;
   else if (tier > 0 && c.hp < mx * FLEE_AT[tier] && this.w.tick - c.hitAt < 60 && c.k !== Kind.Adventurer && c.k !== Kind.Dwarf) c.flee = 120 + (ih(c.id, this.step, 162) % 80);
-  if (c.flee <= 0) {
-    this.fleeTo.delete(c.id);
-    return false;
-  }
+  if (c.flee <= 0) return false;
   const f = this.byId.get(c.foe);
   c.act = 1;
   const sp = SPEC[c.k].speed * 1.2;
-  // 行き止まりで決めた逃げる先を走っている間は、着くまでそこへ走る
-  if (this.fleeStep(c, sp)) return true;
   // コボルトは、追っ手がすぐそば（6マス）にいるあいだは住処へ向かわず、まず追っ手から離れる（追っ手の脇をすり抜けて帰ろうとしない）
   const closeFoe = c.k === Kind.Kobold && f && !f.dead && sq(f.x - c.x) + sq(f.y - c.y) < 6 * TILE * 6 * TILE;
   if ((c.hx || c.hy) && !closeFoe) {
@@ -294,63 +289,11 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
     }
   }
   if (f && !f.dead) {
-    // 追っ手と反対へ一歩。その一歩が壁に阻まれてほとんど進めなければ、歩いて行ける床で追っ手から遠い所を逃げる先に決めて、次から走る（fleePick）。
-    // （以前は行き止まりやマップの端で、壁に押しつけたまま足を動かし続けていた。大グモなど。
-    //  いつも逃げる先を決めて走らせる形も試したが、追っ手が離れると元の行き先へ戻るので行き来の幅が大きくなるだけで、引っかかりが増えた）
     const dx = c.x - f.x;
     const dy = c.y - f.y;
     const L = Math.sqrt(dx * dx + dy * dy) || 1;
-    const x0 = c.x;
-    const y0 = c.y;
     this.tryMove(c, (dx / L) * sp, (dy / L) * sp);
-    if (sq(c.x - x0) + sq(c.y - y0) < sq(sp * 0.3)) this.fleePick(c, f);
   } else c.flee = 0;
-  return true;
-}
-
-/**
- * 逃げる先を決める：いる所から8方向の5マス先（壁ならそこへ向かって手前の床）のうち、いまいる所と歩いてつながっていて、
- * 追っ手からいちばん遠い所。いまいる所より追っ手から遠くならなければ決めない。決めたら true
- */
-export function fleePick(this: Ecology, c: Cr, f: Cr): boolean {
-  const here = this.tileOf(c.x, c.y);
-  if (here < 0) return false;
-  const reg = this.regionOf(here);
-  const m = this.w.map;
-  let best = -1;
-  let bd = sq(f.x - c.x) + sq(f.y - c.y);
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    for (let r = 5; r >= 2; r--) {
-      const k = this.tileOf(c.x + Math.cos(a) * r * TILE, c.y + Math.sin(a) * r * TILE);
-      if (k < 0 || m.solid[k] || m.lava[k] || this.regionOf(k) !== reg) continue;
-      const x = (k % m.w) * TILE + 8;
-      const y = Math.floor(k / m.w) * TILE + 8;
-      const d = sq(f.x - x) + sq(f.y - y);
-      if (d > bd) {
-        bd = d;
-        best = k;
-      }
-      break;
-    }
-  }
-  if (best < 0) return false;
-  this.fleeTo.set(c.id, [(best % m.w) * TILE + 8, Math.floor(best / m.w) * TILE + 8, this.step + 40]);
-  return true;
-}
-
-/** 逃げる先があれば、着くまでそこへ走る。着いた、時間切れ、道が無いなら、逃げる先を消す。この回に走ったら true */
-export function fleeStep(this: Ecology, c: Cr, sp: number): boolean {
-  const r = this.fleeTo.get(c.id);
-  if (!r) return false;
-  const p = this.paths.get(c.id);
-  const noWay = !!p && p.gk === this.tileOf(r[0], r[1]) && p.miss > 0;
-  if (this.step > r[2] || noWay) {
-    this.fleeTo.delete(c.id);
-    return false;
-  }
-  c.act = 1;
-  if (this.goTo(c, r[0], r[1], sp)) this.fleeTo.delete(c.id);
   return true;
 }
 
@@ -372,10 +315,8 @@ declare module '../ecology' {
     strike: typeof strike;
     fight: typeof fight;
     woundsAndFlight: typeof woundsAndFlight;
-    fleePick: typeof fleePick;
-    fleeStep: typeof fleeStep;
     limp: typeof limp;
   }
 }
 
-Object.assign(Ecology.prototype, { str, defend, leaveIfStarving, hunt, maxHp, bleed, strike, fight, woundsAndFlight, fleePick, fleeStep, limp });
+Object.assign(Ecology.prototype, { str, defend, leaveIfStarving, hunt, maxHp, bleed, strike, fight, woundsAndFlight, limp });
