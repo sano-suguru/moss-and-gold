@@ -158,7 +158,7 @@ export function goTo(this: Ecology, c: Cr, tx: number, ty: number, speed: number
     return r;
   }
   if (sq(tx - c.x) + sq(ty - c.y) <= speed * speed) {
-    if (this.passable(c, tx, ty)) {
+    if (this.stepOk(c, c.x, c.y, tx, ty)) {
       c.x = tx;
       c.y = ty;
     }
@@ -227,6 +227,23 @@ export function passable(this: Ecology, c: Cr, x: number, y: number): boolean {
   // 大ネズミは深い水に入らない。ただし、水かさが増して深い水に取り残されたら、泳いで抜け出せる
   if (c.k === Kind.Rat && this.w.water[k] > 40 && this.ratOnDry(c)) return false;
   return true;
+}
+
+/**
+ * (x0, y0) から (x1, y1) へ一歩動いてよいか。行き先が通れることに加えて、マスを斜めにまたぐときは、
+ * 上下左右の2マスのうち少なくとも1マスが通れること（岩の角をすり抜けない）。
+ * 道の探索（findPath・nearPath）とつながった洞窟の領域（regionOf）は上下左右のつながりだけを見るので、
+ * 角をすり抜けられると、斜めにしかつながらない小部屋や閉じた空洞に入り込み、帰り道が見つからずに飢えていた
+ * （main の16シード×25日で、コボルトが4シードで15匹）
+ */
+export function stepOk(this: Ecology, c: Cr, x0: number, y0: number, x1: number, y1: number): boolean {
+  if (!this.passable(c, x1, y1)) return false;
+  const tx0 = Math.floor(x0 / TILE);
+  const ty0 = Math.floor(y0 / TILE);
+  const tx1 = Math.floor(x1 / TILE);
+  const ty1 = Math.floor(y1 / TILE);
+  if (tx0 === tx1 || ty0 === ty1) return true;
+  return this.passable(c, x1, y0) || this.passable(c, x0, y1);
 }
 
 /** ウィスプが寄っていく明るさ（苔の光を強く好む） */
@@ -374,7 +391,7 @@ export function moveToward(this: Ecology, c: Cr, tx: number, ty: number, speed: 
   const dy = ty - c.y;
   const d = Math.sqrt(dx * dx + dy * dy);
   if (d < speed) {
-    if (this.passable(c, tx, ty)) {
+    if (this.stepOk(c, c.x, c.y, tx, ty)) {
       c.x = tx;
       c.y = ty;
     }
@@ -510,14 +527,14 @@ export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
     mx = mx * f - (my / L) * side * L;
     my = my * f + (nx / L) * side * L;
   }
-  if (this.passable(c, c.x + mx, c.y + my)) {
+  if (this.stepOk(c, c.x, c.y, c.x + mx, c.y + my)) {
     c.x += mx;
     c.y += my;
-  } else if (this.passable(c, c.x + mx, c.y)) c.x += mx;
-  else if (this.passable(c, c.x, c.y + my)) c.y += my;
+  } else if (this.stepOk(c, c.x, c.y, c.x + mx, c.y)) c.x += mx;
+  else if (this.stepOk(c, c.x, c.y, c.x, c.y + my)) c.y += my;
   else {
     const v = DIR16[ih(c.id, this.step, 5) & 15];
-    if (this.passable(c, c.x + v[0] * 2, c.y + v[1] * 2)) {
+    if (this.stepOk(c, c.x, c.y, c.x + v[0] * 2, c.y + v[1] * 2)) {
       c.x += v[0] * 2;
       c.y += v[1] * 2;
     }
@@ -858,6 +875,7 @@ declare module '../ecology' {
     tileOf: typeof tileOf;
     ratOnDry: typeof ratOnDry;
     passable: typeof passable;
+    stepOk: typeof stepOk;
     litW: typeof litW;
     lit: typeof lit;
     spawn: typeof spawn;
@@ -878,4 +896,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, unbury, searchLimit, nearPath, unreachable, findPathAvoid, goTo, tileOf, ratOnDry, passable, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, tryMove, findMoss, updateForage, nearestForage, eatMoss, eat, die, rebuildGrid, nearby });
+Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, unbury, searchLimit, nearPath, unreachable, findPathAvoid, goTo, tileOf, ratOnDry, passable, stepOk, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, tryMove, findMoss, updateForage, nearestForage, eatMoss, eat, die, rebuildGrid, nearby });
