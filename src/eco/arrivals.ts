@@ -39,8 +39,9 @@ export function mouthSpot(this: Ecology, i: number): [number, number] {
  * 地表の生き物は開いた地表の横穴、深い所の生き物は地底の裂け目、リザードマンは川の口。
  * 地表の横穴がまだ開いていなければ、小さな生き物（大ネズミ、トカゲ、クモ、アリ）は天井の裂け目の割れ目から入り込む。
  * 戻り値：mouths の番号、-2 天井の割れ目、-3 入れる所がない
+ * reach：コボルトが住処に加わりに来るとき、その住処の領域（regionOf の番号）。渡されたら、そこへ歩いて行ける口（口のマスが同じ領域にある口）だけから選ぶ
  */
-export function pickDoor(this: Ecology, k: Kind, salt: number): number {
+export function pickDoor(this: Ecology, k: Kind, salt: number, reach?: number): number {
   const m = this.w.map;
   const want = k === Kind.Basilisk || k === Kind.Minotaur ? 1 : k === Kind.Lizardman ? 2 : 0;
   let open = m.mouths.map((mo, i) => (mo.kind === want && this.mouthOpen(i) ? i : -1)).filter((i) => i >= 0);
@@ -50,6 +51,8 @@ export function pickDoor(this: Ecology, k: Kind, salt: number): number {
     // （住処がまだないとき。すでにあれば、来る者はその住処に加わるので、口のまわりに新しい場所は要らない）
     const founding = !this.warrens.some((o) => o.id >= 0);
     open = open.filter((i) => !this.dragonNearMouth(i) && (!founding || this.kobMouthOk[i] === 1));
+    // 住処に加わりに来る者は、その住処へ歩いて行ける口からだけ来る（歩いて行けない口から入ると、住処を目指してさまよい、飢えてしまう）
+    if (reach !== undefined) open = open.filter((i) => this.regionOf(this.tileOf(...this.mouthSpot(i))) === reach);
     // 人の気配の薄い口があれば、そちらを選ぶ
     const quiet = open.filter((i) => this.presenceAt(...this.mouthSpot(i)) < 0.5);
     if (quiet.length) open = quiet;
@@ -396,8 +399,12 @@ export function arrivals(this: Ecology, day: number): void {
     } else if (ih(this.step, 5, 72) % 3 === 0) {
       const sizes = live.map((o) => [o, this.warrenMembers(o).length] as [Warren, number]).sort((a, b) => a[1] - b[1] || a[0].id - b[0].id);
       const [wr, sz] = sizes[0];
-      if (sz < 8) {
+      // 住処へ歩いて行ける口が無ければ、この回は来ない
+      const reach = sz < 8 ? this.regionOf(this.tileOf(wr.x, wr.y)) : -1;
+      const jd = reach >= 0 ? this.pickDoor(Kind.Kobold, Kind.Kobold, reach) : -3;
+      if (jd >= 0) {
         next();
+        door = jd;
         for (let i = 0; i < 2; i++) {
           const k = enter(Kind.Kobold, 20, 50);
           k.ref = wr.id;

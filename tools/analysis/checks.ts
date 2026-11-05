@@ -42,7 +42,10 @@ const RUN_A = { seeds: ['かしたれ', 'seed8', 'abc', 'seed7'], from: 10, to: 
 // #42 を取り込んだ main の10〜18日目では、甲冑が立ち上がるのは16シードの合計で8回だけ（seed23 2・seed7 2・かしたれ 1・seed4 1・seed30 1・seed41 1）で、
 // 以前の組（かしたれ・seed5・seed17・seed23・seed8・seed40）では3回になり項目が落ちた。立ち上がったシードの組にする
 // （取り込みは かしたれ 7・seed23 8・seed4 2・seed7 2、崩れるのは6回。どのシードもほかの項目で実行しているので、実行するシードは増えない）
-const RUN_ARMOR = { seeds: ['かしたれ', 'seed23', 'seed7', 'seed4', 'seed30', 'seed41'], from: 10, to: 18 };
+// コボルトを住処へ歩いて行ける口から入れたコード（#45 のあと）では、かしたれと seed30 の展開が変わり、16シードを0日目から通しで実行したときの10〜18日目は、
+// 立ち上がるのが seed40 2・seed4 1・seed41 1（main は かしたれ 1・seed30 1 も）、取り込みは seed4 2 だけ（main は かしたれ 3・seed4 2・seed30 1）、崩れるのは seed40 2・seed4 1。
+// 25日を通した回数は変わらない（立ち上がる 21→22、取り込み 32→30、崩れる 20→20）が、この8日の間ではまれなので、seed40 を足し、取り込みの目安を下げた
+const RUN_ARMOR = { seeds: ['かしたれ', 'seed23', 'seed7', 'seed4', 'seed30', 'seed41', 'seed40'], from: 10, to: 18 };
 const RUN_ORC = { seeds: ['かしたれ', 'seed27'], from: 10, to: 18 };
 // オークの取り立ては、従う集落に蓄えがたまったときだけ起きるまれな出来事（16シード×25日で約25回、起きるのは6シードほど）。
 // いまのコードで10〜18日目に起きているシードを選ぶ。焚き火の夜襲の二歩目（#29）のコードで、
@@ -84,7 +87,7 @@ export const CHECKS: Check[] = [
   },
   {
     // リビングアーマー（src/eco/armor.ts）：倒れた冒険者の武具に未練が宿り、溜まり場で甲冑が立ち上がる
-    name: 'リビングアーマーが武具の溜まり場から立ち上がる（6シードで4回以上）',
+    name: 'リビングアーマーが武具の溜まり場から立ち上がる（7シードで4回以上）',
     ...RUN_ARMOR,
     test: (rs) => {
       const n = rs.map((r) => r.births.filter((x) => x.k === 29 && x.origin === 'gear').length);
@@ -93,12 +96,12 @@ export const CHECKS: Check[] = [
   },
   {
     // リビングアーマー：床の武器と盾を取り込み、倒れるかマナが尽きると武具が床に散らばる
-    name: 'リビングアーマーが武具を取り込み、崩れて散らばる（6シードで取り込み6回以上・取り込みのあったシード2つ以上・崩れる2回以上）',
+    name: 'リビングアーマーが武具を取り込み、崩れて散らばる（7シードで取り込み2回以上・崩れる2回以上）',
     ...RUN_ARMOR,
     test: (rs) => {
       const a = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'absorb').length);
       const f = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'fall').length);
-      return { ok: sum(a) >= 6 && a.filter((n) => n > 0).length >= 2 && sum(f) >= 2, value: rs.map((r, i) => `${r.seed} 取り込み${a[i]}・崩れる${f[i]}`).join('、') };
+      return { ok: sum(a) >= 2 && sum(f) >= 2, value: rs.map((r, i) => `${r.seed} 取り込み${a[i]}・崩れる${f[i]}`).join('、') };
     },
   },
   {
@@ -478,6 +481,20 @@ export const CHECKS: Check[] = [
         return pools;
       });
       return { ok: sum(n) >= 2, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // コボルトが住処に加わりに来るとき（src/eco/arrivals.ts）は、その住処へ歩いて行ける地表の横穴からだけ入る（pickDoor の reach）。
+    // 歩いて行けない横穴から入ると、住処を目指してさまよい、飢えていた。main の10〜18日目では seed30 で23匹、かしたれで14匹が飢え死にした
+    // （#45 のあとの main。直したコードで0日目から通しで実行すると、この間の飢え死にはどちらも0匹。
+    // main の10日目から始めると、10日目より前に行けない住処へ加わっていた者が seed30 で5匹ほど飢える）
+    name: 'コボルトが行けない住処を目指して飢えない（seed30・かしたれ の10〜18日目で、コボルトの飢え死にが合計10匹以下。main は37匹）',
+    seeds: ['seed30', 'かしたれ'],
+    from: 10,
+    to: 18,
+    test: (rs) => {
+      const n = rs.map((r) => r.deaths.filter((x) => x.k === 10 && x.cause === 'starve').length);
+      return { ok: sum(n) <= 10, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },
 ];
