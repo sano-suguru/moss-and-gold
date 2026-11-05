@@ -242,6 +242,12 @@ export function fearFire(this: Ecology, c: Cr): boolean {
   if ((c.k === Kind.Rat || c.k === Kind.Bat) && c.hungry) return false;
   if (c.sinceMeal > SPEC[c.k].starve * 0.85) return false;
   if (c.k === Kind.Bat && c.st !== 0 && c.st !== 1) return false;
+  // ヴァンパイアに従うコウモリは、主の意のままに動き、火を怖がらない（主の狙う冒険者は松明を持っている）。
+  // 以前は主のそばに火があると、主へ向かう一歩と火から離れる一歩を交互に繰り返し、その場で1〜2分行ったり来たりしていた（seed7）
+  if (c.k === Kind.Bat && c.ref2) {
+    const lord = this.byId.get(c.ref2);
+    if (lord && !lord.dead && lord.k === Kind.Vampire) return false;
+  }
   const f = this.fireNear(c.x, c.y);
   if (!f) return false;
   const dx = c.x - f[0];
