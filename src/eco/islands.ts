@@ -5,6 +5,12 @@ import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
 
+/**
+ * マス k が属する、つながった洞窟の領域の番号（歩いて行き来できる床のひとかたまり。岩・閉じた空洞・溶岩のマスは -1）。
+ * 溶岩も壁とみなす：歩く生き物は溶岩を渡れない（move.ts の tilePassable）。通れる床として扱うと、溶岩でつながっているだけの
+ * 場所が入口側と同じ領域になり、そこにあるコボルトの住処が島とみなされず、入口側へ横穴を掘ってつなげに行かない
+ * （入口から来たコボルトが、溶岩の向こうの住処を目指して溶岩の手前で立ち往生していた）
+ */
 export function regionOf(this: Ecology, k: number): number {
   const m = this.w.map;
   if (this.regionVer !== this.w.digs.length || this.regionMap.length !== m.w * m.h) {
@@ -14,7 +20,7 @@ export function regionOf(this: Ecology, k: number): number {
     let id = 0;
     const q = new Int32Array(N);
     for (let s0 = 0; s0 < N; s0++) {
-      if (this.regionMap[s0] >= 0 || m.solid[s0] || m.sealed[s0]) continue;
+      if (this.regionMap[s0] >= 0 || m.solid[s0] || m.sealed[s0] || m.lava[s0]) continue;
       let h = 0;
       let t = 0;
       q[t++] = s0;
@@ -22,7 +28,7 @@ export function regionOf(this: Ecology, k: number): number {
       while (h < t) {
         const k2 = q[h++];
         for (const n of [k2 + 1, k2 - 1, k2 + m.w, k2 - m.w]) {
-          if (n < 0 || n >= N || this.regionMap[n] >= 0 || m.solid[n] || m.sealed[n]) continue;
+          if (n < 0 || n >= N || this.regionMap[n] >= 0 || m.solid[n] || m.sealed[n] || m.lava[n]) continue;
           this.regionMap[n] = id;
           q[t++] = n;
         }
