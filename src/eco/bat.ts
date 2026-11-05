@@ -143,10 +143,31 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
     const gx = (t % this.w.map.w) * TILE + 8;
     const gy = Math.floor(t / this.w.map.w) * TILE + 8;
     if (this.goTo(c, gx, gy, s.speed)) c.ref = 0;
-  } else {
-    const j = DIR16[ih(c.id, this.step, 6) & 15];
-    this.tryMove(c, j[0] * s.speed, j[1] * s.speed);
+  } else this.batRoam(c);
+}
+
+/**
+ * 苔が見つからないコウモリが、ねぐらのまわりを飛び回る。向きは生き物の更新16回ごとに選び直し、その間は同じ向きへ飛ぶ。
+ * 行く手が壁なら、その回だけ横か後ろへ向きを変える。ねぐらから3マスより離れたら、ねぐらへ戻る
+ * （10マスまで飛び回らせると、腹を空かせたコウモリが焚き火で眠る一行を噛んで起こすことが増え、ゴブリンの夜の盗みがほとんど起きなくなった）。
+ * （以前は更新のたびに向きを選び直していたので、ほとんど進まずにその場で向きを変え続け、震えて引っかかっているように見えた。
+ * 16シードの12日目では、コウモリの引っかかりの4分の3がこれだった）
+ */
+export function batRoam(this: Ecology, c: Cr): void {
+  const s = SPEC[Kind.Bat];
+  if ((c.hx || c.hy) && sq(c.hx - c.x) + sq(c.hy - c.y) > sq(3 * TILE)) {
+    this.goTo(c, c.hx, c.hy, s.speed);
+    return;
   }
+  const h = ih(c.id, (this.step + c.id * 5) >> 4, 6) & 15;
+  for (const turn of [0, 4, 12, 8]) {
+    const j = DIR16[(h + turn) & 15];
+    if (!this.stepOk(c, c.x, c.y, c.x + j[0] * s.speed * 2, c.y + j[1] * s.speed * 2)) continue;
+    this.tryMove(c, j[0] * s.speed, j[1] * s.speed);
+    return;
+  }
+  const j = DIR16[h];
+  this.tryMove(c, j[0] * s.speed, j[1] * s.speed);
 }
 
 /**
@@ -185,7 +206,8 @@ declare module '../ecology' {
   interface Ecology {
     bat: typeof bat;
     batForage: typeof batForage;
+    batRoam: typeof batRoam;
   }
 }
 
-Object.assign(Ecology.prototype, { bat, batForage });
+Object.assign(Ecology.prototype, { bat, batForage, batRoam });
