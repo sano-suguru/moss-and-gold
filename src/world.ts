@@ -495,6 +495,7 @@ export class World {
     m.solid[k] = 0;
     m.dug[k] = 1;
     this.weathered++;
+    this.settleSealed(k);
     // ロード時の再生では、養分はすでにセーブされた土の中にある
     if (!replay) {
       this.nutr[k] += 15;
@@ -532,6 +533,82 @@ export class World {
     else if (t === 2) this.applyRubble(k, true);
     else if (t === 3) this.applyWeather(k, true);
     else this.applyPave(k);
+  }
+
+  /**
+   * 新しく床になったマス k（掘った、瓦礫が風化した）が、開いた側か閉じた空洞の側かを決める。
+   * 開いた床に面していれば、この床も開いた側。面している閉じた空洞は掘り当てられて開く。
+   * 溶岩のマスには閉じた空洞の印が付かないので、溶岩はその向こうの床とひと続きの場所として扱う
+   * （隣の溶岩が開いた床に接していれば開いた側、閉じた空洞の床に接していれば閉じた側。開くときは溶岩を越えて広げる。
+   * 越えないと、溶岩の溜まりで分かれた空洞の向こう側が、同じ洞窟なのに閉じたまま残る）。
+   * 風化した瓦礫の床も通す（瓦礫を置くと閉じた空洞の印が消えるので、通さないと、閉じた空洞に接する床が開いた床のまま残り、
+   * その床がほかの開いた床とつながっても空洞が開かない）
+   */
+  private settleSealed(k: number): void {
+    const m = this.map;
+    let openN = false;
+    const sealedN: number[] = [];
+    for (const q of [k + 1, k - 1, k + m.w, k - m.w]) {
+      if (q < 0 || q >= m.solid.length || m.solid[q]) continue;
+      if (m.lava[q]) {
+        const side = this.lavaSide(q);
+        if (side === 1) openN = true;
+        else if (side === 2) sealedN.push(q);
+      } else if (m.sealed[q]) sealedN.push(q);
+      else openN = true;
+    }
+    if (openN) {
+      m.sealed[k] = 0;
+      for (const q of sealedN) {
+        const n = this.openPocket(q);
+        if (n > 0) this.openedQueue.push({ k: q, n });
+      }
+    } else if (sealedN.length) m.sealed[k] = 1;
+  }
+
+  /**
+   * 溶岩のマス q のひとかたまりが、どちら側にあるか：1 開いた床に接している、2 閉じた空洞の床だけに接している、0 どちらにも接していない。
+   * 開くときに溶岩を越えて広げるので、両方に接することはない（地形の生成でそうなっていたら、開いた側とみなす）
+   */
+  private lavaSide(q: number): number {
+    const m = this.map;
+    const seen = new Set<number>([q]);
+    const st = [q];
+    let side = 0;
+    while (st.length) {
+      const c = st.pop() as number;
+      for (const r of [c + 1, c - 1, c + m.w, c - m.w]) {
+        if (r < 0 || r >= m.solid.length || m.solid[r] || seen.has(r)) continue;
+        if (m.lava[r]) {
+          seen.add(r);
+          st.push(r);
+        } else if (m.sealed[r]) side = 2;
+        else return 1;
+      }
+    }
+    return side;
+  }
+
+  /** マス q からつながる閉じた空洞を開き、開いた床のマス数を返す。溶岩のマスは越えて広げる（溶岩自体は数えない） */
+  private openPocket(q: number): number {
+    const m = this.map;
+    const seen = new Set<number>([q]);
+    const st = [q];
+    let n = 0;
+    while (st.length) {
+      const c = st.pop() as number;
+      if (m.sealed[c]) {
+        m.sealed[c] = 0;
+        n++;
+      }
+      for (const r of [c + 1, c - 1, c + m.w, c - m.w]) {
+        if (r < 0 || r >= m.solid.length || m.solid[r] || seen.has(r)) continue;
+        if (!m.sealed[r] && !m.lava[r]) continue;
+        seen.add(r);
+        st.push(r);
+      }
+    }
+    return n;
   }
 
   /** 瓦礫を置く（ceiling = 崩落で天井から落ちた） */
@@ -661,35 +738,7 @@ export class World {
     // 掘り出した岩（または瓦礫）は土になる
     m.rubble[k] = 0;
     this.rockStock++;
-    // 開いた床に面していれば、この床も開いた側。面している閉じた空洞は掘り当てられて開く
-    {
-      let openN = false;
-      const sealedN: number[] = [];
-      for (const q of [k + 1, k - 1, k + m.w, k - m.w]) {
-        if (q < 0 || q >= m.solid.length || m.solid[q] || m.lava[q]) continue;
-        if (m.sealed[q]) sealedN.push(q);
-        else openN = true;
-      }
-      if (openN) {
-        m.sealed[k] = 0;
-        for (const q of sealedN) {
-          if (!m.sealed[q]) continue;
-          let n = 0;
-          const st = [q];
-          m.sealed[q] = 0;
-          while (st.length) {
-            const c = st.pop() as number;
-            n++;
-            for (const r of [c + 1, c - 1, c + m.w, c - m.w]) {
-              if (r < 0 || r >= m.solid.length || m.solid[r] || !m.sealed[r]) continue;
-              m.sealed[r] = 0;
-              st.push(r);
-            }
-          }
-          this.openedQueue.push({ k: q, n });
-        }
-      } else if (sealedN.length) m.sealed[k] = 1;
-    }
+    this.settleSealed(k);
     // 高さと湿り気は、まわりの床にならう
     const x = k % m.w;
     const y = (k / m.w) | 0;
