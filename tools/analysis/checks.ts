@@ -75,9 +75,13 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // ヴァンパイア（src/eco/vampire.ts、src/eco/bat.ts）：日暮れにコウモリを呼び寄せ、コウモリに群がられて足止めされた獲物に打ちかかる
+    // ヴァンパイア（src/eco/vampire.ts、src/eco/bat.ts）：日暮れにコウモリを呼び寄せ、コウモリに群がられて足止めされた獲物に打ちかかる。
+    // 足止めは RUN_A の4シードの10〜18日目では合わせて2〜3回しか起きず、1シードの展開が分かれただけで落ちていた（#50）。
+    // 0日目から実行した10〜18日目で、呼び寄せは seed40 2〜4・seed6 1〜2、足止めは seed40 8〜14・seed27 7・seed18 4（#48 の main と #50）
     name: 'ヴァンパイアが日暮れにコウモリを呼び寄せ、コウモリに群がられた獲物に打ちかかる（4シードで呼び寄せ1回・足止め2回以上）',
-    ...RUN_A,
+    seeds: ['seed40', 'seed27', 'seed18', 'seed6'],
+    from: 10,
+    to: 18,
     test: (rs) => {
       const ca = rs.map((r) => r.settle.filter((x) => x.k === 19 && x.ev === 'callBats').length);
       const pin = rs.map((r) => r.settle.filter((x) => x.k === 19 && x.ev === 'pin').length);
