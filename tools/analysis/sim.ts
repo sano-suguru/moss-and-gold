@@ -157,7 +157,7 @@ function watchStuck(): unknown[] {
 
 /**
  * 短い引っかかりを見つける：見る人の目に「引っかかっている」と映る瞬間を、原因を問わずに数える。
- * 10 tick ごとに生きている生き物の位置と姿を見て、直近の4回（ゲーム内の3秒）がすべて歩く姿（act 1。巣に捕まっている者と眠っている者を除く）で、
+ * 10 tick ごとに生きている生き物の位置を見て、直近の4回（ゲーム内の3秒）の間ずっと歩く姿（act 1。2 tick ごとに見て各10 tick の8割以上。巣に捕まっている者と眠っている者を除く）で、
  * 3秒前の位置から正味で8px（半タイル）も離れておらず、しかも止まっているか行ったり来たりしているなら「引っかかっている」とみなす（ゆっくり進んでいるだけのものは除く。下の判定）。
  * 歩き方の癖で立ち止まる番（大ネズミやクモ、一行の先頭が見回す番など）は act 0 になるので入らない。
  * 引っかかりが2回続けて途切れたら区間を閉じて1行書く（1回だけの途切れは同じ区間とみなす。往復で端点がたまたま離れた瞬間を分けないため）。
@@ -170,6 +170,17 @@ const HITCH_N = 4;
 const HITCH_D2 = 8 * 8;
 type HitchRec = { xs: number[]; ys: number[]; ok: boolean[]; ep: null | { t0: number; x: number; y: number; st: number; near: number; wall: number; last: number; miss: number; n: number; nopath: number; walked: number; px: number; py: number } };
 const hitchMap = new Map<number, HitchRec>();
+/** 直近の 10 tick の間に、生き物の更新ごとに見て歩く姿だった回数と、見た回数（watchHitch が読んで空にする） */
+const hitchWalk = new Map<number, [number, number]>();
+function watchWalk(): void {
+  for (const c of w.eco.list) {
+    if (c.dead || c.away) continue;
+    let a = hitchWalk.get(c.id);
+    if (!a) hitchWalk.set(c.id, (a = [0, 0]));
+    if (c.act === 1) a[0]++;
+    a[1]++;
+  }
+}
 function watchHitch(): unknown[] {
   const e = w.eco;
   const m = w.map;
@@ -187,7 +198,10 @@ function watchHitch(): unknown[] {
     if (!r) hitchMap.set(c.id, (r = { xs: [], ys: [], ok: [], ep: null }));
     r.xs.push(c.x);
     r.ys.push(c.y);
-    r.ok.push(c.act === 1 && !c.caught && !(c.sleep > 0));
+    // 姿は、10 tick の間の生き物の更新ごと（2 tick ごと）に見て、8割以上が歩く姿なら歩いていたとみなす
+    // （10 tick ごとの瞬間だけを見ると、大ネズミの「止まっては走る」の止まる番のように、画面ではほとんど立ち止まっている者を拾ってしまう）
+    const wa = hitchWalk.get(c.id);
+    r.ok.push(!!wa && wa[0] >= wa[1] * 0.8 && !c.caught && !(c.sleep > 0));
     if (r.xs.length > HITCH_N) {
       r.xs.shift();
       r.ys.shift();
@@ -235,6 +249,7 @@ function watchHitch(): unknown[] {
       p.py = c.y;
     }
   }
+  hitchWalk.clear();
   for (const [id, r] of hitchMap) {
     if (seen.has(id)) continue;
     // 死んだ・外へ出た：続いていた区間はそこで閉じる
@@ -313,6 +328,7 @@ while (w.tick < target) {
   while (w.tick < until) {
     tick(w);
     if (w.tick % 20 === 0) stuckRows.push(...watchStuck());
+    if (w.tick % 2 === 0) watchWalk();
     if (w.tick % HITCH_EVERY === 0) hitchRows.push(...watchHitch());
     if (traceId) {
       const c = w.eco.list.find((o) => o.id === traceId);
