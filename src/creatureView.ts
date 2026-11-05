@@ -1238,10 +1238,10 @@ export class CreatureView {
           }
         }
       }
-      // 僧侶に清められた亡骸：数秒に一度、淡い光の粒が一つ立ちのぼる（もう起き上がらない印。描画専用。src/eco/roster.ts の blessBrace）
+      // 僧侶に清められた亡骸：数秒に一度、祈りのときと同じ聖印の光が、薄れながら亡骸から立ちのぼる（もう起き上がらない印。描画専用。src/eco/roster.ts の blessBrace）
       if (isCorpse && c.st === 99) {
-        const ph = (t * 0.22 + c.id * 0.37) % 1;
-        if (ph < 0.5) pushSprite(x + Math.sin(ph * 9 + c.id) * 2, yy, 3 + ph * 2 * 18, false, A.speck(0, Math.min(3, Math.floor(ph * 8))), 0, 2);
+        const ph = (t * 0.2 + c.id * 0.37) % 1;
+        if (ph < 0.45) pushSprite(x, yy, 6 + ph * 40, false, A.pray(1 + Math.min(2, Math.floor(ph * 6.7))), 0, 2);
       }
       let glow = c.glow / 255;
       // リビングアーマーの冑の覗き穴の光：マナが十分なら灯り続け、少なくなるとちらつく（描画専用）
