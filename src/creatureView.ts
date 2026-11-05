@@ -1079,6 +1079,12 @@ export class CreatureView {
         f = braced.get(c.id) === 1 ? 1 : 0;
       } else if (act === 2) {
         f = Math.min(3, c.actT);
+      } else if (act === 1 && c.x === c.px && c.y === c.py && eco.gaitPaused(c)) {
+        // 歩き方の止まる番（大ネズミの「止まってあたりをうかがう」、一行の先頭が見回す、など）で、この更新ではその場から動いていない。
+        // 行動の多くは移動のあとで「着いていなければ歩く姿」と姿を決め直すので、act は歩く姿のままになっている。
+        // 本当に止まっているので立ち姿で描く（以前は、その場で足を動かし続けて引っかかって見えた）
+        act = 0;
+        f = Math.floor(t * 2.6 + seed) & 3;
       } else if (act === 1) {
         f = Math.floor(t * 7 + seed) & 3;
       } else {

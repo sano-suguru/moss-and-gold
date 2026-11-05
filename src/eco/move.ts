@@ -458,6 +458,15 @@ export function gaitOf(this: Ecology, c: Cr): [number, number] {
   }
 }
 
+/**
+ * いまの生き物の更新が、歩き方の止まる番か（gaitOf が [0, 0] を返す番。逃げているときと戦っているときは止まらない）。
+ * 生き物の更新の通し番号と個体の番号だけで決まるので、描画（src/creatureView.ts）や分析からも同じ答えが得られる。読むだけで状態は変えない
+ */
+export function gaitPaused(this: Ecology, c: Cr): boolean {
+  const [f, side] = this.gaitOf(c);
+  return f === 0 && side === 0;
+}
+
 export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
   if (c.hp > 0 && c.hp < this.maxHp(c) * 0.35) {
     mx *= 0.6;
@@ -891,6 +900,7 @@ declare module '../ecology' {
     setDir: typeof setDir;
     moveToward: typeof moveToward;
     gaitOf: typeof gaitOf;
+    gaitPaused: typeof gaitPaused;
     tryMove: typeof tryMove;
     findMoss: typeof findMoss;
     updateForage: typeof updateForage;
@@ -903,4 +913,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, unbury, searchLimit, nearPath, unreachable, findPathAvoid, goTo, tileOf, ratOnDry, passable, stepOk, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, tryMove, findMoss, updateForage, nearestForage, eatMoss, eat, die, rebuildGrid, nearby });
+Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, unbury, searchLimit, nearPath, unreachable, findPathAvoid, goTo, tileOf, ratOnDry, passable, stepOk, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, gaitPaused, tryMove, findMoss, updateForage, nearestForage, eatMoss, eat, die, rebuildGrid, nearby });

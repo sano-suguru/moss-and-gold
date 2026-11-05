@@ -21,6 +21,8 @@ export interface Recs {
   events: any[];
   /** 足踏み（起きて歩く姿のまま2分以上ほぼ同じ場所にいた。sim.ts の stuck.jsonl） */
   stuck: any[];
+  /** 短い引っかかり（歩く姿のまま3秒で正味半タイルも進まない。sim.ts の hitch.jsonl） */
+  hitch: any[];
   /** その日の日次スナップショット（ゲームのセーブと同じ形の JSON）。from〜to の整数の日 */
   state: (day: number) => any;
 }
@@ -355,6 +357,19 @@ export const CHECKS: Check[] = [
     test: (rs) => {
       const n = rs.map((r) => r.stuck.filter((x) => countsAsStuck(x) && x.nopath >= 0.5).length);
       return { ok: sum(n) <= 40, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // 歩き方の止まる番で、その場から動いていない者は、描画で立ち姿になる（src/creatureView.ts。止まる番かは src/eco/move.ts の gaitPaused）。
+    // 引っかかりの判定もそれに合わせて、止まる番を歩いていないとみなす（sim.ts の watchWalk）。
+    // 止まる番も歩く姿で描いていたとき（#52 の判定）は、main の10〜18日目で大ネズミの引っかかりが4シードの合計で約8400回
+    // （かしたれ 1364・seed8 1950・abc 1706・seed7 3417）。多くは「止まってあたりをうかがう」番に、その場で足を動かしていたもの。
+    // いまの判定では約3000回（かしたれ 427・seed8 683・abc 693・seed7 1180）
+    name: '大ネズミが止まる番に足踏みしない（4シードの合計で引っかかりが4500回以下）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.hitch.filter((x) => x.k === 2).length);
+      return { ok: sum(n) <= 4500, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },
   {
