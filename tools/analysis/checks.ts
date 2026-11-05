@@ -437,4 +437,47 @@ export const CHECKS: Check[] = [
       return { ok: sum(res.map((x) => x.pools)) >= 1 && sum(res.map((x) => x.left)) === 0, value: rs.map((r, i) => `${r.seed} 開いた溜まり${res[i].pools}・残った${res[i].left}`).join('、') };
     },
   },
+  {
+    // 歩いて行ける場所の判定（src/eco/islands.ts の regionOf）：溶岩も壁とみなす。溶岩の溜まりをはさんだ二つの開いた場所は、別の領域になる
+    // （溶岩を通れる床として扱っていたときは同じ領域になり、溶岩の向こうのコボルトの住処が島とみなされず、入口から来たコボルトが溶岩の手前で立ち往生した）。
+    // 18日目の地形（日次スナップショットの掘削のログを作業ツリーのコードで再生したもの）で、まわりの床が二つ以上の領域に分かれる溶岩の溜まりを数える。
+    // main の16シードの18日目では seed18・seed27・seed30 で1つずつあった
+    name: '溶岩の溜まりをはさんだ場所が別の領域になる（seed18・seed27・seed30 の合計で、場所を分ける溶岩の溜まりが2つ以上）',
+    seeds: ['seed18', 'seed27', 'seed30'],
+    from: 10,
+    to: 18,
+    test: (rs) => {
+      const n = rs.map((r) => {
+        const w = new World(r.seed);
+        for (const op of (r.state(r.to)?.digs ?? []) as number[]) (w as any).replayOp(op);
+        const m = w.map;
+        const seen = new Uint8Array(m.solid.length);
+        let pools = 0;
+        for (let s = 0; s < m.solid.length; s++) {
+          if (!m.lava[s] || seen[s]) continue;
+          const q = [s];
+          seen[s] = 1;
+          const regs = new Set<number>();
+          for (let i = 0; i < q.length; i++) {
+            const c = q[i];
+            for (const nb of [c + 1, c - 1, c + m.w, c - m.w]) {
+              if (m.solid[nb]) continue;
+              if (m.lava[nb]) {
+                if (!seen[nb]) {
+                  seen[nb] = 1;
+                  q.push(nb);
+                }
+              } else {
+                const g = w.eco.regionOf(nb);
+                if (g >= 0) regs.add(g);
+              }
+            }
+          }
+          if (regs.size >= 2) pools++;
+        }
+        return pools;
+      });
+      return { ok: sum(n) >= 2, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
 ];
