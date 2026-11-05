@@ -989,10 +989,18 @@ void main() {
 
   // 壁際と角の床は少し暗く（奥行き）。暗がりの色にも大きなむらを少し持たせる
   // 壁までのおおよその距離（px）：まわり4マスの岩の量を点の位置でなめらかに補間した値から出す。
-  // まっすぐな壁ぎわでは壁の縁からの距離と一致し、へこんだ角ほど近く、出っ張った角は丸く遠くなる（丸めた壁の形に沿う）
+  // まっすぐな壁ぎわでは壁の縁からの距離と一致し、へこんだ角ほど近く、出っ張った角は丸く遠くなる（丸めた壁の形に沿う）。
+  // 左右の縁を出入りさせた所（edgeOff）では、補間する位置を同じだけ横へずらし、暗い帯も縁に沿って出入りさせる
   float de = 16.0;
   if (s == 0) {
-    float sv = mix(mix(float(q00.r & 1), float(q10.r & 1), qf.x), mix(float(q01.r & 1), float(q11.r & 1), qf.x), qf.y);
+    vec2 qe = qf;
+    int eb = cornerAt(t);
+    int ebit = l.x < 8 ? 32 : 64;
+    if ((eb & ebit) != 0) {
+      float o = edgeOff(t, false, ebit, ebit == 32 ? t.x : t.x + 1, float(w.y) + 0.5, float(l.y) + 0.5);
+      qe.x = clamp(qe.x + (ebit == 32 ? -o : o) / 16.0, 0.0, 1.0);
+    }
+    float sv = mix(mix(float(q00.r & 1), float(q10.r & 1), qe.x), mix(float(q01.r & 1), float(q11.r & 1), qe.x), qe.y);
     de = max(0.0, (0.5 - sv) * 16.0);
   }
   if (s == 0 && !rub) {
