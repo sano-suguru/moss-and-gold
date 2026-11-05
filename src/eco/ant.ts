@@ -35,7 +35,7 @@ export function pickNest(this: Ecology): number {
   return best;
 }
 
-/** 同じ所へ向かうアリが、個体ごとに少しずつずれて取りつく点（中心からのずれ。半径 r の円の上、個体の番号で決まる） */
+/** 巣へ戻って休むアリが、個体ごとに少しずつずれて集まる点（中心からのずれ。半径 r の円の上、個体の番号で決まる） */
 function antSpot(c: Cr, r: number): [number, number] {
   const a = (c.id * 2.39996) % 6.2832;
   return [Math.cos(a) * r, Math.sin(a) * r * 0.75];
@@ -65,11 +65,7 @@ export function ant(this: Ecology, c: Cr): void {
   if (c.hungry && c.st === 0 && c.units === 0 && col.store > 0) c.st = 1;
   if (c.st === 1) {
     c.act = 1;
-    // 巣の口のまわりに、個体ごとに少しずれた所を目指し、巣から1.5マスの内に入れば納める
-    // （以前はみな巣の真ん中の一点から10px の内に入ろうとして、十数匹が一点に集まり、
-    //  列の間合いで歩みをゆるめ合って入れず、巣のまわりで押し合いながら足踏みしていた。16シードの12日目で引っかかりの3割）
-    const [ox, oy] = antSpot(c, 10);
-    if (this.goTo(c, col.x + ox, col.y + oy, s.speed) || sq(col.x - c.x) + sq(col.y - c.y) < 24 * 24) {
+    if (this.goTo(c, col.x, col.y, s.speed) || sq(col.x - c.x) + sq(col.y - c.y) < 10 * 10) {
       col.store += c.units;
       c.units = 0;
       if (c.food < 4 && col.store > 0) {
@@ -124,27 +120,21 @@ export function ant(this: Ecology, c: Cr): void {
   }
   c.act = 1;
   if (target) {
-    // 死骸のまわりに、個体ごとに少しずれて取りつく（一点に集まって押し合わないように）
-    if (sq(target.x - c.x) + sq(target.y - c.y) < 14 * 14) {
+    if (sq(target.x - c.x) + sq(target.y - c.y) < 8 * 8) {
       const t = Math.min(2, target.units, 4 - c.units);
       target.units -= t;
       c.units += t;
       if (target.units <= 0) target.dead = 2;
       if (c.units >= 4 || target.dead === 2) c.st = 1;
-    } else {
-      const [ox, oy] = antSpot(c, 7);
-      this.goTo(c, target.x + ox, target.y + oy, s.speed);
-    }
+    } else this.goTo(c, target.x, target.y, s.speed);
     return;
   }
   if (c.ref2 < 0) {
     const k = -1 - c.ref2;
     const m = this.w.map;
-    // マスの中で、個体ごとに少しずれた所を目指し、そのマスに乗るか10px の内に入れば取る
-    const [ox, oy] = antSpot(c, 5);
-    const tx = (k % m.w) * TILE + 8 + ox;
-    const ty = Math.floor(k / m.w) * TILE + 8 + oy;
-    if (this.goTo(c, tx, ty, s.speed) || this.tileOf(c.x, c.y) === k || sq(tx - c.x) + sq(ty - c.y) < 10 * 10) {
+    const tx = (k % m.w) * TILE + 8;
+    const ty = Math.floor(k / m.w) * TILE + 8;
+    if (this.goTo(c, tx, ty, s.speed) || sq(tx - c.x) + sq(ty - c.y) < 8 * 8) {
       let t = Math.min(2, Math.max(0, this.w.fungus[k] - 12), 4 - c.units);
       if (t > 0) this.w.fungus[k] -= t;
       else {
