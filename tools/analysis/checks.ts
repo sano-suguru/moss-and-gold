@@ -57,8 +57,11 @@ const RUN_A = { seeds: ['かしたれ', 'seed8', 'abc', 'seed7'], from: 10, to: 
 // CI と同じく main の15日目から始めると、上の7シードでは立ち上がり2回・取り込み0回で落ちたので、abc・seed35・seed5 を足す
 const RUN_ARMOR = { seeds: ['かしたれ', 'seed6', 'seed40', 'seed41', 'seed18', 'seed17', 'seed30', 'abc', 'seed35', 'seed5'], from: 15, to: 23 };
 // 僧侶が亡骸の前で祈る場面は、冒険者の亡骸があり、そのそばを僧侶のいる一行が安全に通るときだけ起きる（16シード×25日で13シード・30回ほど）。
-// 0日目から作業ツリーで実行した10〜18日目では seed5 2・seed17 2・seed4 1・seed6 1・seed27 1・seed30 1。RUN_A の4シードでは0回だった
-const RUN_BLESS = { seeds: ['seed5', 'seed17', 'seed4', 'seed6', 'seed27', 'seed30'], from: 10, to: 18 };
+// 0日目から作業ツリーで実行した10〜18日目では seed5 2・seed17 2・seed4 1・seed6 1・seed27 1・seed30 1。RUN_A の4シードでは0回だった。
+// 縦穴のコウモリのねぐらを直したコードを main（#57）の10日目から続けると、上の6シードでは0回になった（main は seed4 9・seed6 2）。
+// main の0日目から／そのコードの0日目から／そのコードを main の10日目から、のどれでも起きる abc（2・2・2）・seed8（1・1・1）・seed40（1・1・1）・seed18（1・4・1）にする
+// （どのシードもほかの項目で10〜18日目を実行しているので、実行するシードは増えない）
+const RUN_BLESS = { seeds: ['abc', 'seed8', 'seed40', 'seed18'], from: 10, to: 18 };
 const RUN_ORC = { seeds: ['かしたれ', 'seed27'], from: 10, to: 18 };
 // オークの取り立ては、従う集落に蓄えがたまったときだけ起きるまれな出来事（16シード×25日で約25回、起きるのは6シードほど）。
 // いまのコードで10〜18日目に起きているシードを選ぶ。焚き火の夜襲の二歩目（#29）のコードで、
@@ -73,10 +76,10 @@ const RUN_ORC = { seeds: ['かしたれ', 'seed27'], from: 10, to: 18 };
 // 苔の無いコウモリを外へ出すコードを main の10日目から続けても seed35 4・seed30 3・seed40 1・かしたれ 1 なので、seed35・seed30・seed40 にする
 // （どのシードもほかの項目で10〜18日目を実行しているので、実行するシードは増えない）
 const RUN_TRIB = { seeds: ['seed35', 'seed30', 'seed40'], from: 10, to: 18 };
-// 倒れた冒険者がヴァンパイアの眷属として起き上がるのは、16シードの10〜18日目で2〜3回のまれな出来事で、どのシードで起きるかは地形と展開で入れ替わる。
-// #49 の地形では RUN_A の4シードで起きず、はじまりの洞窟 1・seed40 2（#48 を取り込む前のコードでは seed6 1・seed35 1）。
-// どちらでも起きるよう4シードを並べる（どれもほかの項目で10〜18日目を実行しているので、実行するシードは増えない）
-const RUN_THRALL = { seeds: ['はじまりの洞窟', 'seed40', 'seed6', 'seed35'], from: 10, to: 18 };
+// 倒れた冒険者がヴァンパイアの眷属として起き上がる場面（src/eco/vampire.ts の vampRaiseFallen）は、check の項目にしない。
+// 16シードの10〜18日目で main でも1体（縦穴のコウモリのねぐらを直したコードを main の10日目から続けると0体）、10〜25日目でも0〜5体のまれな出来事で、
+// どのシードを選んでも短い実行では確かめられない。ヴァンパイアが倒した者を眷属にする仕組みは、RUN_A の項目（旋回と眷属）で確かめ、
+// 冒険者の亡骸から起き上がる場面は、ab の「見せたい場面」の表（lib/moments.ts）で起きたシードの数を追う
 
 export const CHECKS: Check[] = [
   {
@@ -101,15 +104,6 @@ export const CHECKS: Check[] = [
       const ca = rs.map((r) => r.settle.filter((x) => x.k === 19 && x.ev === 'callBats').length);
       const pin = rs.map((r) => r.settle.filter((x) => x.k === 19 && x.ev === 'pin').length);
       return { ok: sum(ca) >= 1 && sum(pin) >= 2, value: rs.map((r, i) => `${r.seed} 呼び寄せ${ca[i]}・足止め${pin[i]}`).join('、') };
-    },
-  },
-  {
-    // ヴァンパイア（src/eco/vampire.ts の vampRaiseFallen）：倒れた冒険者の亡骸にかがみ込み、眷属として起き上がらせる
-    name: '倒れた冒険者がヴァンパイアの眷属として起き上がる（4シードで1体以上）',
-    ...RUN_THRALL,
-    test: (rs) => {
-      const n = rs.map((r) => r.births.filter((x) => x.k === 30 && x.from === 25).length);
-      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },
   {
@@ -220,7 +214,7 @@ export const CHECKS: Check[] = [
   },
   {
     // 亡骸を清める：僧侶のいる一行が、冒険者の亡骸の前で立ち止まって祈る（清められた亡骸は起き上がらない。src/eco/roster.ts の blessBrace）
-    name: '僧侶が冒険者の亡骸の前で祈って清める（6シードの合計で2回以上）',
+    name: '僧侶が冒険者の亡骸の前で祈って清める（4シードの合計で2回以上）',
     ...RUN_BLESS,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'bless').length);
@@ -422,6 +416,20 @@ export const CHECKS: Check[] = [
     test: (rs) => {
       const n = rs.map((r) => r.hitch.filter((x) => x.k === 13 || x.k === 15 || x.k === 16 || x.k === 23).length);
       return { ok: sum(n) <= 2200, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // 縦穴から来るコウモリは、縦穴の真上が岩や縦穴とつながっていない洞窟なら、縦穴のマスの天井ぎわに生まれてぶら下がる（src/eco/bat.ts の roostSpot）。
+    // 以前は岩の中や別の洞窟に生まれて、夜に縦穴へ戻れず、そのそばで足踏みしたまま飢えていた。
+    // main（#57）の10〜18日目では、苔を探すとき（st 1）以外のコウモリの足踏み（2分以上）が seed7 16・seed35 17・seed41 0、
+    // 直したコードを main の10日目から続けると seed7 0・seed35 2・seed41 0
+    name: 'コウモリが縦穴へ戻れずに足踏みしない（seed7・seed35・seed41 の合計で、苔を探すとき以外の足踏みが8回以下）',
+    seeds: ['seed7', 'seed35', 'seed41'],
+    from: 10,
+    to: 18,
+    test: (rs) => {
+      const n = rs.map((r) => r.stuck.filter((x) => x.k === 1 && x.st !== 1).length);
+      return { ok: sum(n) <= 8, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },
   {
