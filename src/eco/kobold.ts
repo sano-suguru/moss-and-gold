@@ -367,6 +367,8 @@ export function kobold(this: Ecology, c: Cr): void {
       if (wr.prog >= [500, 900, 2400][m.rubble[wr.target] ? 0 : m.hard[wr.target]]) {
         if (this.w.dig(wr.target)) {
           wr.len++;
+          // 入口側と切り離されていた住処が、いま掘ったマスで入口側とつながった
+          if (this.islandIds.has(wr.id) && this.warrenRegion(wr) === this.mainRegion) this.markJoined(wr.id, wr.x, wr.y, Kind.Kobold, 1);
           // 横穴を掘り込んでいるなら、住処の中心を奥へ移す
           if ((wr.dir ?? -1) >= 0 && wr.target === this.tunnelNext(wr)) {
             wr.tun = (wr.tun ?? 0) + 1;
