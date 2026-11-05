@@ -334,8 +334,18 @@ export function kobold(this: Ecology, c: Cr): void {
       this.goTo(c, p.x, p.y, s.speed * 1.2);
       return;
     }
-    const k0 = this.findMoss(c, c.x, c.y, c.sinceMeal > 600 ? 14 : 8, 72);
-    const k = k0 >= 0 ? k0 : this.findFungus(c.x, c.y, c.sinceMeal > 600 ? 14 : 8, c.id + this.step);
+    // いま向かっている目的地（道筋の記録に残る目的地のマス）にまだ食べられる苔かキノコがあり、探す範囲の内なら、探し直さずにそこへ向かう。
+    // 苔を探す処理は、まわりのマスを乱数でいくつか試して選ぶので、更新のたびに探し直すと目的地が入れ替わり、
+    // ジグザグに行ったり来たりして引っかかって見えていた（16シードの12日目で、コボルトの引っかかりのうち行ったり来たりの大半）
+    const R = c.sinceMeal > 600 ? 14 : 8;
+    const pg = this.paths.get(c.id);
+    const gk = pg ? pg.gk : -1;
+    const keep = gk >= 0 && pg!.miss === 0 && Math.max(this.w.moss[gk], this.w.fungus[gk]) >= 20 && Math.abs((gk % this.w.map.w) - Math.floor(c.x / TILE)) <= R && Math.abs(Math.floor(gk / this.w.map.w) - Math.floor(c.y / TILE)) <= R;
+    // 着いて食べている間（道筋の記録は着いたときに消える）は、足元のマスに食べ物が残っていればそこにとどまる
+    const here = this.tileOf(c.x, c.y);
+    const atFood = here >= 0 && Math.max(this.w.moss[here], this.w.fungus[here]) >= 20;
+    const k0 = keep ? gk : atFood ? here : this.findMoss(c, c.x, c.y, R, 72);
+    const k = k0 >= 0 ? k0 : this.findFungus(c.x, c.y, R, c.id + this.step);
     if (k >= 0) {
       const m = this.w.map;
       c.act = 1;

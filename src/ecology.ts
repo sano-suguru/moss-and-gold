@@ -705,6 +705,12 @@ export class Ecology {
   items: Cr[] = [];
   /** 道筋（遠くへ行くとき）。miss は、目的地への道が見つからなかった探索が何回続いたか（0 なら道は見つかっている。そのときの path は、目的地にいちばん近づけるマスまでの道） */
   paths = new Map<number, { gx: number; gy: number; gk: number; at: number; path: number[]; pi: number; stall: number; miss: number }>();
+  /**
+   * 退く先：生き物の id →［x, y, この生き物の更新の通し番号までに着けなければやめる, 退き終えたあとの休みの長さ（生き物の更新の回数）］。
+   * 人の気配などから離れるとき、一歩ずつ押し返すのではなく、離れた所を一つ決めて着くまで歩く（src/eco/senses.ts の retreatTo・retreatStep）。
+   * 退き終えたら x を NaN にして、休みの終わりの更新の通し番号を持つ（その間は同じ理由で退かない）。セーブする
+   */
+  retreats = new Map<number, [number, number, number, number]>();
   bq: Int32Array;
   bprev: Int32Array;
   bmark: Int32Array;
