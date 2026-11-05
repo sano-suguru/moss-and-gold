@@ -240,24 +240,26 @@ float edgeOff(ivec2 t, bool self, int bit, int bx, float y, float ly) {
   if ((dn & bit) == 0 || (dn & 1) != s) g = min(g, (10.0 - ly) / 6.0);
   return o * clamp(g, 0.0, 1.0);
 }
-// 左右の縁のふらつき（縁から 4px の内だけ。張り出しは最大 3.5px）。縁が無ければ self のまま
-bool edgePx(ivec2 p, ivec2 t, ivec2 l, int b, bool self) {
+// 左右の縁のふらつき（縁から 4px の内だけ。張り出しは最大 3.5px）。縁が無ければ self のまま。
+// ずれの量は縦の位置 ey で決める（ふだんは p.y。上面か正面かを決めるために正面の高さだけ下の点を見るときは、
+// 元の点の高さのずれを使う。下の点のずれで見ると、張り出した点の下が床になり、細い正面と判定されて暗くなる）
+bool edgePx(ivec2 p, ivec2 t, ivec2 l, int b, bool self, int ey) {
   int bit = l.x < 4 ? 32 : l.x > 11 ? 64 : 0;
   if (bit == 0 || (b & bit) == 0) return self;
   float d = bit == 32 ? float(l.x) + 0.5 : 15.5 - float(l.x);
-  float o = edgeOff(t, self, bit, bit == 32 ? t.x : t.x + 1, float(p.y) + 0.5, float(l.y) + 0.5);
+  float o = edgeOff(t, self, bit, bit == 32 ? t.x : t.x + 1, float(ey) + 0.5, float(l.y) + 0.5);
   return self ? d > -o : d < o;
 }
-bool wallPxB(ivec2 p, ivec2 t, int b) {
+bool wallPxB(ivec2 p, ivec2 t, int b, int ey) {
   bool self = (b & 1) != 0;
   ivec2 l = p - t * 16;
   int q = (l.x < 8 ? 0 : 1) + (l.y < 8 ? 0 : 2);
-  if ((b & (2 << q)) == 0) return edgePx(p, t, l, b, self);
+  if ((b & (2 << q)) == 0) return edgePx(p, t, l, b, self, ey);
   // 角からの距離（ピクセルの中心で 0.5〜7.5）
   ivec2 v = t + ivec2(q & 1, q >> 1);
   vec2 a = abs(vec2(p - v * 16) + 0.5);
   float r = 3.0 + float(hash2(v, 811u) % 4u);
-  if (a.x >= r || a.y >= r) return edgePx(p, t, l, b, self);
+  if (a.x >= r || a.y >= r) return edgePx(p, t, l, b, self, ey);
   // 凹凸は、角から見た向き（a.x − a.y）に沿って 3px ごとの値をなめらかにつないだもの。半径の向きには一様なので、
   // 縁は一続きの線のままで、離れた点や1ピクセルだけの突き出しができない
   float u = (a.x - a.y) / 3.0 + 4.0;
@@ -266,14 +268,17 @@ bool wallPxB(ivec2 p, ivec2 t, int b) {
   bool near = length(vec2(r) - a) > r + j;
   return self ? !near : near;
 }
-bool wallPx(ivec2 p) {
+bool wallPxE(ivec2 p, int ey) {
   ivec2 t = tileOfPx(p);
-  return wallPxB(p, t, cornerAt(t));
+  return wallPxB(p, t, cornerAt(t), ey);
 }
+bool wallPx(ivec2 p) { return wallPxE(p, p.y); }
+// 点 p から正面の高さ（FACE px）だけ下の点が見た目の壁か（縁のずれは p の高さのもの）
+bool wallBelow(ivec2 p) { return wallPxE(p + ivec2(0, FACE), p.y); }
 // 点 p（ワールドのピクセル）が壁の上面か：見た目の壁の足もとを、正面の高さ（FACE px）だけ上へずらした形。正面が丸めた角を回り込む
-bool topPx(ivec2 p) { return wallPx(p) && wallPx(p + ivec2(0, FACE)); }
+bool topPx(ivec2 p) { return wallPx(p) && wallBelow(p); }
 // 点 p が壁の正面か
-bool facePx(ivec2 p) { return wallPx(p) && !wallPx(p + ivec2(0, FACE)); }
+bool facePx(ivec2 p) { return wallPx(p) && !wallBelow(p); }
 // 上面の点（マス t の中の位置 l）が、人の手の床の縁を囲む切り石の天端か：石積みの正面の天端と、人の手の床から CAP px の内の上面
 bool copingPx(ivec2 t, ivec2 l) {
   if (handmadeAt(t + ivec2(0, 1))) return true;
@@ -370,7 +375,7 @@ void main() {
   // 見た目の壁（角を丸めた形）。マスと食い違う点（削った角の床、張り出した岩）は、角をはさむ横の隣のマスのものとして描く
   // （削った角では横の隣が床、張り出した岩では横の隣が岩）
   ivec4 tiOwn = tileAt(t);
-  bool wpx = wallPxB(w, t, tiOwn.r);
+  bool wpx = wallPxB(w, t, tiOwn.r, w.y);
   bool moved = wpx != ((tiOwn.r & 1) != 0);
   if (moved) { t = cnH(w); l = w - t * 16; }
   int s = wpx ? 1 : 0;
@@ -410,8 +415,7 @@ void main() {
     // 岩の内部（まわり8マスもすべて壁）なら、どの点も上面で縁も無いので、判定を省く
     ivec4 tw = moved ? tileAt(t) : tiOwn;
     bool inner = (tw.a & 8) != 0;
-    ivec2 dF = ivec2(0, FACE);
-    bool wF = inner || wallPx(w + dF);
+    bool wF = inner || wallBelow(w);
     bool wL = inner || wallPx(w - ivec2(1, 0));
     bool wR = inner || wallPx(w + ivec2(1, 0));
     bool top = wF;
@@ -438,10 +442,10 @@ void main() {
         }
       }
       bool wU = inner || wallPx(w - ivec2(0, 1));
-      bool up = inner || (wU && wallPx(w - ivec2(0, 1) + dF));
-      bool lf = inner || (wL && wallPx(w - ivec2(1, 0) + dF));
-      bool rt = inner || (wR && wallPx(w + ivec2(1, 0) + dF));
-      bool dn = inner || (wallPx(w + ivec2(0, 1)) && wallPx(w + ivec2(0, 1) + dF));
+      bool up = inner || (wU && wallBelow(w - ivec2(0, 1)));
+      bool lf = inner || (wL && wallBelow(w - ivec2(1, 0)));
+      bool rt = inner || (wR && wallBelow(w + ivec2(1, 0)));
+      bool dn = inner || (wallPx(w + ivec2(0, 1)) && wallBelow(w + ivec2(0, 1)));
       // 床と接する縁は黒い線。正面へ落ちる縁（天端の手前の角）は明るい線。
       // へこんだ角で正面が回り込む曲線では、横が正面でも、すぐ下が上面でなければ明るい線にする（曲線が途切れて点線にならないように）
       bool flrU = !wU;
@@ -456,10 +460,10 @@ void main() {
       // 正面の中での高さ（上端が CAP、床に接する下端が 15）。真下へ何 px で床になるかで決める。
       // 使うのは下端の3段と上端だけなので、その分だけ調べる（途中の段は 10。石積みの壁は角を丸めないので、マスの中の位置を使う）
       int fy = 10;
-      if (!wallPx(w + ivec2(0, 1))) fy = 15;
-      else if (!wallPx(w + ivec2(0, 2))) fy = 14;
-      else if (!wallPx(w + ivec2(0, 3))) fy = 13;
-      else if (wallPx(w + ivec2(0, FACE - 1))) fy = CAP;
+      if (!wallPxE(w + ivec2(0, 1), w.y)) fy = 15;
+      else if (!wallPxE(w + ivec2(0, 2), w.y)) fy = 14;
+      else if (!wallPxE(w + ivec2(0, 3), w.y)) fy = 13;
+      else if (wallPxE(w + ivec2(0, FACE - 1), w.y)) fy = CAP;
       if (brick) {
         // 石積みの壁（いちばん下の段の下端がマスの下端にそろうよう、行をずらす）
         idx = faceIdx(ivec2(l.x, l.y - CAP + 1));
@@ -478,8 +482,8 @@ void main() {
       // 天端のすぐ下は影、足もとは暗く
       if (fy == CAP) idx = min(idx, 2);
       if (fy >= 13) idx -= 1;
-      bool lf = wL && !wallPx(w - ivec2(1, 0) + dF);
-      bool rt = wR && !wallPx(w + ivec2(1, 0) + dF);
+      bool lf = wL && !wallBelow(w - ivec2(1, 0));
+      bool rt = wR && !wallBelow(w + ivec2(1, 0));
       // 左右の縁の黒い線は、床と接する所だけ（へこんだ角で上面と接する所には引かない）
       if (!wL || !wR) idx = 0;
       tkind = 1;
