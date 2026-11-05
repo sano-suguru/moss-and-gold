@@ -438,7 +438,8 @@ export const SPEC: Spec[] = [
   { body: 16, cap: 40, meta: 12, starve: 900, speed: 1.0, glowDecay: 1 },
   { body: 60, cap: 120, meta: 60, starve: 4000, speed: 0.7, glowDecay: 1 },
   { body: 30, cap: 80, meta: 40, starve: 4000, speed: 0.6, glowDecay: 1 },
-  { body: 12, cap: 60, meta: 5, starve: 1e9, speed: 0.35, glowDecay: 1 },
+  // スライム：食べた物は生き物の更新20回ごとに1減る（以前は5回ごとで、死骸を食べても体が育つ前に減ってしまい、二つに分かれることがほとんどなかった）
+  { body: 12, cap: 60, meta: 20, starve: 1e9, speed: 0.35, glowDecay: 1 },
   { body: 0, cap: 0, meta: 1e9, starve: 1e9, speed: 0.4, glowDecay: 1 },
   { body: 0, cap: 0, meta: 1e9, starve: 1e9, speed: 0.5, glowDecay: 1 },
   { body: 20, cap: 0, meta: 1e9, starve: 1e9, speed: 0.4, glowDecay: 1 },
