@@ -76,7 +76,7 @@ const GRAVE_STOP = 60;
 const GRAVE_R = 6;
 /** 冒険者の亡骸に気づいて、僧侶が祈りに立ち止まる遠さ（マス） */
 const BLESS_R = 6;
-/** 亡骸から何マス以内に起きている手強い相手がいると、祈らずに通り過ぎるか */
+/** 一行の先頭から何マス以内に起きている手強い相手がいると、祈らずに通り過ぎるか */
 const BLESS_SAFE = 6;
 
 /** 姿の値：髪 0〜5、肌 0〜3、身につける色 0〜5、体つき 0〜2、頭の形 0〜1、頭の飾り（+1 して 1〜13、0 はまだない）、傷（1 眼帯、2 頭の包帯） */
@@ -343,10 +343,11 @@ export function blessBrace(this: Ecology, p: Party, lead: Cr): void {
   for (const o of this.corpses) {
     if (o.k !== Kind.Adventurer || o.dead !== 1 || o.units <= 0 || o.st === 99) continue;
     if (sq(o.x - lead.x) + sq(o.y - lead.y) > BLESS_R * TILE * BLESS_R * TILE || !lineOfSight(m, lead.x, lead.y, o.x, o.y)) continue;
-    // 亡骸のそばに、起きている手強い相手（強さ6以上：リビングアーマー、ゴーレム、ミノタウロスなど）がいれば祈らない。
-    // 亡骸は冒険者が倒された所、たとえば宝物庫の入口のゴーレムの前に溜まるので、そこで立ち止まると次々に倒されて、亡骸がまた増えていた
+    // 一行のそばに、起きている手強い相手（強さ6以上：リビングアーマー、ゴーレム、ミノタウロスなど）がいれば祈らない。
+    // 亡骸は冒険者が倒された所、たとえば宝物庫の入口のゴーレムの前に溜まるので、その近くで立ち止まると次々に倒されて、亡骸がまた増えていた。
+    // 祈る間、一行はその場で止まる（亡骸へは歩み寄らない）ので、危ないかどうかは一行の先頭のまわりで見る
     let danger = false;
-    this.nearby(o.x, o.y, BLESS_SAFE, (q) => {
+    this.nearby(lead.x, lead.y, BLESS_SAFE, (q) => {
       if (!danger && !q.dead && !q.away && q.sleep === 0 && q.k !== Kind.Adventurer && q.k !== Kind.Dwarf && STR[q.k] >= 6) danger = true;
     });
     if (danger) continue;
