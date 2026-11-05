@@ -230,8 +230,9 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
   if (this.strike(a, d, asleep ? 1.5 : 1)) {
     if (a.k === Kind.Skeleton || a.k === Kind.Lich || a.k === Kind.Dwarf || a.k === Kind.Golem || a.k === Kind.Gargoyle || a.k === Kind.Armor || a.k === Kind.Thrall || (a.k === Kind.Adventurer && d.k !== Kind.Rat)) this.die(d, 'fight', a.k);
     else this.eat(a, d, true);
-    // ヴァンパイアが倒した者は、眷属として起き上がることがある（src/eco/thrall.ts）
+    // ヴァンパイアと、その眷属が倒した者は、眷属として起き上がることがある（src/eco/thrall.ts）
     if (a.k === Kind.Vampire) this.vampClaim(a, d);
+    else if (a.k === Kind.Thrall) this.thrallClaim(a, d);
     return true;
   }
   // 打ち返し（逃げている者と、寝込みを打たれて飛び起きたばかりの者は打ち返さない）
@@ -242,6 +243,7 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
     if (this.strike(d, a, this.batPinned(d) ? 0.4 : 0.8)) {
       this.die(a, 'fight', d.k);
       if (d.k === Kind.Vampire) this.vampClaim(d, a);
+      else if (d.k === Kind.Thrall) this.thrallClaim(d, a);
       // リビングアーマーは、打ち返しで倒した相手も覚える（その落とし物を「奪って」取り込む。src/eco/armor.ts）
       if (d.k === Kind.Armor) {
         d.ref = a.id;

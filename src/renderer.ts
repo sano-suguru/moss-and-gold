@@ -1,6 +1,8 @@
 import type { World } from './world';
 import type { Atlas } from './atlas';
 import { FLOORS, floorId } from './floors';
+import { forBreathFan } from './eco/fire';
+import { Kind } from './ecology';
 import { FS_BLIT, FS_BLUR, FS_BRIGHT, FS_LIGHT, FS_SCENE, FS_SHADOW, FS_SPRITE, MAX_DYN, MAX_LIGHTS, MAX_SHAFTS, VS_FULL, VS_SHADOW, VS_SPRITE } from './shaders';
 
 export interface FrameLights {
@@ -268,16 +270,30 @@ export class Renderer {
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.mapW, this.mapH, gl.RGBA, gl.UNSIGNED_BYTE, d);
   }
 
-  /** 燃えているマスと焼け跡を送る */
-  updateFx(w: World): void {
+  /**
+   * 燃えているマスと焼け跡を送る。ドラゴンが炎を吐いている間は、その炎の扇の中のマスにも、燃える床と同じ炎を描く
+   * （描画だけ。シミュレーションの燃えるマス w.burn は変えない。扇の形は src/eco/fire.ts の forBreathFan で、傷を負う範囲と同じ）。
+   * 炎を吐いているドラゴンがいれば true を返す（その間は毎フレーム送り直す。src/main.ts）
+   */
+  updateFx(w: World): boolean {
     const gl = this.gl;
     const d = this.fxData;
     for (let k = 0; k < w.burn.length; k++) {
       d[k * 4] = w.burn[k] ? Math.min(255, 120 + w.burn[k] * 4) : 0;
       d[k * 4 + 1] = w.ash[k];
     }
+    let breathing = false;
+    for (const c of w.eco.list) {
+      if (c.k !== Kind.Dragon || c.dead || c.act !== 2 || c.ref2 <= 0) continue;
+      breathing = true;
+      const t = Math.max(0, (c.sp === 1 ? 7 : 12) - c.ref2);
+      forBreathFan(w.map, c, c.tx, t, 0, (k) => {
+        d[k * 4] = Math.max(d[k * 4], 200);
+      });
+    }
     gl.bindTexture(gl.TEXTURE_2D, this.fxTex);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.mapW, this.mapH, gl.RGBA, gl.UNSIGNED_BYTE, d);
+    return breathing;
   }
 
   private ensureTargets(artW: number, artH: number): void {

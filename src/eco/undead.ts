@@ -246,7 +246,7 @@ export function skeleton(this: Ecology, c: Cr, day: number): void {
     this.deposit(c.x, c.y, 1);
     if (c.body <= 0) {
       // 崩れて消えたことも、死として記録に残す（保存則の収支は、土へ返した分で合っている）
-      this.record('deaths', { t: this.w.tick, k: c.k, cause: 'crumbled', by: -1, x: Math.round(c.x), y: Math.round(c.y) } as never);
+      this.record('deaths', { t: this.w.tick, id: c.id, k: c.k, cause: 'crumbled', by: -1, x: Math.round(c.x), y: Math.round(c.y) } as never);
       this.dropBelongings(c);
       this.releaseMana(c);
       c.dead = 2;
