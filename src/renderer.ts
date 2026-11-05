@@ -1,5 +1,6 @@
 import type { World } from './world';
 import type { Atlas } from './atlas';
+import { FLOORS, floorId } from './floors';
 import { FS_BLIT, FS_BLUR, FS_BRIGHT, FS_LIGHT, FS_SCENE, FS_SHADOW, FS_SPRITE, MAX_DYN, MAX_LIGHTS, MAX_SHAFTS, VS_FULL, VS_SHADOW, VS_SPRITE } from './shaders';
 
 export interface FrameLights {
@@ -89,9 +90,9 @@ export class Renderer {
   private shadowVao: WebGLVertexArrayObject;
   private vao: WebGLVertexArrayObject;
   private mapTex: WebGLTexture;
-  // 壁の角の丸め方（マスごと）：bit0 壁か、bit1〜4 左上・右上・左下・右下の角を丸めるか（壁のマスなら削る、床のマスなら岩を張り出させる）
-  private cornerTex: WebGLTexture;
-  private cornerData: Uint8Array = new Uint8Array(0);
+  // マスごとの描き方の情報（tileInfo が作る。壁の角の丸め方、床の材質、高さの違う縁、掘りたてか）
+  private tileTex: WebGLTexture;
+  private tileData: Uint8Array = new Uint8Array(0);
   private fieldTex: WebGLTexture;
   private manaTex: WebGLTexture;
   private manaData = new Uint8Array(0);
@@ -138,7 +139,7 @@ export class Renderer {
     gl.vertexAttribDivisor(0, 1);
     gl.bindVertexArray(null);
     this.scene = program(gl, FS_SCENE, '場面', [
-      'uMap', 'uField', 'uGlow', 'uLight', 'uFx', 'uMana', 'uCorner', 'uMapSize', 'uOrigin', 'uArtSize', 'uLmOrigin', 'uLmSize', 'uTime',
+      'uMap', 'uField', 'uGlow', 'uLight', 'uFx', 'uMana', 'uTile', 'uMapSize', 'uOrigin', 'uArtSize', 'uLmOrigin', 'uLmSize', 'uTime',
       'uNumHalo', 'uH', 'uHC', 'uNumShaft', 'uS', 'uDebug',
     ]);
     this.blit = program(gl, FS_BLIT, '拡大', ['uTex', 'uBloom', 'uScale', 'uBloomStr']);
@@ -148,7 +149,7 @@ export class Renderer {
     this.bloomFb = [gl.createFramebuffer()!, gl.createFramebuffer()!];
     this.vao = gl.createVertexArray()!;
     this.mapTex = makeTex(gl, gl.NEAREST);
-    this.cornerTex = makeTex(gl, gl.NEAREST);
+    this.tileTex = makeTex(gl, gl.NEAREST);
     this.fieldTex = makeTex(gl, gl.LINEAR);
     this.manaTex = makeTex(gl, gl.LINEAR);
     this.glowTex = makeTex(gl, gl.LINEAR);
@@ -167,7 +168,7 @@ export class Renderer {
     this.mapH = m.h;
     const N = m.w * m.h;
     this.mapData = new Uint8Array(N * 4);
-    this.cornerData = new Uint8Array(N);
+    this.tileData = new Uint8Array(N * 4);
     this.uploadMap(w);
     this.fieldData = new Uint8Array(N * 4);
     this.glowData = new Uint8Array(N * 4);
@@ -203,9 +204,9 @@ export class Renderer {
     }
     gl.bindTexture(gl.TEXTURE_2D, this.mapTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, m.w, m.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.mapData);
-    cornerBits(m, this.cornerData);
-    gl.bindTexture(gl.TEXTURE_2D, this.cornerTex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, m.w, m.h, 0, gl.RED, gl.UNSIGNED_BYTE, this.cornerData);
+    tileInfo(m, this.tileData);
+    gl.bindTexture(gl.TEXTURE_2D, this.tileTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, m.w, m.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.tileData);
   }
 
   setAtlas(a: Atlas): void {
@@ -372,8 +373,8 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.manaTex);
     gl.uniform1i(u.uMana, 5);
     gl.activeTexture(gl.TEXTURE6);
-    gl.bindTexture(gl.TEXTURE_2D, this.cornerTex);
-    gl.uniform1i(u.uCorner, 6);
+    gl.bindTexture(gl.TEXTURE_2D, this.tileTex);
+    gl.uniform1i(u.uTile, 6);
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform2i(u.uMapSize, this.mapW, this.mapH);
     gl.uniform2f(u.uOrigin, f.originX, f.originY);
@@ -478,25 +479,56 @@ export function newShafts(): Float32Array {
 export { MAX_DYN, MAX_LIGHTS, MAX_SHAFTS };
 
 /**
- * 壁の角の丸め方を、マスごとに求める（地形シェーダーの wallPx が読む。地形が変わるたびに uploadMap から呼ぶ）。
- * 見た目だけのもので、シミュレーションには使わない。
- * - bit0：壁か（瓦礫を除く岩。地図の外も壁とみなす）
- * - bit1〜4：左上・右上・左下・右下の角を丸めるか。壁のマスでは、その角をはさむ横と縦の隣がどちらも床なら削る（出っ張った角）。
+ * マスごとの描き方の情報を求める（地形シェーダーが uTile として読む。地形が変わるたびに uploadMap から呼ぶ）。
+ * 見た目だけのもので、シミュレーションには使わない。1マス4バイト：
+ * - R：壁と角の丸め方。bit0 壁か（瓦礫を除く岩。地図の外も壁とみなす）。bit1〜4 左上・右上・左下・右下の角を丸めるか。
+ *   壁のマスでは、その角をはさむ横と縦の隣がどちらも床なら削る（出っ張った角）。
  *   床のマスでは、横・縦・斜めの隣がすべて岩なら岩を張り出させる（へこんだ角）。
- *   角を囲む4マスのどれかが人の手のもの（石畳の床、石畳に面した石積みの壁）か瓦礫なら、直角のまま
+ *   角を囲む4マスのどれかが人の手のもの（人の手の床、それに面した壁）か瓦礫なら、直角のまま
+ * - G：床の材質の番号（src/floors.ts の FLOORS の位置）。壁は 255
+ * - B：高さの違う縁（人の手の型の材質は、下の材質よりわずかに高く見せる）。bit0〜3 は北・東・南・西の隣が、
+ *   このマスより下の床（このマスが人の手の型で、隣の床のほうが優先度が低い）。bit4〜7 は北・東・南・西の隣が、このマスより上の床
+ * - A：bit0 自然の型の縁を求める必要があるか（まわり8マスに、このマスと重なり合う自然の型の材質がある）。
+ *   bit1 掘りたての床か。bit2 まわり8マスに、掘りたてかどうかが違う床がある（岩のかけらの散らばる範囲の縁を、なめらかに求める）。
+ *   bit3 岩の内部か（このマスとまわり8マスがすべて壁。上面や縁の判定を省く）。
+ *   bit4 壁のマスで、まわり8マスか真下に人の手の床がある（切り石の天端の判定をするか）。
+ *   bit5 瓦礫か。bit6 溶岩か。bit7 湧き水か吸い込み穴がある（そのときだけ地図のテクスチャを読む）
  */
-export function cornerBits(m: { w: number; h: number; solid: ArrayLike<number>; rubble: ArrayLike<number>; paved: ArrayLike<number> }, out: Uint8Array): void {
+export function tileInfo(
+  m: {
+    w: number;
+    h: number;
+    solid: ArrayLike<number>;
+    rubble: ArrayLike<number>;
+    paved: ArrayLike<number>;
+    dug: ArrayLike<number>;
+    lava: ArrayLike<number>;
+    springs: { x: number; y: number }[];
+    sinks: { x: number; y: number }[];
+  },
+  out: Uint8Array,
+): void {
   const { w, h } = m;
+  const feat = new Uint8Array(w * h);
+  for (const q of [...m.springs, ...m.sinks]) feat[q.y * w + q.x] = 1;
   const inMap = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h;
   const wall = (x: number, y: number) => !inMap(x, y) || (!!m.solid[y * w + x] && !m.rubble[y * w + x]);
+  // 床の材質（壁と地図の外は -1）
+  const fl = (x: number, y: number) => (wall(x, y) ? -1 : floorId(m, y * w + x));
+  const handmade = (x: number, y: number) => {
+    const f = fl(x, y);
+    return f >= 0 && FLOORS[f].built;
+  };
   const square = (x: number, y: number) => {
     if (!inMap(x, y)) return false;
-    const k = y * w + x;
-    if (m.paved[k] || m.rubble[k]) return true;
-    return wall(x, y) && inMap(x, y + 1) && !!m.paved[k + w];
+    if (m.rubble[y * w + x] || handmade(x, y)) return true;
+    return wall(x, y) && handmade(x, y + 1);
   };
+  const dug = (x: number, y: number) => inMap(x, y) && !wall(x, y) && !!m.dug[y * w + x];
+  const D4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
+      const k = (y * w + x) * 4;
       const self = wall(x, y);
       let b = self ? 1 : 0;
       for (let q = 0; q < 4; q++) {
@@ -509,6 +541,45 @@ export function cornerBits(m: { w: number; h: number; solid: ArrayLike<number>; 
         if (square(x, y) || square(hx, y) || square(x, vy) || square(hx, vy)) continue;
         b |= 2 << q;
       }
-      out[y * w + x] = b;
+      out[k] = b;
+      const f = fl(x, y);
+      out[k + 1] = f < 0 ? 255 : f;
+      let e = 0;
+      let a = 0;
+      if (f >= 0) {
+        const F = FLOORS[f];
+        for (let d = 0; d < 4; d++) {
+          const g = fl(x + D4[d][0], y + D4[d][1]);
+          if (g < 0 || g === f) continue;
+          if (F.edge === 'built' && FLOORS[g].prio < F.prio) e |= 1 << d;
+          if (FLOORS[g].edge === 'built' && FLOORS[g].prio > F.prio) e |= 16 << d;
+        }
+        const myDug = dug(x, y);
+        if (myDug) a |= 2;
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const g = fl(x + dx, y + dy);
+            if (g < 0) continue;
+            if (g !== f && FLOORS[g].edge === 'natural' && (FLOORS[g].prio > F.prio || F.edge === 'natural')) a |= 1;
+            if (dug(x + dx, y + dy) !== myDug) a |= 4;
+          }
+      }
+      if (self) {
+        let inner = true;
+        let nearHand = handmade(x, y + 1);
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            if (!wall(x + dx, y + dy)) inner = false;
+            if (handmade(x + dx, y + dy)) nearHand = true;
+          }
+        if (inner) a |= 8;
+        if (nearHand) a |= 16;
+      }
+      const kk = y * w + x;
+      if (m.rubble[kk]) a |= 32;
+      if (m.lava[kk]) a |= 64;
+      if (feat[kk]) a |= 128;
+      out[k + 2] = e;
+      out[k + 3] = a;
     }
 }
