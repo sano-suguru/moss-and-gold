@@ -884,9 +884,9 @@ export class CreatureView {
     }
     // 墓標（熟練以上の冒険者が倒れた所）
     for (const g of eco.graves) if (inView(g.x, g.y, 20)) pushSprite(g.x, g.y, 0, false, A.grave(g.rank, unpackLook(g.look).color), 0, 2);
-    // 墓標の前で祈る僧侶：墓標から光の粒が立ちのぼる（描画専用）
+    // 墓標か亡骸の前で祈る僧侶：墓標（亡骸）から光の粒が立ちのぼる（描画専用）
     for (const p of eco.parties) {
-      if ((p.braceT ?? 0) <= eco.step || p.braceK !== 4) continue;
+      if ((p.braceT ?? 0) <= eco.step || (p.braceK !== 4 && p.braceK !== 5)) continue;
       const pr = p.members.map((id) => eco.byId.get(id)).find((o) => o && !o.dead && o.sp === 3);
       if (!pr) continue;
       const gx = p.braceX ?? pr.x;
@@ -1237,6 +1237,11 @@ export class CreatureView {
             pushSprite(x + Math.sin(ph * 6 + i * 3) * 6, yy, 6 + ph * 30, false, A.speck(1, Math.min(3, Math.floor(ph * 4))), 0, 2);
           }
         }
+      }
+      // 僧侶に清められた亡骸：数秒に一度、祈りのときと同じ聖印の光が、薄れながら亡骸から立ちのぼる（もう起き上がらない印。描画専用。src/eco/roster.ts の blessBrace）
+      if (isCorpse && c.st === 99) {
+        const ph = (t * 0.2 + c.id * 0.37) % 1;
+        if (ph < 0.45) pushSprite(x, yy, 6 + ph * 40, false, A.pray(1 + Math.min(2, Math.floor(ph * 6.7))), 0, 2);
       }
       let glow = c.glow / 255;
       // リビングアーマーの冑の覗き穴の光：マナが十分なら灯り続け、少なくなるとちらつく（描画専用）

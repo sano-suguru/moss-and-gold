@@ -11,7 +11,7 @@
  * 倒れた者は名簿から外れ、同じ職業の新人（見習い）が加わる。位は帰還の回数で上がる（2回で熟練、4回で歴戦、7回で英雄）。
  * 位が上がると強さも少し上がる（RANK_MUL。英雄で頭打ち）。墓標（Ecology.graves）は20を超えたら古いものから崩れて消える。
  */
-import { Cr, Ecology, Job, Kind, Party, ih, sq } from '../ecology';
+import { Cr, Ecology, Job, Kind, Party, STR, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { ADV_NAMES, JOB_NAMES } from '../names';
 
@@ -74,6 +74,10 @@ export const CREST_KINDS = 13;
 /** 墓標で立ち止まる長さ（生き物の更新の回数）と、気づく遠さ（マス） */
 const GRAVE_STOP = 60;
 const GRAVE_R = 6;
+/** 冒険者の亡骸に気づいて、僧侶が祈りに立ち止まる遠さ（マス） */
+const BLESS_R = 6;
+/** 一行の先頭から何マス以内に起きている手強い相手がいると、祈らずに通り過ぎるか */
+const BLESS_SAFE = 6;
 
 /** 姿の値：髪 0〜5、肌 0〜3、身につける色 0〜5、体つき 0〜2、頭の形 0〜1、頭の飾り（+1 して 1〜13、0 はまだない）、傷（1 眼帯、2 頭の包帯） */
 export function packLook(hair: number, skin: number, color: number, build: number, head: number, crest = -1, scar = 0): number {
@@ -322,6 +326,40 @@ export function graveBrace(this: Ecology, p: Party, lead: Cr): void {
   }
 }
 
+/**
+ * 冒険者の亡骸に気づいた、僧侶のいる一行：皆が立ち止まって亡骸の方を向き、僧侶が祈って清める（aimStep から）。
+ * 清められた亡骸は、スケルトンやリッチとして起き上がらず、ヴァンパイアの眷属にもならない（src/eco/step.ts、src/eco/vampire.ts）。
+ * 清めは祈り始めた時点で付く（途中で襲われても清まったまま）。清めの印が付くので、同じ亡骸の前で二度は立ち止まらない。
+ * 立ち止まらない場面は墓標と同じ（身構えている、戦いに向かっている、焚き火で休んでいる、物音に耳を澄ませている）
+ */
+export function blessBrace(this: Ecology, p: Party, lead: Cr): void {
+  if ((p.braceT ?? 0) > this.step || p.engage || (p.camp ?? -1) >= 0 || (p.listenT ?? 0) > this.step) return;
+  const priest = p.members.some((id) => {
+    const o = this.byId.get(id);
+    return !!o && !o.dead && o.sp === Job.Priest;
+  });
+  if (!priest) return;
+  const m = this.w.map;
+  for (const o of this.corpses) {
+    if (o.k !== Kind.Adventurer || o.dead !== 1 || o.units <= 0 || o.st === 99) continue;
+    if (sq(o.x - lead.x) + sq(o.y - lead.y) > BLESS_R * TILE * BLESS_R * TILE || !lineOfSight(m, lead.x, lead.y, o.x, o.y)) continue;
+    // 一行のそばに、起きている手強い相手（強さ6以上：リビングアーマー、ゴーレム、ミノタウロスなど）がいれば祈らない。
+    // 亡骸は冒険者が倒された所、たとえば宝物庫の入口のゴーレムの前に溜まるので、その近くで立ち止まると次々に倒されて、亡骸がまた増えていた。
+    // 祈る間、一行はその場で止まる（亡骸へは歩み寄らない）ので、危ないかどうかは一行の先頭のまわりで見る
+    let danger = false;
+    this.nearby(lead.x, lead.y, BLESS_SAFE, (q) => {
+      if (!danger && !q.dead && !q.away && q.sleep === 0 && q.k !== Kind.Adventurer && q.k !== Kind.Dwarf && STR[q.k] >= 6) danger = true;
+    });
+    if (danger) continue;
+    o.st = 99;
+    this.brace(p, o.x, o.y, 5, GRAVE_STOP);
+    const own = o.party === p.id ? 1 : 0;
+    this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'bless', n: o.id, how: o.sp, own, x: Math.round(o.x), y: Math.round(o.y) } as never);
+    this.log(o.x, o.y, `${this.partyTitle(p)}の一行の僧侶が、倒れた${own ? '仲間' : '冒険者'}（${JOB_NAMES[o.sp]}）の亡骸を清めた`);
+    return;
+  }
+}
+
 /** 触れた場所の墓標（情報パネルのため） */
 export function pickGrave(this: Ecology, wx: number, wy: number): Grave | null {
   let best: Grave | null = null;
@@ -348,10 +386,11 @@ declare module '../ecology' {
     rosterStep: typeof rosterStep;
     raiseGrave: typeof raiseGrave;
     graveBrace: typeof graveBrace;
+    blessBrace: typeof blessBrace;
     pickGrave: typeof pickGrave;
     ensureCrests: typeof ensureCrests;
     heroHurt: typeof heroHurt;
   }
 }
 
-Object.assign(Ecology.prototype, { recruit, fillRoster, heroOf, rankMul, pickHeroes, heroEnter, heroHome, rosterStep, raiseGrave, graveBrace, pickGrave, ensureCrests, heroHurt });
+Object.assign(Ecology.prototype, { recruit, fillRoster, heroOf, rankMul, pickHeroes, heroEnter, heroHome, rosterStep, raiseGrave, graveBrace, blessBrace, pickGrave, ensureCrests, heroHurt });
