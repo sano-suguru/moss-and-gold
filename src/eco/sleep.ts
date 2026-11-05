@@ -117,8 +117,7 @@ export function syncLongSleep(this: Ecology): void {
 export function slotOf(this: Ecology, c: Cr, g: { hx: number; hy: number; members: Cr[] }): [number, number] {
   const i = Math.max(0, g.members.indexOf(c));
   const huddle = c.k === Kind.Rat || c.k === Kind.Ant;
-  // アリは体を寄せて並ぶ（絵の横幅が十数px あるので、大ネズミと同じ6px では半分以上重なり、巣の上で山になって見えた）
-  const gap = c.k === Kind.Ant ? 10 : huddle ? 6 : Ecology.bodySize(c.k) * 1.1;
+  const gap = huddle ? 6 : Ecology.bodySize(c.k) * 1.1;
   const a = i * 2.39996 + (c.id % 13) * 0.21;
   const r = i === 0 ? 0 : gap * (0.7 + Math.sqrt(i) * 0.9);
   const jx = ((c.id * 37) % 7) - 3;
