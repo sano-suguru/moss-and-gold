@@ -12,13 +12,18 @@ export function record(this: Ecology, kind: 'deaths' | 'births' | 'exits' | 'mov
   if (a.length > 5000) a.splice(0, a.length - 4000);
 }
 
+/** 飛ぶ（または漂う）者：溶岩や水の上も越え、岩の角を斜めにかすめて進める */
+function flies(c: Cr): boolean {
+  return c.k === Kind.Wisp || c.k === Kind.Bat || c.k === Kind.Ghost || c.k === Kind.Wyvern || (c.k === Kind.Gargoyle && c.act !== 0) || (c.k === Kind.Dragon && c.st === 2) || (c.k === Kind.Vampire && c.st === VAMP_SCATTER);
+}
+
 export function tilePassable(this: Ecology, c: Cr, k: number): boolean {
   const m = this.w.map;
   if (c.k === Kind.Worm) return true;
   if (m.solid[k]) return false;
   // トロールは昼のあいだ、光の筋の差すマスを通らない（石にならないように）
   if (c.k === Kind.Troll && this.dayNow > 0.05 && this.w.lightBase[k] * this.dayNow > 150) return false;
-  if (c.k === Kind.Wisp || c.k === Kind.Bat || c.k === Kind.Ghost || c.k === Kind.Wyvern || (c.k === Kind.Gargoyle && c.act !== 0) || (c.k === Kind.Dragon && c.st === 2) || (c.k === Kind.Vampire && c.st === VAMP_SCATTER)) return true;
+  if (flies(c)) return true;
   if (m.lava[k]) return false;
   if (this.statueAt.has(k) && this.tileOf(c.x, c.y) !== k) return false;
   // 大ネズミは深い水に入らない。ただし、水かさが増して深い水に取り残されたら、泳いで抜け出せる
@@ -234,10 +239,12 @@ export function passable(this: Ecology, c: Cr, x: number, y: number): boolean {
  * 上下左右の2マスのうち少なくとも1マスが通れること（岩の角をすり抜けない）。
  * 道の探索（findPath・nearPath）とつながった洞窟の領域（regionOf）は上下左右のつながりだけを見るので、
  * 角をすり抜けられると、斜めにしかつながらない小部屋や閉じた空洞に入り込み、帰り道が見つからずに飢えていた
- * （main の16シード×25日で、コボルトが4シードで15匹）
+ * （#48 の前の main の16シード×25日で、コボルトが4シードで15匹）
  */
 export function stepOk(this: Ecology, c: Cr, x0: number, y0: number, x1: number, y1: number): boolean {
   if (!this.passable(c, x1, y1)) return false;
+  // 飛ぶ者と、岩の中を進むワームは、角をかすめてよい（飛ぶ者は道の探索でも岩を越えずに上下左右で進むが、閉じ込められて飢えることはない）
+  if (c.k === Kind.Worm || flies(c)) return true;
   const tx0 = Math.floor(x0 / TILE);
   const ty0 = Math.floor(y0 / TILE);
   const tx1 = Math.floor(x1 / TILE);
