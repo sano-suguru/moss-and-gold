@@ -28,11 +28,26 @@ uniform vec3 uLavaCol;
 uniform int uNumD;
 uniform vec4 uDL[48];
 uniform vec3 uDCol;
+uniform float uTime;
 out vec4 o;
 
 bool solidAt(ivec2 t) {
   if (t.x < 0 || t.y < 0 || t.x >= uMapSize.x || t.y >= uMapSize.y) return true;
   return texelFetch(uMap, t, 0).r > 0.5;
+}
+uint lhash(ivec2 p, uint s) {
+  uint h = uint(p.x) * 374761393u + uint(p.y) * 668265263u + s * 2246822519u;
+  h = (h ^ (h >> 13u)) * 1274126177u;
+  return h ^ (h >> 16u);
+}
+float lnoise(vec2 p, uint salt) {
+  vec2 i = floor(p);
+  vec2 f = p - i;
+  f = f * f * (3.0 - 2.0 * f);
+  ivec2 c = ivec2(i);
+  float a = float(lhash(c, salt) & 0xffffu), b = float(lhash(c + ivec2(1, 0), salt) & 0xffffu);
+  float d = float(lhash(c + ivec2(0, 1), salt) & 0xffffu), e = float(lhash(c + ivec2(1, 1), salt) & 0xffffu);
+  return mix(mix(a, b, f.x), mix(d, e, f.x), f.y) / 65535.0;
 }
 
 float vis(vec2 a, vec2 b) {
@@ -54,8 +69,16 @@ void main() {
   vec2 p = uLmOrigin + (gl_FragCoord.xy - 0.5) * 4.0 + 2.0;
   vec3 L = uAmbient;
   vec4 g = texture(uGlow, p / 16.0 / vec2(uMapSize));
+  // 溶岩の光：マスごとの値をそのまま補間すると、光の届く範囲がひし形に角ばる。まわり4点（半マス先）と平均してなめらかにする
+  {
+    vec2 gu = p / 16.0 / vec2(uMapSize), gd = 8.0 / 16.0 / vec2(uMapSize);
+    g.g = g.g * 0.4 + (texture(uGlow, gu + vec2(gd.x, gd.y)).g + texture(uGlow, gu - vec2(gd.x, gd.y)).g + texture(uGlow, gu + vec2(gd.x, -gd.y)).g + texture(uGlow, gu - vec2(gd.x, -gd.y)).g) * 0.15;
+  }
+  // 溶岩の光はゆっくり揺らぐ（溶けた岩の割れ目が開いたり閉じたりするのに合わせて、場所ごとに少しずつずれて明滅する）
+  float lavaL = g.g;
+  if (lavaL > 0.0) lavaL *= 0.72 + 0.2 * lnoise(p / 40.0 + vec2(uTime * 0.23, uTime * 0.11), 951u) + 0.06 * sin(uTime * 2.3 + lnoise(p / 24.0, 952u) * 6.28);
   // 光る苔は、どれだけ豊かになっても光の芯が白く飛ばないよう、上限をつける
-  L += min(g.r, 0.55) * uMossCol + g.g * uLavaCol + min(g.a, 0.6) * vec3(0.6, 0.4, 0.95);
+  L += min(g.r, 0.55) * uMossCol + lavaL * uLavaCol + min(g.a, 0.6) * vec3(0.6, 0.4, 0.95);
   // 燃えているマスの光（まわりへにじませる）
   vec2 fu = p / 16.0 / vec2(uMapSize), fd = 1.0 / vec2(uMapSize);
   float fb = texture(uFx, fu).r * 0.4 + (texture(uFx, fu + vec2(fd.x, 0.0)).r + texture(uFx, fu - vec2(fd.x, 0.0)).r + texture(uFx, fu + vec2(0.0, fd.y)).r + texture(uFx, fu - vec2(0.0, fd.y)).r) * 0.15
@@ -84,7 +107,8 @@ void main() {
     if (uC[i].w > 0.5) v *= vis(l.xy, p);
     L += v * uC[i].rgb;
   }
-  o = vec4(L * 0.5, 1.0);
+  // α には溶岩から来た光の強さだけを入れる（場面の側で、閉じた空洞の色抜きからこの分を外し、照り返しの橙を残すのに使う）
+  o = vec4(L * 0.5, clamp(lavaL * 0.9, 0.0, 1.0));
 }
 `;
 
@@ -175,7 +199,9 @@ float vnoise(vec2 p, uint salt) {
 // （値に足すと、値の変わり方がゆるい角や突き出しの先ほど岸が大きく動き、とげのように尖る。位置をずらせば、どこでも同じだけ動く）
 float lavaField(vec2 p) {
   // ずらす量は、離れた点どうしのずれの差が点の間の距離より小さくなる程度にとどめる（大きいと形が折り返して、かぎ状の突起ができる）
-  p += (vec2(vnoise(p / 13.0, 641u), vnoise(p / 13.0, 645u)) - 0.5) * 6.0 + (vec2(vnoise(p / 4.0, 642u), vnoise(p / 4.0, 646u)) - 0.5) * 0.8;
+  // 大きなうねり（20px ごと、±4.5px）と中くらいの出入り（7px ごと、±1.2px）と細かなぎざぎざを重ね、マスの並び（45°のまっすぐな辺）を消す
+  p += (vec2(vnoise(p / 20.0, 641u), vnoise(p / 20.0, 645u)) - 0.5) * 9.0 + (vec2(vnoise(p / 7.0, 640u), vnoise(p / 7.0, 639u)) - 0.5) * 2.4
+    + (vec2(vnoise(p / 4.0, 642u), vnoise(p / 4.0, 646u)) - 0.5) * 0.8;
   ivec2 t = ivec2(floor(p / 16.0));
   float sum = 0.0;
   float wsum = 0.0;
@@ -658,40 +684,111 @@ void main() {
       if (ring < 0.7 && r < 7.5) alb = mix(alb, vec3(0.78, 0.9, 0.96), 0.6);
       if (r < 1.5) alb = vec3(0.78, 0.9, 0.96);
     }
-    // 溶岩：床より一段低い溜まりに、黒い岩の皮が浮かび、そのすき間で溶けた岩が光る。
-    // 岸はマスの四角に沿わず、数 px ずつ内外へふらつく（lavaField）。まわり4マスに溶岩が無ければ何もしない
+    // 溶岩：床より一段低い溜まりに、溶けた岩が流れ、その上を冷えた黒い岩の皮が漂う。
+    // 岸に近いほど冷えて皮が厚く、割れ目は細く暗い赤。奥（大きな溜まりの中ほど）ほど熱く、割れ目は太く黄白く、皮は溶けて消える。
+    // 皮の形は、ゆっくり形を変える流れでゆがめたセル状ノイズで、割れ目は場所ごとに太さが違い、ゆっくり開いたり閉じたりする。
+    // 岸はマスの四角に沿わず、内外へふらつく（lavaField）。まわり4マスに溶岩が無ければ何もしない
     if ((((q00.a | q10.a | q01.a | q11.a) >> 6) & 1) != 0) {
       vec2 pc = wp + 0.5;
       // 岸からの距離のおおよそ（px）。正なら溶岩の中、負なら床
       float ld = (lavaField(pc) - 0.5) * 16.0;
       if (ld > 0.0) {
         lavaPx = true;
-        vec4 st = stones(pc + vec2(uTime * 1.1, uTime * 0.45), vec2(9.0, 8.0), 61u);
-        float pulse = 0.5 + 0.5 * sin(uTime * 1.6 + st.z * 6.28);
+        // 熱さ（0 岸〜1 芯）。岸からの距離と、溶岩の光の強さ（大きな溜まりの中ほど強い）に、ゆっくり動くむらを足す
+        float heat = clamp(smoothstep(0.5, 9.0, ld) * 0.55 + smoothstep(0.6, 1.0, glw.g) * 0.3 + (vnoise(pc / 12.0 + vec2(uTime * 0.04, -uTime * 0.03), 653u) - 0.5) * 0.36, 0.0, 1.0);
+        // 流れ：全体がゆっくり一方へ動き、場所ごとのゆがみも時間とともに変わる（ゆがみは点の間の距離より小さく、形は折り返さない）
+        vec2 fp = pc + vec2(uTime * 0.8, uTime * 0.3);
+        fp += (vec2(vnoise(pc / 18.0 + vec2(0.0, uTime * 0.05), 654u), vnoise(pc / 18.0 + vec2(uTime * 0.04, 7.0), 655u)) - 0.5) * 8.0;
+        vec4 st = stones(fp, vec2(10.0, 9.0), 61u);
         float gap = st.y - st.x;
-        if (gap < 1.6) alb = mix(vec3(255.0, 170.0, 60.0), vec3(255.0, 225.0, 140.0), pulse) / 255.0;
-        else if (st.z < 0.62) alb = gap < 2.8 ? vec3(120.0, 38.0, 20.0) / 255.0 : vec3(56.0, 20.0, 18.0) / 255.0 * (0.85 + 0.3 * pulse);
-        else alb = mix(vec3(214.0, 70.0, 22.0), vec3(255.0, 128.0, 40.0), pulse) / 255.0;
-        // 岸に寄るほど皮が厚く冷えて黒い（岸から 1〜3px。幅はなめらかにふらつく）。そのすぐ内側で溶けた岩が明るく縁取る
-        float crust = 1.2 + vnoise(pc / 4.0, 643u) * 1.8;
-        if (ld < crust) alb = h < 0.7 ? vec3(40.0, 22.0, 24.0) / 255.0 : vec3(78.0, 32.0, 24.0) / 255.0;
-        else if (ld < crust + 1.0) alb = mix(alb, vec3(255.0, 150.0, 50.0) / 255.0, 0.6);
-        emis = ld >= crust;
-        // 北の岸：床が溜まりへ落ちる岩の側面（3px）が見える（壁の正面と同じく、南から見下ろしているので北の岸だけ）。
-        // 岸から 6px より奥の点は、3px 北もかならず溶岩なので調べない
-        if (ld < 6.0 && lavaField(pc - vec2(0.0, 3.0)) <= 0.5) {
+        // 割れ目の太さ：熱いほど太く、場所ごとにむらがあり、皮ごとにゆっくり開いたり閉じたりする
+        float breathe = 0.5 + 0.5 * sin(uTime * 0.8 + st.z * 6.28);
+        float cw = mix(0.7, 2.3, heat) * (0.4 + 1.2 * vnoise(fp / 5.0, 656u)) + breathe * 0.9 * heat;
+        // ところどころ割れ目が閉じて、隣の皮とつながった大きな皮になる（皮の大きさと形をそろえない）
+        cw *= smoothstep(0.24, 0.5, vnoise(fp / 8.0, 660u) + heat * 0.25);
+        // 芯に近い所では、皮が溶けて消える（皮ごとに消えるかどうかが違う）
+        bool open = st.z < heat * 0.7 - 0.42;
+        // 溶けた岩の明るさ：割れ目の中心ほど、熱い所ほど明るい
+        float molt;
+        if (open || gap < cw) {
+          // 皮の無い所は、流れに沿って伸びた筋（明るい筋と、少し冷えた暗い筋）が流れていく
+          float mid = open ? 0.25 + 0.75 * smoothstep(0.2, 0.8, vnoise(fp / vec2(7.0, 2.6) + vec2(uTime * 0.2, 0.0), 657u)) : 1.0 - gap / max(cw, 0.01);
+          molt = heat * 0.4 + mid * 0.38 + breathe * 0.07;
+          // 色の段階：暗い赤 → 赤橙 → 橙 → 黄 → 黄白
+          vec3 c0 = vec3(130.0, 26.0, 14.0), c1 = vec3(214.0, 60.0, 18.0), c2 = vec3(250.0, 128.0, 34.0), c3 = vec3(255.0, 196.0, 78.0), c4 = vec3(255.0, 244.0, 186.0);
+          float x = clamp(molt, 0.0, 1.0) * 4.0;
+          vec3 mc = x < 1.0 ? mix(c0, c1, x) : x < 2.0 ? mix(c1, c2, x - 1.0) : x < 3.0 ? mix(c2, c3, x - 2.0) : mix(c3, c4, x - 3.0);
+          // 2段の網点で段階をつなぐ（ドット絵の階調に合わせる）
+          alb = floor(mc / 255.0 * 12.0 + bayer(w) * 0.9) / 12.0;
+          emis = true;
+        } else {
+          // 皮：冷えた黒い岩。割れ目の際は熱で赤く焼け、熱い所の皮は薄く赤みを帯びる。皮の上にも細いひび
+          float ph = h01(ivec2(stoneC * 7.0), 658u);
+          vec3 crust = mix(vec3(20.0, 13.0, 17.0), vec3(42.0, 22.0, 22.0), ph) / 255.0;
+          crust = mix(crust, vec3(70.0, 22.0, 16.0) / 255.0, heat * 0.4);
+          alb = crust;
+          float edge = gap - cw;
+          // （光で照らすと、強い溶岩の光を掛けて真っ赤に飛ぶので、自分で光る色として描く）
+          if (edge < 1.3) { alb = mix(vec3(150.0, 40.0, 18.0), vec3(100.0, 26.0, 16.0), edge / 1.3) / 255.0 * (0.6 + 0.4 * heat); emis = true; }
+          else {
+            vec4 s2 = stones(fp, vec2(4.5, 4.0), 659u);
+            if (s2.y - s2.x < 0.55 && heat > 0.25) { alb = vec3(96.0, 26.0, 16.0) / 255.0; emis = true; }
+            else if (h < 0.08) alb *= 1.35;
+          }
+        }
+        // 泡：熱い所で、ときどき溶けた岩がふくらみ、明るい輪になってはじける
+        if (heat > 0.3) {
+          ivec2 bc = ivec2(floor(pc / 13.0));
+          float per = 2.6;
+          float tt = uTime / per + h01(bc, 662u);
+          uint bh = hash2(bc, 663u + uint(floor(tt)) * 31u);
+          if ((bh & 7u) < 2u) {
+            vec2 bp = (vec2(bc) + 0.2 + 0.6 * vec2(float((bh >> 4u) & 255u), float((bh >> 12u) & 255u)) / 255.0) * 13.0;
+            float u = fract(tt);
+            float r = 0.6 + u * 2.4;
+            float dd = length(pc - bp);
+            if (u < 0.85 && dd < r + 0.5 && dd > r - 0.9) { alb = u < 0.5 ? vec3(255.0, 214.0, 120.0) / 255.0 : vec3(250.0, 140.0, 44.0) / 255.0; emis = true; }
+          }
+        }
+        // 岸：溶岩の縁は冷えて固まった黒い岩（厚さは場所ごとに 0〜3px ほど。ところどころ切れて、溶けた岩が岸まで来る）
+        float lip = (0.4 + vnoise(pc / 6.0, 643u) * 2.8) * smoothstep(0.55, 0.8, 1.0 - vnoise(pc / 10.0, 644u) * 0.9);
+        if (ld < lip) { alb = h < 0.6 ? vec3(32.0, 20.0, 24.0) / 255.0 : vec3(58.0, 34.0, 30.0) / 255.0; emis = false; }
+        // 北の岸：床が溜まりへ落ちる岩の側面（2〜3px）が見える（壁の正面と同じく、南から見下ろしているので北の岸だけ）。
+        // 上ほど暗く、下は溶けた岩に照らされて赤い。岸から 6px より奥の点は、3px 北もかならず溶岩なので調べない
+        float bank = 2.0 + step(0.5, vnoise(pc / 7.0, 645u));
+        if (ld < 6.0 && lavaField(pc - vec2(0.0, bank)) <= 0.5) {
           vec4 bs = stones(pc, vec2(7.0, 4.0), 644u);
-          alb = bs.y - bs.x < 0.9 ? vec3(28.0, 18.0, 22.0) / 255.0 : (bs.z < 0.5 ? vec3(62.0, 40.0, 40.0) : vec3(84.0, 52.0, 44.0)) / 255.0;
+          alb = bs.y - bs.x < 0.9 ? vec3(28.0, 18.0, 22.0) / 255.0 : (bs.z < 0.5 ? vec3(58.0, 36.0, 38.0) : vec3(76.0, 44.0, 40.0)) / 255.0;
           emis = false;
-          // 側面のいちばん上は床の縁（明るく）、いちばん下は溶けた岩との境（赤く光る）
-          if (lavaField(pc - vec2(0.0, 1.0)) <= 0.5) alb = vec3(104.0, 70.0, 64.0) / 255.0;
-          else if (lavaField(pc - vec2(0.0, 2.0)) > 0.5) { alb = vec3(200.0, 70.0, 26.0) / 255.0; emis = true; }
+          if (lavaField(pc - vec2(0.0, bank - 1.0)) > 0.5) { alb = mix(alb, vec3(170.0, 56.0, 22.0) / 255.0, 0.75); emis = true; }
         }
         isWater = false;
-      } else if (ld > -2.5) {
-        // 岸の床：縁は溶けた岩の熱で焼けて黒ずむ（溜まりに近いほど濃く、まだらに）
-        float k = smoothstep(-2.5, 0.0, ld);
-        if (bayer(w) < k * 0.85) alb = mix(alb, vec3(46.0, 28.0, 28.0) / 255.0, 0.7);
+      } else if (ld > -7.0) {
+        // 岸の床：熱で焼けて赤黒い。溜まりに近いほど濃く、帯の縁はまだらにふらつく
+        float k = smoothstep(-7.0, 0.0, ld + (vnoise(pc / 3.0, 647u) - 0.5) * 3.0);
+        alb = mix(alb, vec3(64.0, 34.0, 30.0) / 255.0, k * k * 0.85);
+        // 岸のすぐそばには、はね飛んで冷えた溶岩の黒い粒。まれにまだ赤く熱いものが残る
+        if (ld > -2.5 && h01(w, 648u) < (ld + 2.5) * 0.16) {
+          alb = vec3(30.0, 18.0, 22.0) / 255.0;
+          if (h01(w, 649u) < 0.05) { alb = vec3(150.0, 44.0, 20.0) / 255.0; emis = true; }
+        }
+      }
+      // 火の粉：溜まりの上から、小さな光の粒がときどき舞い上がり、揺れながら消える（溜まりから 20px 上まで）
+      if (ld > -8.0 || lavaField(pc + vec2(0.0, 16.0)) > 0.3) {
+        for (int j = 0; j < 3; j++) {
+          ivec2 sc = ivec2(floor(pc.x / 9.0), int(floor(pc.y / 9.0)) + j);
+          float per = 3.4;
+          float tt = uTime / per + h01(sc, 664u);
+          uint sh = hash2(sc, 665u + uint(floor(tt)) * 17u);
+          if ((sh & 15u) >= 3u) continue;
+          float u = fract(tt);
+          vec2 sp = (vec2(sc) + vec2(float((sh >> 4u) & 255u), float((sh >> 12u) & 255u)) / 255.0) * 9.0;
+          vec2 at = sp + vec2(sin(u * 7.0 + float(sh & 63u)) * 1.6, -u * 20.0);
+          if (ivec2(floor(at)) != w) continue;
+          if (lavaField(sp) <= 0.5) continue;
+          alb = u < 0.4 ? vec3(255.0, 220.0, 120.0) / 255.0 : u < 0.75 ? vec3(255.0, 150.0, 50.0) / 255.0 : vec3(190.0, 60.0, 24.0) / 255.0;
+          emis = true;
+        }
       }
     }
     // 焼け跡：灰で黒く沈み、まだ熱いうちは熾火がまだらに光る
@@ -770,7 +867,10 @@ void main() {
 
   if (uDebug == 1) { o = vec4(alb, 1.0); return; }
   vec2 luv = ((wp + 0.5 - uLmOrigin - 2.0) / 4.0 + 0.5) / uLmSize;
-  vec3 L = texture(uLight, luv).rgb * 2.0;
+  vec4 Lt = texture(uLight, luv);
+  vec3 L = Lt.rgb * 2.0;
+  // 溶岩から来た光の強さ（閉じた空洞の色抜きから外す分）
+  float lavaA = Lt.a;
   float bq = bayer(w);
   vec3 col;
   if (emis) {
@@ -802,7 +902,8 @@ void main() {
       col.r += alb.r * ww * 0.5 + 40.0 / 255.0 * ww;
       col.g += alb.g * ww * 0.3 + 20.0 / 255.0 * ww;
     } else if (lum < 0.5) {
-      float c2 = (0.5 - lum) * 0.5;
+      // 暗い所は青く寄せる（溶岩の光の届く所では寄せない。橙の光が赤紫に濁る）
+      float c2 = (0.5 - lum) * 0.5 * (1.0 - smoothstep(0.02, 0.25, lavaA));
       col *= vec3(1.0 - c2 * 0.5, 1.0 - c2 * 0.25, 1.0 + c2 * 0.4);
     }
     // 暗がり：光が届かなくても、地形は青く沈んだ色でいつも見える（神の視点）
@@ -813,6 +914,8 @@ void main() {
       // 岩の上面は、上から見下ろした岩肌として、光がなくても地層の色と模様が読める明るさで描く
       if (tkind == 2) dim = mix(vec3(ga), alb, 0.8) * vec3(0.74, 0.74, 0.82);
       dim = max(dim, alb * glint);
+      // 溶岩に照らされている所では、暗がりの色の青みを抜く（色ごとに大きい方を取るので、青が残ると橙の光が桃色に濁る）
+      dim = mix(dim, vec3(dot(dim, vec3(0.3, 0.5, 0.2))) * vec3(1.0, 0.62, 0.42), smoothstep(0.03, 0.35, lavaA));
       col = max(col, dim);
     }
   }
@@ -873,11 +976,13 @@ void main() {
     vec2 muv = (wp / 16.0) / vec2(uMapSize);
     float mn = texture(uMana, muv).r;
     float mi = smoothstep(0.02, 0.55, mn);
-    if (mi > 0.0) {
+    if (mi > 0.0 && !lavaPx) {
       if (s == 0) {
         float mist = 0.55 + 0.45 * sin(uTime * 0.35 + h01(t / 3, 731u) * 6.283 + float(w.x) * 0.02);
         float mpatch = h01(w / 6, 732u) * 0.5 + h01(w / 3, 733u) * 0.5;
-        col += vec3(0.15, 0.05, 0.26) * mi * mist * (0.45 + 0.55 * mpatch);
+        // 溶岩に照らされた所では、もやを薄くする（溶岩のまわりはマナが濃く、紫のもやが橙の照り返しに重なると赤紫に濁る。
+        // マナがあることは、またたく光の粒で見せる）
+        col += vec3(0.15, 0.05, 0.26) * mi * mist * (0.45 + 0.55 * mpatch) * (1.0 - 0.75 * smoothstep(0.03, 0.4, lavaA));
         if (h01(w, 734u + uint(floor(uTime * 2.0))) < mi * 0.006) col = max(col, vec3(0.75, 0.55, 1.0));
       } else {
         if (h01(w / 2, 735u) < 0.06) col += vec3(0.05, 0.0, 0.09) * mi;
@@ -888,11 +993,13 @@ void main() {
   // 閉じた空洞：上に岩がかぶさっている。線は使わず、色を抜いて冷たく暗く沈め、壁に近いほど岩の色になじませる
   if (s == 0 && sealedAt(t)) {
     float g = dot(col, vec3(0.3, 0.5, 0.2));
-    // 溶岩は色を抜かず、わずかに沈めるだけにする（岩のすき間から照り返しが見えるくらい。色を抜くと冷えた石と見分けがつかず、
-    // 暗く沈めると眺めて楽しい場面が減る）
-    col = lavaPx ? mix(vec3(g), col, 0.92) * vec3(0.9, 0.78, 0.72) : mix(vec3(g), col, 0.35) * vec3(0.42, 0.46, 0.60);
+    // 溶岩そのものは色を抜かない（岩の奥で赤く光る溜まりは、閉じた空洞の中でもいちばんの見どころ）。
+    // 溶岩に照らされた床も、照らされている分だけ色を残す（色を抜くと、照り返しの橙が灰紫に濁り、溜まりだけが切り抜いたように浮く）
+    float lk = lavaPx ? 1.0 : smoothstep(0.04, 0.5, lavaA);
+    vec3 cold = mix(vec3(g), col, 0.35) * mix(vec3(0.42, 0.46, 0.60), vec3(0.62, 0.44, 0.34), smoothstep(0.0, 0.3, lavaA));
+    col = mix(cold, col * vec3(0.96, 0.9, 0.86), lk);
     float k = smoothstep(0.0, 9.0, de + bq * 2.0);
-    col = mix(vec3(0.035, 0.034, 0.048), col, 0.35 + 0.65 * k);
+    col = mix(vec3(0.035, 0.034, 0.048), col, 0.35 + 0.65 * max(k, lk * 0.7));
   }
 
   o = vec4(softClip(col), 1.0);
