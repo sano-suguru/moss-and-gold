@@ -666,11 +666,7 @@ export class World {
           if (m.solid[k] || m.lava[k] || this.water[k] > 20 || m.paved[k] || occupied.has(k)) continue;
           // コボルトの住処の横穴（入口から奥まで）は行き止まりでも埋めない（以前は掘り出した土で自分たちの住処の奥を埋めていた）
           if (this.eco.inWarrenTunnel(k)) continue;
-          // 閉じた空洞（sealed）の床は、開いた床と数えない。空洞の床そのものと、空洞に接するマス（空洞の口）にも置かない。
-          // 以前は空洞の口に瓦礫を置き、あとで隣を掘っても掘ったマスが空洞に面さず、空洞が開かないまま残っていた（かしたれ）
-          const nb = [k - m.w, k + 1, k + m.w, k - 1];
-          if (m.sealed[k] || nb.some((q) => m.sealed[q] && !m.solid[q])) continue;
-          const o = nb.map((q) => !m.solid[q]);
+          const o = [k - m.w, k + 1, k + m.w, k - 1].map((q) => !m.solid[q]);
           const n4 = o.filter(Boolean).length;
           let ok = n4 <= 1;
           // 角の窪み：開いた二辺が直角で、その間の斜めも開いていれば、ふさいでも道は切れない
@@ -682,7 +678,7 @@ export class World {
               const dxs = [0, 1, 0, -1];
               const dys = [-1, 0, 1, 0];
               const dg = k + (dys[a] + dys[b]) * m.w + dxs[a] + dxs[b];
-              if (!m.solid[dg] && !m.sealed[dg]) ok = true;
+              if (!m.solid[dg]) ok = true;
             }
           }
           if (n4 === 0) ok = false;
