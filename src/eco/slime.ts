@@ -53,7 +53,13 @@ export function slime(this: Ecology, c: Cr): void {
     target = null;
     let bd = 160 * 160;
     for (const o of this.corpses) {
-      if (o.ref !== 0 && o.ref !== c.id) continue;
+      // ほかのスライムが食べに向かっている死骸は避ける。ただし、その予約が有効なのは、予約したスライムが生きている間だけ。
+      // 死んだスライムの予約や、生きていたときの番号（集落や巣穴など）が死骸の ref に残ると、どのスライムもその死骸を食べられなくなる。
+      // しかも新しいスライムは死骸の近くで生まれるので、食べられない死骸のそばで生まれては飢え死にする、を繰り返していた
+      if (o.ref !== 0 && o.ref !== c.id) {
+        const owner = this.byId.get(o.ref);
+        if (owner && owner.k === Kind.Slime && !owner.dead) continue;
+      }
       const ok = this.tileOf(o.x, o.y);
       if (ok < 0 || this.w.moist[ok] < 60) continue;
       const d = sq(o.x - c.x) + sq(o.y - c.y);

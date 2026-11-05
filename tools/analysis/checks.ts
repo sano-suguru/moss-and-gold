@@ -330,6 +330,17 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // スライムは死骸を包み込んで食べ、育つと二つに分かれる。死んだスライムの予約が死骸に残って、どのスライムも食べられなくなっていたころ（371df4e8baa4）は、
+    // 生まれては飢え死にを繰り返し、この4シードの10〜18日目でスライムがいたサンプルは 64/128（abc 9・seed7 5）だった
+    name: 'スライムが死骸を食べて残りつづける（4シードの合計で、スライムがいたサンプルが7割以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.samples.filter((s) => (s.counts[5] ?? 0) > 0).length);
+      const all = sum(rs.map((r) => r.samples.length));
+      return { ok: sum(n) >= all * 0.7, value: rs.map((r, i) => `${r.seed} ${n[i]}/${r.samples.length}`).join('、') };
+    },
+  },
+  {
     // 七巡目：地表の横穴が開いたあとでも、絶えかけたら天井の割れ目から入り直す（abc と seed7 は変更前のコードで0匹の日が続く）
     name: '大ネズミが割れ目から入り直す（4シードで1回以上）',
     ...RUN_A,
