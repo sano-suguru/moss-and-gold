@@ -1,4 +1,4 @@
-import { flamePuff, vampMist, livingArmor, heroSprite, heroBed, graveMarker, prayLight, adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
+import { vampMist, livingArmor, heroSprite, heroBed, graveMarker, prayLight, adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -72,8 +72,6 @@ export interface Atlas {
   dust: (f: number) => number;
   /** ヴァンパイアの黒い霧（f は薄れていく段） */
   mist: (f: number) => number;
-  /** ドラゴンの炎の粒（f は口元から炎の先へ進んだ段 0〜3） */
-  flame: (f: number) => number;
   forge: (f: number) => number;
   campfire: (f: number) => number;
   /** 眠り：Z / z / eye（半分だけ眠る片目）/ dragon / bat / worm / bed-職業 */
@@ -680,11 +678,6 @@ export function buildAtlas(): Atlas {
     dustFrames.push(raws.length);
     raws.push(dust(f) as RawFrame);
   }
-  const flameFrames: number[] = [];
-  for (let f = 0; f < 4; f++) {
-    flameFrames.push(raws.length);
-    raws.push(flamePuff(f) as RawFrame);
-  }
   const mistFrames: number[] = [];
   for (let f = 0; f < 4; f++) {
     mistFrames.push(raws.length);
@@ -901,7 +894,6 @@ export function buildAtlas(): Atlas {
     item: (kind, f) => (kind === 11 ? packFrame : itemFrames[kind * 4 + (f & 3)] ?? itemFrames[0]),
     dust: (f) => dustFrames[f & 3],
     mist: (f) => mistFrames[f & 3],
-    flame: (f) => flameFrames[Math.max(0, Math.min(3, f))],
     forge: (f) => forgeFrames[f & 3],
     campfire: (f) => fireFrames[f & 3],
     sleep: (key, f) => sleepFrames[key][f & 3],

@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
+import type { MapData } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
 
@@ -106,13 +107,17 @@ export function updateFire(this: Ecology): void {
   if (this.step % 4 === 0) this.w.fxDirty = true;
 }
 
-/** 炎の口元：体の中心から、向いている側へこのマス数だけ先（若い竜は横向き、成竜は横向きと縦向きで絵の口元の位置が違う） */
-const MOUTH_YOUNG = 1.5;
-const MOUTH_SIDE = 2.5;
-const MOUTH_FRONT = 1;
+/**
+ * 炎の口元：体の中心（足元）から、向いている側へ前、画面の上へ上のマス数（絵の炎の柱の付け根に合わせる。src/creatureView.ts）。
+ * 横向きの竜は頭が足元より上にあるので、口元も上へずらす（以前は足元の高さから吐いていたので、絵の炎は床の上を通るのに、
+ * 一段下の行が燃え、壁ぎわでは扇のほとんどが壁にかかって消えていた）
+ */
+const MOUTH_YOUNG = { fwd: 1.5, up: 1 };
+const MOUTH_SIDE = { fwd: 2.5, up: 2 };
+const MOUTH_FRONT = { fwd: 1, up: 0 };
 /**
  * 炎の先が生き物の更新1回に進むマス数（若い竜は吐く時間が短いので速く進む。炎の先は口元から、若い竜で約5マス、成竜で約7マス）と、
- * 口元での扇の半分の幅、1マス進むごとに広がる半分の幅（炎の先の幅は、若い竜で3マス、成竜で5マス）。描画（src/creatureView.ts）も同じ形で炎の粒を描く
+ * 口元での扇の半分の幅、1マス進むごとに広がる半分の幅（炎の先の幅は、若い竜で3マス、成竜で5マス）。描画（src/renderer.ts）も同じ形の扇に、燃える床と同じ炎を描く
  */
 export const BREATH_STEP = 0.6;
 export const BREATH_STEP_YOUNG = 0.8;
@@ -122,14 +127,14 @@ export const BREATH_SPREAD = 0.25;
 const BURN_MIN = 16;
 const BURN_RANGE = 13;
 
-/** ドラゴン c が炎を吐くときの向き（上下左右。若い竜は左右だけ）と口元、炎の先の進む速さ。breathe・breathCovers・描画で同じものを使う */
+/** ドラゴン c が炎を吐くときの向き（上下左右。若い竜は左右だけ）と口元、炎の先の進む速さ。breathe・breathCovers・forBreathFan で同じものを使う */
 export function breathAxis(c: Cr, tx: number): { ux: number; uy: number; mx: number; my: number; young: boolean; dir: number; step: number } {
   const young = c.sp < 2 && c.elite !== 8;
   const dir = young ? (tx >= c.x ? 2 : 3) : c.dir;
   const ux = dir === 2 ? 1 : dir === 3 ? -1 : 0;
   const uy = ux ? 0 : dir === 1 ? -1 : 1;
-  const mouth = young ? MOUTH_YOUNG : ux ? MOUTH_SIDE : MOUTH_FRONT;
-  return { ux, uy, mx: c.x + ux * mouth * TILE, my: c.y + uy * mouth * TILE, young, dir, step: young ? BREATH_STEP_YOUNG : BREATH_STEP };
+  const mo = young ? MOUTH_YOUNG : ux ? MOUTH_SIDE : MOUTH_FRONT;
+  return { ux, uy, mx: c.x + ux * mo.fwd * TILE, my: c.y + uy * mo.fwd * TILE - mo.up * TILE, young, dir, step: young ? BREATH_STEP_YOUNG : BREATH_STEP };
 }
 
 /** ドラゴン c が今の向きで炎を吐けば、(x, y) が炎の扇の中に入るか（吐き終わるまでに炎の先が届く範囲。若い竜は左右だけを向く） */
@@ -142,31 +147,47 @@ export function breathCovers(this: Ecology, c: Cr, x: number, y: number): boolea
 }
 
 /**
+ * 炎の扇の中の、口元からの遠さ d0 から炎の先までのマス（体の中心から見通せる床だけ）を、fn に順に渡す。
+ * t は炎を吐きはじめてからの生き物の更新の回数（成竜は 0..11、若い竜は 0..6）。先へ行くほど広い。
+ * シミュレーション（breathe）と描画（src/renderer.ts。炎を吐いている間、扇のマスに燃える床と同じ炎を描く）で同じ形を使う
+ */
+export function forBreathFan(m: MapData, c: Cr, tx: number, t: number, d0: number, fn: (k: number) => void): void {
+  const { ux, uy, mx, my, step } = breathAxis(c, tx);
+  const reach = 0.5 + t * step;
+  // 見通しは口元から測る（口元が岩の中なら体の中心から）
+  const mk = Math.floor(my / TILE) * m.w + Math.floor(mx / TILE);
+  const inRock = mx < 0 || my < 0 || mx >= m.w * TILE || my >= m.h * TILE || m.solid[mk];
+  const ox = inRock ? c.x : mx;
+  const oy = inRock ? c.y : my;
+  for (let d = d0; d <= reach; d += 0.5) {
+    // 横のずれは、0 を中心に半マスずつ左右対称に（口元の近くは1マス幅の線になる。以前は片側へ寄って、体の横や下にも火がついていた）
+    const hw = Math.floor((BREATH_HALF0 + d * BREATH_SPREAD) * 2) / 2;
+    for (let w = -hw; w <= hw; w += 0.5) {
+      const x = mx + (ux * d - uy * w) * TILE;
+      const y = my + (uy * d + ux * w) * TILE;
+      const tx0 = Math.floor(x / TILE);
+      const ty0 = Math.floor(y / TILE);
+      if (tx0 < 0 || ty0 < 0 || tx0 >= m.w || ty0 >= m.h) continue;
+      const k = ty0 * m.w + tx0;
+      if (m.solid[k]) continue;
+      if (!lineOfSight(m, ox, oy, tx0 * TILE + 8, ty0 * TILE + 8)) continue;
+      fn(k);
+    }
+  }
+}
+
+/**
  * 炎の吐息：口元から、向いている向きに沿って扇形に、手前から順に火をつける。
  * 向きは絵の向きに合わせる（若い竜は横向きの絵しかないので左右だけ、成竜は上下左右）。斜めに吐くと、絵の炎の柱と燃える場所がずれていた。
  * 扇は体の中心ではなく口元から始まる（以前は体の中心から1マス先で燃え始め、ドラゴンの足元や体の横から火が湧いたように見えていた）
  */
 export function breathe(this: Ecology, c: Cr, tx: number, ty: number, t: number): void {
   const m = this.w.map;
-  const { ux, uy, mx, my, dir, step } = breathAxis(c, tx);
   // 若い竜は、いつも獲物のいる側の左右を向く（絵の向きも合わせる）
-  c.dir = dir;
-  // t は 0 から（成竜は 0..11、若い竜は 0..6）。先へ行くほど広く
-  const reach = 0.5 + t * step;
-  const halfAt = (d: number) => BREATH_HALF0 + d * BREATH_SPREAD;
-  // 扇の中の、口元からの遠さ d・横のずれ w のマス（体の中心から見通せるものだけ）を順に渡す
-  const fan = (d0: number, fn: (k: number) => void) => {
-    for (let d = d0; d <= reach; d += 0.5) {
-      // 横のずれは、0 を中心に半マスずつ左右対称に（口元の近くは1マス幅の線になる。以前は片側へ寄って、体の横や下にも火がついていた）
-      const hw = Math.floor(halfAt(d) * 2) / 2;
-      for (let w = -hw; w <= hw; w += 0.5) {
-        const k = this.tileOf(mx + (ux * d - uy * w) * TILE, my + (uy * d + ux * w) * TILE);
-        if (k < 0 || m.solid[k]) continue;
-        if (!lineOfSight(m, c.x, c.y, (k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8)) continue;
-        fn(k);
-      }
-    }
-  };
+  const ax = breathAxis(c, tx);
+  c.dir = ax.dir;
+  const reach = 0.5 + t * ax.step;
+  const fan = (d0: number, fn: (k: number) => void) => forBreathFan(m, c, tx, t, d0, fn);
   // 床に火をつけるのは炎の先の帯だけ。炎が地面に届くのは口元の半マス先から（口元の真下の、ドラゴンの頭の下には火がつかない）
   fan(Math.max(0.5, reach - 1.2), (k) => this.ignite(k, BURN_MIN + (ih(k, this.step, 130) % BURN_RANGE)));
   // 扇の全体（口元から炎の先まで）にいる者は、炎を吐く間、生き物の更新ごとにドラゴンの強さの4〜8割の傷を負う（居続けると打ち合いの2〜3回分。逃げれば助かる）。

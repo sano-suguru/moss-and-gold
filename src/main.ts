@@ -59,6 +59,8 @@ function boot(): void {
   let speed = saved?.speed ?? 1;
   if (![0, 1, 3, 10, 30].includes(speed)) speed = 1;
   let lastGlowV = -1;
+  // 前のフレームに炎を吐いているドラゴンがいたか（いれば次のフレームも燃えるマスを送り直す。吐き終わったら一度送って扇の炎を消す）
+  let fxBreathing = false;
   let acc = 0;
   let sinceSeen = 0;
   // 演出のデモ（URL の末尾に #fxdemo）：明るく開けた所に技の見本の組を並べ、技を繰り返す
@@ -541,9 +543,10 @@ function boot(): void {
       world.terrainDirty = false;
       renderer.uploadMap(world);
     }
-    if (world.fxDirty) {
+    // 燃えるマスが変わったときと、ドラゴンが炎を吐いている間（扇の中に燃える床と同じ炎を描く）と、吐き終わった直後に、描画へ送り直す
+    if (world.fxDirty || fxBreathing) {
       world.fxDirty = false;
-      renderer.updateFx(world);
+      fxBreathing = renderer.updateFx(world);
     }
     if (world.glowVersion !== lastGlowV) {
       lastGlowV = world.glowVersion;
