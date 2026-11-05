@@ -8,6 +8,7 @@
  * チェックを足すときは、起きることがわかっているシードと日を、前の batch の settle.jsonl などから選ぶ（例：かしたれは10日目ごろに貢ぎ物）。
  */
 import { countsAsStuck } from './common';
+import { World } from '../../src/world';
 export interface Recs {
   seed: string;
   from: number;
@@ -390,6 +391,50 @@ export const CHECKS: Check[] = [
     test: (rs) => {
       const d = Math.max(0, ...rs.flatMap((r) => r.samples.map((s) => Math.max(Math.abs(s.nutrientDrift), Math.abs(s.goldDrift), Math.abs(s.rockDrift), Math.abs(s.manaDrift ?? 0)))));
       return { ok: d === 0, value: `最大 ${d}` };
+    },
+  },
+  {
+    // 溶岩をはさんだ空洞（src/world.ts の applyDig・openPocket）：溶岩のマスには閉じた空洞の印が付かないので、空洞を開くときに溶岩を越えて広げる。
+    // 越えないと、溶岩の溜まりで分かれた空洞の片側が開いたときや、開いた側から溶岩の隣を掘り抜いたときに、溶岩の向こうの床が閉じたまま残る
+    // （直す前の main では、16シード中8シードで起き、seed30・seed35・seed40 は25日のうち19〜20日、はじまりの洞窟は16日残っていた）。
+    // 18日目の地形（日次スナップショットの掘削のログを作業ツリーのコードで再生したもの）で、開いた床に接する溶岩の溜まりの向こうに、閉じた空洞が残っていないかを見る
+    name: '溶岩の向こうに閉じた空洞が残らない（seed30・seed35・seed40・はじまりの洞窟で、開いた溶岩の溜まりが合計1つ以上・残った閉じた床0マス）',
+    seeds: ['seed30', 'seed35', 'seed40', 'はじまりの洞窟'],
+    from: 10,
+    to: 18,
+    test: (rs) => {
+      const res = rs.map((r) => {
+        const w = new World(r.seed);
+        for (const op of (r.state(r.to)?.digs ?? []) as number[]) (w as any).replayOp(op);
+        const m = w.map;
+        const seen = new Uint8Array(m.solid.length);
+        let pools = 0;
+        let left = 0;
+        for (let s = 0; s < m.solid.length; s++) {
+          if (!m.lava[s] || seen[s]) continue;
+          const q = [s];
+          seen[s] = 1;
+          let open = false;
+          let sealedT = 0;
+          for (let i = 0; i < q.length; i++) {
+            const c = q[i];
+            if (m.sealed[c] && !m.solid[c]) sealedT++;
+            for (const n of [c + 1, c - 1, c + m.w, c - m.w]) {
+              if (m.solid[n] || seen[n]) continue;
+              if (m.lava[n] || m.sealed[n]) {
+                seen[n] = 1;
+                q.push(n);
+              } else open = true;
+            }
+          }
+          if (open) {
+            pools++;
+            left += sealedT;
+          }
+        }
+        return { pools, left };
+      });
+      return { ok: sum(res.map((x) => x.pools)) >= 1 && sum(res.map((x) => x.left)) === 0, value: rs.map((r, i) => `${r.seed} 開いた溜まり${res[i].pools}・残った${res[i].left}`).join('、') };
     },
   },
 ];
