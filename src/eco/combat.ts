@@ -282,7 +282,7 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
   const f = this.byId.get(c.foe);
   c.act = 1;
   const sp = SPEC[c.k].speed * 1.2;
-  // 逃げる先を走っている間は、着くまでそこへ走る（住みかへ戻ろうとしない）
+  // 行き止まりで決めた逃げる先を走っている間は、着くまでそこへ走る
   if (this.fleeStep(c, sp)) return true;
   // コボルトは、追っ手がすぐそば（6マス）にいるあいだは住処へ向かわず、まず追っ手から離れる（追っ手の脇をすり抜けて帰ろうとしない）
   const closeFoe = c.k === Kind.Kobold && f && !f.dead && sq(f.x - c.x) + sq(f.y - c.y) < 6 * TILE * 6 * TILE;
@@ -294,14 +294,16 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
     }
   }
   if (f && !f.dead) {
-    // 追っ手から離れる：歩いて行ける床で追っ手から遠い所を逃げる先に決めて走る（fleePick）。
-    // 以前は追っ手と反対へ一歩ずつ動いたので、住みかのそば（20px の内）では住みかへ戻る動きと交互に行ったり来たりし、
-    // 行き止まりやマップの端では壁に押しつけたまま足踏みしていた（大グモ・アリ・コボルト・大ネズミ）
-    if (this.fleePick(c, f) && this.fleeStep(c, sp)) return true;
+    // 追っ手と反対へ一歩。その一歩が壁に阻まれてほとんど進めなければ、歩いて行ける床で追っ手から遠い所を逃げる先に決めて、次から走る（fleePick）。
+    // （以前は行き止まりやマップの端で、壁に押しつけたまま足を動かし続けていた。大グモなど。
+    //  いつも逃げる先を決めて走らせる形も試したが、追っ手が離れると元の行き先へ戻るので行き来の幅が大きくなるだけで、引っかかりが増えた）
     const dx = c.x - f.x;
     const dy = c.y - f.y;
     const L = Math.sqrt(dx * dx + dy * dy) || 1;
+    const x0 = c.x;
+    const y0 = c.y;
     this.tryMove(c, (dx / L) * sp, (dy / L) * sp);
+    if (sq(c.x - x0) + sq(c.y - y0) < sq(sp * 0.3)) this.fleePick(c, f);
   } else c.flee = 0;
   return true;
 }

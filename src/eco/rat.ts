@@ -124,18 +124,7 @@ export function rat(this: Ecology, c: Cr, day: number): void {
       }
       c.ref = t >= 0 ? t + 1 : 0;
       if (t < 0) {
-        // 食べ物が見つからなければ、向きを生き物の更新16回ごと（約3秒ごと）に選び直して探し歩く。行く手が壁なら、その回だけ横か後ろへ向きを変える
-        // （以前は更新のたびに向きを選び直していたので、ほとんど進まずにその場で向きを変え続け、揺れて引っかかって見えた。
-        //  向きを保つだけでは、壁に向かった向きのまま3秒押しつけて足踏みした）
-        const h = ih(c.id, (this.step + c.id * 5) >> 4, 14) & 15;
-        let j = DIR16[h];
-        for (const turn of [0, 4, 12, 8]) {
-          const v = DIR16[(h + turn) & 15];
-          if (this.stepOk(c, c.x, c.y, c.x + v[0] * s.speed * 3, c.y + v[1] * s.speed * 3)) {
-            j = v;
-            break;
-          }
-        }
+        const j = DIR16[ih(c.id, this.step, 14) & 15];
         this.tryMove(c, j[0] * s.speed, j[1] * s.speed);
         c.act = 1;
         return;
