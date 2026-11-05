@@ -34,6 +34,29 @@ for (const seed of ['かしたれ', 'abc', 'はじまりの洞窟']) {
 }
 check(fnv(generate('かしたれ').solid) !== fnv(generate('abc').solid), '別のシードでは別の地形');
 {
+  // 生き物は、岩の角をすり抜けて斜めのマスへ入らない（src/eco/move.ts の stepOk）。
+  // 道の探索と、つながった洞窟の領域は上下左右だけを見るので、すり抜けられると、斜めにしかつながらない所へ入り込んで帰れなくなる。
+  // 2×2 の床を探し、右と下を岩にして、左上のマスの右下の角にいるコボルトを右下へ歩かせる
+  const w = new World('かしたれ');
+  const m = w.map;
+  const open = (x: number, y: number) => { const k = y * MAP_W + x; return !m.solid[k] && !m.lava[k] && w.water[k] <= 40; };
+  let at = -1;
+  for (let k = MAP_W * 2; k < MAP_W * (MAP_H - 2) && at < 0; k++) {
+    const x = k % MAP_W, y = Math.floor(k / MAP_W);
+    if (x > 1 && x < MAP_W - 2 && open(x, y) && open(x + 1, y) && open(x, y + 1) && open(x + 1, y + 1)) at = k;
+  }
+  const x = at % MAP_W, y = Math.floor(at / MAP_W);
+  m.solid[y * MAP_W + x + 1] = 1;
+  m.solid[(y + 1) * MAP_W + x] = 1;
+  const c = w.eco.spawn(10, x * 16 + 15, y * 16 + 15, 10, 10);
+  const blocked = !w.eco.stepOk(c, c.x, c.y, c.x + 2, c.y + 2);
+  for (let i = 0; i < 60; i++) w.eco.tryMove(c, 1, 1);
+  const inside = w.eco.tileOf(c.x, c.y) !== (y + 1) * MAP_W + x + 1;
+  m.solid[y * MAP_W + x + 1] = 0;
+  const freed = w.eco.stepOk(c, x * 16 + 15, y * 16 + 15, x * 16 + 17, y * 16 + 17);
+  check(blocked && inside && freed, `岩の角をすり抜けて斜めのマスへ入らない（上下左右のどちらかが開いていれば斜めに進める）`);
+}
+{
   // 30個のシードで、溶岩を除いた床がすべて入口から歩いて行けること
   let bad = 0;
   for (let i = 0; i < 30; i++) {

@@ -169,11 +169,11 @@ export function personalSpace(this: Ecology): void {
       const dB = o.k === Kind.Dragon && c.k !== Kind.Dragon;
       const wa = dA ? 0 : dB ? 1 : sb / (sa + sb);
       const wb = dB ? 0 : dA ? 1 : sa / (sa + sb);
-      if (this.passable(c, c.x - px * wa, c.y - py * wa)) {
+      if (this.stepOk(c, c.x, c.y, c.x - px * wa, c.y - py * wa)) {
         c.x -= px * wa;
         c.y -= py * wa;
       }
-      if (this.passable(o, o.x + px * wb, o.y + py * wb)) {
+      if (this.stepOk(o, o.x, o.y, o.x + px * wb, o.y + py * wb)) {
         o.x += px * wb;
         o.y += py * wb;
       }
