@@ -6,7 +6,7 @@
  *   npm run shot -- --seed abc --find kind:24 --day 6 --zoom 3 --lit
  *   npm run shot -- --seed abc --find xy:120,40 --day 10
  *
- * --find：warren（横穴を掘り終え罠が2つ以上の住処）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、kind:番号（その種の生き物）、xy:マスx,マスy
+ * --find：warren（横穴を掘り終え罠が2つ以上の住処）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、bless（冒険者の亡骸の前で祈る一行）、kind:番号（その種の生き物）、xy:マスx,マスy
  * --day 探し始める日（既定 0）、--until 探すのをやめる日（既定 25）、--every 探す間隔（tick、既定 200）、--zoom 拡大率（既定 4）、--lit 確認用の明かり（#lit）、
  * --fog 霧をそのまま（既定は地図全体を見えたマスにする）、--name 出力の名前（既定は find から）、--out 出力先（既定 build/shots）
  *
@@ -80,6 +80,11 @@ function look(): Hit | null {
       if (find === 'gobhide' && cp.hide === 1 && hid.length >= 1) return { cam: { x: Math.round(cp.x), y: Math.round(cp.y), zoom }, marks: [{ x: cp.x, y: cp.y, label: '集落', color: '#ffd24a', size: 2 }, ...hid.map((c: any) => ({ x: c.x, y: c.y, label: '隠れている', color: '#80ff9a' }))], title: '散って隠れたゴブリン' };
     }
     return null;
+  }
+  if (find === 'bless') {
+    // 冒険者の亡骸の前で祈っている一行（僧侶が清める。src/eco/roster.ts の blessBrace）
+    const p = e.parties.find((q: any) => q.braceK === 5 && (q.braceT ?? 0) > e.step);
+    if (p) return { cam: { x: p.braceX, y: p.braceY, zoom }, marks: [], title: '亡骸の前で祈る一行' };
   }
   if (find.startsWith('kind:')) {
     const k = +find.slice(5);

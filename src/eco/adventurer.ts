@@ -4,7 +4,7 @@ import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, 
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
-import { ARMOR_REMNANT, isJobItem } from './armor';
+import { ARMOR_HP_MUL, ARMOR_REMNANT, isJobItem } from './armor';
 import type { World } from '../world';
 
 /** 噂の総量（評判） */
@@ -241,6 +241,16 @@ export function partyStr(this: Ecology, p: Party): number {
 }
 
 /**
+ * 一行が見積もる相手の強さ：強さに残りの体力の割合を掛ける。リビングアーマー（空の鎧）は、体力が強さのわりに大きい
+ * （ふつうは強さの5倍、鎧は ARMOR_HP_MUL 倍。src/eco/combat.ts の maxHp）ので、その分を見積もりに入れる。
+ * 入れないと、武具を取り込んで強くなった鎧に一行が挑みつづけ、宝物庫の入口で次々に倒されていた（倒れた者の武具をまた鎧が取り込む）
+ */
+export function foeStr(this: Ecology, o: Cr): number {
+  const s = this.str(o) * (o.hp > 0 ? o.hp / this.maxHp(o) : 1);
+  return o.k === Kind.Armor ? (s * ARMOR_HP_MUL) / 5 : s;
+}
+
+/**
  * 一行の行き先：
  * 1. 知っている宝の区画（自分たちが見たか、外の世界の地図にあるもの）
  * 2. まだ探していない区画のうち、探した区画に接する所（危ない区画は、一行が十分に強くなければ避ける）
@@ -400,7 +410,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       if (o.k === Kind.Skeleton || o.k === Kind.Lich || o.k === Kind.Armor) p.saw |= 2;
       // 危ない相手：一行より強そうなら区画を覚え、勝てそうになければ引き返す
       if (o.k !== Kind.Adventurer && STR[o.k] >= 6 && TIER[o.k] !== undefined) {
-        const os = this.str(o) * (o.hp > 0 ? o.hp / this.maxHp(o) : 1);
+        const os = this.foeStr(o);
         const ps = this.partyStr(p);
         if (os > ps * 0.7) {
           const dc = this.cellOf(o.x, o.y);
@@ -429,10 +439,6 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
         }
       }
     });
-  }
-  // 僧侶は足もとの死骸を清める（アンデッドとして起き上がらない）
-  if (c.sp === Job.Priest && this.step % 10 === c.id % 10) {
-    for (const o of this.corpses) if (o.st !== 99 && sq(o.x - c.x) + sq(o.y - c.y) < 20 * 20) o.st = 99;
   }
   // 戦う：三段階。気づく距離は灯りの届く範囲（5.5マス、光の中に見えている相手）。
   //  雑魚（大ネズミ、コウモリ、アリ、ウィスプ、マイコニド、サラマンダー、トカゲ、クモ、スライム）は、近く（2マス）に来たか、自分に害をなしたときに、通りがかりの一人が払う。
@@ -481,7 +487,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       }
     });
   // 手強い敵に気づいたら、一行に知らせる（かなわない相手は、見張りの判断で引き返す）
-  if (foe && !MINOR.includes((foe as Cr).k) && !p.engage && this.str(foe as Cr) <= this.partyStr(p) * 1.2) p.engage = (foe as Cr).id;
+  if (foe && !MINOR.includes((foe as Cr).k) && !p.engage && this.foeStr(foe as Cr) <= this.partyStr(p) * 1.2) p.engage = (foe as Cr).id;
   // 逃げていく弱い者（コボルトなど）は、すぐそばにいなければ追わない（射かけもしない）
   if (foe && (foe as Cr).flee > 0 && STR[(foe as Cr).k] <= 3 && sq((foe as Cr).x - c.x) + sq((foe as Cr).y - c.y) > 14 * 14) {
     if (p.engage === (foe as Cr).id) p.engage = 0;
@@ -975,6 +981,7 @@ declare module '../ecology' {
     cellOf: typeof cellOf;
     cellFloor: typeof cellFloor;
     partyStr: typeof partyStr;
+    foeStr: typeof foeStr;
     pickTarget: typeof pickTarget;
     pickTargetRandom: typeof pickTargetRandom;
     adventurer: typeof adventurer;
@@ -994,4 +1001,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { reputation, maybeParty, partyLights, seenBy, updateParties, cellOf, cellFloor, partyStr, pickTarget, pickTargetRandom, adventurer, setExit, startCamp, endCamp, campSeatOk, campWounded, dropScraps, leaveDungeon, dropBelongings, dropJobItems, dropItem, updateItems, eachLight, lightSources });
+Object.assign(Ecology.prototype, { reputation, maybeParty, partyLights, seenBy, updateParties, cellOf, cellFloor, partyStr, foeStr, pickTarget, pickTargetRandom, adventurer, setExit, startCamp, endCamp, campSeatOk, campWounded, dropScraps, leaveDungeon, dropBelongings, dropJobItems, dropItem, updateItems, eachLight, lightSources });

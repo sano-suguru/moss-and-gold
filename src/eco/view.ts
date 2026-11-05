@@ -24,6 +24,9 @@ export function pick(this: Ecology, wx: number, wy: number): Cr | null {
   return best;
 }
 
+/** 群れを作る種の住処の呼び方（群れに一匹だけのときの文に使う） */
+const HOME_NAME: Record<number, string> = { [Kind.Rat]: '巣穴', [Kind.Bat]: 'ねぐら', [Kind.Ant]: '巣', [Kind.Kobold]: '住処', [Kind.Goblin]: '集落', [Kind.Lizardman]: '住処', [Kind.Orc]: '縄張り' };
+
 /** 生き物の名前と、いまの様子と、属する群れを、短い言葉で */
 export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]): { title: string; lines: string[] } {
   // ヴァンパイアの眷属：見出しは主の名、本文は元の姿の1行（src/eco/thrall.ts）
@@ -56,12 +59,16 @@ export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]):
   else if (c.k === Kind.Armor) state = c.st === 10 ? '散らばった武具が寄り集まり、組み上がろうとしている' : c.mana < ARMOR_LOW ? 'マナが尽きかけ、継ぎ目を軋ませてマナの濃い所へ向かっている' : c.st === 1 ? '立ち番をしている' : '巡回している';
   else if (c.k === Kind.Dragon) state = c.st === 2 ? '飛んでいる' : c.foe ? '宝を盗った者を追っている' : '目を覚まして獲物を探している';
   else if (party && (party.camp ?? -1) >= 0) state = party.members[0] === c.id ? '焚き火のそばで見張りをしている' : '焚き火で休んでいる';
-  else if (party && (party.braceT ?? 0) > this.step) state = party.braceK === 1 ? '目標に着いて、武器を構えている' : party.braceK === 3 ? '荷を掠め取られて、振り返っている' : party.braceK === 4 ? (c.sp === Job.Priest ? '墓標の前で祈りを捧げている' : '墓標の前で立ち止まっている') : '住みかの気配に身構えている';
+  else if (party && (party.braceT ?? 0) > this.step) state = party.braceK === 1 ? '目標に着いて、武器を構えている' : party.braceK === 3 ? '荷を掠め取られて、振り返っている' : party.braceK === 4 ? (c.sp === Job.Priest ? '墓標の前で祈りを捧げている' : '墓標の前で立ち止まっている') : party.braceK === 5 ? (c.sp === Job.Priest ? '亡骸の前で祈りを捧げている' : '亡骸の前で立ち止まっている') : '住みかの気配に身構えている';
   else if (party && (party.listenT ?? 0) > this.step) state = party.listenBy === c.id ? '暗がりの物音の方へ一歩出て、構えている' : '暗がりの物音に、立ち止まって耳を澄ませている';
   else if (party && party.goal === 1) state = '引き返している';
   else if (key && this.isSentry(c, key) && this.groups.get(key)!.members.some((o) => o.sleep > 0)) state = '群れの見張りをしている';
   else if (c.act === 2) state = '何かをしている';
-  else if (c.hungry) state = '腹をすかせて餌を探している';
+  else if (c.k === Kind.Skeleton) state = c.act === 1 ? '暗がりをさまよっている' : '暗がりにたたずんでいる';
+  else if (c.k === Kind.Lich) state = c.act === 1 ? '住みかを漂っている' : '住みかで動かずにいる';
+  // 食べない種（腹に入る量が0：ゾンビ、ゴースト、マイコニド、ゴーレム、スケルトン、リッチ、リビングアーマー、眷属）は、
+  // 代謝の処理で空腹のカウンタが増えても飢えないので、空腹の文を出さない
+  else if (c.hungry && SPEC[c.k].cap > 0) state = '腹をすかせて餌を探している';
   else if (c.act === 1) state = '歩き回っている';
   else state = 'じっとしている';
   lines.push(state);
@@ -78,8 +85,10 @@ export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]):
     if (c.k === Kind.Adventurer) lines.push(party?.name ? `${this.partyTitle(party)}の一行（${n}人）` : `冒険者の一行（${n}人）`);
     else if (c.k === Kind.Dwarf) lines.push(`ドワーフの一団（${n}人）`);
     else if (n > 1) lines.push(`${known ? names[c.k] : '見知らぬ影'}の群れ（${n}匹）`);
-    else lines.push('群れからはぐれている');
-  } else if (Ecology.TERRITORY[c.k]) lines.push('一匹で縄張りを持って暮らしている');
+    // 群れに自分しかいないとき：ヴァンパイア（群れの中心）とその従者は何も出さない。住処のある者は、そこに一匹で暮らしている
+    else if (key[0] !== 'v' && HOME_NAME[c.k]) lines.push(`${HOME_NAME[c.k]}に一匹だけで暮らしている`);
+  } else if (GROUPED[c.k] && c.k !== Kind.Adventurer && c.k !== Kind.Dwarf) lines.push('群れからはぐれている');
+  else if (Ecology.TERRITORY[c.k]) lines.push('一匹で縄張りを持って暮らしている');
   if (party) lines.push(this.aimLine(party));
   if (c.k === Kind.Armor) {
     const kit = this.armorKit.get(c.id) ?? [0];

@@ -205,21 +205,14 @@ export function lichNear(this: Ecology, x: number, y: number): boolean {
   return false;
 }
 
-/** 冒険者の亡骸が起き上がる：魔法使いは（死者がとても多ければ）リッチに、ほかはスケルトンに。足もとの装備を拾う */
+/**
+ * 冒険者の亡骸が起き上がる：魔法使いは（死者がとても多ければ）リッチに、ほかはスケルトンに。
+ * 骨は体の未練、鎧は道具の未練：スケルトンは足もとの装備を拾わず、素の骨のまま弱く起き上がる。
+ * 装備とそこに宿る未練は床に残り、リビングアーマーの材料になる（src/eco/armor.ts）。僧侶の清めは亡骸（体）にだけ効くので、装備の未練は清めとは関わらない。
+ * （以前は装備を拾って職業ごとの強さと姿になり、リビングアーマーと同じ装備を取り合っていた。古いセーブの、装備を持つスケルトン（init 1）はそのまま動く）
+ */
 export function raiseUndead(this: Ecology, c: Cr, manyDead: boolean): void {
   const asLich = c.sp === Job.Wizard && manyDead && this.counts[Kind.Lich] === 0 && !this.list.some((o) => o.k === Kind.Lich && !o.dead);
-  const kinds = Ecology.JOB_ITEMS[c.sp];
-  let found = false;
-  if (!asLich && c.sp !== Job.Wizard) {
-    const near = this.gear.filter((it) => kinds.includes(it.kind) && sq(it.x - c.x) + sq(it.y - c.y) < 24 * 24);
-    if (near.length) {
-      found = true;
-      // 装備に宿っていた未練（マナ）は、起き上がった骨の体へ移る（src/eco/armor.ts）
-      for (const it of near) this.takeRemnant(c, it);
-      const ids = new Set(near.map((it) => it.id));
-      this.gear = this.gear.filter((it) => !ids.has(it.id));
-    }
-  }
   c.k = asLich ? Kind.Lich : Kind.Skeleton;
   this.log(c.x, c.y, asLich ? `倒れた魔法使いの亡骸が{k:${Kind.Lich}}になった` : `冒険者の骨が{k:${Kind.Skeleton}}として起き上がった`);
   c.body = c.units;
@@ -229,7 +222,7 @@ export function raiseUndead(this: Ecology, c: Cr, manyDead: boolean): void {
   c.act = 0;
   c.actT = 0;
   c.hungry = 0;
-  c.init = found ? 1 : 0;
+  c.init = 0;
   c.party = 0;
   c.hx = c.x;
   c.hy = c.y;

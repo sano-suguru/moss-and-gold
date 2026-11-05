@@ -341,6 +341,7 @@ export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
   const lead = alive[0];
   if (this.step % 5 === p.id % 5 && (p.camp ?? -1) < 0) this.passBrace(p, lead);
   if (this.step % 5 === (p.id + 2) % 5 && (p.camp ?? -1) < 0) this.graveBrace(p, lead);
+  if (this.step % 5 === (p.id + 3) % 5 && (p.camp ?? -1) < 0) this.blessBrace(p, lead);
   if (!p.aim || p.aimEnd || p.goal !== 0 || this.step % 10 !== p.id % 10) return;
   const lights = this.partyLights(p);
   const sees = (o: Cr, r: number) => alive.some((c) => sq(o.x - c.x) + sq(o.y - c.y) < r * TILE * r * TILE && this.seenBy(c, lights, o));
