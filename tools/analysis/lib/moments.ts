@@ -94,6 +94,8 @@ export const MOMENTS: Moment[] = [
   { key: 'armorFall', label: 'リビングアーマー：崩れて武具が散らばった' },
   { key: 'armorSlain', label: 'リビングアーマー：冒険者かドワーフに倒された' },
   { key: 'slimeSplit', label: 'スライム：死骸を食べて育ち、二つに分かれた' },
+  { key: 'joined', label: '住処の洞窟が入口側とつながる' },
+  { key: 'joinedDig', label: '住処の洞窟が入口側とつながる：住処のコボルトが掘ってつないだ' },
 ];
 
 const DAY = 14400;
@@ -247,6 +249,9 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     armorFall: ev(K.Armor, 'fall').length,
     slimeSplit: ev(K.Slime, 'split').length,
     armorSlain: d.filter((x) => x.k === K.Armor && (x.by === K.Adventurer || x.by === 28)).length,
+    // 入口側と切り離されていた住みか（コボルトの住処、ゴブリン・リザードマンの集落、アリの巣）が、入口側の洞窟とつながった（src/eco/islands.ts の markJoined）
+    joined: s.filter((x) => x.ev === 'joined').length,
+    joinedDig: s.filter((x) => x.ev === 'joined' && x.how === 1).length,
   };
 }
 

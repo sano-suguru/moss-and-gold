@@ -1,4 +1,4 @@
-/** Ecology のメソッド：島（入口側の洞窟とつながっていない洞窟）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+/** Ecology のメソッド：島（入口側と切り離された洞窟。入口側の洞窟と歩いてつながっていない領域のこと。説明では「入口側と切り離された住処」と書く）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
@@ -167,12 +167,19 @@ export function checkJoined(this: Ecology): void {
   for (const [id, x, y, k] of homes) {
     const island = this.onIsland(x, y);
     if (island) this.islandIds.add(id);
-    else if (this.islandIds.has(id) && this.regionOf(this.tileOf(x, y)) === this.mainRegion) {
-      this.islandIds.delete(id);
-      this.log(x, y, `{k:${k}}の暮らす洞窟が、入口側の洞窟とつながった`);
-    }
+    else if (this.islandIds.has(id) && this.regionOf(this.tileOf(x, y)) === this.mainRegion) this.markJoined(id, x, y, k, 0);
   }
   void m;
+}
+
+/**
+ * 入口側と切り離されていた住みかが、入口側の洞窟とつながった：ゲーム内ログに出し、settle.jsonl に joined を記録する。
+ * how は 1 なら住処のコボルトが内側から掘ってつないだ（kobold.ts の掘る処理から呼ぶ）、0 ならそれ以外（瓦礫の風化、ほかの者の掘削など。checkJoined から）
+ */
+export function markJoined(this: Ecology, id: number, x: number, y: number, k: number, how: number): void {
+  this.islandIds.delete(id);
+  this.log(x, y, `{k:${k}}の暮らす洞窟が、入口側の洞窟とつながった`);
+  this.record('settle', { t: this.w.tick, k, id, ev: 'joined', how, x: Math.round(x), y: Math.round(y) } as never);
 }
 
 declare module '../ecology' {
@@ -183,7 +190,8 @@ declare module '../ecology' {
     windTarget: typeof windTarget;
     breakTopWall: typeof breakTopWall;
     checkJoined: typeof checkJoined;
+    markJoined: typeof markJoined;
   }
 }
 
-Object.assign(Ecology.prototype, { regionOf, onIsland, nearestMain, windTarget, breakTopWall, checkJoined });
+Object.assign(Ecology.prototype, { regionOf, onIsland, nearestMain, windTarget, breakTopWall, checkJoined, markJoined });

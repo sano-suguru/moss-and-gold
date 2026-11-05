@@ -31,7 +31,7 @@ const median = (a: number[]) => {
 };
 const f1 = (v: number) => (isFinite(v) ? v.toFixed(1) : '—');
 
-interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number; orcStarveExit: number; storeMean: number; storeMax: number; storePos: number; storeKnown: boolean; ratReenter: number; ratZero: number; slimeMax: number; slimeLast: number; slimeGone: boolean; slimeZero: number; slimeAfter5: number; slimeStarve: number; slimeBorn: number; splitDur: number[]; splitStore: number; stuck: number; stuckNoPath: number; stuckAdv: number; unbury: number; mo: Record<string, number>; kindsMean: number; kindsMin: number; kindShare: number[]; links: Map<string, number> }
+interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number; orcStarveExit: number; storeMean: number; storeMax: number; storePos: number; storeKnown: boolean; ratReenter: number; ratZero: number; slimeMax: number; slimeLast: number; slimeGone: boolean; slimeZero: number; slimeAfter5: number; slimeStarve: number; slimeBorn: number; splitDur: number[]; splitStore: number; stuck: number; stuckNoPath: number; stuckAdv: number; unbury: number; hitch: number; hitchSec: number; hitchLong: number; hitchOsc: number; hitchNear: number; hitchKnown: boolean; hitchKind: Record<number, number>; mo: Record<string, number>; kindsMean: number; kindsMin: number; kindShare: number[]; links: Map<string, number> }
 /** にぎわいで数えない種：冒険者とドワーフ（人の側。来訪の多さに数字が引っ張られないよう、モンスターと分ける） */
 const NOT_MONSTER = new Set([25, 28]);
 const MONSTER_KINDS = KIND_NAMES.map((_, k) => k).filter((k) => !NOT_MONSTER.has(k));
@@ -214,6 +214,19 @@ function measure(dir: string): M {
           const U = rd(dir, 'settle.jsonl').filter((x) => x.ev === 'unbury').length;
           return { stuck: T.length, stuckNoPath: T.filter((x) => x.nopath >= 0.5).length, stuckAdv: T.filter((x) => x.k === 25).length, unbury: U };
         })(),
+        // 短い引っかかり（sim.ts の hitch.jsonl）：歩く姿のまま3秒で正味半タイルも進まない状態が続いた区間。
+        // 回数、合わせた秒数、5秒以上続いたもの、往復（区間の間に歩いた道のりが24px以上）、近くに他の生き物がいたもの、種ごとの回数。
+        // 漂う種は数えない（common.ts の countsAsStuck）。hitch.jsonl の無い古い実行結果では hitchKnown が false
+        ...(() => {
+          const known = existsSync(join(dir, 'hitch.jsonl'));
+          const H = known ? rd(dir, 'hitch.jsonl').filter(countsAsStuck) : [];
+          const byK: Record<number, number> = {};
+          for (const x of H) byK[x.k] = (byK[x.k] ?? 0) + 1;
+          return {
+            hitchKnown: known, hitch: H.length, hitchSec: H.reduce((a, x) => a + x.dur, 0) / 10, hitchLong: H.filter((x) => x.dur >= 50).length,
+            hitchOsc: H.filter((x) => x.walked >= 24).length, hitchNear: H.filter((x) => x.near > 0).length, hitchKind: byK,
+          };
+        })(),
         // 見せたい瞬間の回数（lib/moments.ts）
         mo: countMoments(dir, sinceT),
         advDeaths: cnt(D, 25), gobStarveExit: cnt(X, 12, (x) => x.reason === 'starving'), gobAbandonExit: cnt(X, 12, (x) => x.reason === 'abandoned'), gobStarveDeath: cnt(D, 12, (d) => d.cause === 'starve'),
@@ -325,6 +338,8 @@ if (args.paired && all.length >= 2) {
     ['ゴブリン：分かれてできた集落', (m) => m.splitDur.length], ['ゴブリン：分かれた集落の日数の中央値', (m) => md(m.splitDur)], ['ゴブリン：絶えた（1）', (m) => (m.gobGone ? 1 : 0)],
     ['ゴブリン：オークに倒された', (m) => m.gobByOrc], ['ゴブリン：コボルト・冒険者・オーク以外に倒された', (m) => m.gobByOther],
     ['足踏み：起きて歩く姿のまま2分以上ほぼ動かない（漂う種と、巣に捕まった者を除く）', (m) => m.stuck], ['足踏み：そのうち道が見つからないまま', (m) => m.stuckNoPath], ['足踏み：冒険者', (m) => m.stuckAdv], ['壁や瓦礫に埋まっていて床へ出た', (m) => m.unbury],
+    ['引っかかり：歩く姿のまま3秒で半タイルも進まない（回）', (m) => (m.hitchKnown ? m.hitch : NaN)], ['引っかかり：合わせた秒数', (m) => (m.hitchKnown ? m.hitchSec : NaN)],
+    ['引っかかり：5秒以上続いた', (m) => (m.hitchKnown ? m.hitchLong : NaN)], ['引っかかり：そのうち往復', (m) => (m.hitchKnown ? m.hitchOsc : NaN)], ['引っかかり：そのうち近くに他の生き物', (m) => (m.hitchKnown ? m.hitchNear : NaN)],
     ['冒険者：死んだ', (m) => m.advDeaths], ['ゴブリンに倒されたコボルト', (m) => m.kobByGob], ['コボルトに倒されたゴブリン', (m) => m.gobByKob],
   ];
   for (const mo of MOMENTS) P.push([`瞬間：${mo.label}`, (m) => m.mo[mo.key] ?? 0]);
@@ -441,6 +456,17 @@ tbl('コボルトに倒されたゴブリン / ゴブリンに倒されたコボ
 L.push('## ほかの種', '');
 tbl('死んだ冒険者', (m) => m.advDeaths, (ms) => sum(ms, (m) => m.advDeaths));
 tbl('来たゴブリン / 来たオーク', (m) => `${m.gobArr} / ${m.orcArr}`, (ms) => `${sum(ms, (m) => m.gobArr)} / ${sum(ms, (m) => m.orcArr)}`);
+if (all.some((ms) => ms.some((m) => m.hitchKnown))) {
+  // 短い引っかかり（sim.ts の hitch.jsonl）：見る人の目に「引っかかっている」と映る瞬間。原因は問わずに数える
+  L.push('## 引っかかり', '', '歩く姿のまま、ゲーム内の3秒で正味半タイルも進まない状態が続いた区間（止まったままも、行ったり来たりも含む。漂う種を除く）。往復は区間の間に24px以上歩いていたもの。', '');
+  tbl('回数 / 合わせた秒数 / 5秒以上続いた / 往復 / 近くに他の生き物', (m) => (m.hitchKnown ? `${m.hitch} / ${Math.round(m.hitchSec)} / ${m.hitchLong} / ${m.hitchOsc} / ${m.hitchNear}` : '—'), (ms) => `${sum(ms, (m) => m.hitch)} / ${Math.round(sum(ms, (m) => m.hitchSec))} / ${sum(ms, (m) => m.hitchLong)} / ${sum(ms, (m) => m.hitchOsc)} / ${sum(ms, (m) => m.hitchNear)}`);
+  const ks = [...new Set(all.flatMap((ms) => ms.flatMap((m) => Object.keys(m.hitchKind).map(Number))))];
+  const tot = (ms: M[], k: number) => sum(ms, (m) => m.hitchKind[k] ?? 0);
+  ks.sort((p, q) => tot(all[all.length - 1], q) - tot(all[all.length - 1], p));
+  L.push('### 種ごとの回数（全シードの合計 / 起きたシードの数）', '', `| 種 | ${names.join(' | ')} |`, `|---|${names.map(() => '---:').join('|')}|`);
+  for (const k of ks) L.push(`| ${KIND_NAMES[k]} | ${all.map((ms) => `${tot(ms, k)} / ${ms.filter((m) => (m.hitchKind[k] ?? 0) > 0).length}`).join(' | ')} |`);
+  L.push('');
+}
 L.push('## 保存則', '');
 tbl('四つの保存則のずれ（最大）', (m) => m.drift, (ms) => Math.max(...ms.map((m) => m.drift)));
 const outp = args.out;

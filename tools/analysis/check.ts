@@ -58,7 +58,7 @@ async function main() {
       const hi = c.to * DAY_TICKS;
       return {
         seed: s, from: c.from, to: c.to,
-        samples: rd(dir, 'samples', lo - 1, hi), deaths: rd(dir, 'deaths', lo, hi), births: rd(dir, 'births', lo, hi), exits: rd(dir, 'exits', lo, hi), settle: rd(dir, 'settle', lo, hi), events: rd(dir, 'events', lo, hi), stuck: rd(dir, 'stuck', lo, hi),
+        samples: rd(dir, 'samples', lo - 1, hi), deaths: rd(dir, 'deaths', lo, hi), births: rd(dir, 'births', lo, hi), exits: rd(dir, 'exits', lo, hi), settle: rd(dir, 'settle', lo, hi), events: rd(dir, 'events', lo, hi), stuck: rd(dir, 'stuck', lo, hi), hitch: rd(dir, 'hitch', lo, hi),
         state: (d: number) => readState(join(dir, 'snap', dayName(d))),
       };
     });
