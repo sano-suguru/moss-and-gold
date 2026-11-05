@@ -124,7 +124,9 @@ export function rat(this: Ecology, c: Cr, day: number): void {
       }
       c.ref = t >= 0 ? t + 1 : 0;
       if (t < 0) {
-        const j = DIR16[ih(c.id, this.step, 14) & 15];
+        // 食べ物が見つからなければ、向きを生き物の更新16回ごと（約3秒ごと）に選び直して探し歩く
+        // （以前は更新のたびに向きを選び直していたので、ほとんど進まずにその場で向きを変え続け、揺れて引っかかって見えた）
+        const j = DIR16[ih(c.id, (this.step + c.id * 5) >> 4, 14) & 15];
         this.tryMove(c, j[0] * s.speed, j[1] * s.speed);
         c.act = 1;
         return;
