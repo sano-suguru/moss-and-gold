@@ -198,11 +198,12 @@ export class Renderer {
     for (let k = 0; k < N; k++) if (m.dug[k]) feat[k] = 40;
     for (const s of m.springs) feat[s.y * m.w + s.x] = 85;
     for (const s of m.sinks) feat[s.y * m.w + s.x] = 170;
+    const veil = sealedLook(m);
     for (let k = 0; k < N; k++) {
       this.mapData[k * 4] = m.solid[k] ? 255 : 0;
       this.mapData[k * 4 + 1] = m.lava[k] ? 255 : 0;
       this.mapData[k * 4 + 2] = feat[k];
-      this.mapData[k * 4 + 3] = (m.paved[k] ? 128 : 0) | (m.rubble[k] ? 64 : 0) | (m.sealed[k] && !m.solid[k] ? 32 : 0) | (m.solid[k] && !m.rubble[k] ? (m.hard[k] === 0 ? 8 : m.hard[k] === 2 ? 16 : 0) : 0);
+      this.mapData[k * 4 + 3] = (m.paved[k] ? 128 : 0) | (m.rubble[k] ? 64 : 0) | (veil[k] ? 32 : 0) | (m.solid[k] && !m.rubble[k] ? (m.hard[k] === 0 ? 8 : m.hard[k] === 2 ? 16 : 0) : 0);
     }
     gl.bindTexture(gl.TEXTURE_2D, this.mapTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, m.w, m.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.mapData);
@@ -493,6 +494,45 @@ export function newShafts(): Float32Array {
   return new Float32Array(MAX_SHAFTS * 4);
 }
 export { MAX_DYN, MAX_LIGHTS, MAX_SHAFTS };
+
+/**
+ * 閉じた空洞（上に岩がかぶさっている）として暗く描くマス（描画だけ）。閉じた空洞の床のマスに加えて、その中の溶岩のマス。
+ * 地図では溶岩のマスに閉じた空洞の印が付かないので、そのままだと空洞の中の溶岩だけが暗くならず、溶岩のマスの四角どおりに
+ * 明るい枠が浮いて見える。溶岩のひとかたまりが閉じた空洞の床に接していて、開いた床に接していなければ、そのかたまりも暗く描く
+ */
+export function sealedLook(m: { w: number; h: number; solid: ArrayLike<number>; sealed: ArrayLike<number>; lava: ArrayLike<number> }): Uint8Array {
+  const { w, h } = m;
+  const N = w * h;
+  const out = new Uint8Array(N);
+  for (let k = 0; k < N; k++) if (m.sealed[k] && !m.solid[k]) out[k] = 1;
+  const done = new Uint8Array(N);
+  const comp: number[] = [];
+  for (let s = 0; s < N; s++) {
+    if (!m.lava[s] || done[s]) continue;
+    comp.length = 0;
+    comp.push(s);
+    done[s] = 1;
+    let toSealed = false;
+    let toOpen = false;
+    for (let i = 0; i < comp.length; i++) {
+      const k = comp[i];
+      const x = k % w;
+      const y = (k / w) | 0;
+      for (const n of [x + 1 < w ? k + 1 : -1, x > 0 ? k - 1 : -1, y + 1 < h ? k + w : -1, y > 0 ? k - w : -1]) {
+        if (n < 0 || m.solid[n]) continue;
+        if (m.lava[n]) {
+          if (!done[n]) {
+            done[n] = 1;
+            comp.push(n);
+          }
+        } else if (m.sealed[n]) toSealed = true;
+        else toOpen = true;
+      }
+    }
+    if (toSealed && !toOpen) for (const k of comp) out[k] = 1;
+  }
+  return out;
+}
 
 /**
  * マスごとの描き方の情報を求める（地形シェーダーが uTile として読む。地形が変わるたびに uploadMap から呼ぶ）。
