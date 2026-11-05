@@ -242,6 +242,9 @@ export function arrivals(this: Ecology, day: number): void {
       for (let i = 0; i < 5; i++) {
         const a = enter(Kind.Ant, 4, 12);
         a.ref = col.id;
+        // 住みかの印は、入ってきた口ではなく巣にする（逃げるときに巣へ逃げ帰るように。src/eco/ant.ts の ant でも合わせ直す）
+        a.hx = col.x;
+        a.hy = col.y;
         a.st = 1;
       }
     }

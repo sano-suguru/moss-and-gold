@@ -404,11 +404,17 @@ export const CHECKS: Check[] = [
     // コボルトは食べ物の目当てを保つ（src/eco/kobold.ts。更新のたびに苔を探し直して目当てが入れ替わり、ジグザグに行き来していた）。
     // main（#55）の10〜18日目では、コボルトの引っかかりが4シードの合計で約10300回（かしたれ 233・seed8 0・abc 5430・seed7 4647）、
     // 直したコードを main の10日目から続けると約4700回（かしたれ 0・seed8 0・abc 2957・seed7 1726）
-    name: 'コボルトが食べ物の目当てを替え続けない（4シードの合計で引っかかりが7500回以下）',
+    // 回数はコボルトの数で大きく揺れる（#58・#59 の後の main だけで、この4シードの合計が約7000回まで増えた）ので、
+    // 大ネズミの項目と同じく、コボルト1匹あたりの引っかかり（回数 ÷ 1/4日ごとのサンプルで数えたコボルトの数の合計）で見る。
+    // アリの住みかの印を直したコード（main #59 の後）で、main 6.87・0日目から 7.86・main の10日目から 7.52。
+    // #57 で目当ての入れ替わりを直したとき、回数はほぼ半分になったので、直す前は14前後と見積もれる
+    name: 'コボルトが食べ物の目当てを替え続けない（4シードで、コボルト1匹あたりの引っかかりが10以下）',
     ...RUN_A,
     test: (rs) => {
       const n = rs.map((r) => r.hitch.filter((x) => x.k === 10).length);
-      return { ok: sum(n) <= 7500, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+      const kobs = rs.map((r) => r.samples.filter((x) => x.t > r.from * 14400).reduce((a, x) => a + (x.counts[10] ?? 0), 0));
+      const v = sum(n) / Math.max(1, sum(kobs));
+      return { ok: v <= 10, value: `${v.toFixed(2)}（${rs.map((r, i) => `${r.seed} ${n[i]}/${kobs[i]}`).join('、')}）` };
     },
   },
   {
@@ -448,6 +454,30 @@ export const CHECKS: Check[] = [
       const ants = rs.map((r) => r.samples.filter((x) => x.t > r.from * 14400).reduce((a, x) => a + (x.counts[9] ?? 0), 0));
       const v = sum(n) / Math.max(1, sum(ants));
       return { ok: v <= 10, value: `${v.toFixed(2)}（引っかかり ${sum(n)}、アリ ${sum(ants)}）` };
+    },
+  },
+  {
+    // アリの住みかの印（逃げるときに逃げ帰る先）は巣（src/eco/ant.ts、src/eco/arrivals.ts）。
+    // 以前は巣を作りに来たアリの印が入ってきた地表の口のままで、傷を負うとダンジョンの入口まで逃げていた（abc・seed27 の12日目で働きアリの8割ほど）。
+    // 18日目のセーブで、巣に属するアリの印がすべて巣と一致するかを見る（L は1体43個ずつ：1 種、15・16 住みかの印、19 倒れたか、23 所属。AC は巣 [id, x, y, …]）
+    name: 'アリの住みかの印が巣になっている（RUN_WIDE の18日目で、巣に属するアリすべて）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const bad = rs.map((r) => {
+        const eco = r.state(r.to)?.eco;
+        if (!eco) return 0;
+        const cols = new Map<number, number[]>((eco.AC ?? []).map((a: number[]) => [a[0], a]));
+        const L: number[] = eco.L ?? [];
+        const V = eco.V ?? 43;
+        let n = 0;
+        for (let i = 0; i + V - 1 < L.length; i += V) {
+          if (L[i + 1] !== 9 || L[i + 19] !== 0) continue;
+          const col = cols.get(L[i + 23]);
+          if (col && (L[i + 15] !== col[1] || L[i + 16] !== col[2])) n++;
+        }
+        return n;
+      });
+      return { ok: sum(bad) === 0, value: `印が巣とずれたアリ ${sum(bad)} 匹` };
     },
   },
   {
