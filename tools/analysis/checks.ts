@@ -60,8 +60,15 @@ const RUN_ORC = { seeds: ['かしたれ', 'seed27'], from: 10, to: 18 };
 // 0日目から実行すると abc 11.7日目・seed27 15.5日目から何度も、#28 の main の10日目から続けると seed23 15.8日目ほか（どちらでも起きるシードはない）。
 // 以前の かしたれ は六歩目（#16）のあと、seed41・seed18 は焚き火の眠り（#28）のあと、18日目までに起きなくなった。
 // クモの巣の変更（#38）のコードで0日目から実行すると、abc・seed27・seed23 では起きず、seed41・seed30 で起きる（#37 の main では seed23・seed41・seed30 で起きる）。
-// どちらのスナップショットから始めても通るよう、seed23・seed41・seed30 にする
-const RUN_TRIB = { seeds: ['seed23', 'seed41', 'seed30'], from: 10, to: 18 };
+// どちらのスナップショットから始めても通るよう、seed23・seed41・seed30 にしていた。
+// 壁から床へ1マスだけ突き出た岩を作らないようにした地形（#49）では、0日目から実行した10〜18日目に seed23・seed41 で起きず、seed30 は1回か0回。
+// 起きるのは abc 6・seed7 8・seed17 2（#48 を取り込む前のコードでは abc 6・seed17 7・seed35 4）なので、abc・seed7・seed17 にする
+// （どのシードもほかの項目で10〜18日目を実行しているので、実行するシードは増えない）
+const RUN_TRIB = { seeds: ['abc', 'seed7', 'seed17'], from: 10, to: 18 };
+// 倒れた冒険者がヴァンパイアの眷属として起き上がるのは、16シードの10〜18日目で2〜3回のまれな出来事で、どのシードで起きるかは地形と展開で入れ替わる。
+// #49 の地形では RUN_A の4シードで起きず、はじまりの洞窟 1・seed40 2（#48 を取り込む前のコードでは seed6 1・seed35 1）。
+// どちらでも起きるよう4シードを並べる（どれもほかの項目で10〜18日目を実行しているので、実行するシードは増えない）
+const RUN_THRALL = { seeds: ['はじまりの洞窟', 'seed40', 'seed6', 'seed35'], from: 10, to: 18 };
 
 export const CHECKS: Check[] = [
   {
@@ -91,7 +98,7 @@ export const CHECKS: Check[] = [
   {
     // ヴァンパイア（src/eco/vampire.ts の vampRaiseFallen）：倒れた冒険者の亡骸にかがみ込み、眷属として起き上がらせる
     name: '倒れた冒険者がヴァンパイアの眷属として起き上がる（4シードで1体以上）',
-    ...RUN_A,
+    ...RUN_THRALL,
     test: (rs) => {
       const n = rs.map((r) => r.births.filter((x) => x.k === 30 && x.from === 25).length);
       return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
@@ -287,7 +294,7 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'オークが貢ぎ物を取り立てる（seed23・seed41・seed30 の合計で1回以上）',
+    name: 'オークが貢ぎ物を取り立てる（abc・seed7・seed17 の合計で1回以上）',
     ...RUN_TRIB,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'tribute').length);

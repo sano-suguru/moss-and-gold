@@ -204,6 +204,7 @@ export function generate(seed: string): MapData {
   }
 
   // 柱（上面＋正面の2マス）を部屋に立てる。通路を掘ったあとに置く
+  const pillar = new Uint8Array(W * H);
   for (const r of rooms) {
     if (r.w < 10 || r.h < 8 || !rng.chance(0.65)) continue;
     const rowsY = r.h >= 10 ? [r.y + 2, r.y + r.h - 4] : [r.y + 2];
@@ -211,6 +212,7 @@ export function generate(seed: string): MapData {
       for (let px = r.x + 2; px <= r.x + r.w - 3; px += 4) {
         solid[id(px, py)] = 1;
         solid[id(px, py + 1)] = 1;
+        pillar[id(px, py)] = pillar[id(px, py + 1)] = 1;
       }
   }
 
@@ -255,14 +257,21 @@ export function generate(seed: string): MapData {
   for (let s = 0; s < W * H; s++) if (!solid[s] && region[s] !== best) solid[s] = 1;
   for (let s = 0; s < W * H; s++) if (solid[s]) paved[s] = 0;
 
-  // 6. 孤立した1マスの岩は崩す
-  for (let pass = 0; pass < 2; pass++)
+  // 6. 孤立した1マスの岩と、壁から床へ1マスだけ突き出た岩（上下左右の岩が1つ以下）は崩す。
+  // 突き出た岩を崩すと、その付け根がまた突き出た岩になることがあるので、無くなるまで繰り返す（細く伸びた岩の筋は根もとまで崩れる）。
+  // 部屋の柱は残す
+  for (let pass = 0, changed = true; changed && pass < 32; pass++) {
+    changed = false;
     for (let y = 2; y < H - 2; y++)
       for (let x = 2; x < W - 2; x++) {
-        if (!solid[id(x, y)]) continue;
+        if (!solid[id(x, y)] || pillar[id(x, y)]) continue;
         const n = S(x + 1, y) + S(x - 1, y) + S(x, y + 1) + S(x, y - 1);
-        if (n === 0) solid[id(x, y)] = 0;
+        if (n <= 1) {
+          solid[id(x, y)] = 0;
+          changed = true;
+        }
       }
+  }
 
   // 7. 入口：地上（マップの上端）から一番近い所へ通路を掘る
   let ex = W >> 1;
@@ -729,6 +738,62 @@ function sealPockets(seed: string, W: number, H: number, solid: Uint8Array, lava
     if (!wall[k]) continue;
     solid[k] = 1;
     sealed[k] = 0;
+  }
+  // 岩の帯や境目にしたマスのうち、床へ1マスだけ突き出たもの（上下左右の岩が1つだけ）をなくす（見た目が不自然なので）。
+  // まわりの床がすべて同じ空洞（または開いた洞窟）で、崩してもつながり方が変わらなければ床に戻す。
+  // そうでなければ（閉じた空洞が開いたり、二つの空洞がつながったりするなら）、脇の床を岩にして塊にする。
+  // 直すと隣がまた突き出ることがあるので、無くなるまで繰り返す
+  const made = new Uint8Array(N);
+  for (let k = 0; k < N; k++) if (solid[k] && (wall[k] || (dist[k] > dMax && dist[k] <= dMax + 2))) made[k] = 1;
+  const side = (k: number) => (sealed[k] ? own[k] : -2);
+  // 床のマス f を岩にしても、まわり8マスの床どうしのつながりが切れないか（まわりの床が、上下左右でたどって一つにつながっている）
+  const R8 = [[1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1]];
+  const fillable = (f: number) => {
+    const x = f % W;
+    const y = (f / W) | 0;
+    if (x < 3 || y < 4 || x >= W - 3 || y >= H - 3 || solid[f] || lava[f] || vault[f]) return false;
+    if (shafts.some((s) => s.y * W + s.x === f) || springs.some((s) => s.y * W + s.x === f)) return false;
+    const open = R8.map(([dx, dy]) => !solid[f + dy * W + dx] && !lava[f + dy * W + dx]);
+    // 輪の上で床の続く区間を数える。斜めのマスは、両隣の上下左右のマスが床のときだけ区間をつなぐ（斜めだけでは歩けない）
+    // （両隣が岩の斜めのマスは、f と上下左右で接していないので、f を岩にしても関係がない。数えない）
+    let runs = 0;
+    for (let i = 0; i < 8; i++) if (open[i] && !open[(i + 7) & 7] && !(i & 1 && !open[(i + 1) & 7])) runs++;
+    return runs === 1 || (runs === 0 && open.every(Boolean));
+  };
+  for (let pass = 0, changed = true; changed && pass < 32; pass++) {
+    changed = false;
+    for (let k = 0; k < N; k++) {
+      if (!made[k] || !solid[k] || vault[k]) continue;
+      const x = k % W;
+      const y = (k / W) | 0;
+      if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) continue;
+      const nb = [k + 1, k - W, k - 1, k + W];
+      const rocks = nb.filter((n) => solid[n] || lava[n]);
+      if (rocks.length !== 1 || lava[rocks[0]]) continue;
+      // 崩してよいのは、岩の反対側の3マスと、その間の斜めの2マスが床で、どれも同じ側のとき
+      const d = nb.indexOf(rocks[0]);
+      const ring = [nb[(d + 1) & 3], nb[(d + 2) & 3], nb[(d + 3) & 3]];
+      const o = nb[(d + 2) & 3] - k;
+      ring.push(ring[0] + o, ring[2] + o);
+      const sd = side(ring[0]);
+      if (ring.some((n) => solid[n] || lava[n] || vault[n] || side(n) !== sd)) {
+        // 境目の岩なので崩せない。代わりに、脇の床の1マスを岩にして、付け根と合わせて2×2の塊にする
+        // （そのマスを岩にしても、まわりの床どうしのつながりが切れないときだけ）
+        for (const f of [ring[0], ring[2]]) {
+          if (!solid[f + rocks[0] - k] || !fillable(f)) continue;
+          solid[f] = 1;
+          sealed[f] = 0;
+          made[f] = 1;
+          changed = true;
+          break;
+        }
+        continue;
+      }
+      solid[k] = 0;
+      sealed[k] = sd === -2 ? 0 : 1;
+      own[k] = sd === -2 ? -1 : sd;
+      changed = true;
+    }
   }
   // 岩の帯や境目に埋もれた光の筋と湧き水は取り除く
   for (let i = shafts.length - 1; i >= 0; i--) if (solid[shafts[i].y * W + shafts[i].x]) shafts.splice(i, 1);

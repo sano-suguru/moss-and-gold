@@ -2,7 +2,7 @@ const KEY = 'dungeon-aquarium-v2';
 const OLD_KEY = 'dungeon-aquarium-v1';
 
 export interface SaveData {
-  v: 4;
+  v: 5;
   seed: string;
   tick: number;
   cam: { x: number; y: number; zoom: number };
@@ -84,15 +84,15 @@ export function load(): SaveData | undefined {
     const s = localStorage.getItem(KEY);
     if (s) {
       const d = JSON.parse(s) as SaveData;
-      if (d && (d as { v: number }).v === 4 && typeof d.seed === 'string' && typeof d.tick === 'number') return d;
-      // 地形の作り方が変わる前のセーブデータ（v2：段階7a まで、v3：迷路の区画があったころ）は、同じ言葉から新しいダンジョンとして始める
-      // （地形はセーブせず、ロードのたびにシードから作り直すので、古い生き物や水を新しい地形に載せられない）
-      if (d && ((d as { v: number }).v === 2 || (d as { v: number }).v === 3) && typeof d.seed === 'string') return { v: 4, seed: d.seed, tick: 0, cam: d.cam, speed: d.speed ?? 1, seen: '' };
+      if (d && (d as { v: number }).v === 5 && typeof d.seed === 'string' && typeof d.tick === 'number') return d;
+      // 地形の作り方が変わる前のセーブデータ（v2：段階7a まで、v3：迷路の区画があったころ、v4：床へ1マスだけ突き出た岩があったころ）は、
+      // 同じ言葉から新しいダンジョンとして始める（地形はセーブせず、ロードのたびにシードから作り直すので、古い生き物や水を新しい地形に載せられない）
+      if (d && [2, 3, 4].includes((d as { v: number }).v) && typeof d.seed === 'string') return { v: 5, seed: d.seed, tick: 0, cam: d.cam, speed: d.speed ?? 1, seen: '' };
     }
     const o = localStorage.getItem(OLD_KEY);
     if (o) {
       const d = JSON.parse(o);
-      if (d && typeof d.seed === 'string') return { v: 4, seed: d.seed, tick: 0, cam: d.cam, speed: d.speed ?? 1, seen: '' };
+      if (d && typeof d.seed === 'string') return { v: 5, seed: d.seed, tick: 0, cam: d.cam, speed: d.speed ?? 1, seen: '' };
     }
   } catch {
     /* 読めない場合は新しく始める */
