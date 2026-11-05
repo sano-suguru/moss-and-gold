@@ -1,3 +1,5 @@
+import { floorGlsl } from './floors';
+
 export const MAX_LIGHTS = 64;
 export const MAX_SHAFTS = 24;
 
@@ -91,6 +93,7 @@ export const FS_SCENE = `#version 300 es
 precision highp float;
 precision highp int;
 uniform sampler2D uMap;
+uniform sampler2D uTile;
 uniform sampler2D uField;
 uniform sampler2D uMana;
 uniform sampler2D uGlow;
@@ -136,32 +139,72 @@ float bayer(ivec2 w) {
 bool inMap(ivec2 t) { return t.x >= 0 && t.y >= 0 && t.x < uMapSize.x && t.y < uMapSize.y; }
 int solidAt(ivec2 t) { return inMap(t) ? (texelFetch(uMap, t, 0).r > 0.5 ? 1 : 0) : 1; }
 int abits(ivec2 t) { return inMap(t) ? int(texelFetch(uMap, t, 0).a * 255.0 + 0.5) : 0; }
-bool pavedAt(ivec2 t) { return (abits(t) & 128) != 0; }
-bool rubbleAt(ivec2 t) { return (abits(t) & 64) != 0; }
 bool sealedAt(ivec2 t) { return (abits(t) & 32) != 0; }
 
 // 壁（瓦礫を除く岩。地図の外も壁）。下が床の壁のマスは、上の CAP px が上面（天端）、残りが正面
 const int CAP = 5;
-bool wallAt(ivec2 t) { return solidAt(t) == 1 && !rubbleAt(t); }
+const int FACE = 16 - CAP;
+bool wallAt(ivec2 t) {
+  if (!inMap(t)) return true;
+  vec4 m = texelFetch(uMap, t, 0);
+  return m.r > 0.5 && (int(m.a * 255.0 + 0.5) & 64) == 0;
+}
 ivec2 tileOfPx(ivec2 p) { return ivec2(floor(vec2(p) / 16.0)); }
-// 点 p（ワールドのピクセル）が壁の上面か
-bool topPx(ivec2 p) {
-  ivec2 t = tileOfPx(p);
-  return wallAt(t) && (p.y - t.y * 16 < CAP || wallAt(t + ivec2(0, 1)));
+// マスごとの描き方の情報（renderer.ts の tileInfo が求める）。r：壁と角の丸め方（bit0 壁か、bit1〜4 左上・右上・左下・右下の角を丸めるか）、
+// g：床の材質の番号（src/floors.ts。壁は 255）、b：高さの違う縁（bit0〜3 北東南西の隣がこのマスより下の床、bit4〜7 上の床）、
+// a：bit0 自然の型の縁を求めるか、bit1 掘りたての床か、bit2 まわりに掘りたてかどうかが違う床がある
+${floorGlsl()}
+ivec4 tileAt(ivec2 t) { return inMap(t) ? ivec4(texelFetch(uTile, t, 0) * 255.0 + 0.5) : ivec4(1, 255, 0, 0); }
+int cornerAt(ivec2 t) { return tileAt(t).r; }
+// マス t が人の手の床か（その床に接する壁の角は直角、面した壁の正面は石積み）
+bool handmadeAt(ivec2 t) { int f = tileAt(t).g; return f < FLOOR_N && handmade(f); }
+// なめらかな値のノイズ（0〜1）。格子点の値を補間するので、境目をまだらにしても離れた点が散らばらない
+float vnoise(vec2 p, uint salt) {
+  vec2 i = floor(p);
+  vec2 f = p - i;
+  f = f * f * (3.0 - 2.0 * f);
+  ivec2 c = ivec2(i);
+  return mix(mix(h01(c, salt), h01(c + ivec2(1, 0), salt), f.x), mix(h01(c + ivec2(0, 1), salt), h01(c + ivec2(1, 1), salt), f.x), f.y);
 }
+// 点 p にいちばん近いマスの角（格子点）をはさむ横の隣のマス
+ivec2 cnH(ivec2 p) { ivec2 t = tileOfPx(p); return t + ivec2(p.x - t.x * 16 < 8 ? -1 : 1, 0); }
+// 点 p が、見た目の壁か（真上から見た岩の足もとの形）。シミュレーションはマス単位のままで、描画だけ自然の岩壁の角を丸める：
+// 出っ張った角は削って床を見せ、へこんだ角は床の上へ岩を張り出させる（どの角を丸めるかは cornerAt）。
+// 丸める半径は角ごとに 3〜6px、縁には小さなごつごつした凹凸
+bool wallPxB(ivec2 p, ivec2 t, int b) {
+  bool self = (b & 1) != 0;
+  ivec2 l = p - t * 16;
+  int q = (l.x < 8 ? 0 : 1) + (l.y < 8 ? 0 : 2);
+  if ((b & (2 << q)) == 0) return self;
+  // 角からの距離（ピクセルの中心で 0.5〜7.5）
+  ivec2 v = t + ivec2(q & 1, q >> 1);
+  vec2 a = abs(vec2(p - v * 16) + 0.5);
+  float r = 3.0 + float(hash2(v, 811u) % 4u);
+  if (a.x >= r || a.y >= r) return self;
+  // 凹凸は、角から見た向き（a.x − a.y）に沿って 3px ごとの値をなめらかにつないだもの。半径の向きには一様なので、
+  // 縁は一続きの線のままで、離れた点や1ピクセルだけの突き出しができない
+  float u = (a.x - a.y) / 3.0 + 4.0;
+  float k = floor(u);
+  float j = (mix(h01(v * 16 + ivec2(int(k), 0), 812u), h01(v * 16 + ivec2(int(k) + 1, 0), 812u), u - k) - 0.5) * 1.6;
+  bool near = length(vec2(r) - a) > r + j;
+  return self ? !near : near;
+}
+bool wallPx(ivec2 p) {
+  ivec2 t = tileOfPx(p);
+  return wallPxB(p, t, cornerAt(t));
+}
+// 点 p（ワールドのピクセル）が壁の上面か：見た目の壁の足もとを、正面の高さ（FACE px）だけ上へずらした形。正面が丸めた角を回り込む
+bool topPx(ivec2 p) { return wallPx(p) && wallPx(p + ivec2(0, FACE)); }
 // 点 p が壁の正面か
-bool facePx(ivec2 p) {
-  ivec2 t = tileOfPx(p);
-  return wallAt(t) && p.y - t.y * 16 >= CAP && !wallAt(t + ivec2(0, 1));
-}
-// 上面の点（マス t の中の位置 l）が、石畳の床の縁を囲む切り石の天端か：石積みの正面の天端と、石畳の床から CAP px の内の上面
+bool facePx(ivec2 p) { return wallPx(p) && !wallPx(p + ivec2(0, FACE)); }
+// 上面の点（マス t の中の位置 l）が、人の手の床の縁を囲む切り石の天端か：石積みの正面の天端と、人の手の床から CAP px の内の上面
 bool copingPx(ivec2 t, ivec2 l) {
-  if (!wallAt(t + ivec2(0, 1)) && pavedAt(t + ivec2(0, 1))) return true;
+  if (handmadeAt(t + ivec2(0, 1))) return true;
   for (int dy = -1; dy <= 1; dy++)
     for (int dx = -1; dx <= 1; dx++) {
       if (dx == 0 && dy == 0) continue;
       ivec2 n = t + ivec2(dx, dy);
-      if (wallAt(n) || !pavedAt(n)) continue;
+      if (!handmadeAt(n)) continue;
       int ddx = dx < 0 ? l.x + 1 : dx > 0 ? 16 - l.x : 0;
       int ddy = dy < 0 ? l.y + 1 : dy > 0 ? 16 - l.y : 0;
       if (max(ddx, ddy) <= CAP) return true;
@@ -169,7 +212,9 @@ bool copingPx(ivec2 t, ivec2 l) {
   return false;
 }
 
-// 石のひび割れ模様（セル状ノイズ）。x: 最も近い石までの距離, y: 二番目, z: 石ごとの値, w: 石の中での上下左右の位置
+// 石のひび割れ模様（セル状ノイズ）。x: 最も近い石までの距離, y: 二番目, z: 石ごとの値, w: 石の中での上下左右の位置。
+// 最も近い石の中心は stoneC に残す（岩の硬さを石ひとつごとに決めて、層の境目を石のひび割れに沿わせるのに使う）
+vec2 stoneC;
 vec4 stones(vec2 p, vec2 cs, uint salt) {
   vec2 g = floor(p / cs);
   float d1 = 1e9;
@@ -188,6 +233,7 @@ vec4 stones(vec2 p, vec2 cs, uint salt) {
         d1 = d;
         id = float((h >> 16u) & 255u) / 255.0;
         pos = dv.x + dv.y;
+        stoneC = fp;
       } else if (d < d2) {
         d2 = d;
       }
@@ -196,17 +242,6 @@ vec4 stones(vec2 p, vec2 cs, uint salt) {
 }
 
 float seenSoft(vec2 wp) { return texture(uField, wp / 16.0 / vec2(uMapSize)).g; }
-bool lavaAt(ivec2 t) { return inMap(t) && texelFetch(uMap, t, 0).g > 0.5; }
-float lavaF(ivec2 t) { return lavaAt(t) ? 1.0 : 0.0; }
-// 溶岩の広がりをなめらかに（マスの角を丸める）
-float lavaSoft(vec2 p) {
-  vec2 f = p / 16.0 - 0.5;
-  ivec2 i0 = ivec2(floor(f));
-  vec2 fr = f - floor(f);
-  float a = mix(lavaF(i0), lavaF(i0 + ivec2(1, 0)), fr.x);
-  float b = mix(lavaF(i0 + ivec2(0, 1)), lavaF(i0 + ivec2(1, 1)), fr.x);
-  return mix(a, b, fr.y);
-}
 float waterAt(vec2 p) { return texture(uField, p / 16.0 / vec2(uMapSize)).b; }
 
 vec3 ramp(int i) {
@@ -255,11 +290,13 @@ void main() {
   ivec2 l = w - t * 16;
   if (!inMap(t)) { o = vec4(0.0, 0.0, 0.0, 1.0); return; }
 
-  int s = solidAt(t);
-  int sS = solidAt(t + ivec2(0, 1));
-  int sN = solidAt(t - ivec2(0, 1));
-  int sE = solidAt(t + ivec2(1, 0));
-  int sW = solidAt(t - ivec2(1, 0));
+  // 見た目の壁（角を丸めた形）。マスと食い違う点（削った角の床、張り出した岩）は、角をはさむ横の隣のマスのものとして描く
+  // （削った角では横の隣が床、張り出した岩では横の隣が岩）
+  ivec4 tiOwn = tileAt(t);
+  bool wpx = wallPxB(w, t, tiOwn.r);
+  bool moved = wpx != ((tiOwn.r & 1) != 0);
+  if (moved) { t = cnH(w); l = w - t * 16; }
+  int s = wpx ? 1 : 0;
   float h = h01(w, 1u);
   vec3 alb;
   bool emis = false;
@@ -269,15 +306,38 @@ void main() {
   int tkind = 0;
   bool edgeLine = false;
   int idx;
-  bool rub = rubbleAt(t);
+  bool rub = (tiOwn.a & 32) != 0 && !moved;
   float matGlow = 0.0;
   float glint = 0.0;
+  // 床の点では、この点に近い4マス（マスの中心で囲む4つ）の情報を一度だけ読み、床の材質の縁・壁までの距離・岩のかけらの範囲に使い回す
+  ivec4 q00 = ivec4(0);
+  ivec4 q10 = ivec4(0);
+  ivec4 q01 = ivec4(0);
+  ivec4 q11 = ivec4(0);
+  vec2 qf = vec2(0.0);
+  if (s == 0) {
+    vec2 f = (wp + 0.5) / 16.0 - 0.5;
+    ivec2 i0 = ivec2(floor(f));
+    qf = f - floor(f);
+    q00 = tileAt(i0);
+    q10 = tileAt(i0 + ivec2(1, 0));
+    q01 = tileAt(i0 + ivec2(0, 1));
+    q11 = tileAt(i0 + ivec2(1, 1));
+  }
 
-  if (s == 1 && !rub) {
-    // 壁の上面と正面（周りのマスを見て、縁と角を点ごとに描く。上面の範囲は topPx、正面の範囲は facePx）
-    bool top = topPx(w);
-    bool brick = !top && pavedAt(t + ivec2(0, 1));
-    bool cope = top && copingPx(t, l);
+  if (s == 1) {
+    // 壁の上面と正面（周りの点の見た目の壁を見て、縁と角を点ごとに描く。上面の範囲は topPx、正面の範囲は facePx）。
+    // 同じ点の判定を何度もしないよう、この点と左右の点、およびそれぞれ正面の高さだけ下の点の見た目の壁を先に求めておく
+    // 岩の内部（まわり8マスもすべて壁）なら、どの点も上面で縁も無いので、判定を省く
+    ivec4 tw = moved ? tileAt(t) : tiOwn;
+    bool inner = (tw.a & 8) != 0;
+    ivec2 dF = ivec2(0, FACE);
+    bool wF = inner || wallPx(w + dF);
+    bool wL = inner || wallPx(w - ivec2(1, 0));
+    bool wR = inner || wallPx(w + ivec2(1, 0));
+    bool top = wF;
+    bool brick = !top && handmadeAt(t + ivec2(0, 1));
+    bool cope = top && (tw.a & 16) != 0 && copingPx(t, l);
     if (top) {
       if (cope) {
         // 切り石の天端：8px 角の石を並べる
@@ -298,16 +358,29 @@ void main() {
           if (h > 0.96) idx += 1;
         }
       }
-      bool up = topPx(w - ivec2(0, 1));
-      bool lf = topPx(w - ivec2(1, 0));
-      bool rt = topPx(w + ivec2(1, 0));
-      bool dn = topPx(w + ivec2(0, 1));
-      // 床と接する縁は黒い線。正面へ落ちる縁（天端の手前の角）は明るい線
-      if (!up || !lf || !rt) idx = 0;
+      bool wU = inner || wallPx(w - ivec2(0, 1));
+      bool up = inner || (wU && wallPx(w - ivec2(0, 1) + dF));
+      bool lf = inner || (wL && wallPx(w - ivec2(1, 0) + dF));
+      bool rt = inner || (wR && wallPx(w + ivec2(1, 0) + dF));
+      bool dn = inner || (wallPx(w + ivec2(0, 1)) && wallPx(w + ivec2(0, 1) + dF));
+      // 床と接する縁は黒い線。正面へ落ちる縁（天端の手前の角）は明るい線。
+      // へこんだ角で正面が回り込む曲線では、横が正面でも、すぐ下が上面でなければ明るい線にする（曲線が途切れて点線にならないように）
+      bool flrU = !wU;
+      bool flrL = !wL;
+      bool flrR = !wR;
+      if (flrU || flrL || flrR) idx = 0;
       else if (!dn) idx = cope ? 5 : 4;
+      else if (!up || !lf || !rt) idx = 0;
       tkind = 2;
       edgeLine = !up || !lf || !rt || !dn;
     } else {
+      // 正面の中での高さ（上端が CAP、床に接する下端が 15）。真下へ何 px で床になるかで決める。
+      // 使うのは下端の3段と上端だけなので、その分だけ調べる（途中の段は 10。石積みの壁は角を丸めないので、マスの中の位置を使う）
+      int fy = 10;
+      if (!wallPx(w + ivec2(0, 1))) fy = 15;
+      else if (!wallPx(w + ivec2(0, 2))) fy = 14;
+      else if (!wallPx(w + ivec2(0, 3))) fy = 13;
+      else if (wallPx(w + ivec2(0, FACE - 1))) fy = CAP;
       if (brick) {
         // 石積みの壁（いちばん下の段の下端がマスの下端にそろうよう、行をずらす）
         idx = faceIdx(ivec2(l.x, l.y - CAP + 1));
@@ -324,18 +397,21 @@ void main() {
         }
       }
       // 天端のすぐ下は影、足もとは暗く
-      if (l.y == CAP) idx = min(idx, 2);
-      if (l.y >= 13) idx -= 1;
-      bool lf = facePx(w - ivec2(1, 0));
-      bool rt = facePx(w + ivec2(1, 0));
-      if (!lf || !rt) idx = 0;
+      if (fy == CAP) idx = min(idx, 2);
+      if (fy >= 13) idx -= 1;
+      bool lf = wL && !wallPx(w - ivec2(1, 0) + dF);
+      bool rt = wR && !wallPx(w + ivec2(1, 0) + dF);
+      // 左右の縁の黒い線は、床と接する所だけ（へこんだ角で上面と接する所には引かない）
+      if (!wL || !wR) idx = 0;
       tkind = 1;
-      edgeLine = l.y == 15 || !lf || !rt;
+      edgeLine = fy == 15 || !lf || !rt;
     }
     alb = ramp(idx);
     // 岩の硬さ：柔らかい層は茶色がかった細かい肌、硬い岩は青みがかった暗い大きな岩肌（石積みと切り石は人の手のものなので色を分けない）
     if (!brick && !cope) {
-      int hb = abits(t);
+      // 硬さは、その点が属する石の中心があるマスで決める（中心が壁でなければ自分のマス）。境目がマスの直線でなく、石のひび割れに沿う
+      ivec2 mt = tileOfPx(ivec2(floor(stoneC)));
+      int hb = wallAt(mt) ? abits(mt) : abits(t);
       if ((hb & 8) != 0) {
         alb *= vec3(1.22, 1.0, 0.74);
         if (h01(w, 501u) < 0.2) alb *= 1.12;
@@ -354,7 +430,73 @@ void main() {
     }
   } else {
     uint th = hash2(t, 7u);
-    if (!pavedAt(t)) {
+    // ---- 床の材質の段（src/floors.ts）。この点に見える材質 mat を決める ----
+    // 自分のマスの情報は、読んだまわり4マスの中にある（削った壁の角の点は、描くマスを付け替えたので読み直す）
+    ivec4 ti = moved ? tileAt(t) : tiOwn;
+    int fid = min(ti.g, FLOOR_N - 1);
+    int mat = fid;
+    // 自然の型の縁：材質ごとに、まわり4マスの中心での「その材質か」をなめらかに補間し、ノイズを足して 0.5 を超えれば覆う。
+    // 境目はマスの境目の内外へふらつき、角は丸くなる。優先度の高い材質から覆うかを見る（人の手の型は自分のマスだけを覆う）
+    if ((ti.a & 1) != 0) {
+      int ids[4] = int[4](q00.g, q10.g, q01.g, q11.g);
+      float nz = (vnoise(wp / 5.0, 831u) - 0.5) * 0.45;
+      int bestP = -1;
+      for (int i = 0; i < 4; i++) {
+        int c = ids[i];
+        if (c >= FLOOR_N || FLOOR_PRIO[c] <= bestP) continue;
+        bool cov;
+        if (edgeBuilt(c)) cov = c == fid;
+        else {
+          float sv = mix(mix(float(q00.g == c), float(q10.g == c), qf.x), mix(float(q01.g == c), float(q11.g == c), qf.x), qf.y);
+          cov = sv + nz > 0.5;
+        }
+        if (cov) { mat = c; bestP = FLOOR_PRIO[c]; }
+      }
+    }
+    // 人の手の型の縁の石：ほかの床に接する縁の石（8px 角を半分ずつずらして並べた石）の一部は、抜けたり欠けたりして下の材質がのぞく
+    bool hole = false;
+    int hb0x = 0;
+    int hb0y = 0;
+    int hside = -1;
+    if (mat == fid && edgeBuilt(fid) && (ti.b & 15) != 0) {
+      int row = w.y >> 3;
+      int sh = (row & 1) * 4;
+      int col = (w.x + sh) >> 3;
+      int bx0 = col * 8 - sh;
+      int by0 = row * 8;
+      int tx0 = t.x * 16;
+      int ty0 = t.y * 16;
+      int side = -1;
+      if ((ti.b & 1) != 0 && by0 == ty0) side = 0;
+      else if ((ti.b & 4) != 0 && by0 + 8 == ty0 + 16) side = 2;
+      else if ((ti.b & 8) != 0 && bx0 <= tx0) side = 3;
+      else if ((ti.b & 2) != 0 && bx0 + 8 >= tx0 + 16) side = 1;
+      if (side >= 0) {
+        float bh = h01(ivec2(col, row), 821u);
+        if (bh < 0.1) hole = true;
+        else if (bh < 0.27) {
+          // 欠け：外側の縁から、半円にえぐれる
+          int dOut = side == 0 ? w.y - by0 : side == 2 ? by0 + 7 - w.y : side == 3 ? w.x - max(bx0, tx0) : min(bx0 + 7, tx0 + 15) - w.x;
+          int along = side == 0 || side == 2 ? w.x - bx0 : w.y - by0;
+          float c = 1.5 + h01(ivec2(col, row), 822u) * 4.0;
+          hole = length(vec2(float(along) - c, float(dOut))) < 2.6;
+        }
+        if (hole) {
+          ivec2 dir = side == 0 ? ivec2(0, -1) : side == 1 ? ivec2(1, 0) : side == 2 ? ivec2(0, 1) : ivec2(-1, 0);
+          mat = min(tileAt(t + dir).g, FLOOR_N - 1);
+          hb0x = max(bx0, tx0);
+          hb0y = by0;
+          hside = side;
+        }
+      }
+    }
+    // 材質ごとの模様（材質を足したら、ここに模様の描き方を足す）
+    if (mat == 1) {
+      // 石畳
+      idx = floorIdx(ivec2(w.x & 15, w.y & 15));
+      if (idx == 3 && h < 0.07) idx = 2;
+      else if (idx == 3 && h > 0.95) idx = 4;
+    } else {
       // 岩床
       vec4 st = stones(wp + 0.5, vec2(7.0, 6.0), 11u);
       if (st.y - st.x < 1.0) idx = 1;
@@ -364,36 +506,52 @@ void main() {
         else if (st.w > 0.45) idx -= 1;
         if (h > 0.97) idx += 1;
       }
-    } else {
-      // 石畳
-      idx = floorIdx(l);
-      if (idx == 3 && h < 0.07) idx = 2;
-      else if (idx == 3 && h > 0.95) idx = 4;
     }
-    if (pavedAt(t) && (th & 7u) == 0u) {
+    // 人の手の型の材質は、下の材質よりわずかに高く敷かれているように見せる：南の縁に暗い側面、北の縁に明るい線
+    if (!hole && mat == fid && edgeBuilt(fid)) {
+      if ((ti.b & 4) != 0 && l.y >= 14) idx = l.y == 15 ? 1 : 2;
+      else if ((ti.b & 1) != 0 && l.y == 0) idx = 4;
+    }
+    // 高い材質から落ちる影：北の隣が高ければ上の 3px、東西の隣が高ければその側の 2px を一段暗く
+    if (mat == fid) {
+      if ((ti.b & 16) != 0 && l.y < 3) idx -= 1;
+      if ((ti.b & 32) != 0 && l.x > 13) idx -= 1;
+      if ((ti.b & 128) != 0 && l.x < 2) idx -= 1;
+    }
+    // 抜けた石の穴：まわりの石から穴の底へ落ちる影（北と西の縁。縁が外の床に開いている側は除く）
+    if (hole) {
+      if (w.y - hb0y < 2 && hside != 0) idx -= 1;
+      if (w.x - hb0x < 1 && hside != 3) idx -= 1;
+    }
+    if (mat == 1 && mat == fid && !hole && (th & 7u) == 0u) {
       int ax = int((th >> 3u) & 7u) + 3;
       int ay = int((th >> 6u) & 7u) + 2;
       int dx = l.x - ax;
       int dy = l.y - ay;
       if (dy >= 0 && dy < 6 && (dx == dy / 2 || (dx == dy / 2 + 1 && dy % 2 == 1))) idx = 1;
     }
-    if (sN == 1) { if (l.y < 2) idx -= 2; else if (l.y < 4) idx -= 1; }
-    if (sW == 1 && l.x < 2) idx -= 1;
-    if (sE == 1 && l.x > 13) idx -= 1;
+    // 壁の足もとは暗く（見た目の壁から 2px 以内は二段、4px 以内は一段。左右は 2px 以内を一段）。
+    // 近い4マスに壁が無ければ、調べる点（4px 以内）にも壁は無いので省く
+    if ((((q00.r | q10.r | q01.r | q11.r) & 1) != 0)) {
+      if (wallPx(w - ivec2(0, 2))) idx -= 2;
+      else if (wallPx(w - ivec2(0, 4))) idx -= 1;
+      if (wallPx(w - ivec2(2, 0)) || wallPx(w + ivec2(2, 0))) idx -= 1;
+    }
     alb = ramp(idx);
     vec2 fuv = (wp + 0.5) / 16.0 / vec2(uMapSize);
     vec4 fld = texture(uField, fuv);
     vec2 glw = texture(uGlow, fuv).rg;
     // 養分の多い土は、わずかに黒く湿って見える
     float rich = smoothstep(0.35, 0.95, fld.a);
-    if (rich > 0.0 && !pavedAt(t)) {
+    if (rich > 0.0 && !handmade(mat)) {
       alb *= mix(vec3(1.0), vec3(0.8, 0.82, 0.7), rich * 0.7);
       if (h01(w, 77u) < rich * 0.16) alb = vec3(58.0, 44.0, 36.0) / 255.0;
     }
     // 溶岩のそばは焼けて赤茶ける
     float scorch = smoothstep(0.12, 0.6, glw.g);
     if (scorch > 0.0) alb = mix(alb, alb * vec3(1.05, 0.72, 0.6), scorch);
-    float feat = texelFetch(uMap, t, 0).b;
+    // 湧き水と吸い込み穴（あるマスだけ地図のテクスチャを読む）
+    float feat = (ti.a & 128) != 0 ? texelFetch(uMap, t, 0).b : 0.0;
     // 吸い込み穴
     if (feat > 0.55) {
       float r = length((vec2(l) - 7.5) * vec2(1.0, 1.35));
@@ -409,7 +567,7 @@ void main() {
     }
     // 微生物の膜：溶岩のまわりに白、黄、橙、赤茶の縞。端はまだらにかすれ、ほのかに光る
     float mt = fld.g;
-    if (mt > 0.05 && !pavedAt(t)) {
+    if (mt > 0.05 && !handmade(mat)) {
       float band = floor(glw.g * 9.0 + h01(w / 2, 7u) * 1.6);
       int bi = int(mod(band, 6.0));
       vec3 mc = bi == 0 ? vec3(226.0, 206.0, 168.0) : bi == 1 ? vec3(236.0, 176.0, 80.0) : bi == 2 ? vec3(220.0, 120.0, 48.0) : bi == 3 ? vec3(178.0, 76.0, 38.0) : bi == 4 ? vec3(214.0, 188.0, 128.0) : vec3(204.0, 140.0, 64.0);
@@ -419,8 +577,13 @@ void main() {
         matGlow = 0.11 * cover * (0.75 + 0.25 * sin(uTime * 0.7 + float(band)));
       }
     }
-    // 掘りたての床：崩れた岩のかけらが散らばる
-    if (feat > 0.1 && feat < 0.2) {
+    // ---- 床の上の状態の段 ----
+    // 状態（岩のかけら、焼け跡、微生物の膜、苔、水、溶岩）は、それぞれ量を持ち、床の材質を選ばずに上へ重なる。
+    // 量はマスの中心の値をなめらかに補間して読み、境目にまだらなノイズを入れる（マスの四角で切れないように）。
+    // 掘りたての床：崩れた岩のかけらが散らばる。散らばる範囲の縁は、まわりのマスの「掘りたてか」を補間してまだらにする
+    float dugv = float((ti.a >> 1) & 1);
+    if ((ti.a & 4) != 0) dugv = mix(mix(float((q00.a >> 1) & 1), float((q10.a >> 1) & 1), qf.x), mix(float((q01.a >> 1) & 1), float((q11.a >> 1) & 1), qf.x), qf.y);
+    if (dugv > 0.0 && h01(w, 62u) < smoothstep(0.3, 0.7, dugv + (vnoise(wp / 4.0, 63u) - 0.5) * 0.4)) {
       float r = h01(w, 61u);
       if (r < 0.18) alb = vec3(132.0, 124.0, 140.0) / 255.0;
       else if (r < 0.3) alb = vec3(52.0, 46.0, 60.0) / 255.0;
@@ -469,7 +632,8 @@ void main() {
       if (r < 1.5) alb = vec3(0.78, 0.9, 0.96);
     }
     // 溶岩：黒い岩の皮が浮かび、そのすき間で溶けた岩が光る
-    float ls = lavaSoft(wp + 0.5);
+    // 溶岩の広がりをなめらかに（読んだまわり4マスの「溶岩か」を補間して、マスの角を丸める）
+    float ls = mix(mix(float((q00.a >> 6) & 1), float((q10.a >> 6) & 1), qf.x), mix(float((q01.a >> 6) & 1), float((q11.a >> 6) & 1), qf.x), qf.y);
     float lth = 0.5 + (h01(w / 3, 5u) - 0.5) * 0.3;
     if (ls > lth) {
       vec4 st = stones(wp + 0.5 + vec2(uTime * 1.1, uTime * 0.45), vec2(9.0, 8.0), 61u);
@@ -484,23 +648,37 @@ void main() {
       isWater = false;
     }
     // 焼け跡：灰で黒く沈み、まだ熱いうちは熾火がまだらに光る
-    vec4 fx = texelFetch(uFx, t, 0);
-    if (fx.g > 0.01 && fx.r < 0.01) {
-      float a = fx.g;
+    // 灰の量と燃えている度合いはなめらかに補間して読む（炎の舌だけは、マスごとの「もの」としてマスの値で描く）
+    vec4 fx = texture(uFx, fuv);
+    vec4 fxT = fx.r > 0.001 || fx.g > 0.01 ? texelFetch(uFx, t, 0) : vec4(0.0);
+    if (fx.g > 0.01 && fxT.r < 0.01) {
+      // 灰の濃さはまわり4マスの最大値。補間した値（最大値に対する割合）は、どこまで覆うかだけに使う
+      // （補間した値をそのまま濃さにすると、1マスだけの焼け跡が縁に向かって薄れ、ぼやけて見えなくなる）
+      ivec2 a0 = max(ivec2(floor((wp + 0.5) / 16.0 - 0.5)), ivec2(0));
+      float aMax = max(max(texelFetch(uFx, a0, 0).g, texelFetch(uFx, a0 + ivec2(1, 0), 0).g), max(texelFetch(uFx, a0 + ivec2(0, 1), 0).g, texelFetch(uFx, a0 + ivec2(1, 1), 0).g));
+      float a = aMax * smoothstep(0.35, 0.6, fx.g / max(aMax, 0.001) + (vnoise(wp / 3.0, 70u) - 0.5) * 0.35);
       float ah = h01(w, 71u);
       vec3 ashC = ah < 0.3 ? vec3(18.0, 14.0, 16.0) : (ah < 0.7 ? vec3(34.0, 28.0, 30.0) : vec3(58.0, 50.0, 48.0));
       alb = mix(alb, ashC / 255.0, a * 0.85);
       uint eh = hash2(w / 2, 72u + uint(floor(uTime * 1.5)));
       // 熾火は燃え尽きた直後（地上の1時間ほど）だけ、だんだん少なく
-      if (a > 0.955 && float(eh & 1023u) < (a - 0.955) * 500.0) { alb = h01(w, 73u) < 0.5 ? vec3(1.0, 0.45, 0.14) : vec3(0.75, 0.2, 0.08); emis = true; }
+      // （燃え尽きたマスの値で決め、補間した灰の量の割合で縁ほど少なく）
+      if (fxT.g > 0.955 && float(eh & 1023u) < (fxT.g - 0.955) * 500.0 * min(1.0, fx.g / fxT.g)) { alb = h01(w, 73u) < 0.5 ? vec3(1.0, 0.45, 0.14) : vec3(0.75, 0.2, 0.08); emis = true; }
     }
-    // 燃えているマス：焦げた床に熾火がまだらに光り、炎の舌があちこちから揺れながら立ち上がる
-    if (fx.r > 0.01) {
-      float bn = fx.r;
+    // 燃えているマス：焦げた床に熾火がまだらに光り、炎の舌があちこちから揺れながら立ち上がる。
+    // 焦げた床と熾火は、燃えている度合いを補間した範囲（縁はまだら）、炎の舌は燃えているマスの中だけ
+    // （燃えているマスの値は 0.47 以上。隣が燃えていなければ、マスの境目で補間した値はその半分ほどになる）
+    float burnC = fx.r > 0.01 ? smoothstep(0.12, 0.3, fx.r + (vnoise(wp / 3.0, 78u) - 0.5) * 0.2) : 0.0;
+    if (burnC > 0.0) {
+      float bn = max(fxT.r, fx.r);
       float eh = h01(w / 2, 76u);
-      alb = mix(alb * 0.35, vec3(26.0, 16.0, 16.0) / 255.0, 0.6);
+      alb = mix(alb, mix(alb * 0.35, vec3(26.0, 16.0, 16.0) / 255.0, 0.6), burnC);
       uint fl = hash2(w / 2, 77u + uint(floor(uTime * 6.0)));
-      if (eh < 0.35 * bn) { alb = float(fl & 3u) == 0.0 ? vec3(255.0, 170.0, 60.0) / 255.0 : vec3(190.0, 60.0, 22.0) / 255.0; emis = true; }
+      if (eh < 0.35 * bn * burnC) { alb = float(fl & 3u) == 0.0 ? vec3(255.0, 170.0, 60.0) / 255.0 : vec3(190.0, 60.0, 22.0) / 255.0; emis = true; }
+      isWater = false;
+    }
+    if (fxT.r > 0.01) {
+      float bn = fxT.r;
       float fr = floor(uTime * 9.0);
       int nT = 2 + int(bn * 3.0);
       for (int c = 0; c < 5; c++) {
@@ -630,16 +808,14 @@ void main() {
   }
 
   // 壁際と角の床は少し暗く（奥行き）。暗がりの色にも大きなむらを少し持たせる
+  // 壁までのおおよその距離（px）：まわり4マスの岩の量を点の位置でなめらかに補間した値から出す。
+  // まっすぐな壁ぎわでは壁の縁からの距離と一致し、へこんだ角ほど近く、出っ張った角は丸く遠くなる（丸めた壁の形に沿う）
+  float de = 16.0;
+  if (s == 0) {
+    float sv = mix(mix(float(q00.r & 1), float(q10.r & 1), qf.x), mix(float(q01.r & 1), float(q11.r & 1), qf.x), qf.y);
+    de = max(0.0, (0.5 - sv) * 16.0);
+  }
   if (s == 0 && !rub) {
-    float de = 16.0;
-    if (sW == 1) de = min(de, float(l.x));
-    if (sE == 1) de = min(de, float(15 - l.x));
-    if (sN == 1) de = min(de, float(l.y));
-    if (sS == 1) de = min(de, float(15 - l.y));
-    if (solidAt(t + ivec2(-1, -1)) == 1) de = min(de, length(vec2(l)));
-    if (solidAt(t + ivec2(1, -1)) == 1) de = min(de, length(vec2(15 - l.x, l.y)));
-    if (solidAt(t + ivec2(-1, 1)) == 1) de = min(de, length(vec2(l.x, 15 - l.y)));
-    if (solidAt(t + ivec2(1, 1)) == 1) de = min(de, length(vec2(15 - l.x, 15 - l.y)));
     col *= mix(0.6, 1.0, smoothstep(0.0, 8.0, de + bq));
     float n = h01(t / 6, 611u) * 0.6 + h01(t / 3, 612u) * 0.4;
     col *= mix(vec3(0.94, 0.97, 1.06), vec3(1.06, 1.0, 0.92), n);
@@ -666,11 +842,6 @@ void main() {
   if (s == 0 && sealedAt(t)) {
     float g = dot(col, vec3(0.3, 0.5, 0.2));
     col = mix(vec3(g), col, 0.35) * vec3(0.42, 0.46, 0.60);
-    float de = 16.0;
-    if (sW == 1) de = min(de, float(l.x));
-    if (sE == 1) de = min(de, float(15 - l.x));
-    if (sN == 1) de = min(de, float(l.y));
-    if (sS == 1) de = min(de, float(15 - l.y));
     float k = smoothstep(0.0, 9.0, de + bq * 2.0);
     col = mix(vec3(0.035, 0.034, 0.048), col, 0.35 + 0.65 * k);
   }
