@@ -116,6 +116,8 @@ export function slime(this: Ecology, c: Cr): void {
     c.food -= 15;
     const ch = this.spawn(Kind.Slime, c.x + 6, c.y, 15, 0);
     ch.ref = 0;
+    // 分かれた場面の記録（分析用のログだけ。シミュレーションの判断には使わない）
+    this.record('settle', { t: this.w.tick, k: Kind.Slime, id: c.id, ev: 'split', n: ch.id, x: Math.round(c.x), y: Math.round(c.y) } as never);
     this.counts[Kind.Slime]++;
   }
   // 食べた分は体になる

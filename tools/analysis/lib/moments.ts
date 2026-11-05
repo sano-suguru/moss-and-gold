@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-const K = { Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30 };
+const K = { Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5 };
 
 export interface Moment {
   key: string;
@@ -93,6 +93,7 @@ export const MOMENTS: Moment[] = [
   { key: 'armorRob', label: 'リビングアーマー：倒した相手の武具を奪って取り込んだ' },
   { key: 'armorFall', label: 'リビングアーマー：崩れて武具が散らばった' },
   { key: 'armorSlain', label: 'リビングアーマー：冒険者かドワーフに倒された' },
+  { key: 'slimeSplit', label: 'スライム：死骸を食べて育ち、二つに分かれた' },
 ];
 
 const DAY = 14400;
@@ -244,6 +245,7 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     armorAbsorb: ev(K.Armor, 'absorb').length,
     armorRob: ev(K.Armor, 'absorb').filter((x) => x.how === 'rob').length,
     armorFall: ev(K.Armor, 'fall').length,
+    slimeSplit: ev(K.Slime, 'split').length,
     armorSlain: d.filter((x) => x.k === K.Armor && (x.by === K.Adventurer || x.by === 28)).length,
   };
 }
