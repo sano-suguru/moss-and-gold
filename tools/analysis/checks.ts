@@ -42,7 +42,12 @@ const RUN_A = { seeds: ['かしたれ', 'seed8', 'abc', 'seed7'], from: 10, to: 
 // #42 を取り込んだ main の10〜18日目では、甲冑が立ち上がるのは16シードの合計で8回だけ（seed23 2・seed7 2・かしたれ 1・seed4 1・seed30 1・seed41 1）で、
 // 以前の組（かしたれ・seed5・seed17・seed23・seed8・seed40）では3回になり項目が落ちた。立ち上がったシードの組にする
 // （取り込みは かしたれ 7・seed23 8・seed4 2・seed7 2、崩れるのは6回。どのシードもほかの項目で実行しているので、実行するシードは増えない）
-const RUN_ARMOR = { seeds: ['かしたれ', 'seed23', 'seed7', 'seed4', 'seed30', 'seed41'], from: 10, to: 18 };
+// スケルトンが装備を拾わなくなった（骨は体の未練、鎧は道具の未練）コードでは、取り込みは かしたれ 8・seed5 3・seed30 1、崩れるのは seed5 3・seed40 2・かしたれ 1
+// （0日目から作業ツリーで実行した10〜18日目）。立ち上がる方の組を残したまま、seed5 と seed40 を足す
+const RUN_ARMOR = { seeds: ['かしたれ', 'seed23', 'seed7', 'seed4', 'seed30', 'seed41', 'seed5', 'seed40'], from: 10, to: 18 };
+// 僧侶が亡骸の前で祈る場面は、冒険者の亡骸があり、そのそばを僧侶のいる一行が安全に通るときだけ起きる（16シード×25日で13シード・30回ほど）。
+// 0日目から作業ツリーで実行した10〜18日目では seed5 2・seed17 2・seed4 1・seed6 1・seed27 1・seed30 1。RUN_A の4シードでは0回だった
+const RUN_BLESS = { seeds: ['seed5', 'seed17', 'seed4', 'seed6', 'seed27', 'seed30'], from: 10, to: 18 };
 const RUN_ORC = { seeds: ['かしたれ', 'seed27'], from: 10, to: 18 };
 // オークの取り立ては、従う集落に蓄えがたまったときだけ起きるまれな出来事（16シード×25日で約25回、起きるのは6シードほど）。
 // いまのコードで10〜18日目に起きているシードを選ぶ。焚き火の夜襲の二歩目（#29）のコードで、
@@ -84,7 +89,7 @@ export const CHECKS: Check[] = [
   },
   {
     // リビングアーマー（src/eco/armor.ts）：倒れた冒険者の武具に未練が宿り、溜まり場で甲冑が立ち上がる
-    name: 'リビングアーマーが武具の溜まり場から立ち上がる（6シードで4回以上）',
+    name: 'リビングアーマーが武具の溜まり場から立ち上がる（8シードで4回以上）',
     ...RUN_ARMOR,
     test: (rs) => {
       const n = rs.map((r) => r.births.filter((x) => x.k === 29 && x.origin === 'gear').length);
@@ -93,7 +98,7 @@ export const CHECKS: Check[] = [
   },
   {
     // リビングアーマー：床の武器と盾を取り込み、倒れるかマナが尽きると武具が床に散らばる
-    name: 'リビングアーマーが武具を取り込み、崩れて散らばる（6シードで取り込み6回以上・取り込みのあったシード2つ以上・崩れる2回以上）',
+    name: 'リビングアーマーが武具を取り込み、崩れて散らばる（8シードで取り込み6回以上・取り込みのあったシード2つ以上・崩れる2回以上）',
     ...RUN_ARMOR,
     test: (rs) => {
       const a = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'absorb').length);
@@ -190,11 +195,11 @@ export const CHECKS: Check[] = [
   },
   {
     // 亡骸を清める：僧侶のいる一行が、冒険者の亡骸の前で立ち止まって祈る（清められた亡骸は起き上がらない。src/eco/roster.ts の blessBrace）
-    name: '僧侶が冒険者の亡骸の前で祈って清める（4シードの合計で1回以上）',
-    ...RUN_A,
+    name: '僧侶が冒険者の亡骸の前で祈って清める（6シードの合計で2回以上）',
+    ...RUN_BLESS,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'bless').length);
-      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+      return { ok: sum(n) >= 2, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },
   {
