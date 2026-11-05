@@ -28,6 +28,7 @@
 import { appendFileSync, existsSync, linkSync, mkdirSync, readFileSync, writeFileSync, cpSync } from 'fs';
 import { join } from 'path';
 import { DAY_TICKS, Ecology, World, tick } from './lib/engine';
+import { SPEC } from '../../src/ecology';
 import { decodeState, encodeState, readState, writeState } from './lib/state';
 import { dayName, SELF_BIN, SELF_SIM, snapDir } from './lib/runs';
 import { parseArgs } from './common';
@@ -157,7 +158,7 @@ function watchStuck(): unknown[] {
 /**
  * 短い引っかかりを見つける：見る人の目に「引っかかっている」と映る瞬間を、原因を問わずに数える。
  * 10 tick ごとに生きている生き物の位置と姿を見て、直近の4回（ゲーム内の3秒）がすべて歩く姿（act 1。巣に捕まっている者と眠っている者を除く）で、
- * 3秒前の位置から正味で8px（半タイル）も離れていなければ「引っかかっている」とみなす。止まったまま歩く姿でいるのも、一歩進んでは戻る往復も入る。
+ * 3秒前の位置から正味で8px（半タイル）も離れておらず、しかも止まっているか行ったり来たりしているなら「引っかかっている」とみなす（ゆっくり進んでいるだけのものは除く。下の判定）。
  * 歩き方の癖で立ち止まる番（大ネズミやクモ、一行の先頭が見回す番など）は act 0 になるので入らない。
  * 引っかかりが2回続けて途切れたら区間を閉じて1行書く（1回だけの途切れは同じ区間とみなす。往復で端点がたまたま離れた瞬間を分けないため）。
  * 書くもの：t（区間を閉じた tick）、t0（引っかかり始めた tick＝3秒の窓の始まり）、dur（tick 数）、walked（区間の間に歩いた道のり px。正味の移動に比べて大きければ往復）、
@@ -192,7 +193,20 @@ function watchHitch(): unknown[] {
       r.ys.shift();
       r.ok.shift();
     }
-    const hit = r.xs.length === HITCH_N && r.ok.every(Boolean) && (c.x - r.xs[0]) ** 2 + (c.y - r.ys[0]) ** 2 < HITCH_D2;
+    let hit = false;
+    if (r.xs.length === HITCH_N && r.ok.every(Boolean)) {
+      const net2 = (c.x - r.xs[0]) ** 2 + (c.y - r.ys[0]) ** 2;
+      if (net2 < HITCH_D2) {
+        // ゆっくり歩く種（マイコニドなど）や、ぶらつくときに歩みをゆるめる者は、3秒で8px 進まなくても、体は少しずつ前へ進んでいて引っかかって見えない。
+        // そこで、止まっている（3秒で、その種の歩く速さで進める道のりの3割も進んでいない）か、行ったり来たりしている
+        // （3秒の間に歩いた道のりが、正味の移動の2倍＋12px 以上ある）ときだけ引っかかりとみなす
+        const net = Math.sqrt(net2);
+        let path = 0;
+        for (let i = 1; i < HITCH_N; i++) path += Math.sqrt((r.xs[i] - r.xs[i - 1]) ** 2 + (r.ys[i] - r.ys[i - 1]) ** 2);
+        const expect = (HITCH_EVERY * (HITCH_N - 1)) / 2 * (SPEC[c.k]?.speed ?? 1);
+        hit = net < expect * 0.3 || path >= net * 2 + 12;
+      }
+    }
     if (hit) {
       if (!r.ep) {
         let near = 0;
