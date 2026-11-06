@@ -62,10 +62,12 @@ export function orc(this: Ecology, c: Cr): void {
     c.act = 1;
     this.goTo(c, c.hx, c.hy, s.speed);
   } else {
-    c.act = c.actT % 80 < 50 ? 0 : 1;
+    // 住みかのそばでは、たいてい立ち止まり、ときどき数歩うろつく。
+    // （以前は80回のうち30回、ふつうの速さの0.4倍で歩き、脚を動かしながら3秒で半タイルも進まず、群れごと足踏みして見えていた）
+    c.act = c.actT % 80 < 60 ? 0 : 1;
     if (c.act === 1) {
       const j = DIR16[ih(c.id, this.step >> 4, 97) & 15];
-      this.tryMove(c, j[0] * s.speed * 0.4, j[1] * s.speed * 0.4);
+      this.tryMove(c, j[0] * s.speed * 0.8, j[1] * s.speed * 0.8);
     }
   }
 }
