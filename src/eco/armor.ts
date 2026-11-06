@@ -35,8 +35,8 @@
  * 取り込み：8マスの内の、見通しの利く床の武具。武器と盾は手に（ARMOR_HAND_MAX 個まで）、杖・聖印・リュート・弓は体に（ARMOR_BODY_MAX 個まで）。
  * 前に取り込んでから、未練の宿った武具なら ARMOR_GATHER_GAP 回、宿っていない武具なら ARMOR_ABSORB_GAP 回の更新が経っていれば取り込む。
  * 襲う相手：武具を持つ侵入者（冒険者、ドワーフ、武器を拾ったゴブリン・オーク）。アンデッド、獣や虫、他の番人は襲わない（番人の側も甲冑を襲わない）。
- * 賢さは本能だけで、逃げない。強さは6に、手に取り込んだ武器と盾1つごとに +3（ARMOR_HAND_MAX 個まで。src/eco/combat.ts の str）。
- * 体力は強さの ARMOR_HP_MUL 倍（空の鎧は固い）。打たれていないあいだは、体のマナを使って少しずつ傷を直す（マナが ARMOR_LOW の半分を下回ると直せない）。
+ * 賢さは本能だけで、逃げない。強さ（打撃）は6に、手に取り込んだ武器と盾1つごとに +3（ARMOR_HAND_MAX 個まで。src/eco/combat.ts の str）。
+ * 体力（固さ）は体になった武具の数で決まる（armorHp）。剣や盾を拾うと打撃が重くなり、杖や聖印を体に取り込むと固くなる。打たれていないあいだは、体のマナを使って少しずつ傷を直す（マナが ARMOR_LOW の半分を下回ると直せない）。
  * 倒した相手の落とし物は、取り込みの間隔（ARMOR_ABSORB_GAP）を待たずに、強さの上限を超えても ARMOR_ROB_MAX 個まで取り込む（強さは上がらない）。
  * アンデッドとして扱う（冒険者の一行の目標「アンデッド祓い」の相手になる。src/eco/aim.ts）。
  *
@@ -44,7 +44,7 @@
  * ref, ref2 最後に倒した相手と、その生き物の更新の通し番号（倒した相手の落とし物を取り込んだか＝「奪う」の判定）。lureAt 最後に取り込んだ生き物の更新の通し番号。
  * 持ち物は Ecology.armorKit。
  */
-import { Cr, DIR16, Ecology, Item, ItemKind, Kind, SPEC, ih, sq } from '../ecology';
+import { Cr, DIR16, Ecology, Item, ItemKind, Kind, SPEC, STR, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { ITEM_NAMES } from './inspect';
 
@@ -73,8 +73,11 @@ export const ARMOR_ABSORB_GAP = 300;
 export const ARMOR_GATHER_GAP = 30;
 /** 巡回先を決めるとき、取り込める武具を探す半径（マス） */
 export const ARMOR_SEEK_R = 20;
-/** 体力：強さの何倍か（ほかの種は5倍。空の鎧は固い。src/eco/combat.ts の maxHp） */
+/** 体力：4 + ARMOR_HP_MUL ×（もとの強さ + 体の武具1つにつき ARMOR_BODY_HP）。ほかの種は 4 + 強さ×5。空の鎧は固い（src/eco/combat.ts の maxHp）。
+ *  手に取った武器と盾は体力を上げない（以前は武器で上がった強さにも12倍がかかり、武器5つで体力256＝ミノタウロスの約2.5倍の固さに、
+ *  ミノタウロス並みの打撃が付いて、いる量あたりで冒険者をミノタウロスの約4.5倍倒していた） */
 export const ARMOR_HP_MUL = 12;
+export const ARMOR_BODY_HP = 2;
 /** 傷を直す：打たれてから何 tick 経てば直しはじめるか。直すときは生き物の更新6回ごとに体力の30分の1を直し、体のマナを1使う（足もとの土へ還る） */
 export const ARMOR_MEND_AFTER = 100;
 /** 立ち番の長さ（生き物の更新の回数） */
@@ -252,6 +255,12 @@ export function pickArmorPost(this: Ecology, c: Cr): void {
   }
   c.tx = tx;
   c.ty = ty;
+}
+
+/** 甲冑の体力の上限：体になった武具の数で決まる（手の武器と盾は数えない） */
+export function armorHp(this: Ecology, c: Cr): number {
+  const kit = this.armorKit.get(c.id) ?? [0];
+  return Math.round(4 + ARMOR_HP_MUL * (STR[Kind.Armor] + ARMOR_BODY_HP * Math.min(ARMOR_BODY_MAX, kit[0])));
 }
 
 /** 甲冑がその床の武具を取り込める（手か体に空きがある）か。間隔は見ない */
@@ -439,6 +448,7 @@ declare module '../ecology' {
     armorHand: typeof armorHand;
     armorFoe: typeof armorFoe;
     armorWants: typeof armorWants;
+    armorHp: typeof armorHp;
     fadeRemnant: typeof fadeRemnant;
     takeRemnant: typeof takeRemnant;
     armorBirths: typeof armorBirths;
@@ -449,4 +459,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { armorCap, armorHand, armorFoe, armorWants, fadeRemnant, takeRemnant, armorBirths, pickArmorPost, absorbItem, scatterArmor, armor });
+Object.assign(Ecology.prototype, { armorCap, armorHand, armorFoe, armorWants, armorHp, fadeRemnant, takeRemnant, armorBirths, pickArmorPost, absorbItem, scatterArmor, armor });
