@@ -530,11 +530,13 @@ export function goblin(this: Ecology, c: Cr): void {
           if (tf > 0) {
             this.w.fungus[k] -= tf;
             c.units += tf;
+            this.fxBites.push(this.step, c.id, k, 1);
           } else {
             const tm = Math.min(4, this.w.moss[k] - 12, 20 - c.units);
             if (tm > 0) {
               this.w.moss[k] -= tm;
               c.units += tm;
+              this.fxBites.push(this.step, c.id, k, 0);
             }
           }
           this.mossTouched = true;

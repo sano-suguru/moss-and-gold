@@ -292,11 +292,10 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
     const toward = ((f.x - c.x) * (c.hx - c.x) + (f.y - c.y) * (c.hy - c.y)) / (fd * hd);
     if (toward > 0.5 && fd < 8 * TILE && fd < hd) {
       if (fd > 3 * TILE) {
-        c.act = 0;
+        this.cower(c, f);
         return true;
       }
-      const L = fd;
-      this.tryMove(c, ((c.x - f.x) / L) * sp, ((c.y - f.y) / L) * sp);
+      this.fleeFrom(c, f, sp);
       return true;
     }
   }
@@ -312,15 +311,33 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
     // （以前はそこでも相手から離れる向きへ一歩ずつ動いたので、行き止まりにある住みかでは壁に押しつけたまま足を動かし続けた。
     //  seed27 では、住処のそばで休む冒険者への警戒（heedAlarm）が続き、コボルト10匹ほどが4〜6分足踏みしていた）
     if ((c.hx || c.hy) && sq(c.hx - c.x) + sq(c.hy - c.y) <= 20 * 20 && sq(f.x - c.x) + sq(f.y - c.y) > 2 * TILE * 2 * TILE) {
-      c.act = 0;
+      this.cower(c, f);
       return true;
     }
-    const dx = c.x - f.x;
-    const dy = c.y - f.y;
-    const L = Math.sqrt(dx * dx + dy * dy) || 1;
-    this.tryMove(c, (dx / L) * sp, (dy / L) * sp);
+    this.fleeFrom(c, f, sp);
   } else c.flee = 0;
   return true;
+}
+
+/**
+ * 逃げる者が、相手から離れる向きへ一歩動く。行き止まりの壁などで動けなければ（ほとんど進まなければ）、その場で縮こまる（cower）。
+ * （以前は壁に押しつけたまま歩く姿で足を動かし続けた。冒険者が住処のそばで休むと、行き止まりに逃げ込んだコボルトが何分も足踏みしていた。
+ *  15シードの10〜18日目で、コボルトの2分以上の足踏みの半分以上がこれだった）
+ */
+export function fleeFrom(this: Ecology, c: Cr, f: Cr, sp: number): void {
+  const dx = c.x - f.x;
+  const dy = c.y - f.y;
+  const L = Math.sqrt(dx * dx + dy * dy) || 1;
+  const x0 = c.x;
+  const y0 = c.y;
+  this.tryMove(c, (dx / L) * sp, (dy / L) * sp);
+  if (Math.abs(c.x - x0) + Math.abs(c.y - y0) < sp * 0.3) this.cower(c, f);
+}
+
+/** 逃げる者が、その場で縮こまる：立ち止まって相手の方を向く（画面では、src/creatureView.ts が小刻みに震わせ、ときどき左右をうかがわせる） */
+export function cower(this: Ecology, c: Cr, f: Cr): void {
+  c.act = 0;
+  this.setDir(c, f.x - c.x, f.y - c.y);
 }
 
 /** 深手を負った者は足を引きずって遅くなる */
@@ -341,8 +358,10 @@ declare module '../ecology' {
     strike: typeof strike;
     fight: typeof fight;
     woundsAndFlight: typeof woundsAndFlight;
+    fleeFrom: typeof fleeFrom;
+    cower: typeof cower;
     limp: typeof limp;
   }
 }
 
-Object.assign(Ecology.prototype, { str, defend, leaveIfStarving, hunt, maxHp, bleed, strike, fight, woundsAndFlight, limp });
+Object.assign(Ecology.prototype, { str, defend, leaveIfStarving, hunt, maxHp, bleed, strike, fight, woundsAndFlight, fleeFrom, cower, limp });

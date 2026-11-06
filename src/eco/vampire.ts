@@ -23,10 +23,17 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
   if (this.leaveIfStarving(c)) return;
   const m = this.w.map;
   const k = this.tileOf(c.x, c.y);
-  // 近くのコウモリを従える
+  // 近くのコウモリを従える。従えるのは RETINUE_MAX 匹まで
+  // （以前は上限がなく、コウモリの多いシードでは26匹ほどが狭い住処で主の周りに押し合っていた。偵察の遠さは5匹で上限に届き、
+  //  足止めは2匹からできるので、それより多い分は群れの見た目にしか効かない。渦を巻いて見える数は残す）
   if (this.step % 25 === c.id % 25) {
+    let n = 0;
+    for (const o of this.list) if (o.k === Kind.Bat && !o.dead && o.ref2 === c.id) n++;
     this.nearby(c.x, c.y, 12, (o) => {
-      if (o.k === Kind.Bat && !o.dead && !o.away && o.ref2 === 0) o.ref2 = c.id;
+      if (n < RETINUE_MAX && o.k === Kind.Bat && !o.dead && !o.away && o.ref2 === 0) {
+        o.ref2 = c.id;
+        n++;
+      }
     });
   }
   if (c.act === 2 && c.actT < 4) return;
@@ -419,6 +426,8 @@ export function vampRaiseFallen(this: Ecology, c: Cr, day: number): boolean {
   return true;
 }
 
+/** ヴァンパイアが従えるコウモリの数の上限 */
+const RETINUE_MAX = 12;
 /** 日暮れに呼び寄せるコウモリの数の上限（従うコウモリと合わせて）と、呼び寄せる遠さ（住処からのマス） */
 const CALL_BATS = 5;
 const CALL_R = 40;

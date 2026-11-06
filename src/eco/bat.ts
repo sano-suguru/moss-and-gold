@@ -92,10 +92,20 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
       gy = p.y - (close ? 4 : 14) + Math.sin(a) * r * 0.6;
       sp = s.speed * 1.2;
     } else {
-      const a = (this.step * 0.02 + c.id * 1.7) % 6.283;
-      const r = 20 + (c.id % 3) * 8;
+      // 主の周りを、四つの輪に分かれて渦を巻く。どの輪も、輪に沿って生き物の更新1回に約1.1px で回る（外の輪ほどゆっくり一周する）。
+      // 回る点が岩の中なら、輪を縮めて主へ寄せる（通路の中で群れが壁ぎわに張りつかないように）。
+      // （以前は半径20〜36px の三つの輪を、更新1回に0.02（一周に約1分）で回っていたので、従うコウモリが十数匹いると、
+      //  主の真上でほとんど動かない塊になり、押し合っているように見えた。はじまりの洞窟では、ほぼ歩く姿のまま止まった引っかかりとして数えられていた）
+      const r0 = 18 + (c.id % 4) * 9;
+      const a = (this.step * (1.1 / r0) + c.id * 1.7) % 6.283;
+      let r = r0;
+      for (let i = 0; i < 3; i++) {
+        const k = this.tileOf(lord.x + Math.cos(a) * r, lord.y - 6 + Math.sin(a) * r * 0.6);
+        if (k >= 0 && !this.w.map.solid[k]) break;
+        r *= 0.6;
+      }
       gx = lord.x + Math.cos(a) * r;
-      gy = lord.y - 10 + Math.sin(a) * r * 0.6;
+      gy = lord.y - 6 + Math.sin(a) * r * 0.6;
     }
     // 中心（獲物か主）から3マスより離れていれば、道を探して寄る（回る点へまっすぐ向かうと、曲がった通路で壁に引っかかり、
     // 主から十数マス離れた所に取り残されて、主が獲物に打ちかかっても群がれなかった）。近ければ、回る点へ飛ぶ

@@ -8,6 +8,7 @@ import type { World } from '../world';
 
 export function update(this: Ecology, tick: number, day: number, phase: number): void {
   this.step++;
+  this.trimChews();
   this.day = day;
   this.dayNow = day;
   this.phaseNow = phase;
