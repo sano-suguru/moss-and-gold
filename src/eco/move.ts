@@ -210,8 +210,8 @@ export function goTo(this: Ecology, c: Cr, tx: number, ty: number, speed: number
 }
 
 /**
- * (x0, y0) から (x1, y1) までまっすぐ歩けるか：線の通るマスがどれも立てるマスで、斜めに隣のマスへ移るところでは、
- * 間の二つのマスの少なくとも一つが立てるマスであること（両方とも岩なら、角に押しつけられて抜けられない）
+ * (x0, y0) から (x1, y1) までまっすぐ向かって、岩の角に押しつけられないか：線が斜めに隣のマスへ移るところで、間の二つのマスが両方とも立てないマスなら抜けられない。
+ * 線が岩のマスをかすめるだけなら、moveToward が壁沿いに滑らせて進めるので、ここでは止めない（止めると、戦いで間合いを詰める者まで遠回りして、展開が大きく変わった）
  */
 export function straightOk(this: Ecology, c: Cr, x0: number, y0: number, x1: number, y1: number): boolean {
   const m = this.w.map;
@@ -222,7 +222,7 @@ export function straightOk(this: Ecology, c: Cr, x0: number, y0: number, x1: num
     const qx = Math.floor((x0 + ((x1 - x0) * i) / n) / TILE);
     const qy = Math.floor((y0 + ((y1 - y0) * i) / n) / TILE);
     if (qx === px && qy === py) continue;
-    if (qx < 0 || qy < 0 || qx >= m.w || qy >= m.h || !this.tilePassable(c, qy * m.w + qx)) return false;
+    if (qx < 0 || qy < 0 || qx >= m.w || qy >= m.h) return false;
     if (qx !== px && qy !== py && !this.tilePassable(c, py * m.w + qx) && !this.tilePassable(c, qy * m.w + px)) return false;
     px = qx;
     py = qy;
