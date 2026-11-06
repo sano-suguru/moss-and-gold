@@ -2040,7 +2040,8 @@ function pxShape(W,H,fill){
  * 正面：腕の下から裾が体の両脇へ広がる。後ろ：肩幅から裾へ広がり、縦のひだと裾の暗い帯（英雄は金の十字と裾の金の縁）。横：背中から後ろへ広がる。
  */
 function pxCape(dir,hero){
- const out=hero?2:1;
+ // 体の外へのはみ出し：正面は裾がのぞく程度、後ろは歴戦なら体の幅の中、横は背中へ少し
+ const out=dir==='down'?1:dir==='up'?(hero?1:0):(hero?2:1);
  if(dir==='down'){
   // 幅は体（14）の両側に out ピクセルずつ。上（11行目）は体の幅、下へ行くほど広がる
   const W=14+2*(out+1),H=10,o=out+1;
