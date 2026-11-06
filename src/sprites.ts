@@ -2325,13 +2325,19 @@ function pxDeath(job,f,L,rank,pc,hairM){
   const bodyX=tW-10;let low=-1;for(let y=0;y<tH;y++)for(let x=bodyX;x<tW;x++)if(t.px[(y*tW+x)*4+3])low=Math.max(low,y);const sh=low<0?0:tH-1-low;
   for(let x=0;x<tW;x++)for(let y=0;y<tH;y++){const p=y*tW+x;if(!t.px[p*4+3])continue;const ny=x>=bodyX?y+sh:y;if(ny>=tH)continue;const qq=ny*tW+x;for(let c=0;c<4;c++)g.px[qq*4+c]=t.px[p*4+c];g.mat[qq]=t.mat[p]}
   const bx=16-Math.floor(tW/2)+2,by=H-2-tH+1;
-  // 落とした剣は体の向こう側に、盾は足もとに
+  // 落とした剣と盾
   const swd=pxCompose(24,8,[{g:pxSword('side','strike',rank).g,x:0,y:0,mats:{steel:rank===0?'hqWood':rank>=3?'hqPlate':'hqSteel',gold:rank===0?'hqLeather':'hqGold',leather:'hqLeather',wood:'hqWood'}}],{w:[[236,246,255],'wisp']},[]);
   const shd=pxCompose(12,12,[{g:PXW.shield[rank],x:0,y:0,mats:{pc:rank===0?'hqWood':pc,gold:rank===0?'hqWood':'hqGold',wood:'hqWood',steel:'hqSteel'}}],{w:[[236,246,255],'wisp']},[]);
-  const sc=pxCrop(swd),hc=pxCrop(shd);pxPaste(out,sc,bx+tW-sc.W-2,by+sh-sc.H+3);pxPaste(out,hc,bx+tW-3,by+tH-hc.H);
+  // 盾は地面に寝ていて、横から見ると上の面が細く見える。足もとの向こう側に置く（体より先に描く）
+  const shFlat=rank===0?['.KKKKK.','KdDDDdK','.KKKKK.']:['.KKKKKKK.','KgGRGRGgK','KgrrGrrgK','.KKKKKKK.'];
+  const hc=pxCrop(pxCompose(12,6,[{g:shFlat,x:0,y:0,mats:{pc:rank===0?'hqWood':pc,gold:rank>=3?'hqGold':'hqGold',wood:'hqWood'}}],{},[]));
+  pxPaste(out,hc,bx+tW-hc.W+1,H-2-hc.H+1);
+  const sc=pxCrop(swd);
   let fr=g;
   if(q===3){fr={...g,px:Uint8ClampedArray.from(g.px)};for(let p=0;p<fr.W*fr.H;p++){if(!fr.px[p*4+3])continue;const v=(fr.px[p*4]+fr.px[p*4+1]+fr.px[p*4+2])/3;for(let c=0;c<3;c++)fr.px[p*4+c]=Math.round(fr.px[p*4+c]*0.8+v*0.2)}}
   pxPaste(out,fr,bx,by);
+  // 剣は地面に寝ていて、体の手前（見る人の側）の胴のあたりにある（体より後に描く）
+  pxPaste(out,sc,bx+Math.max(2,bodyX-4),H-2-sc.H+1);
   // マント（歴戦から）：背中の上にかぶせる。肩から膝のあたりまで、背中の輪郭より1〜2ピクセル盛り上げ（裾に近いほど厚い）、
   // 膝のあたりで裾がふくらはぎの上へ垂れる。上の面は明るく、下へ暗く。英雄は裾の縁が金。輪郭はマントのまわりに1本だけ
   if(rank>=2){
