@@ -1236,6 +1236,11 @@ export class CreatureView {
       const isCorpse = c.dead === 1 && c.actT >= 4 && sp !== Kind.Wisp && sp !== Kind.Slime && sp !== Kind.Ghost && sp !== Kind.Myconid;
       const eliteName = ['', 'firespirit', 'pknight', '', '', '', 'wspirit', 'lspirit', '', 'mlord'][c.elite] ?? '';
       let frame = !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : csp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Adventurer ? (csp >= 4 ? 8 + csp - 4 : csp * 2 + (c.torch > 0 && csp !== 1 ? 1 : 0)) : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][csp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? csp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
+      // 倒れた名簿の冒険者の亡骸（白骨になる前）：その人の倒れた姿（src/sprites.ts の pxDeath の4コマ目）
+      if (sp === Kind.Adventurer && isCorpse && eco.corpseStage(c) < 2) {
+        const h = eco.heroOf(c);
+        if (h) frame = this.atlas.hero(csp, false, h.look, h.rank, 0, 3, 3);
+      }
       // 名簿の冒険者：一人ひとりの姿と位の装備（src/eco/roster.ts、src/sprites.ts の heroSprite）
       if (sp === Kind.Adventurer && !isCorpse) {
         const h = thrallOf ? eco.roster.find((q) => q.cid === c.id) ?? null : eco.heroOf(c);
