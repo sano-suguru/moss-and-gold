@@ -1967,8 +1967,7 @@ function scarPrims(scar,dir,P,x,y,K){
 }
 // ===== 手描きの冒険者（試作：戦士） =====
 // 図形を組み合わせる humanoid の代わりに、輪郭まで1ピクセルずつ置いた型で描く。頭は兜と髪の塊で作り、顔は前髪の下の小さな窓にする。
-// 目は縦2ピクセル（上が濃く、下に色）、頬に薄い赤み。脚は短く太く、籠手は胴の外に出す。
-// 材質ごとに4段の明暗を塊で置き、光は左上から。輪郭はほぼ黒の一定の色（PX_K）。
+// 脚は短く太く、手は胴の外に出す。光は左上から。輪郭はほぼ黒の一定の色（PX_K）。
 let HERO_PIX=true;
 /** 道具用：手描きの戦士を使うかどうか（比較の画像で、古い絵と並べるため） */
 function setHeroPix(v){HERO_PIX=!!v}
@@ -1989,8 +1988,6 @@ RAMP.hqPlate=hueRamp([182,196,222]);
 const PX_K=[24,18,30];
 /** 型の文字 → [材質の役, 明るさ]。役は pxWarrior で実際の材質（名簿の髪・肌・身につける色など）に置き換える */
 const PX_MAT={'0':['steel',0],'1':['steel',1],'2':['steel',2],'3':['steel',3],'4':['steel',4],j:['hair',1],h:['hair',2],H:['hair',3],J:['hair',4],u:['skin',1],s:['skin',2],S:['skin',3],T:['skin',4],z:['pc',0],q:['pc',1],r:['pc',2],R:['pc',3],Q:['pc',4],o:['gold',1],g:['gold',2],G:['gold',3],Y:['gold',4],c:['leather',1],l:['leather',2],L:['leather',3],v:['boot',1],b:['boot',2],B:['boot',3],d:['wood',2],D:['wood',3],f:['wood',1]};
-/** 目の下の段の色（名簿の髪の色の番号で選ぶ。肌の色に溶けない色）：青、緑、青緑、灰青、紫、茶 */
-const PX_EYE=[[70,110,190],[60,140,90],[56,134,146],[100,116,150],[130,84,170],[150,90,50]];
 /** 型を重ねて1コマにする。parts は {g: 型の行, x, y, mats: 役ごとの材質}。'.' は透明、'K' は輪郭 */
 function pxCompose(W,H,parts,fix,glowRoles){
  const px=new Uint8ClampedArray(W*H*4),mat=new Array(W*H).fill(null);
@@ -2010,66 +2007,36 @@ function pxCompose(W,H,parts,fix,glowRoles){
  return {W,H,px,mat};
 }
 // ---- 戦士の型。頭は0〜13行、胴は14〜24行、脚は25〜28行（28行目が足の下の輪郭） ----
+// 省略して読みやすくする：材質ごとに2〜3色の広い面で塗り、形と大事な印（兜の形、盾、武器、身につける色）だけを残す。目は縦2ピクセルの黒だけ。
+// 位ごとに形が変わる（FF1 のクラスチェンジのように）。0 見習い：兜なし、はねた髪と身につける色の鉢巻き、古着と縄の帯、丸い木の盾、木剣。
+// 1 熟練：丸い鉄兜、陣羽織、十字の盾。2 歴戦：面頬を下ろしたとがった兜（顔は見えない）、大きな肩当て、鉄の脛当て、マント、凧型の盾、長剣。
+// 3 英雄：金の額帯と十字の面頬に翼のついた兜、金で縁取った胸当てと肩を覆う外套、足もとまでのマント、宝石の盾、光る大剣
 const PXW={
- down:{
-  head:['........KKKK........','......KK4432KK......','.....K34443221K.....','....K2344433221K....','...K234443332211K...','...K233333332211K...','..K123Y333333Y221K..','..KjjhjjjhjjjhjjjK..','..KhHJHhHJHHhJHhhK..','..KhHhuhuuuuhuhHhK..','..KhHjSSESSESSjHhK..','..KhHjTSeSSeSsjHhK..','..KjHjTpSSSSpsjHjK..','...KjhsSSSsSSshjK...'],
-  beard:['..KjHjTSSSSSSsjHjK..','...KjhHHhhhhHHhjK...'],
-  torso:['..KKK.KKussuKK.KKK..','.K443KQRRRRRrqK322K.','K2332KgQRRRRrgK2211K','.KKKKKgRRGGRRgKKKKK.','K3232KgRGYGGRgK2121K','K2323KgRRGGRrgK1212K','K3232KgrRGGrrgK2121K','K4332KcLLGYLlcK3221K','K3221KqrRRRRrqK2110K','.KKKK.K2rRRr2K.KKKK.','......K32qq23K......'],
-  legs:[['.....KcLLKKLLcK.....','.....KBBbKKBBbK.....','.....KKKKKKbbvK.....','..........KKKKK.....'],['.....KcLLKKLLcK.....','.....KBBbKKBBbK.....','.....KbbvKKbbvK.....','.....KKKKKKKKKK.....'],null,['.....KcLLKKLLcK.....','.....KBBbKKBBbK.....','.....KbbvKKKKKK.....','.....KKKKK..........']],
-  shield:['KKKKKKKKK','KGYGGGGgK','KGQRRRrgK','KGRRGRrgK','KGRGYGrgK','KGRRGrrgK','.KgRRrgK.','.KgrrrgK.','..KgrgK..','...KgK...','....K....'],
-  cape:['KK................KK','KrK..............KrK','KrK..............KrK','KrK..............KrK','KrK..............KrK','KrK..............KrK','KrK..............KrK','KrK..............KrK','.KrRRRRRRRRRRRRRRrK.','.KrrRRRRRRRRRRRRrrK.','.KqrrrrrrrrrrrrrrqK.','..KKKKKKKKKKKKKKKK..'],
- },
- side:{
-  head:['......KKKK........','....KK4432KK......','...K34443221K.....','..K2344433221K....','.K234443332211K...','.K233333332211K...','K123333333333Y21K.','.KjjhjjjhjjhhhhK..','.KhHJHhHJHhJuhuK..','.KhHHhHJHjTSSESK..','.KhHHhHHhjTSSeSSK.','.KjhHhHhhjTpSSsK..','..KjhhjhhjsSSsK...','...KjjhhjjKusK....'],
-  beard:['.KjhHhHhhjTHHHsK..','..KjhhjhhjhHHhK...'],
-  torso:['...KK.KKKKKqRK....','..KrqK34443KRRK...','..KrqK23332KRrK...','..KrrRK323KRRrK...','..KrRRK232KRRrK...','..KrRRK323KRGrK...','..KcLLK434KLLcK...','..KqrRK323KRrqK...','...K2rKKKKKr2K....','...K32rRRRr23K....','....K3qqqq3K......'],
-  legs:[['...KcLLKKLLcK.....','..KBBbK..KBBbK....','..KbbvK..KbbbBK...','..KKKKK..KKKKKK...'],['....KcLLLLLcK.....','....KBBBBbbK......','....KbbbbbbbBK....','....KKKKKKKKKK....'],['...KcLLKKLLcK.....','..KbbvK..KBBBK....','..KbbvK..KbbbBK...','..KKKKK..KKKKKK...'],['....KcLLLLLcK.....','....KBBBBbbK......','....KbbbbbbbBK....','....KKKKKKKKKK....']],
-  shield:['KKKK.','KGRgK','KGQRK','KGRRK','KGRRK','KGRRK','KgRrK','.KgrK','.KgrK','..KgK','...K.'],
- },
- up:{
-  head:['........KKKK........','......KK4432KK......','.....K34443221K.....','....K2344433221K....','...K234443332211K...','...K233333332211K...','..K12333333333221K..','..KhhHhhhHhhhHhhhK..','..KHJHHhHJHHhJHHhK..','..KhHJHhHHJHhHJHhK..','..KhHHhHHhHHhHHhjK..','..KjhHhhHhhHhhHhjK..','...KjhHhhHhhHhhjK...','....KjjhhhhhhjjK....'],
-  torso:['..KKK.KKqrrqKK.KKK..','.K443KrRRRRRRrK322K.','K2332KrRRRRRRrK2211K','.KKKKKrRRRRRRrKKKKK.','K3232KrRRRRRRrK2121K','K2323KrRRRRRRrK1212K','K3232KqrRRRRrqK2121K','K4332KcLLLLLLcK3221K','K3221KqrRRRRrqK2110K','.KKKK.K2rRRr2K.KKKK.','......K32qq23K......'],
-  legs:null,
-  shield:['KKKKKKKKK','KDDdDDdDK','KDDdDDddK','K2232222K','KDDd3DddK','KdDdDddDK','.KDdDddK.','.KddDddK.','..KdddK..','...KdK...','....K....'],
-  capeLong:['KrRRRRRRRRRRrK','KqrrrrrrrrrrqK','.KKKKKKKKKKKK.'],
-  roll:['.KKKKKKKKKKKK.','KdDDDDDDDDDDdK','KfddddddddddfK','.KKKKKKKKKKKK.'],
- },
+ down:{head:[['.......KK.KK........', '......KHKKHHK.......', '.....KHHHHHHhKK.....', '....KHJHHHHHHhhK....', '...KHJHHHHHHHHhhK...', '...KHHHHHHHHHHhhK...', '..KRRRRRRRRRRRRrrK..', '..KHHHHHHHHHHHHhhK..', '..KhHHHHHHHHHHHhhK..', '..KHHHSSSSSSSSHHhK..', '..KHHHSSESSESSHHhK..', '..KHHHSSESSESSHHhK..', '..KhHHSSSSSSSsHhhK..', '...KhhsSSSSSSshhK...'],['........KKKK........', '......KK3333KK......', '.....K34333332K.....', '....K3433333322K....', '...K333333333222K...', '...K333333333222K...', '..K22222222222222K..', '..KhhHHHHHHHHHhhhK..', '..KhHHHHHHHHHHHhhK..', '..KHHHSSSSSSSSHHhK..', '..KHHHSSESSESSHHhK..', '..KHHHSSESSESSHHhK..', '..KhHHSSSSSSSsHhhK..', '...KhhsSSSSSSshhK...'],['.........KK.........', '........K34K........', '.......K3332K.......', '......K333322K......', '.....K33333222K.....', '....K3433333222K....', '...K333333333222K...', '...K333333333222K...', '...K3KKKKKKKKK22K...', '...K333333333222K...', '...K333333333222K...', '...K233333333221K...', '....K2333333222K....', '.....KK222222KK.....'],['.........KK.........', '........K34K........', '.......K3332K.......', '......K333322K......', '.....K33333222K.....', '....K3433333222K....', '...KGGGGGGGGGGGGK...', '...K333333G33222K...', '...K3KKKKKGKKK22K...', '...K333333G33222K...', '...K333333G33222K...', '...K233333333221K...', '....K2333333222K....', '.....KK222222KK.....']],beard:['..KhHHSHHHHHHSHhhK..', '...KhhHHHHHHHHhhK...'],torso:[['..KKKK.KKSSKK.KKKK..', '.KRRrKRRRRRRRrKRrrK.', '.KRRrKRRRRRRRrKRrrK.', '.KRrrKRRRRRRRrKrrrK.', '.KRrrKRRRRRRrrKrrrK.', '.KRrrKdDDDDDDdKrrrK.', '.KSSsKRRRRRRrrKSssK.', '.KSssKRRRRRrrrKsssK.', '..KKK.KRRRRRrK.KKK..', '......KRRRRRrK......', '......KrrrrrrK......'],['..KKKK.KKSSKK.KKKK..', '.K333KRRRRRRRrK322K.', '.K332KRRRRRRRrK322K.', '.K332KRRRRRRRrK222K.', '.K332KRRRRRRRrK222K.', '.K332KccccccccK222K.', '.K443KRRRRRRrrK332K.', '.K332KRRRRRrrrK222K.', '..KKK.KRRRRRrK.KKK..', '......KRRRRRrK......', '......K222222K......'],['.KKKKK.KKKKKK.KKKKK.', 'K3433KRRRRRRrrK3322K', 'K3332KRRRRRRrrK3222K', 'KKKKKKRRRRRRrrKKKKKK', '.K332KRRRRRRrrK322K.', '.K332KccccccccK222K.', '.K443KRRRRRRrrK332K.', '.K332KRRRRRrrrK222K.', '..KKK.KRRRRRrK.KKK..', '......K333332K......', '......K222222K......'],['.KKKKK.KKKKKK.KKKKK.', 'KRRRRKG333332GKRRrrK', 'KRRrrKG333322GKRrrqK', 'KKKKKKG332222GKKKKKK', '.K332KGG3322GGK322K.', '.K332KccccccccK222K.', '.K443KRRRRRRrrK332K.', '.K332KRRRRRrrrK222K.', '..KKK.KRRRRRrK.KKK..', '......K333332K......', '......K222222K......']],legs:[['.....KlLlKKlLlK.....', '.....KBBBKKBBBK.....', '.....KKKKKKbbbK.....', '..........KKKKK.....'], ['.....KlLlKKlLlK.....', '.....KBBBKKBBBK.....', '.....KbbbKKbbbK.....', '.....KKKKKKKKKK.....'], null, ['.....KlLlKKlLlK.....', '.....KBBBKKBBBK.....', '.....KbbbKKKKKK.....', '.....KKKKK..........']],
+  shield:[['..KKK..', '.KDDDK.', 'KDD3DDK', 'KD343DK', 'KDD3DDK', '.KDDDK.', '..KKK..'],['KKKKKKKKK', 'KGGGGGGGK', 'KGRRGRRGK', 'KGGGGGGGK', 'KGRRGRrGK', '.KGRGrGK.', '..KGrGK..', '...KGK...', '....K....'],['KKKKKKKKKKK', 'KGGGGGGGGGK', 'KGRRRGRRrGK', 'KGRRRGRRrGK', 'KGGGGGGGGGK', 'KGRRRGRRrGK', 'KGRRRGRrrGK', '.KGRRGRrGK.', '.KGRRGrrGK.', '..KGRGrGK..', '...KGGGK...', '....KGK....', '.....K.....'],['..KKKKKKK..', '.KGGGGGGGK.', 'KGGRRRRRGGK', 'KGRRRGRRrGK', 'KGRRGwGRrGK', 'KGRRRGRRrGK', 'KGGRRRRrGGK', '.KGGRRrGGK.', '..KGGGGGK..', '...KKKKK...']],shieldAt:[[-2,19],[-3,16],[-4,15],[-4,16]],wings:['K..................K', 'KK................KK', 'K3K..............K3K', 'K33K............K33K', 'K333K..........K333K', '.K33K..........K33K.', '..KK............KK..'],cape2:['.KK..................KK.', 'KrK..................KrK', 'KrK..................KrK', 'KrK..................KrK', 'KrK..................KrK', 'KrK..................KrK', 'KrK..................KrK', 'KrK..................KrK', 'KrrK................KrrK', 'KRrrRRRRRRRRRRRRRRRRrrrK', '.KRrrrrrrrrrrrrrrrrrrrK.', '..KKKKKKKKKKKKKKKKKKKK..'],cape3:['.KK....................KK.', 'KRK....................KrK', 'KRrK..................KrrK', 'KRrK..................KrrK', 'KRrK..................KrrK', 'KRrK..................KrrK', 'KRrK..................KrrK', 'KRrK..................KrrK', 'KRrK..................KrrK', 'KRrrK................KrrrK', 'KRRrrRRRRRRRRRRRRRRRRRrrrK', '.KRrrrrrrrrrrrrrrrrrrrrrK.', '..KKKKKKKKKKKKKKKKKKKKKK..']},
+ side:{head:[['......KK.KK.......', '.....KHKKHHK......', '...KKHHHHHHhK.....', '..KHJHHHHHHhhK....', '.KHJHHHHHHHHhhK...', '.KHHHHHHHHHHhhK...', '.KRRRRRRRRRRRRrK..', '.KhhHHHHHHHHHHHK..', '.KhHHHHHHHHSSSSK..', '.KhHHHHHHHHSSESK..', '.KhHHHHHHHHSSESSK.', '.KhhHHHHHhhSSSSK..', '..KhhHHhhhhsSSK...', '...KKhhhhKKSSK....'],['......KKKK........', '....KK3333KK......', '...K34333332K.....', '..K3433333322K....', '.K333333333222K...', '.K333333333222K...', 'K222222222222222K.', '.KhhHHHHHHHHHHHK..', '.KhHHHHHHHHSSSSK..', '.KhHHHHHHHHSSESK..', '.KhHHHHHHHHSSESSK.', '.KhhHHHHHhhSSSSK..', '..KhhHHhhhhsSSK...', '...KKhhhhKKSSK....'],['.......KK.........', '......K34K........', '.....K3332K.......', '....K333322K......', '...K33333222K.....', '..K3433333222K....', '.K333333333222K...', '.K333333333222K...', '.K3333333KKKK2K...', '.K333333333222K...', '.K333333333322K...', '.K233333333221K...', '..K2333333222K....', '...KK222222KK.....'],['.......KK.........', '......K34K........', '.....K3332K.......', '....K333322K......', '...K33333222K.....', '..K3433333222K....', '.KGGGGGGGGGGGGK...', '.K333333333G22K...', '.K3333333KKGK2K...', '.K333333333G22K...', '.K333333333322K...', '.K233333333221K...', '..K2333333222K....', '...KK222222KK.....']],beard:['.KhhHHHHHhhSHHHK..', '..KhhHHhhhhHHHK...'],torso:['...KKKKKKKKKKK....', '...KrRRK333KRRK...', '...KrRRK332KRRK...', '...KrRRK332KRRK...', '...KrRRK332KRRK...', '...KcccK332KccK...', '...KrRRK443KRrK...', '...KrRRK332KRrK...', '....KrRKKKKKRK....', '....KRRRRRRrK.....', '....K2222222K.....'],legs:[['....KlLKKLlK......', '...KBBK..KBBK.....', '...KbbK..KbbbK....', '...KKKK..KKKKK....'], ['.....KlLLlK.......', '.....KBBBBK.......', '.....KbbbbbK......', '.....KKKKKKK......'], ['....KlLKKLlK......', '...KbbK..KBBK.....', '...KbbK..KbbbK....', '...KKKK..KKKKK....'], ['.....KlLLlK.......', '.....KBBBBK.......', '.....KbbbbbK......', '.....KKKKKKK......']],shield:['KKK', 'KGK', 'KRK', 'KRK', 'KRK', 'KRK', 'KrK', 'KGK', 'KKK'],wings:['K.....', 'KK....', 'K3K...', 'K33K..', 'K333K.', '.K33K.', '..KK..'],cape:['KKK.', 'KrK.', 'KRK.', 'KRK.', 'KRK.', 'KRK.', 'KRK.', 'KRK.', 'KRrK', 'KRrK', 'KRrK', 'KKKK']},
+ up:{head:[['.......KK.KK........', '......KHKKHHK.......', '.....KHHHHHHhKK.....', '....KHJHHHHHHhhK....', '...KHJHHHHHHHHhhK...', '...KHHHHHHHHHHhhK...', '..KRRRRRRRRRRRRrrK..', '..KhhHHHHHHHHHHhhK..', '..KhHHHHHHHHHHHHhK..', '..KhHHHHHHHHHHHHhK..', '..KhHHHHHHHHHHHHhK..', '..KhhHHHHHHHHHHhhK..', '...KhhHHHHHHHHhhK...', '....KKhhhhhhhhKK....'],['........KKKK........', '......KK3333KK......', '.....K34333332K.....', '....K3433333322K....', '...K333333333222K...', '...K333333333222K...', '..K22222222222222K..', '..KhhHHHHHHHHHHhhK..', '..KhHHHHHHHHHHHHhK..', '..KhHHHHHHHHHHHHhK..', '..KhHHHHHHHHHHHHhK..', '..KhhHHHHHHHHHHhhK..', '...KhhHHHHHHHHhhK...', '....KKhhhhhhhhKK....'],['.........KK.........', '........K34K........', '.......K3332K.......', '......K333322K......', '.....K33333222K.....', '....K3433333222K....', '...K333333333222K...', '...K333333333222K...', '...K333333333222K...', '...K333333333222K...', '...K333333333222K...', '...K233333333221K...', '....K2333333222K....', '.....KK222222KK.....'],['.........KK.........', '........K34K........', '.......K3332K.......', '......K333322K......', '.....K33333222K.....', '....K3433333222K....', '...KGGGGGGGGGGGGK...', '...K333333333222K...', '...K333333333222K...', '...K333333333222K...', '...K333333333222K...', '...K233333333221K...', '....K2333333222K....', '.....KK222222KK.....']],torso:['..KKKK.KKhhKK.KKKK..', '.K333KRRRRRRRrK322K.', '.K332KRRRRRRRrK322K.', '.K332KRRRRRRRrK222K.', '.K332KRRRRRRRrK222K.', '.K332KccccccccK222K.', '.K443KRRRRRRrrK332K.', '.K332KRRRRRrrrK222K.', '..KKK.KRRRRRrK.KKK..', '......KRRRRRrK......', '......K222222K......'],legs:null,shield:['KKKKKKKKK', 'KDDDDDDdK', 'KDDDDDDdK', 'K3333332K', 'KDDDDDDdK', '.KDDDDdK.', '..KDDdK..', '...KdK...', '....K....'],wings:['K..................K', 'KK................KK', 'K3K..............K3K', 'K33K............K33K', 'K333K..........K333K', '.K33K..........K33K.', '..KK............KK..'],cape2:['KrRRRRRRRRRRrK', 'KrrrrrrrrrrrrK', '.KKKKKKKKKKKK.'],cape3:['..KKKKKKKKKKKK..', '.KRRRRGRRGRRRrK.', '.KRRRRRRRRRRRrK.', '.KRRRRRRRRRRRrK.', '.KRRRRRRRRRRRrK.', '.KRRRRRRRRRRRrK.', '.KRRRRRRRRRRRrK.', '.KRRRRRRRRRRRrK.', '.KRRRRRRRRRRRrK.', 'KRRRRRRRRRRRRrrK', 'KRrRRrRRRrRRrrrK', 'KrrrrrrrrrrrrrrK', '.KKKKKKKKKKKKKK.'],roll:['.KKKKKKKKKKKK.', 'KdDDDDDDDDDDdK', 'KddddddddddddK', '.KKKKKKKKKKKK.']},
 };
 PXW.up.legs=PXW.down.legs;
-/** 位ごとの形（FF1 のクラスチェンジのように、位が上がると形が変わる）。0 見習い：兜なし、はねた髪と布の鉢巻き、革の胴着と袖、縄の帯、小さな丸い木の盾。
- * 1 熟練：丸い鉄兜、鎖帷子と陣羽織、紋章の盾（PXW の型）。2 歴戦：頂のとがった兜に金の額帯と頬当て、重ねた大きな肩当て、鉄の脛当て、マント、凧型の盾、長剣。
- * 3 英雄：翼の兜、金で縁取った胸当て、肩を覆う外套と足もとまでのマント、宝石の盾、光る大剣 */
-const PXR={
- head:{down:[['.......KK.KK........', '......KhKKJhK.......', '.....KhHJJJHhKK.....', '....KhHJJHHHHhjK....', '...KhHJHHHHhHhhjK...', '...KhHHHhHHHhHhjK...', '..KqRRrRRRRrRRrqK...', '..KHJHHhHJHHhJHHhK..', '..KhHJHhHJHHhJHhhK..', '..KhHhuhuuuuhuhHhK..', '..KhHjSSESSESSjHhK..', '..KhHjTSeSSeSsjHhK..', '..KjHjTpSSSSpsjHjK..', '...KjhsSSSsSSshjK...'],null,['.........KK.........', '........K43K........', '.......K3442K.......', '.....KK344432KK.....', '....K23444433221K...', '...K234443333221K...', '..K1GYGGGGGGGGg1K...', '..K23jhjjjhjjjh21K..', '..K34HhHJHHhJHh21K..', '..K342uhuuuuhu221K..', '..K342SSESSESS221K..', '..K342TSeSSeSs211K..', '..K232TpSSSSps211K..', '...K21sSSSsSSs11K...'],['K.......KKKK.......K', 'KK....KK4432KK....KK', 'K4K..K34443221K..K4K', 'K44KK2344433221KK44K', 'K434K234443332211K4K', '.K43K233333332211K3K', '..KK123YGGGGGY221KK.', '..KjjhjjjhjjjhjjjK..', '..KhHJHhHJHHhJHhhK..', '..KhHhuhuuuuhuhHhK..', '..KhHjSSESSESSjHhK..', '..KhHjTSeSSeSsjHhK..', '..KjHjTpSSSSpsjHjK..', '...KjhsSSSsSSshjK...']],side:[['......KK.KK.......', '.....KhKKJhK......', '...KKhHJJJHhK.....', '..KhHJJHHHHhjK....', '.KhHJHHHHhHhhjK...', '.KhHHHhHHHhHhjK...', '.KqRRrRRRRrRRqK...', '.KjjhjjjhjjhhhhK..', '.KhHJHhHJHhJuhuK..', '.KhHHhHJHjTSSESK..', '.KhHHhHHhjTSSeSSK.', '.KjhHhHhhjTpSSsK..', '..KjhhjhhjsSSsK...', '...KjjhhjjKusK....'],null,['........KK........', '.......K43K.......', '......K3442K......', '....KK344432KK....', '..KK2344433221K...', '.K234443333221K...', 'K1GYGGGGGGGGGg1K..', '.KjjhjjjhjjhhhhK..', '.K23JHhHJHhJuhuK..', '.K23HhHJHjTSSESK..', '.K23HhHHhjTSSeSSK.', '.K23HhHhhjTpSSsK..', '..KjhhjhhjsSSsK...', '...KjjhhjjKusK....'],null],up:[['.......KK.KK........', '......KhKKJhK.......', '.....KhHJJJHhKK.....', '....KhHJJHHHHhjK....', '...KhHJHHHHhHhhjK...', '...KhHHHhHHHhHhjK...', '..KqRRrRRRRrRRrqK...', '..KhhHhhhHhhhHhhhK..', '..KHJHHhHJHHhJHHhK..', '..KhHJHhHHJHhHJHhK..', '..KhHHhHHhHHhHHhjK..', '..KjhHhhHhhHhhHhjK..', '...KjhHhhHhhHhhjK...', '....KjjhhhhhhjjK....'],null,['.........KK.........', '........K43K........', '.......K3442K.......', '.....KK344432KK.....', '....K23444433221K...', '...K234443333221K...', '..K1GYGGGGGGGGg1K...', '..KhhHhhhHhhhHhhhK..', '..KHJHHhHJHHhJHHhK..', '..KhHJHhHHJHhHJHhK..', '..KhHHhHHhHHhHHhjK..', '..KjhHhhHhhHhhHhjK..', '...KjhHhhHhhHhhjK...', '....KjjhhhhhhjjK....'],['K.......KKKK.......K', 'KK....KK4432KK....KK', 'K4K..K34443221K..K4K', 'K44KK2344433221KK44K', 'K434K234443332211K4K', '.K43K233333332211K3K', '..KK123YGGGGGY221KK.', '..KhhHhhhHhhhHhhhK..', '..KHJHHhHJHHhJHHhK..', '..KhHJHhHHJHhHJHhK..', '..KhHHhHHhHHhHHhjK..', '..KjhHhhHhhHhhHhjK..', '...KjhHhhHhhHhhjK...', '....KjjhhhhhhjjK....']]},
- torso:[['..KKKK.KussuK.KKKK..', '.KQRrKLLlqqlLLKrRqK.', '.KRRrKLLLqqLLlKrrqK.', '.KRrrKLlLLLLlcKrrqK.', '.KRrqKLLlLLlLcKrqqK.', '.KrrqKcLLLLLLcKqqzK.', '.KTSsKdDDdDDDdKsSuK.', '.KSSsKrRRRRRrqKsSuK.', '..KKK.KrRRRRrK.KKK..', '......KrRRRRrK......', '......KqrrrrqK......'],null,['.KKKKK.KussuK.KKKKK.', 'K34443KKQRRqKK34432K', 'K23332KgQRRrgK23321K', 'KK2221KgRGGRgK1222KK', 'K3443KKgRYGRgKK3443K', '.K221KgRRGGRRgK122K.', '.K332KgrRGGRrgK233K.', '.K443KcLLGYLlcK344K.', '.K322KqrRRRRrqK223K.', '..KKK.K2rRRr2K.KKK..', '......K32qq23K......'],['..KKK.KKussuKK.KKK..', '.K443KKGYGGGgKK322K.', 'K2332KG443321GK2211K', 'K3443KG4G33G2GK3221K', 'K2332KG34GG32GK2211K', 'K3232KG3GYG32GK2121K', 'K2323KgGG33GggK1212K', 'K4332KcLLGYLlcK3221K', 'K3221KqrRRRRrqK2110K', '.KKKK.K2rRRr2K.KKKK.', '......K3qrrq3K......']],
- shield:[['..KKK..', '.KDDdK.', 'KDD2DdK', 'KD242dK', 'KDd2ddK', '.KddfK.', '..KKK..'],null,['KKKKKKKKKKK', 'KGYGGGGGGgK', 'KGQQRRRRrgK', 'KGQRRGRRrgK', 'KGRRGYGRrgK', 'KGRGYGYGrgK', 'KGRRGYGRrgK', 'KgRRRGRRrgK', '.KgRRGRrgK.', '.KgrRGRrgK.', '..KgrGrgK..', '...KgrgK...', '....KgK....', '.....K.....'],['..KKKKKKK..', '.KGYYGGGgK.', 'KGY4RRRqGgK', 'KG4RRGRRqGK', 'KGRRGYGRqgK', 'KGRGYwYGqgK', 'KGRRGYGRqgK', 'KgRRRGRqqgK', '.KgrRGRqgK.', '..KgrGqgK..', '...KgggK...', '....KKK....']],
- shieldAt:[[-2,19],[-3,16],[-4,15],[-4,16]],
- cape2:['.KK..................KK.', 'KrK..................KrK', 'KrK..................KrK', 'KrK..................KrK', 'KrK..................KrK', 'KrK..................KrK', 'KrK..................KrK', 'KrK..................KrK', 'KrrK................KrrK', 'KRrrRRRRRRRRRRRRRRRRrrqK', '.KRrrrrrrrrrrrrrrrrrrqK.', '..KKKKKKKKKKKKKKKKKKKK..'],
- cape3:['.KK....................KK.', 'KQK....................KrK', 'KRrK..................KrrK', 'KRrK..................KrrK', 'KRrK..................KrrK', 'KRrK..................KrrK', 'KRrK..................KrrK', 'KRrK..................KrrK', 'KRrK..................KrrK', 'KRrrK................KrrqK', 'KRRrrRRRRRRRRRRRRRRRRRrrqK', '.KRrrrrrrrrrrrrrrrrrrrrqK.', '..KKKKKKKKKKKKKKKKKKKKKK..'],
- mantle:['.KKKKKK......KKKKKK.', 'KQRRRRYK....KYRRRrqK', 'KRRrrrqK....KqrrrrqK', '.KKKKKK......KKKKKK.'],
- wings:['KK.....', 'K4K....', 'K44KK..', 'K4433K.', '.KK33K.', '...KK..'],
- capeSide:['KKK.', 'KrK.', 'KRK.', 'KRK.', 'KRK.', 'KRK.', 'KRK.', 'KRK.', 'KRrK', 'KRrK', 'KRrK', 'KKKK'],
- capeUp3:['..KKKKKKKKKKKK..', '.KQRRRYRRYRRRrK.', '.KRRRRRRRRRRRrK.', '.KRRRRRRRRRRRrK.', '.KRRRRRRRRRRRrK.', '.KRRRRRRRRRRRrK.', '.KRRRRRRRRRRRrK.', '.KRRRRRRRRRRRrK.', '.KRRRRRRRRRRRrK.', 'KRRRRRRRRRRRRrqK', 'KRrRRrRRRrRRrrqK', 'KrrrrrrrrrrrrrqK', '.KKKKKKKKKKKKKK.'],
-};
 /** 鉄の脛当て（歴戦から）：脚の型の革と靴を鉄の明暗に置き換える */
-const pxSteelLegs=g=>g&&g.map(r=>r.replace(/[cLlBbv]/g,ch=>({c:'2',L:'4',l:'3',B:'3',b:'2',v:'1'})[ch]));
+const pxSteelLegs=g=>g&&g.map(r=>r.replace(/[cLlBbv]/g,ch=>({c:'2',L:'3',l:'2',B:'3',b:'2',v:'1'})[ch]));
 /** 剣。dir と構え（rest 構えた、raise 振り上げた、strike 振り下ろした）ごとの型と、体の型に対する位置。刃の長さは位で伸びる（見習いの木剣6、熟練8、歴戦の長剣10、英雄の大剣11。英雄は幅広の刃と宝石の鍔） */
 function pxSword(dir,pose,rank){
  const n=[6,8,10,11][rank],e=n-8,heavy=rank>=3,bl=heavy?'..K44K':'..K42K',blade=r=>Array(n).fill(r);
  if(dir==='down'){
-  if(pose==='rest')return {x:16,y:10-e-(heavy?1:0),g:['...KK.',bl,...blade(bl),...(heavy?['KGYwGK']:[]),'KGYGGK','..KcLK','..KcLK','..KYGK','..KKKK']};
-  if(pose==='raise')return {x:16,y:-1-e,g:['...KK.',bl,...blade(bl),'KGYGGK','..KcLK','..KYGK','..KKKK']};
+  if(pose==='rest')return {x:16,y:10-e-(heavy?1:0),g:['...KK.',bl,...blade(bl),...(heavy?['KGwGGK']:[]),'KGGGGK','..KcLK','..KcLK','..KGGK','..KKKK']};
+  if(pose==='raise')return {x:16,y:-1-e,g:['...KK.',bl,...blade(bl),'KGGGGK','..KcLK','..KGGK','..KKKK']};
   const d=['KK.........','KGKK.......','KKG4K......'];for(let i=0;i<n-4;i++)d.push('.'.repeat(2+i)+'K42K'+'.'.repeat(Math.max(0,5-i)));d.push('.'.repeat(n-2)+'K4K',' '.repeat(0)+'.'.repeat(n-1)+'KK');
   return {x:15,y:19,g:d};
  }
  if(dir==='side'){
   if(pose==='rest'){const d=['KK.......','KGKK.....','KKG4K....'];for(let i=0;i<n-5;i++)d.push('.'.repeat(2+i)+'K42K');d.push('.'.repeat(n-3)+'K4K','.'.repeat(n-2)+'KK');return {x:9,y:19,g:d}}
-  if(pose==='raise')return {x:5,y:-9-e,g:['.KK.',...blade('K42K'),'KGYK','.KK.']};
+  if(pose==='raise')return {x:5,y:-9-e,g:['.KK.',...blade('K42K'),'KGGK','.KK.']};
   return {x:10,y:18,g:['KK'+'.'.repeat(n),'KGK'+'K'.repeat(n-1)+'.','KG'+'4'.repeat(n-1)+'2K','KGK'+'K'.repeat(n-1)+'.','KK'+'.'.repeat(n)]};
  }
  // 上向き：構えている間は体に隠れ、振り上げた刃は左肩の上に、振り下ろした刃は頭の向こうに先だけ見える
  if(pose==='rest')return null;
- if(pose==='raise')return {x:-2,y:2-e,g:['.KK.','K42K',...blade('K42K'),'KGYK','KcLK','KKKK']};
+ if(pose==='raise')return {x:-2,y:2-e,g:['.KK.','K42K',...blade('K42K'),'KGGK','KcLK','KKKK']};
  return {x:8,y:-3-e,g:['.KK.','K42K',...Array(Math.max(1,n-4)).fill('K42K')]};
 }
 /** 松明（盾の代わりに持つ）。数字の5〜8は炎の色（FLAME）で、自ら光る */
@@ -2083,58 +2050,57 @@ function pxTorch(dir,q){
 /** 手描きの戦士の1コマ。戻り値は raster と同じ形に、頭の飾りの基準点 hd を足したもの */
 function pxWarrior(dir,act,f,torch,L,rank,pc,hairM){
  const W=30,H=Math.ceil(24*1.4)+CREST_PAD,q=mod(f,4),mv=act==='move',at=act==='attack';
- const T=PXW[dir],side=dir==='side',back=dir==='up';
+ const T=PXW[dir],side=dir==='side',back=dir==='up',down=dir==='down';
  const bob=mv?[0,-1,0,-1][q]:0;
  // 攻撃：1 振り上げ、2 振り下ろし（体が向きの方へ1ピクセル出る）、3 戻り
  const pose=at?['rest','raise','strike','rest'][q]:'rest';
- const lx=at&&q===2&&side?1:0,ly=at&&q===2?(back?-1:dir==='down'?1:0):0;
+ const lx=at&&q===2&&side?1:0,ly=at&&q===2?(back?-1:down?1:0):0;
  const X0=(side?6:5)+lx,Y0=H-2-28+ly,ux=X0,uy=Y0+bob;
  const novice=rank===0,hero=rank>=3;
  let legs=T.legs[mv?q:1]||T.legs[1];
  if(rank>=2)legs=pxSteelLegs(legs);
  const skinM='skin'+Math.min(3,L.skin);
- // 役 → 材質。見習いは袖とくすんだ古着（鋼の役を古着に）。英雄は白金の鎧
+ // 役 → 材質。見習いは袖も古着。英雄は青みの銀の鎧
  const base={steel:hero?'hqPlate':'hqSteel',hair:hairM,skin:skinM,pc:novice?'hqDrab':pc,gold:novice?'hqWood':'hqGold',leather:'hqLeather',boot:'hqBoot',wood:'hqWood'};
  const bodyM=novice?{...base,steel:'hqDrab'}:base;
  const weap={...base,steel:novice?'hqWood':hero?'hqPlate':'hqSteel',gold:novice?'hqLeather':'hqGold'};
  const shieldM=novice?{...base,pc:'hqWood',gold:'hqWood',steel:'hqSteel'}:base;
- const sk=RAMP[skinM][3],fix={E:[[30,24,44],skinM],e:[PX_EYE[L.hair%PX_EYE.length],skinM],p:[[Math.round(sk[0]*0.7+232*0.3),Math.round(sk[1]*0.7+104*0.3),Math.round(sk[2]*0.7+100*0.3)],skinM],w:[[236,246,255],'wisp']};
- const hv=PXR.head[dir][rank]||T.head;
- const head=L.head===1&&!back?[...hv.slice(0,12),...T.beard]:hv;
- const torsoG=dir==='down'?(PXR.torso[rank]||T.torso):T.torso;
+ const fix={E:[[30,24,44],skinM],w:[[236,246,255],'wisp']};
+ const hv=T.head[rank];
+ // ひげは顔の見える位（見習い・熟練）だけ
+ const head=L.head===1&&!back&&rank<=1?[...hv.slice(0,12),...T.beard]:hv;
+ const torsoG=down?T.torso[rank]:T.torso;
  const sw=pxSword(dir,pose,rank);
  const swP=sw&&{...sw,x:sw.x+ux,y:sw.y+uy,mats:weap,glow:hero};
  const tch=torch&&pxTorch(dir,q),off=tch&&{...tch,x:tch.x+ux,y:tch.y+uy,mats:base};
  // 見習いの鉢巻きだけは身につける色（古着の中で、一人ひとりの色が分かる）
  const P=[],hd={g:head,x:ux,y:uy,mats:novice?{...base,pc}:base},td={g:torsoG,x:ux,y:uy+14,mats:bodyM},lg={g:legs,x:X0,y:Y0+25,mats:base};
- if(dir==='down'){
-  if(rank===2)P.push({g:PXR.cape2,x:ux-2,y:uy+15,mats:base});
-  if(hero)P.push({g:PXR.cape3,x:ux-3,y:uy+14,mats:base});
-  P.push(lg,td);
-  if(hero)P.push({g:PXR.mantle,x:ux,y:uy+14,mats:base});
-  P.push(hd,swP);
-  const [sx,sy]=PXR.shieldAt[rank];
-  P.push(off||{g:PXR.shield[rank]||T.shield,x:ux+sx,y:uy+sy,mats:shieldM});
+ const wg=hero&&{g:T.wings,x:ux+(side?1:0),y:uy+1,mats:base};
+ if(down){
+  if(rank===2)P.push({g:T.cape2,x:ux-2,y:uy+15,mats:base});
+  if(hero)P.push({g:T.cape3,x:ux-3,y:uy+14,mats:base});
+  P.push(lg,td,hd,wg,swP);
+  const [sx,sy]=T.shieldAt[rank];
+  P.push(off||{g:T.shield[rank],x:ux+sx,y:uy+sy,mats:shieldM});
  }else if(side){
-  if(rank>=2)P.push({g:PXR.capeSide,x:ux+(hero?0:1),y:uy+15,mats:base});
-  P.push(off||{g:T.shield,x:ux+1,y:uy+15,mats:shieldM});
+  if(rank>=2)P.push({g:T.cape,x:ux+1,y:uy+15,mats:base});
+  P.push(off||{g:T.shield,x:ux+1,y:uy+16,mats:shieldM});
   if(pose==='raise')P.push(swP);
-  P.push(lg,td,hd);
-  if(hero)P.push({g:PXR.wings,x:ux+1,y:uy,mats:base});
+  P.push(lg,td,hd,wg);
   if(pose!=='raise')P.push(swP);
  }else{
   if(pose==='strike')P.push(swP);
-  P.push(lg,{...td,mats:novice?{...bodyM,pc:'hqLeather'}:bodyM});
-  if(rank===2)P.push({g:T.capeLong,x:ux+3,y:uy+24,mats:base});
-  if(hero)P.push({g:PXR.capeUp3,x:ux+2,y:uy+14,mats:base});
-  P.push(hd);
+  P.push(lg,td);
+  if(rank===2)P.push({g:T.cape2,x:ux+3,y:uy+24,mats:base});
+  if(hero)P.push({g:T.cape3,x:ux+2,y:uy+14,mats:base});
+  P.push(hd,wg);
   if(novice)P.push({g:T.roll,x:ux+3,y:uy+12,mats:base});
   if(pose!=='strike')P.push(swP);
   P.push(off||{g:T.shield,x:ux+14,y:uy+16,mats:shieldM});
  }
  const fr=pxCompose(W,H,P,fix,['steel','gold']);
  if(hero)for(let p=0;p<W*H;p++)if(fr.mat[p]==='hqGold')fr.mat[p]='glw';
- return {...fr,ax:15,ay:H-2,hd:{d:dir,x:ux+(side?9:10),y:uy+6.4,k:1.4}};
+ return {...fr,ax:15,ay:H-2,hd:{d:dir,x:ux+(side?8:10),y:uy+6.4,k:1.4}};
 }
 /**
  * 名簿の冒険者の絵。job: warrior|wizard|thief|priest|bard|hunter|slayer、look は src/eco/roster.ts の packLook、rank 0〜3。
