@@ -63,6 +63,10 @@ export function shyOfPeople(this: Ecology, c: Cr): boolean {
   if (STR[c.k] < 7 || [Kind.Adventurer, Kind.Dwarf, Kind.Golem, Kind.Dragon, Kind.Worm, Kind.Mimic, Kind.Gargoyle, Kind.Lich, Kind.Vampire].includes(c.k)) return false;
   const st = this.str(c);
   if (st < 10 || c.act === 2 || c.flee > 0 || c.sleep > 0 || this.w.tick - c.hitAt < 300) return false;
+  // 飢え死にしそうな者は気配を避けない（出ていく道や食べ物が気配の濃い所にあると、退いては戻るのを繰り返していた）
+  if (c.sinceMeal > SPEC[c.k].starve * 0.85) return false;
+  // 退き終えてしばらくは気配を気にしない（retreatStep。一度退いてから、意を決して通り抜ける）
+  if (this.retreats.has(c.id)) return false;
   // 夜襲に出る大物は、細った焚き火のまわり（12マス）の気配を避けない（src/eco/night.ts）
   if (this.nightRaider(c) && this.weakCampAt(c.x, c.y, 12)) return false;
   const p = this.presenceAt(c.x, c.y);
@@ -81,8 +85,51 @@ export function shyOfPeople(this: Ecology, c: Cr): boolean {
     }
   }
   if (!bx && !by) return false;
+  // 気配の薄いほうへ3マス先の床を退く先に決め、着くまでそこへ歩く（retreatStep）。
+  // 以前は気配の薄いほうへ一歩ずつ動いていたので、次の更新で元の行き先へ戻ろうとして、その間を一歩ずつ行き来し、
+  // その場で足踏みして見えていた（ミノタウロス・オーク・トロール・ワイバーン）
+  // （隣の区画（8マス先）まで退かせると、オークが従えた集落から離れて、従える集落が減り、冒険者に倒されるゴブリンが増えた）
+  if (this.retreatTo(c, c.x + bx * 3 * TILE, c.y + by * 3 * TILE, 40, 300)) return this.retreatStep(c);
   c.act = 1;
   this.tryMove(c, bx * SPEC[c.k].speed, by * SPEC[c.k].speed);
+  return true;
+}
+
+/**
+ * 退く先を決める：(x, y) のそばの床で、いまいる所から歩いて行ける（つながった洞窟の同じ領域の）マス。
+ * 生き物の更新 dur 回のうちに着けなければやめる。退き終えたあと、生き物の更新 rest 回の間は、記録を「休み」として残す
+ * （その間は同じ理由で退かない。退いては元の行き先へ戻り、また退く、を繰り返さないように）。決められたら true
+ */
+export function retreatTo(this: Ecology, c: Cr, x: number, y: number, dur: number, rest: number): boolean {
+  const k = this.nearestFloor(x, y);
+  const here = this.tileOf(c.x, c.y);
+  if (k < 0 || here < 0 || k === here || this.regionOf(k) !== this.regionOf(here)) return false;
+  const m = this.w.map;
+  this.retreats.set(c.id, [(k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8, this.step + dur, rest]);
+  return true;
+}
+
+/**
+ * 退く先があれば、着くまでそこへ歩く。着いた、道が無い、時間切れ、打たれた、逃げ出したら、退くのをやめて休みに入る
+ * （記録の x を NaN にし、休みの終わりの更新の通し番号を持つ）。休みが終われば記録を消す。この回に退いたら true
+ */
+export function retreatStep(this: Ecology, c: Cr): boolean {
+  const r = this.retreats.get(c.id);
+  if (!r) return false;
+  if (Number.isNaN(r[0])) {
+    if (this.step > r[2]) this.retreats.delete(c.id);
+    return false;
+  }
+  const rest = () => this.retreats.set(c.id, [NaN, NaN, this.step + r[3], 0]);
+  // 道が無いかは、退く先への道筋の記録で見る（ほかの目的地へ向かっていたときの記録は見ない）
+  const p = this.paths.get(c.id);
+  const noWay = !!p && p.gk === this.tileOf(r[0], r[1]) && p.miss > 0;
+  if (this.step > r[2] || c.flee > 0 || c.sleep > 0 || this.w.tick - c.hitAt < 300 || noWay) {
+    rest();
+    return false;
+  }
+  c.act = 1;
+  if (this.goTo(c, r[0], r[1], SPEC[c.k].speed)) rest();
   return true;
 }
 
@@ -195,6 +242,12 @@ export function fearFire(this: Ecology, c: Cr): boolean {
   if ((c.k === Kind.Rat || c.k === Kind.Bat) && c.hungry) return false;
   if (c.sinceMeal > SPEC[c.k].starve * 0.85) return false;
   if (c.k === Kind.Bat && c.st !== 0 && c.st !== 1) return false;
+  // ヴァンパイアに従うコウモリは、主の意のままに動き、火を怖がらない（主の狙う冒険者は松明を持っている）。
+  // 以前は主のそばに火があると、主へ向かう一歩と火から離れる一歩を交互に繰り返し、その場で1〜2分行ったり来たりしていた（seed7）
+  if (c.k === Kind.Bat && c.ref2) {
+    const lord = this.byId.get(c.ref2);
+    if (lord && !lord.dead && lord.k === Kind.Vampire) return false;
+  }
   const f = this.fireNear(c.x, c.y);
   if (!f) return false;
   const dx = c.x - f[0];
@@ -534,6 +587,8 @@ declare module '../ecology' {
     updatePresenceTrace: typeof updatePresenceTrace;
     presenceAt: typeof presenceAt;
     shyOfPeople: typeof shyOfPeople;
+    retreatTo: typeof retreatTo;
+    retreatStep: typeof retreatStep;
     buildLitMap: typeof buildLitMap;
     isLit: typeof isLit;
     canSense: typeof canSense;
@@ -550,4 +605,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { updatePresenceBase, updatePresenceTrace, presenceAt, shyOfPeople, buildLitMap, isLit, canSense, fires, fireNearTile, fireNear, fearFire, lurk, pester, feeding, noise, creatureSounds, hear });
+Object.assign(Ecology.prototype, { updatePresenceBase, updatePresenceTrace, presenceAt, shyOfPeople, retreatTo, retreatStep, buildLitMap, isLit, canSense, fires, fireNearTile, fireNear, fearFire, lurk, pester, feeding, noise, creatureSounds, hear });

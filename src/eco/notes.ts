@@ -32,7 +32,7 @@ export function note(this: Ecology, id: number, n: Note): void {
 
 /**
  * 持ち主（倒れた者、落とした者）を表す覚え書き。how はどうしてそこにあるか：
- * 'fell' 倒れた（石になった）ときに残した、'spent' 燃え尽きた松明を捨てた、'stash' 金貨を寝床や集落へ運び込んだ
+ * 'fell' 倒れた（石になった）ときに残した、'spent' 燃え尽きた松明を捨てた、'shed' リビングアーマーが打たれて手の武器を落とした、'stash' 金貨を寝床や集落へ運び込んだ
  */
 export function ownerNote(this: Ecology, c: Cr | undefined, how?: string): Note {
   const n: Note = { t: this.w.tick };

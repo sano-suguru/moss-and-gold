@@ -5,7 +5,7 @@ import { lineOfSight, TILE } from '../mapgen';
 import { thrallStr } from './thrall';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
-import { ARMOR_HAND_MAX, ARMOR_HP_MUL } from './armor';
+import { ARMOR_HAND_MAX } from './armor';
 
 /** 攻める側の勝つ確率は、近くの仲間を含めた強さの比で決まる。負けた側は死ぬことがある */
 /** 強さ：冒険者は職業と一行の格で決まる */
@@ -165,8 +165,8 @@ export function hunt(this: Ecology, c: Cr, R: number, kinds: Kind[], speed: numb
 
 /** 体力の上限（強さに比例） */
 export function maxHp(this: Ecology, c: Cr): number {
-  // リビングアーマー（空の鎧）は固い（src/eco/armor.ts の ARMOR_HP_MUL）
-  if (c.k === Kind.Armor) return Math.round(4 + this.str(c) * ARMOR_HP_MUL);
+  // リビングアーマー（空の鎧）は固い。固さは体になった武具の数で決まり、手に取った武器と盾は打撃（強さ）だけを上げる（src/eco/armor.ts の armorHp）
+  if (c.k === Kind.Armor) return this.armorHp(c);
   return Math.round(4 + this.str(c) * 5);
 }
 
@@ -192,6 +192,8 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1): boolean {
   const sa = this.str(a) * (1 + 0.4 * allies(a));
   const dmg = sa * (1.2 + (ih(a.id, d.id ^ this.step, 161) % 1000) / 1000 * 1.2) * mul;
   d.hp -= dmg;
+  // リビングアーマーは、倒れずに強い一打を受けると、手の武器を落とす（src/eco/armor.ts）
+  if (d.k === Kind.Armor && d.hp > 0) this.armorShed(d, dmg, a);
   // やられそうになったヴァンパイアは、コウモリの群れにばらけて逃げる（1日に1回、光の中ではできない。src/eco/vampire.ts）
   let scatter = false;
   if (d.k === Kind.Vampire && d.hp < this.maxHp(d) * 0.35 && this.vampCanScatter(d)) {
@@ -281,6 +283,23 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
   const sp = SPEC[c.k].speed * 1.2;
   // コボルトは、追っ手がすぐそば（6マス）にいるあいだは住処へ向かわず、まず追っ手から離れる（追っ手の脇をすり抜けて帰ろうとしない）
   const closeFoe = c.k === Kind.Kobold && f && !f.dead && sq(f.x - c.x) + sq(f.y - c.y) < 6 * TILE * 6 * TILE;
+  // 住みかへ帰る道の途中に相手がいる（住みかへの向きと相手への向きがほぼ同じ）とき、相手が8マスの内なら住みかへは向かわない。
+  // 相手が3マスより離れていればその場で身をひそめ、近ければ離れる向きへ動く（下）。
+  // （以前は相手の方へ帰っては離れるのを、距離の境目で更新ごとに繰り返し、5分以上その場で行き来していた。はじまりの洞窟のコボルト）
+  if ((c.hx || c.hy) && f && !f.dead && !closeFoe && sq(c.hx - c.x) + sq(c.hy - c.y) > 20 * 20) {
+    const fd = Math.sqrt(sq(f.x - c.x) + sq(f.y - c.y)) || 1;
+    const hd = Math.sqrt(sq(c.hx - c.x) + sq(c.hy - c.y)) || 1;
+    const toward = ((f.x - c.x) * (c.hx - c.x) + (f.y - c.y) * (c.hy - c.y)) / (fd * hd);
+    if (toward > 0.5 && fd < 8 * TILE && fd < hd) {
+      if (fd > 3 * TILE) {
+        c.act = 0;
+        return true;
+      }
+      const L = fd;
+      this.tryMove(c, ((c.x - f.x) / L) * sp, ((c.y - f.y) / L) * sp);
+      return true;
+    }
+  }
   if ((c.hx || c.hy) && !closeFoe) {
     // 巣や住みかへ逃げ帰る
     if (sq(c.hx - c.x) + sq(c.hy - c.y) > 20 * 20) {
@@ -289,6 +308,13 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
     }
   }
   if (f && !f.dead) {
+    // 住みかのそば（20px の内）まで逃げ帰っていて、相手が2マスより離れていれば、住みかで身を縮めてじっとする。
+    // （以前はそこでも相手から離れる向きへ一歩ずつ動いたので、行き止まりにある住みかでは壁に押しつけたまま足を動かし続けた。
+    //  seed27 では、住処のそばで休む冒険者への警戒（heedAlarm）が続き、コボルト10匹ほどが4〜6分足踏みしていた）
+    if ((c.hx || c.hy) && sq(c.hx - c.x) + sq(c.hy - c.y) <= 20 * 20 && sq(f.x - c.x) + sq(f.y - c.y) > 2 * TILE * 2 * TILE) {
+      c.act = 0;
+      return true;
+    }
     const dx = c.x - f.x;
     const dy = c.y - f.y;
     const L = Math.sqrt(dx * dx + dy * dy) || 1;

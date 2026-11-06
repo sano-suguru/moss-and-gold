@@ -1,7 +1,7 @@
 import type { Atlas } from './atlas';
 import { BLOOD, Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
-import { ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
+import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
 import { RANK_AT, unpackLook } from './eco/roster';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
@@ -925,10 +925,10 @@ export class CreatureView {
     for (const it of eco.gear) {
       if (!inView(it.x, it.y, 16)) continue;
       pushSprite(it.x, it.y + 2, 0, false, it.kind === 12 ? A.trophy(TROPHY[it.fuel]?.[1] ?? 'fang') : A.item(it.kind, itf + it.id), 0, 2);
-      // 持ち主の未練（マナ）が宿った武具：青白い粒がかすかに立ちのぼる（未練が濃いほど頻く。src/eco/armor.ts）
+      // マナ（持ち主の未練と、土から吸ったマナ）が宿った武具：青白い粒が立ちのぼる。甲冑が立ち上がる量に近づくほど頻く（src/eco/armor.ts）
       if (isJobItem(it.kind) && it.fuel > 0) {
         const ph = (t * 0.45 + it.id * 0.137) % 1;
-        if (ph < Math.min(1, it.fuel / 24)) pushSprite(it.x + Math.sin(ph * 6 + it.id) * 3, it.y + 2.05, 2 + ph * 12, false, A.manaMote(Math.min(3, Math.floor(ph * 4))), 0, 2);
+        if (ph < Math.min(1, it.fuel / ARMOR_BIRTH_MANA)) pushSprite(it.x + Math.sin(ph * 6 + it.id) * 3, it.y + 2.05, 2 + ph * 12, false, A.manaMote(Math.min(3, Math.floor(ph * 4))), 0, 2);
       }
     }
     // 宝の山：量に応じた大きさ。光が当たるときらめく

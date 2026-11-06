@@ -35,6 +35,12 @@ export function pickNest(this: Ecology): number {
   return best;
 }
 
+/** 巣へ戻って休むアリが、個体ごとに少しずつずれて集まる点（中心からのずれ。半径 r の円の上、個体の番号で決まる） */
+function antSpot(c: Cr, r: number): [number, number] {
+  const a = (c.id * 2.39996) % 6.2832;
+  return [Math.cos(a) * r, Math.sin(a) * r * 0.75];
+}
+
 export function colonyOf(this: Ecology, c: Cr): Colony | undefined {
   return this.colonies.find((o) => o.id === c.ref);
 }
@@ -48,6 +54,13 @@ export function ant(this: Ecology, c: Cr): void {
     const j = DIR16[ih(c.id, this.step >> 3, 64) & 15];
     this.tryMove(c, j[0] * s.speed * 0.6, j[1] * s.speed * 0.6);
     return;
+  }
+  // 住みかの印（逃げるときに逃げ帰る先。src/eco/combat.ts の woundsAndFlight）を巣に合わせる。
+  // 巣を作りに来たアリは、生み出されたとき住みかの印が入ってきた地表の口のままだったので、傷を負うと巣ではなく
+  // ダンジョンの入口までマップを横切って逃げていた（abc・seed27 の12日目では、働きアリの8割ほど）。すでにずれているアリもここで直す
+  if (c.hx !== col.x || c.hy !== col.y) {
+    c.hx = col.x;
+    c.hy = col.y;
   }
   // 腹が減ったら、運んでいる物を少し食べる。何もなければ巣に戻って蓄えを食べる
   if (c.hungry && c.units > 0 && c.food < 3) {
@@ -101,9 +114,13 @@ export function ant(this: Ecology, c: Cr): void {
       if (kk >= 0) {
         c.ref2 = -1 - kk;
       } else {
-        c.act = 1;
-        const j = DIR16[ih(c.id, this.step >> 4, 66) & 15];
-        this.tryMove(c, j[0] * s.speed * 0.5, j[1] * s.speed * 0.5);
+        // 運ぶ物が見つからなければ、巣のそばで休む（巣から3マスより遠ければ巣へ戻る。蓄えが十分なときと同じ）。
+        // 以前は約3秒ごとに乱数で向きを選んで半分の速さでぶらつき、向きが戻るとほとんど進まずに足踏みして見えていた
+        c.act = sq(col.x - c.x) + sq(col.y - c.y) > 3 * TILE * 3 * TILE ? 1 : 0;
+        if (c.act === 1) {
+          const [ox, oy] = antSpot(c, 10);
+          this.goTo(c, col.x + ox, col.y + oy, s.speed);
+        }
         return;
       }
     }

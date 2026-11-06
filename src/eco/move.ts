@@ -500,8 +500,11 @@ export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
         // 前の仲間がこちらへ向かってくる（向きが逆）なら、列ではなくすれ違い：ゆるめずに脇へよける
         // （以前は向かい合った二匹が互いにゆるめ合い、細い通路で押し戻し合って進めず、苔のそばで飢えていた）
         const od = o.dir === 0 ? [0, 1] : o.dir === 1 ? [0, -1] : o.dir === 2 ? [1, 0] : [-1, 0];
-        const oncoming = od[0] * hx + od[1] * hy < -0.3;
-        if (o.act === 1 && o.sleep <= 0 && !oncoming) slow = ahead < gap * 0.5 ? 0.15 : 0.5;
+        // 前の仲間が同じ向きへ進んでいるとき（列になっているとき）だけ歩みをゆるめる。横切っている、別の向きへ歩いている仲間は、脇へよけて追い越す
+        // （以前は向きが逆でなければゆるめていたので、仲間がいつもまわりにいるアリの巣のそばでは、横切る仲間のたびに歩みをゆるめ続け、
+        //  脚を動かしたままほとんど進まず、足踏みして見えていた）
+        const along = od[0] * hx + od[1] * hy;
+        if (o.act === 1 && o.sleep <= 0 && along > 0.5) slow = ahead < gap * 0.5 ? 0.15 : 0.5;
         else sidestep = cross > 0 ? -1 : cross < 0 ? 1 : c.id % 2 ? 1 : -1;
       });
       if (sidestep) {
@@ -568,6 +571,9 @@ export function findMoss(this: Ecology, c: Cr, cx: number, cy: number, R: number
   const needy = (c.k === Kind.Rat || c.k === Kind.Kobold || c.k === Kind.Goblin) && c.hungry > 0;
   let bv = needy ? 0 : 24;
   const per = 4;
+  // 地面を歩く者は、いまいる所と歩いてつながるマスだけを選ぶ（飛ぶ者と岩の中を進む者は除く。goblinForage と同じ理由）
+  const here = flies(c) || c.k === Kind.Worm ? -1 : this.tileOf(c.x, c.y);
+  const reg = here >= 0 ? this.regionOf(here) : -1;
   for (let i = 0; i < (needy ? 40 : 28); i++) {
     const h = ih(c.id, seedStep, salt + i);
     const dx = ((h & 255) % (2 * R + 1)) - R;
@@ -577,6 +583,7 @@ export function findMoss(this: Ecology, c: Cr, cx: number, cy: number, R: number
     if (x < 0 || y < 0 || x >= m.w || y >= m.h) continue;
     const k = y * m.w + x;
     if (m.solid[k] || m.lava[k] || m.sealed[k]) continue;
+    if (reg >= 0 && this.regionOf(k) !== reg) continue;
     if (c.k === Kind.Rat && this.w.water[k] > 40) continue;
     const food = c.k === Kind.Rat || c.k === Kind.Kobold || (c.k === Kind.Goblin && needy) ? Math.max(this.w.moss[k], this.w.fungus[k]) : this.w.moss[k];
     if (needy && food < 20) continue;

@@ -190,10 +190,11 @@ export function describeThing(this: Ecology, s: Thing): { title: string; lines: 
       const when = n ? `（${ago(this, n.t)}）` : '';
       if (o.kind === ItemKind.Trophy) lines.push(`${n?.name ? `${n.name}の一行` : 'ある一行'}が持ち帰れなかった戦利品${when}`);
       else if (who && n?.cause === 'spent') lines.push(`${who}が捨てていった${when}`);
+      else if (who && n?.cause === 'shed') lines.push(`${who}が打たれて落とした${when}`);
       else if (who) lines.push(`倒れた${who}が残していった${when}`);
       else lines.push('いきさつはわからない');
-      // 持ち主の未練（マナ）が宿っている（src/eco/armor.ts）
-      if (o.kind >= ItemKind.Sword && o.kind <= ItemKind.Greatsword && o.fuel > 0) lines.push(o.fuel >= 12 ? '持ち主の未練が宿り、青白くかすかに光っている' : '持ち主の未練が、薄れかけて残っている');
+      // 持ち主の未練や、土から吸ったマナが宿っている（src/eco/armor.ts）
+      if (o.kind >= ItemKind.Sword && o.kind <= ItemKind.Greatsword && o.fuel > 0) lines.push(o.fuel >= 12 ? 'マナが宿り、青白く光っている' : 'マナが、かすかに残っている');
       return { title, lines };
     }
     case 'pile': {

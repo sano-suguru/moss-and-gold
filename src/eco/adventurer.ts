@@ -4,7 +4,7 @@ import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, 
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
-import { ARMOR_HP_MUL, ARMOR_REMNANT, isJobItem } from './armor';
+import { ARMOR_REMNANT, isJobItem } from './armor';
 import type { World } from '../world';
 
 /** 噂の総量（評判） */
@@ -242,12 +242,13 @@ export function partyStr(this: Ecology, p: Party): number {
 
 /**
  * 一行が見積もる相手の強さ：強さに残りの体力の割合を掛ける。リビングアーマー（空の鎧）は、体力が強さのわりに大きい
- * （ふつうは強さの5倍、鎧は ARMOR_HP_MUL 倍。src/eco/combat.ts の maxHp）ので、その分を見積もりに入れる。
+ * （ふつうは 4 + 強さ×5、鎧は体の武具の数で決まる。src/eco/combat.ts の maxHp、src/eco/armor.ts の armorHp）ので、
+ * ふつうの種と比べた体力の比を見積もりに掛ける。
  * 入れないと、武具を取り込んで強くなった鎧に一行が挑みつづけ、宝物庫の入口で次々に倒されていた（倒れた者の武具をまた鎧が取り込む）
  */
 export function foeStr(this: Ecology, o: Cr): number {
   const s = this.str(o) * (o.hp > 0 ? o.hp / this.maxHp(o) : 1);
-  return o.k === Kind.Armor ? (s * ARMOR_HP_MUL) / 5 : s;
+  return o.k === Kind.Armor ? (s * this.maxHp(o)) / (4 + 5 * this.str(o)) : s;
 }
 
 /**
@@ -595,10 +596,14 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     }
     c.hx = fx;
     c.hy = fy;
-    if (sq(sx - c.x) + sq(sy - c.y) > 8 * 8) {
+    const d2 = sq(sx - c.x) + sq(sy - c.y);
+    if (d2 > 8 * 8) {
       c.act = 1;
+      const d0 = Math.sqrt(d2);
       this.goTo(c, sx, sy, s.speed);
-      return;
+      // 席のそば（1.5マスの内）まで来て、眠る仲間や壁の角に阻まれてほとんど近づけなければ、その場に座る
+      // （以前は席へ入れないまま、眠る仲間の脇で歩く姿のまま押し返され続け、seed27 では2分近く足踏みしていた）
+      if (!(d0 < 24 && d0 - Math.hypot(sx - c.x, sy - c.y) < 0.2)) return;
     }
     c.act = 0;
     const watch = idx === 0;
@@ -642,8 +647,23 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   }
   const idx = p.members.indexOf(c.id);
   // 先頭の後ろに、少し間をあけて並ぶ
-  const ox = [0, -14, 14, -8, 8][idx % 5];
-  const oy = -[0, 10, 10, 22, 22][idx % 5];
+  let ox = [0, -14, 14, -8, 8][idx % 5];
+  let oy = -[0, 10, 10, 22, 22][idx % 5];
+  // 並ぶ位置が壁の中なら、左右を入れ替えた位置、先頭に寄せた位置、先頭の真後ろの順に、立てる床で先頭と歩いてつながる所にする
+  // （以前は先頭が壁ぎわを歩くと並ぶ位置が壁の中に入り、そこへまっすぐ向かって壁に押しつけたまま足踏みしていた。1回5〜7秒、1日に800回ほど）
+  {
+    const lk = this.tileOf(leader.x, leader.y);
+    const ok = (dx: number, dy: number) => {
+      const k = this.tileOf(leader.x + dx, leader.y + dy);
+      return k >= 0 && lk >= 0 && this.tilePassable(c, k) && this.regionOf(k) === this.regionOf(lk);
+    };
+    for (const [dx, dy] of [[ox, oy], [-ox, oy], [ox / 2, oy / 2], [0, oy / 2], [0, 0]]) {
+      if (!ok(dx, dy)) continue;
+      ox = dx;
+      oy = dy;
+      break;
+    }
+  }
   if (sq(leader.x + ox - c.x) + sq(leader.y + oy - c.y) > 22 * 22) {
     c.act = 1;
     this.goTo(c, leader.x + ox, leader.y + oy, s.speed);

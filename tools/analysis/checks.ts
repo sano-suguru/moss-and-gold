@@ -55,10 +55,17 @@ const RUN_A = { seeds: ['かしたれ', 'seed8', 'abc', 'seed7'], from: 10, to: 
 // スライムが死骸を分け合い、湿った床で暮らすようにしたコードでは、25日を0日目から通すと15〜23日目の立ち上がりは main 9 → 11 回で、
 // 起きるシードが入れ替わった（main：かしたれ 4・seed41 3・seed23 1・seed17 1、作業ツリー：abc 3・seed41 3・seed35 3・seed5 1・seed27 1）。
 // CI と同じく main の15日目から始めると、上の7シードでは立ち上がり2回・取り込み0回で落ちたので、abc・seed35・seed5 を足す
-const RUN_ARMOR = { seeds: ['かしたれ', 'seed6', 'seed40', 'seed41', 'seed18', 'seed17', 'seed30', 'abc', 'seed35', 'seed5'], from: 15, to: 23 };
-// 僧侶が亡骸の前で祈る場面は、冒険者の亡骸があり、そのそばを僧侶のいる一行が安全に通るときだけ起きる（16シード×25日で13シード・30回ほど）。
-// 0日目から作業ツリーで実行した10〜18日目では seed5 2・seed17 2・seed4 1・seed6 1・seed27 1・seed30 1。RUN_A の4シードでは0回だった
-const RUN_BLESS = { seeds: ['seed5', 'seed17', 'seed4', 'seed6', 'seed27', 'seed30'], from: 10, to: 18 };
+// 起きるシードは変更のたびに入れ替わり、#60 の後の main では、上の10シードの15〜23日目の立ち上がりが main 自体で2回になり項目が落ちた。
+// まれな出来事の項目（RUN_WIDE）と同じく、16シードの合計で見る（16シードでは main 8・ヴァンパイアに従うコウモリを直したコードの0日目から 7・
+// main の15日目から 6、取り込みは 11・10・7、崩れるのは 6・8・4。15〜23日目に実行するシードは10から16に増える）
+const RUN_ARMOR = { seeds: ['abc', 'かしたれ', 'はじまりの洞窟', 'seed4', 'seed5', 'seed6', 'seed7', 'seed8', 'seed40', 'seed41', 'seed18', 'seed27', 'seed23', 'seed35', 'seed17', 'seed30'], from: 15, to: 23 };
+// まれな出来事（僧侶が亡骸の前で祈る、オークの取り立て）を見るシードの組。どのシードで起きるかは変更のたびに入れ替わり、
+// 数シードを選ぶやり方では、ほかの PR の変更で展開が分かれるたびに落ちて、シードを選び直していた（#55・#57・#58）。
+// ほかの項目で10〜18日目を実行している14シードに seed17 を足し、15シードの合計で見る（実行するシードは seed17 の1つだけ増える）。
+// アリの混雑を直したコード（main #58 の後）では、10〜18日目の15シードの合計が、祈り main 10・0日目から 6・main の10日目から 7、
+// 取り立て main 10・5・2（取り立ては main の10日目から続けると seed17 でしか起きなかった）
+const RUN_WIDE = { seeds: ['abc', 'かしたれ', 'はじまりの洞窟', 'seed4', 'seed5', 'seed6', 'seed7', 'seed8', 'seed40', 'seed41', 'seed18', 'seed27', 'seed35', 'seed30', 'seed17'], from: 10, to: 18 };
+const RUN_BLESS = RUN_WIDE;
 const RUN_ORC = { seeds: ['かしたれ', 'seed27'], from: 10, to: 18 };
 // オークの取り立ては、従う集落に蓄えがたまったときだけ起きるまれな出来事（16シード×25日で約25回、起きるのは6シードほど）。
 // いまのコードで10〜18日目に起きているシードを選ぶ。焚き火の夜襲の二歩目（#29）のコードで、
@@ -69,14 +76,12 @@ const RUN_ORC = { seeds: ['かしたれ', 'seed27'], from: 10, to: 18 };
 // 壁から床へ1マスだけ突き出た岩を作らないようにした地形（#49）では、0日目から実行した10〜18日目に seed23・seed41 で起きず、seed30 は1回か0回。
 // 起きるのは abc 6・seed7 8・seed17 2（#48 を取り込む前のコードでは abc 6・seed17 7・seed35 4）なので、abc・seed7・seed17 にする
 // （どのシードもほかの項目で10〜18日目を実行しているので、実行するシードは増えない）
-// スライムが死骸を分け合うようにした main（#54）では、10〜18日目に abc・seed7・seed17 で起きなくなった（16シードで seed35 6・seed30 3・seed40 1）。
-// 苔の無いコウモリを外へ出すコードを main の10日目から続けても seed35 4・seed30 3・seed40 1・かしたれ 1 なので、seed35・seed30・seed40 にする
-// （どのシードもほかの項目で10〜18日目を実行しているので、実行するシードは増えない）
-const RUN_TRIB = { seeds: ['seed35', 'seed30', 'seed40'], from: 10, to: 18 };
-// 倒れた冒険者がヴァンパイアの眷属として起き上がるのは、16シードの10〜18日目で2〜3回のまれな出来事で、どのシードで起きるかは地形と展開で入れ替わる。
-// #49 の地形では RUN_A の4シードで起きず、はじまりの洞窟 1・seed40 2（#48 を取り込む前のコードでは seed6 1・seed35 1）。
-// どちらでも起きるよう4シードを並べる（どれもほかの項目で10〜18日目を実行しているので、実行するシードは増えない）
-const RUN_THRALL = { seeds: ['はじまりの洞窟', 'seed40', 'seed6', 'seed35'], from: 10, to: 18 };
+// （以前は数シードを選んでいたが、#54・#58 の後で起きるシードが入れ替わり、そのたびに落ちたので、RUN_WIDE の15シードで見る）
+const RUN_TRIB = RUN_WIDE;
+// 倒れた冒険者がヴァンパイアの眷属として起き上がる場面（src/eco/vampire.ts の vampRaiseFallen）は、check の項目にしない。
+// 16シードの10〜18日目で main でも1体（縦穴のコウモリのねぐらを直したコードを main の10日目から続けると0体）、10〜25日目でも0〜5体のまれな出来事で、
+// どのシードを選んでも短い実行では確かめられない。ヴァンパイアが倒した者を眷属にする仕組みは、RUN_A の項目（旋回と眷属）で確かめ、
+// 冒険者の亡骸から起き上がる場面は、ab の「見せたい場面」の表（lib/moments.ts）で起きたシードの数を追う
 
 export const CHECKS: Check[] = [
   {
@@ -104,17 +109,8 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // ヴァンパイア（src/eco/vampire.ts の vampRaiseFallen）：倒れた冒険者の亡骸にかがみ込み、眷属として起き上がらせる
-    name: '倒れた冒険者がヴァンパイアの眷属として起き上がる（4シードで1体以上）',
-    ...RUN_THRALL,
-    test: (rs) => {
-      const n = rs.map((r) => r.births.filter((x) => x.k === 30 && x.from === 25).length);
-      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
-    },
-  },
-  {
     // リビングアーマー（src/eco/armor.ts）：倒れた冒険者の武具に未練が宿り、溜まり場で甲冑が立ち上がる
-    name: 'リビングアーマーが武具の溜まり場から立ち上がる（10シードの15〜23日目で4回以上）',
+    name: 'リビングアーマーが武具の溜まり場から立ち上がる（16シードの15〜23日目で4回以上）',
     ...RUN_ARMOR,
     test: (rs) => {
       const n = rs.map((r) => r.births.filter((x) => x.k === 29 && x.origin === 'gear').length);
@@ -122,13 +118,27 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // リビングアーマー：床の武器と盾を取り込み、倒れるかマナが尽きると武具が床に散らばる
-    name: 'リビングアーマーが武具を取り込み、崩れて散らばる（10シードの15〜23日目で取り込み2回以上・崩れる2回以上）',
+    // リビングアーマー：溜まり場に残った武具や巡回の途中で見つけた床の武具を一つずつ取り込み、倒れるかマナが尽きると武具が床に散らばる。
+    // 以前は立ち上がるときに溜まり場の武具を近い順に5個まで一度に体にしていたので、剣や盾が残らず、取り込みはまれだった
+    // （#66 の main の16シードの15〜23日目で2回。大ネズミの変更を main の15日目から続けると1回になり、この項目が落ちた）。
+    // 芯の分だけを体にして残りを拾い集め、床の武具がまわりのマナを吸って1個からでも立ち上がるようにしたコード（#67）では、
+    // 立ち上がり・取り込み・崩れるが 0日目から 62・206・56、main の15日目から 53・140・47
+    name: 'リビングアーマーが武具を取り込み、崩れて散らばる（16シードの15〜23日目で取り込み6回以上・崩れる2回以上）',
     ...RUN_ARMOR,
     test: (rs) => {
       const a = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'absorb').length);
       const f = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'fall').length);
-      return { ok: sum(a) >= 2 && sum(f) >= 2, value: rs.map((r, i) => `${r.seed} 取り込み${a[i]}・崩れる${f[i]}`).join('、') };
+      return { ok: sum(a) >= 6 && sum(f) >= 2, value: rs.map((r, i) => `${r.seed} 取り込み${a[i]}・崩れる${f[i]}`).join('、') };
+    },
+  },
+  {
+    // リビングアーマーは、倒れずに強い一打を受けると手の武器を落とす（src/eco/armor.ts の armorShed）。強くなり続けず、打ち合うたびに強さが行き来する。
+    // 16シードの15〜23日目で、0日目から 114回（9シード）、main（#66）の15日目から 78回（10シード）。main には無い仕組み
+    name: 'リビングアーマーが打たれて手の武器を落とす（16シードの15〜23日目で20回以上）',
+    ...RUN_ARMOR,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'shed').length);
+      return { ok: sum(n) >= 20, value: rs.filter((r, i) => n[i]).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、') || '0' };
     },
   },
   {
@@ -200,13 +210,16 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // ゴブリンの流れを短くする：通り道の脇の暗がりで待ち伏せ、通路を行く一行の最後尾から荷を掠め取る
-    name: 'ゴブリンが通路を行く一行の最後尾から荷を掠め取る（4シードで1回以上）',
-    ...RUN_A,
+    // ゴブリンの流れを短くする：通り道の脇の暗がりで待ち伏せ、通路を行く一行の最後尾から荷を掠め取る。
+    // 以前は RUN_A の4シードで1回以上を見ていたが、まれな出来事（16シード×25日で30〜52回）で、どの版でも4シードの10〜18日目では0〜4回しか起きず、
+    // 大ネズミのおびえる動きを直したコードを main（#68）の10日目から続けると0回になって落ちた。ほかのまれな場面の項目と同じく、RUN_WIDE の15シードの合計で見る。
+    // 15シードの10〜18日目で、main（#68）の0日目から 10回、main（#67）の0日目から 19回、大ネズミを直したコードの0日目から 24回、main の10日目から 17回
+    name: 'ゴブリンが通路を行く一行の最後尾から荷を掠め取る（15シードの合計で4回以上）',
+    ...RUN_WIDE,
     test: (rs) => {
       const st = rs.map((r) => r.settle.filter((x) => x.k === 12 && x.ev === 'stalk').length);
       const rob = rs.map((r) => r.settle.filter((x) => x.k === 12 && x.ev === 'rob' && x.how === 'snatch').length);
-      return { ok: sum(rob) >= 1, value: rs.map((r, i) => `${r.seed} ${rob[i]}（つけた ${st[i]}）`).join('、') };
+      return { ok: sum(rob) >= 4, value: `${sum(rob)}回（つけた ${sum(st)}回。${rs.filter((r, i) => rob[i]).map((r) => `${r.seed} ${rob[rs.indexOf(r)]}`).join('、')}）` };
     },
   },
   {
@@ -220,7 +233,7 @@ export const CHECKS: Check[] = [
   },
   {
     // 亡骸を清める：僧侶のいる一行が、冒険者の亡骸の前で立ち止まって祈る（清められた亡骸は起き上がらない。src/eco/roster.ts の blessBrace）
-    name: '僧侶が冒険者の亡骸の前で祈って清める（6シードの合計で2回以上）',
+    name: '僧侶が冒険者の亡骸の前で祈って清める（15シードの合計で2回以上）',
     ...RUN_BLESS,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'bless').length);
@@ -302,7 +315,7 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    name: 'オークが貢ぎ物を取り立てる（seed35・seed30・seed40 の合計で1回以上）',
+    name: 'オークが貢ぎ物を取り立てる（15シードの合計で1回以上）',
     ...RUN_TRIB,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'tribute').length);
@@ -383,11 +396,44 @@ export const CHECKS: Check[] = [
     // 止まる番も歩く姿で描いていたとき（#52 の判定）は、main の10〜18日目で大ネズミの引っかかりが4シードの合計で約8400回
     // （かしたれ 1364・seed8 1950・abc 1706・seed7 3417）。多くは「止まってあたりをうかがう」番に、その場で足を動かしていたもの。
     // いまの判定では約3000回（かしたれ 427・seed8 683・abc 693・seed7 1180）
-    name: '大ネズミが止まる番に足踏みしない（4シードの合計で引っかかりが4500回以下）',
+    // 回数は大ネズミの数で大きく変わる（群れの展開しだいで、同じコードでも始め方によって倍ほど違った）ので、大ネズミ1匹あたりで見る：
+    // 引っかかりの回数 ÷（ゲーム内の1/4日ごとのサンプルで数えた大ネズミの数の合計）。
+    // アリの混雑を直したコード（main #58 の後）で、main 2.80・0日目から 2.02・main の10日目から 4.58。止まる番も歩く姿で描いていたころは約3倍（約8）
+    name: '大ネズミが止まる番に足踏みしない（4シードで、大ネズミ1匹あたりの引っかかりが6以下）',
     ...RUN_A,
     test: (rs) => {
       const n = rs.map((r) => r.hitch.filter((x) => x.k === 2).length);
-      return { ok: sum(n) <= 4500, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+      const rats = rs.map((r) => r.samples.filter((x) => x.t > r.from * 14400).reduce((a, x) => a + (x.counts[2] ?? 0), 0));
+      const v = sum(n) / Math.max(1, sum(rats));
+      return { ok: v <= 6, value: `${v.toFixed(2)}（${rs.map((r, i) => `${r.seed} ${n[i]}/${rats[i]}`).join('、')}）` };
+    },
+  },
+  {
+    // おびえる大ネズミは、40px の内の怖い相手が次に向かう道筋の点の方向にいれば、近づかずにその場でじっとする（src/eco/rat.ts）。
+    // 以前は、道筋が相手の方を通っていると、逃げる距離（26px）の境目で、離れる一歩と戻る一歩を繰り返して行き来していた（seed35 で40秒以上）。
+    // 大ネズミの数は展開で大きく変わるので、大ネズミ1匹あたり（上の項目と同じ数え方）で、15シードの合計で見る。
+    // main（#67）の10〜18日目で 2.96、main（#68）で 3.19、直したコードの0日目から 2.00〜2.01、main の10日目から 2.29
+    name: 'おびえる大ネズミが逃げる距離の境目で行き来しない（15シードで、大ネズミ1匹あたりの引っかかりが2.7以下）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.hitch.filter((x) => x.k === 2).length);
+      const rats = rs.map((r) => r.samples.filter((x) => x.t > r.from * 14400).reduce((a, x) => a + (x.counts[2] ?? 0), 0));
+      const v = sum(n) / Math.max(1, sum(rats));
+      return { ok: v <= 2.7, value: `${v.toFixed(2)}（引っかかり ${sum(n)}、大ネズミ ${sum(rats)}）` };
+    },
+  },
+  {
+    // 夜のトロール（src/eco/monsters.ts の troll）と、住みかのそばのオーク（src/eco/orc.ts）は、立ち止まる番と、ふつうに近い速さで歩く番を交互にする（見回す動きや、止まっているあいだの効果はない）。
+    // 以前はふつうの速さの0.4〜0.6倍で歩き続け、脚を動かしながら3秒で半タイルも進まず（ひらけた床でも必ず引っかかりと数えられ）、足踏みして見えていた。
+    // 数で大きく変わるので、2種を合わせた1匹あたり（大ネズミの項目と同じ数え方）で見る。
+    // main（#67）の10〜18日目の15シードで 4.38（オーク 5.04・トロール 3.69）、直したコードの0日目から 1.80、main の10日目から 1.74
+    name: 'トロールとオークがぶらつくときに足踏みしない（15シードで、2種を合わせた1匹あたりの引っかかりが3以下）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.hitch.filter((x) => x.k === 13 || x.k === 16).length);
+      const pop = rs.map((r) => r.samples.filter((x) => x.t > r.from * 14400).reduce((a, x) => a + (x.counts[13] ?? 0) + (x.counts[16] ?? 0), 0));
+      const v = sum(n) / Math.max(1, sum(pop));
+      return { ok: v <= 3, value: `${v.toFixed(2)}（引っかかり ${sum(n)}、トロールとオーク ${sum(pop)}）` };
     },
   },
   {
@@ -400,6 +446,121 @@ export const CHECKS: Check[] = [
     test: (rs) => {
       const n = rs.map((r) => r.hitch.filter((x) => x.k === 1).length);
       return { ok: sum(n) <= 6000, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // コボルトは食べ物の目当てを保つ（src/eco/kobold.ts。更新のたびに苔を探し直して目当てが入れ替わり、ジグザグに行き来していた）。
+    // main（#55）の10〜18日目では、コボルトの引っかかりが4シードの合計で約10300回（かしたれ 233・seed8 0・abc 5430・seed7 4647）、
+    // 直したコードを main の10日目から続けると約4700回（かしたれ 0・seed8 0・abc 2957・seed7 1726）
+    // 回数はコボルトの数で大きく揺れる（#58・#59 の後の main だけで、この4シードの合計が約7000回まで増えた）ので、
+    // 大ネズミの項目と同じく、コボルト1匹あたりの引っかかり（回数 ÷ 1/4日ごとのサンプルで数えたコボルトの数の合計）で見る。
+    // アリの住みかの印を直したコード（main #59 の後）で、main 6.87・0日目から 7.86・main の10日目から 7.52。
+    // #57 で目当ての入れ替わりを直したとき、回数はほぼ半分になったので、直す前は14前後と見積もれる
+    name: 'コボルトが食べ物の目当てを替え続けない（4シードで、コボルト1匹あたりの引っかかりが10以下）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.hitch.filter((x) => x.k === 10).length);
+      const kobs = rs.map((r) => r.samples.filter((x) => x.t > r.from * 14400).reduce((a, x) => a + (x.counts[10] ?? 0), 0));
+      const v = sum(n) / Math.max(1, sum(kobs));
+      return { ok: v <= 10, value: `${v.toFixed(2)}（${rs.map((r, i) => `${r.seed} ${n[i]}/${kobs[i]}`).join('、')}）` };
+    },
+  },
+  {
+    // 人の気配を避ける強いモンスターは、退く先を決めて着くまで歩き、退き終えてしばらくは気配を気にしない（src/eco/senses.ts の retreatTo・retreatStep）。
+    // main（#55）の10〜18日目では、オーク・ミノタウロス・トロール・ワイバーンの引っかかりが4シードの合計で約2560回（かしたれ 456・seed8 415・abc 821・seed7 869）、
+    // 直したコードを main の10日目から続けると約1550回（かしたれ 241・seed8 179・abc 727・seed7 406）
+    name: '強いモンスターが人の気配の前で行き来しない（オーク・ミノタウロス・トロール・ワイバーンの引っかかりが4シードの合計で2200回以下）',
+    ...RUN_A,
+    test: (rs) => {
+      const n = rs.map((r) => r.hitch.filter((x) => x.k === 13 || x.k === 15 || x.k === 16 || x.k === 23).length);
+      return { ok: sum(n) <= 2200, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // 縦穴から来るコウモリは、縦穴の真上が岩や縦穴とつながっていない洞窟なら、縦穴のマスの天井ぎわに生まれてぶら下がる（src/eco/bat.ts の roostSpot）。
+    // 以前は岩の中や別の洞窟に生まれて、夜に縦穴へ戻れず、そのそばで足踏みしたまま飢えていた。
+    // main（#57）の10〜18日目では、苔を探すとき（st 1）以外のコウモリの足踏み（2分以上）が seed7 16・seed35 17・seed41 0、
+    // 直したコードを main の10日目から続けると seed7 0・seed35 2・seed41 0
+    name: 'コウモリが縦穴へ戻れずに足踏みしない（seed7・seed35・seed41 の合計で、苔を探すとき以外の足踏みが8回以下）',
+    seeds: ['seed7', 'seed35', 'seed41'],
+    from: 10,
+    to: 18,
+    test: (rs) => {
+      const n = rs.map((r) => r.stuck.filter((x) => x.k === 1 && x.st !== 1).length);
+      return { ok: sum(n) <= 8, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // アリの混雑（src/eco/move.ts の列の間合い、src/eco/ant.ts の巣のそばで休む）：仲間がいつもまわりにいる巣のそばで、
+    // 横切る仲間のたびに歩みをゆるめ、運ぶ物の無いときは乱数の向きにぶらついて、脚を動かしたまま進まなかった。
+    // アリの数で大きく変わるので、アリ1匹あたりの引っかかり（大ネズミの項目と同じ数え方）で見る。
+    // main #58 の10〜18日目の15シードで13.86、直したコードの0日目から 6.55、main の10日目から 7.23
+    name: 'アリが巣のそばで足踏みし続けない（15シードで、アリ1匹あたりの引っかかりが10以下）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.hitch.filter((x) => x.k === 9).length);
+      const ants = rs.map((r) => r.samples.filter((x) => x.t > r.from * 14400).reduce((a, x) => a + (x.counts[9] ?? 0), 0));
+      const v = sum(n) / Math.max(1, sum(ants));
+      return { ok: v <= 10, value: `${v.toFixed(2)}（引っかかり ${sum(n)}、アリ ${sum(ants)}）` };
+    },
+  },
+  {
+    // アリの住みかの印（逃げるときに逃げ帰る先）は巣（src/eco/ant.ts、src/eco/arrivals.ts）。
+    // 以前は巣を作りに来たアリの印が入ってきた地表の口のままで、傷を負うとダンジョンの入口まで逃げていた（abc・seed27 の12日目で働きアリの8割ほど）。
+    // 18日目のセーブで、巣に属するアリの印がすべて巣と一致するかを見る（L は1体43個ずつ：1 種、15・16 住みかの印、19 倒れたか、23 所属。AC は巣 [id, x, y, …]）
+    name: 'アリの住みかの印が巣になっている（RUN_WIDE の18日目で、巣に属するアリすべて）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const bad = rs.map((r) => {
+        const eco = r.state(r.to)?.eco;
+        if (!eco) return 0;
+        const cols = new Map<number, number[]>((eco.AC ?? []).map((a: number[]) => [a[0], a]));
+        const L: number[] = eco.L ?? [];
+        const V = eco.V ?? 43;
+        let n = 0;
+        for (let i = 0; i + V - 1 < L.length; i += V) {
+          if (L[i + 1] !== 9 || L[i + 19] !== 0) continue;
+          const col = cols.get(L[i + 23]);
+          if (col && (L[i + 15] !== col[1] || L[i + 16] !== col[2])) n++;
+        }
+        return n;
+      });
+      return { ok: sum(bad) === 0, value: `印が巣とずれたアリ ${sum(bad)} 匹` };
+    },
+  },
+  {
+    // 冒険者が壁ぎわで足踏みしない（src/eco/adventurer.ts）：一行の並ぶ位置が壁の中なら立てる所へずらし、焚き火の席に入れなければそばに座る。
+    // 壁ぎわ（引っかかり始めたマスの周り8マスのうち3マス以上が壁）の冒険者の引っかかりを、冒険者1人あたり（大ネズミの項目と同じ数え方）で見る。
+    // main（#63）の10〜18日目の15シードで1.23、直したコードの0日目から 0.84、main の10日目から 0.76
+    name: '冒険者が壁ぎわで足踏みしない（15シードで、壁ぎわの冒険者の引っかかりが1人あたり1.05以下）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.hitch.filter((x) => x.k === 25 && x.wall >= 3).length);
+      const adv = rs.map((r) => r.samples.filter((x) => x.t > r.from * 14400).reduce((a, x) => a + (x.counts[25] ?? 0), 0));
+      const v = sum(n) / Math.max(1, sum(adv));
+      return { ok: v <= 1.05, value: `${v.toFixed(2)}（引っかかり ${sum(n)}、冒険者 ${sum(adv)}）` };
+    },
+  },
+  {
+    // 食べ物のマスは、いまいる所と歩いてつながるマスだけを選ぶ（src/eco/goblin.ts の goblinForage、src/eco/move.ts の findMoss）。
+    // 以前は斜めにしかつながらない窪みや壁の向こうのマスを選び、壁の角に押しつけたまま足踏みし続けた。
+    // 15シードの10〜18日目のゴブリンの長い足踏み（2分以上）は、main（#64）で89回（seed41 が72回）、直したコードの0日目から 20回、main の10日目から 25回
+    name: 'ゴブリンが行けない食べ物を目指して足踏みし続けない（15シードで、ゴブリンの2分以上の足踏みが45回以下）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.stuck.filter((x) => countsAsStuck(x) && x.k === 12).length);
+      return { ok: sum(n) <= 45, value: `${sum(n)}回（${rs.filter((r, i) => n[i]).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、')}）` };
+    },
+  },
+  {
+    // 逃げる者は、住みかのそばで相手が離れていれば身をひそめ、帰り道の途中に相手がいれば近づかずに身をひそめる（src/eco/combat.ts の woundsAndFlight）。
+    // 以前は住処のそばで休む冒険者への警戒が続くと、行き止まりの住処で壁に押しつけたまま、あるいは距離の境目で行き来しながら、何分も足踏みした。
+    // 15シードの10〜18日目のコボルトの長い足踏み（2分以上）は、main（#65）で58回、直したコードの0日目から 12回、main の10日目から 21回
+    name: '逃げるコボルトが住処のそばで足踏みし続けない（15シードで、コボルトの2分以上の足踏みが40回以下）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.stuck.filter((x) => countsAsStuck(x) && x.k === 10).length);
+      return { ok: sum(n) <= 40, value: `${sum(n)}回` };
     },
   },
   {

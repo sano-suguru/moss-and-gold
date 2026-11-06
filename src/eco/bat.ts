@@ -46,8 +46,7 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
       if (g && this.step % 20 === c.id % 20) {
         const mates = g.members.filter((o) => o.k === Kind.Bat && !o.ref2).sort((a, b) => a.id - b.id);
         const i = Math.max(0, mates.indexOf(c));
-        c.hx = c.tx + ((i % 6) - 2.5) * 7 + ((c.id % 3) - 1);
-        c.hy = c.ty - 26 - Math.floor(i / 6) * 8;
+        [c.hx, c.hy] = this.roostSpot(c.tx, c.ty, c.tx + ((i % 6) - 2.5) * 7 + ((c.id % 3) - 1), c.ty - 26 - Math.floor(i / 6) * 8);
       }
     }
     if (c.st !== 0) {
@@ -208,12 +207,28 @@ export function batForage(this: Ecology, c: Cr, lord: Cr): boolean {
   return true;
 }
 
+/**
+ * 縦穴（出入りの口のマスの真ん中 sx, sy）のねぐらで、コウモリがぶら下がる場所。(x, y) が床で、縦穴のマスと歩いてつながっていればそこ。
+ * 岩の中か、縦穴とつながっていない別の洞窟なら、縦穴のマスの天井ぎわ（左右は ±6px の内）にする。
+ * （縦穴の真上が岩の地形では、岩の中に生まれたりぶら下がったりしたコウモリが、夜に飛び立とうとしても一歩も動けず、飢えていた。
+ * 岩が掘られて別の洞窟になると、そこから縦穴へまっすぐ戻ろうとして、間の壁に突き当たったまま縦穴へ戻れなかった。16シードの縦穴161のうち15）
+ */
+export function roostSpot(this: Ecology, sx: number, sy: number, x: number, y: number): [number, number] {
+  const m = this.w.map;
+  const ks = this.tileOf(sx, sy);
+  const k = this.tileOf(x, y);
+  if (ks < 0 || (k >= 0 && !m.solid[k] && this.regionOf(k) === this.regionOf(ks))) return [x, y];
+  const top = Math.floor(sy / TILE) * TILE;
+  return [sx + Math.max(-6, Math.min(6, x - sx)), top + 3];
+}
+
 declare module '../ecology' {
   interface Ecology {
     bat: typeof bat;
+    roostSpot: typeof roostSpot;
     batForage: typeof batForage;
     batRoam: typeof batRoam;
   }
 }
 
-Object.assign(Ecology.prototype, { bat, batForage, batRoam });
+Object.assign(Ecology.prototype, { bat, batForage, batRoam, roostSpot });
