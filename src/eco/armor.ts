@@ -2,8 +2,9 @@
  * Ecology のメソッド：リビングアーマー（床に落ちた武具から生まれる、中身の空の自律甲冑）。
  *
  * 見せたい場面：
- *  1. 誕生：倒れた冒険者たちの武具が溜まった所で、武具がカタカタ震えて寄り集まり、甲冑が立ち上がる。
- *  2. 取り込み：床の剣や盾に歩み寄って取り込み、それを手に持った姿になる（強くなる）。
+ *  1. 誕生：倒れた冒険者たちの武具が溜まった所で、未練のいちばん強い武具がカタカタ震えて寄り集まり、甲冑の芯が立ち上がる。
+ *  2. 取り込み：溜まり場に残った武具や、巡回の途中で見つけた床の武具に歩み寄って、一つずつ取り込む。剣や盾は手に持った姿になり（強くなる）、
+ *     杖や聖印などは体に溶け込む。
  *  3. 奪う：武具を持つ侵入者を倒し、その場に落ちた武具を取り込む。
  *  4. 崩れる：倒されるか、マナが尽きると、体と手の武具が床に散らばる。散った武具は、また次の甲冑やゴブリンの拾い物になる。
  *
@@ -13,7 +14,10 @@
  * マナの保存則では、床の武具に宿る未練も、生き物が持つマナと同じく総量に数える（heldMana）。未練の宿った武具は、描画で青白くかすかに光る。
  *
  * 誕生（生き物の更新50回ごと、armorBirths）：未練の宿った武具から半径 ARMOR_R マスの内に職業の道具が3つ以上あり、それらの未練の合計が
- * ARMOR_BIRTH_MANA 以上なら、未練の宿った物を先に近い順に ARMOR_BODY_MAX 個までを体にして（その未練の合計が ARMOR_BIRTH_MANA 以上のとき）甲冑が生まれる。明るさは問わない（竜の焼け跡でも生まれる）。
+ * ARMOR_BIRTH_MANA 以上なら、立ち上がるのに要る分だけ（未練の合計が ARMOR_BIRTH_MANA 以上になる、少なくとも2個）を体にして甲冑が生まれる。
+ * 体には、未練の宿った物を先に、手に持たない道具（杖・聖印・リュート・弓）を先に、近い順に使う。残りの武具は溜まり場に残り、
+ * 立ち上がった甲冑が一つずつ拾い集める（以前は近い順に5個までを一度に体にしていたので、剣や盾が溜まり場に残らず、
+ * 取り込む場面がほとんど起きなかった：16シード×25日で取り込みのあったシードは5つ）。明るさは問わない（竜の焼け跡でも生まれる）。
  * 手を下した大物（ドラゴン・ワイバーン・ワーム）や武具を持つ者が8マスの内にいるあいだは立ち上がらない（組み上がる間に倒されないように）。
  * 体にした武具の未練が、甲冑の体のマナになる。同時にいる数は、地図の面積に比例した安全柵（192×144 マスで4体、armorCap）まで。
  * 生まれてから ARMOR_RISE 回の更新のあいだは、その場で組み上がる（描画は、散らばった武具が寄り集まって立ち上がる演出）。
@@ -21,7 +25,10 @@
  * 生き方：体のマナは、生き物の更新 ARMOR_LEAK 回ごとに1ずつ足もとの土へ漏れる。土のマナが濃い所（巡回する宝物庫など）では
  * 土から吸って補い（ARMOR_MANA_MAX まで）、取り込んだ武具の未練でも補う。マナが尽きると崩れる。マナが少ないと動きが鈍る。
  * 巡回：生まれた場所（hx, hy）と宝物庫のあいだを行き来し、着いた所でしばらく立ち番をする。
+ * 巡回先を決めるとき、同じ洞窟の領域の ARMOR_SEEK_R マスの内に取り込める武具があれば、いちばん近いその武具へ向かう。
  * マナが少なくなると、土のマナが濃いほうへ向かう。
+ * 取り込み：8マスの内の、見通しの利く床の武具。武器と盾は手に（ARMOR_HAND_MAX 個まで）、杖・聖印・リュート・弓は体に（ARMOR_BODY_MAX 個まで）。
+ * 前に取り込んでから、未練の宿った武具なら ARMOR_GATHER_GAP 回、宿っていない武具なら ARMOR_ABSORB_GAP 回の更新が経っていれば取り込む。
  * 襲う相手：武具を持つ侵入者（冒険者、ドワーフ、武器を拾ったゴブリン・オーク）。アンデッド、獣や虫、他の番人は襲わない（番人の側も甲冑を襲わない）。
  * 賢さは本能だけで、逃げない。強さは6に、手に取り込んだ武器と盾1つごとに +3（ARMOR_HAND_MAX 個まで。src/eco/combat.ts の str）。
  * 体力は強さの ARMOR_HP_MUL 倍（空の鎧は固い）。打たれていないあいだは、体のマナを使って少しずつ傷を直す（マナが ARMOR_LOW の半分を下回ると直せない）。
@@ -44,6 +51,8 @@ export const ARMOR_REMNANT_FADE = 1200;
 export const ARMOR_R = 6;
 export const ARMOR_BIRTH_MANA = 40;
 export const ARMOR_BODY_MAX = 5;
+/** 誕生のとき体にする武具の少なさ（芯になる数） */
+export const ARMOR_CORE_MIN = 2;
 export const ARMOR_RISE = 40;
 /** 体のマナ：1漏れるまでの生き物の更新の回数、土から吸って溜める上限、これを下回ると動きが鈍りマナの濃い所へ向かう量 */
 export const ARMOR_LEAK = 180;
@@ -54,6 +63,10 @@ export const ARMOR_HAND_MAX = 5;
 /** 倒した相手から奪う物は、強さの上限（ARMOR_HAND_MAX）を超えても、この数まで取り込む（強さは上がらず、巡る武具が増えるだけ） */
 export const ARMOR_ROB_MAX = 8;
 export const ARMOR_ABSORB_GAP = 300;
+/** 未練の宿った武具（倒れた者の物）を拾い集めるときの間隔（生き物の更新の回数。一つずつ歩み寄って取り込むのが見えるように） */
+export const ARMOR_GATHER_GAP = 30;
+/** 巡回先を決めるとき、取り込める武具を探す半径（マス） */
+export const ARMOR_SEEK_R = 20;
 /** 体力：強さの何倍か（ほかの種は5倍。空の鎧は固い。src/eco/combat.ts の maxHp） */
 export const ARMOR_HP_MUL = 12;
 /** 傷を直す：打たれてから何 tick 経てば直しはじめるか。直すときは生き物の更新6回ごとに体力の30分の1を直し、体のマナを1使う（足もとの土へ還る） */
@@ -138,11 +151,16 @@ export function armorBirths(this: Ecology): void {
     if (ck < 0 || m.solid[ck] || m.lava[ck]) ck = this.nearestFloor(cx, cy);
     const x = (ck % m.w) * TILE + 8;
     const y = Math.floor(ck / m.w) * TILE + 8;
-    // 体にする武具：未練の宿った物を先に、近い順に（未練の無い古い武具ばかりで体を作って、マナの無いまま生まれないように）
-    near.sort((a, b) => (b.fuel > 0 ? 1 : 0) - (a.fuel > 0 ? 1 : 0) || sq(a.x - x) + sq(a.y - y) - (sq(b.x - x) + sq(b.y - y)) || a.id - b.id);
-    const body = near.slice(0, ARMOR_BODY_MAX);
+    // 体にする武具：未練の宿った物を先に（未練の無い古い武具ばかりで体を作って、マナの無いまま生まれないように）、
+    // 手に持たない道具を先に（剣や盾は溜まり場に残し、立ち上がってから手に取る）、近い順に。立ち上がるのに要る分だけ
+    near.sort((a, b) => (b.fuel > 0 ? 1 : 0) - (a.fuel > 0 ? 1 : 0) || (isHandItem(a.kind) ? 1 : 0) - (isHandItem(b.kind) ? 1 : 0) || sq(a.x - x) + sq(a.y - y) - (sq(b.x - x) + sq(b.y - y)) || a.id - b.id);
+    const body: Item[] = [];
     let got = 0;
-    for (const o of body) got += o.fuel;
+    for (const o of near) {
+      if (body.length >= ARMOR_BODY_MAX || (body.length >= ARMOR_CORE_MIN && got >= ARMOR_BIRTH_MANA)) break;
+      body.push(o);
+      got += o.fuel;
+    }
     if (got < ARMOR_BIRTH_MANA) continue;
     const ids = new Set(body.map((o) => o.id));
     this.gear = this.gear.filter((o) => !ids.has(o.id));
@@ -150,7 +168,8 @@ export function armorBirths(this: Ecology): void {
     const c = this.spawn(Kind.Armor, x, y, 0, 0);
     c.mana = got;
     c.st = 10;
-    c.lureAt = this.step;
+    // 立ち上がったらすぐ、溜まり場に残った武具を拾い集めはじめる
+    c.lureAt = this.step - ARMOR_ABSORB_GAP;
     c.hx = x;
     c.hy = y;
     c.tx = x;
@@ -168,6 +187,27 @@ export function armorBirths(this: Ecology): void {
 /** 巡回先を決める：生まれた場所と宝物庫のあいだを行き来する。マナが少なければ、土のマナの濃いほうへ */
 export function pickArmorPost(this: Ecology, c: Cr): void {
   const m = this.w.map;
+  // 取り込める武具が同じ洞窟の領域の ARMOR_SEEK_R マスの内にあれば、いちばん近いその武具へ（マナが少ないときは、土のマナを先に）
+  if (c.mana >= ARMOR_LOW) {
+    const here = this.tileOf(c.x, c.y);
+    const reg = here >= 0 ? this.regionOf(here) : -1;
+    let best: Item | null = null;
+    let bd = sq(ARMOR_SEEK_R * TILE);
+    for (const it of this.gear) {
+      if (!this.armorWants(c, it)) continue;
+      const d = sq(it.x - c.x) + sq(it.y - c.y);
+      if (d >= bd) continue;
+      const ik = this.tileOf(it.x, it.y);
+      if (ik < 0 || m.solid[ik] || (reg >= 0 && this.regionOf(ik) !== reg)) continue;
+      bd = d;
+      best = it;
+    }
+    if (best) {
+      c.tx = best.x;
+      c.ty = best.y;
+      return;
+    }
+  }
   const posts: [number, number][] = [];
   if (m.vaultCenter.x >= 0) posts.push([m.vaultCenter.x * TILE + 8, m.vaultCenter.y * TILE + 8]);
   let tx = c.hx;
@@ -200,7 +240,14 @@ export function pickArmorPost(this: Ecology, c: Cr): void {
   c.ty = ty;
 }
 
-/** 床の武器か盾を取り込む */
+/** 甲冑がその床の武具を取り込める（手か体に空きがある）か。間隔は見ない */
+export function armorWants(this: Ecology, c: Cr, it: Item): boolean {
+  const kit = this.armorKit.get(c.id) ?? [0];
+  if (isHandItem(it.kind)) return kit.length - 1 - kit[0] < ARMOR_HAND_MAX;
+  return isJobItem(it.kind) && kit[0] < ARMOR_BODY_MAX;
+}
+
+/** 床の武具を取り込む：武器と盾は手に、ほかの職業の道具は体に */
 export function absorbItem(this: Ecology, c: Cr, it: Item): void {
   this.gear = this.gear.filter((o) => o !== it);
   const kit = this.armorKit.get(c.id) ?? [0];
@@ -209,7 +256,12 @@ export function absorbItem(this: Ecology, c: Cr, it: Item): void {
   const victim = c.ref ? this.byId.get(c.ref) : undefined;
   const rob = !!victim && this.step - c.ref2 < 900 && sq(victim.x - it.x) + sq(victim.y - it.y) < sq(3 * TILE);
   this.takeRemnant(c, it);
-  kit.push(it.kind);
+  const hand = isHandItem(it.kind);
+  if (hand) kit.push(it.kind);
+  else {
+    kit.splice(1 + kit[0], 0, it.kind);
+    kit[0]++;
+  }
   this.armorKit.set(c.id, kit);
   // 強くなった分だけ、体力も上がる
   if (c.hp > 0) c.hp += this.maxHp(c) - before;
@@ -218,9 +270,9 @@ export function absorbItem(this: Ecology, c: Cr, it: Item): void {
   c.actT = 0;
   c.dir = Math.abs(it.x - c.x) > Math.abs(it.y - c.y) ? (it.x > c.x ? 2 : 3) : it.y > c.y ? 0 : 1;
   this.noise(c.x, c.y, 5);
-  this.record('settle', { t: this.w.tick, k: Kind.Armor, id: c.id, ev: 'absorb', how: rob ? 'rob' : 'floor', n: it.kind, x: Math.round(c.x), y: Math.round(c.y) } as never);
+  this.record('settle', { t: this.w.tick, k: Kind.Armor, id: c.id, ev: 'absorb', how: rob ? 'rob' : 'floor', part: hand ? 'hand' : 'body', n: it.kind, x: Math.round(c.x), y: Math.round(c.y) } as never);
   const name = ITEM_NAMES[it.kind] ?? '武具';
-  this.log(c.x, c.y, rob ? `{k:${Kind.Armor}}が、倒した相手の${name}を取り込んだ` : `{k:${Kind.Armor}}が床の${name}を取り込んだ`);
+  this.log(c.x, c.y, rob ? `{k:${Kind.Armor}}が、倒した相手の${name}を取り込んだ` : hand ? `{k:${Kind.Armor}}が床の${name}を取り込んだ` : `{k:${Kind.Armor}}が床の${name}を体に取り込んだ`);
 }
 
 /** 崩れる：体と手の武具を床に散らす（dropBelongings から。体のマナは die の releaseMana で土へ還る） */
@@ -316,18 +368,19 @@ export function armor(this: Ecology, c: Cr): void {
     }
     return;
   }
-  // 床の武器と盾を取り込む（8マスの内の、見通しの利く物。前に取り込んでから ARMOR_ABSORB_GAP 回の更新が経っていれば。
-  // 倒した相手の落とし物＝亡骸のそば3マスの内の物は、倒してから生き物の更新900回の内なら、間隔を待たずに）
+  // 床の武具を取り込む（8マスの内の、見通しの利く物。前に取り込んでから、未練の宿った物なら ARMOR_GATHER_GAP 回、
+  // 宿っていない物なら ARMOR_ABSORB_GAP 回の更新が経っていれば。
+  // 倒した相手の落とし物＝亡骸のそば3マスの内の武器と盾は、倒してから生き物の更新900回の内なら、間隔を待たずに）
   const victim = c.ref && this.step - c.ref2 < 900 ? this.byId.get(c.ref) : undefined;
-  const gapOk = this.step - c.lureAt >= ARMOR_ABSORB_GAP;
+  const since = this.step - c.lureAt;
   const nHand = this.armorHand(c).length;
-  if ((nHand < ARMOR_HAND_MAX && (gapOk || victim)) || (victim && nHand < ARMOR_ROB_MAX)) {
+  if (since >= ARMOR_GATHER_GAP || (victim && nHand < ARMOR_ROB_MAX)) {
     let best: Item | null = null;
     let bd2 = sq(8 * TILE);
     for (const it of this.gear) {
-      if (!isHandItem(it.kind)) continue;
-      const robbed = !!victim && sq(victim.x - it.x) + sq(victim.y - it.y) < sq(3 * TILE);
-      if (!robbed && (!gapOk || nHand >= ARMOR_HAND_MAX)) continue;
+      if (!isJobItem(it.kind)) continue;
+      const robbed = !!victim && isHandItem(it.kind) && nHand < ARMOR_ROB_MAX && sq(victim.x - it.x) + sq(victim.y - it.y) < sq(3 * TILE);
+      if (!robbed && (since < (it.fuel > 0 ? ARMOR_GATHER_GAP : ARMOR_ABSORB_GAP) || !this.armorWants(c, it))) continue;
       const d = sq(it.x - c.x) + sq(it.y - c.y);
       if (d >= bd2) continue;
       const ik = this.tileOf(it.x, it.y);
@@ -371,6 +424,7 @@ declare module '../ecology' {
     armorCap: typeof armorCap;
     armorHand: typeof armorHand;
     armorFoe: typeof armorFoe;
+    armorWants: typeof armorWants;
     fadeRemnant: typeof fadeRemnant;
     takeRemnant: typeof takeRemnant;
     armorBirths: typeof armorBirths;
@@ -381,4 +435,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { armorCap, armorHand, armorFoe, fadeRemnant, takeRemnant, armorBirths, pickArmorPost, absorbItem, scatterArmor, armor });
+Object.assign(Ecology.prototype, { armorCap, armorHand, armorFoe, armorWants, fadeRemnant, takeRemnant, armorBirths, pickArmorPost, absorbItem, scatterArmor, armor });
