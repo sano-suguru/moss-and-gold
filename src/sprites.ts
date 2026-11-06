@@ -2313,6 +2313,30 @@ function pxDeath(job,f,L,rank,pc,hairM){
   }else pxPaste(out,top,16-Math.floor(top.W/2),H-2-top.H+1);
   return {...out,ax:16,ay:H-2,hd:null};
  }
+ // 戦士：立った横向きの絵（その位の兜・マント・脛当てのまま、目を閉じ、持ち物なし）を倒して作る。
+ // 縦横を入れ替えると頭が左・顔が下（地面に伏せる）になる。頭より細い体と足は、まとめて地面まで下げて、地面に伏せた形にする
+ if(job==='warrior'){
+  const sd=pxCrop(make('side','idle',{noGear:true,shut:true}));
+  const tW=sd.H,tH=sd.W,t={W:tW,H:tH,px:new Uint8ClampedArray(tW*tH*4),mat:new Array(tW*tH).fill(null)};
+  for(let ny=0;ny<tH;ny++)for(let nx=0;nx<tW;nx++){const p=nx*sd.W+ny,qq=ny*tW+nx;for(let c=0;c<4;c++)t.px[qq*4+c]=sd.px[p*4+c];t.mat[qq]=sd.mat[p]}
+  const g={W:tW,H:tH,px:new Uint8ClampedArray(tW*tH*4),mat:new Array(tW*tH).fill(null)};
+  // 頭（左の列）はそのまま、胴と足（右の10列）だけをまとめて地面まで下げる
+  const bodyX=tW-10;let low=-1;for(let y=0;y<tH;y++)for(let x=bodyX;x<tW;x++)if(t.px[(y*tW+x)*4+3])low=Math.max(low,y);const sh=low<0?0:tH-1-low;
+  for(let x=0;x<tW;x++)for(let y=0;y<tH;y++){const p=y*tW+x;if(!t.px[p*4+3])continue;const ny=x>=bodyX?y+sh:y;if(ny>=tH)continue;const qq=ny*tW+x;for(let c=0;c<4;c++)g.px[qq*4+c]=t.px[p*4+c];g.mat[qq]=t.mat[p]}
+  const bx=16-Math.floor(tW/2)+2,by=H-2-tH+1;
+  // 落とした剣は体の向こう側に、盾は足もとに
+  const swd=pxCompose(24,8,[{g:pxSword('side','strike',rank).g,x:0,y:0,mats:{steel:rank===0?'hqWood':rank>=3?'hqPlate':'hqSteel',gold:rank===0?'hqLeather':'hqGold',leather:'hqLeather',wood:'hqWood'}}],{w:[[236,246,255],'wisp']},[]);
+  const shd=pxCompose(12,12,[{g:PXW.shield[rank],x:0,y:0,mats:{pc:rank===0?'hqWood':pc,gold:rank===0?'hqWood':'hqGold',wood:'hqWood',steel:'hqSteel'}}],{w:[[236,246,255],'wisp']},[]);
+  const sc=pxCrop(swd),hc=pxCrop(shd);pxPaste(out,sc,bx+tW-sc.W-2,by+sh-sc.H+3);pxPaste(out,hc,bx+tW-3,by+tH-hc.H);
+  let fr=g;
+  if(q===3){fr={...g,px:Uint8ClampedArray.from(g.px)};for(let p=0;p<fr.W*fr.H;p++){if(!fr.px[p*4+3])continue;const v=(fr.px[p*4]+fr.px[p*4+1]+fr.px[p*4+2])/3;for(let c=0;c<3;c++)fr.px[p*4+c]=Math.round(fr.px[p*4+c]*0.8+v*0.2)}}
+  pxPaste(out,fr,bx,by);
+  // 頭の先の地面についた手
+  const skM='skin'+Math.min(3,L.skin),sk=RAMP[skM],hx=bx-1,hy=H-4,put=(x,y,c,m)=>{const p=y*W+x;out.px[p*4]=c[0];out.px[p*4+1]=c[1];out.px[p*4+2]=c[2];out.px[p*4+3]=255;out.mat[p]=m};
+  for(const [x,y] of [[hx,hy-1],[hx+1,hy-1],[hx-1,hy],[hx-1,hy+1],[hx+2,hy],[hx,hy+2],[hx+1,hy+2]])if(!out.px[(y*W+x)*4+3])put(x,y,PX_K,'ol');
+  put(hx,hy,sk[3],skM);put(hx+1,hy,sk[3],skM);put(hx,hy+1,sk[2],skM);put(hx+1,hy+1,sk[2],skM);
+  return {...out,ax:16,ay:H-2,hd:null};
+ }
  // 腹ばいに倒れた姿を横から見た形：頭は左で顔を地面に伏せ、頭の上（兜・帽子・頭巾・髪）が上を向く。背中（身につける色、歴戦からはマント）が上の面、
  // 腕は体の脇に沿い、もう片方の手は頭の先の地面につく。足は右で、かかとが上を向く。
  // 役：鉄（1〜4）は頭、h は髪、肌（S s）は頬と手、身につける色（R r q）は背中、職の布（M m）は腕、革（L l）は脚、靴（B b）
