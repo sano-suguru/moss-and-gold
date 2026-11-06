@@ -486,7 +486,6 @@ export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
       const hy = my / L;
       const gap = Ecology.bodySize(c.k) * 0.9;
       let slow = 1;
-      let wait = false;
       // 前で止まっている仲間（休む、食べる、眠る）は、列ではなく障害物：ゆるめずに脇へよけて追い越す
       // （以前は止まっている仲間の後ろでも歩みをゆるめ続け、やわらかい間合いで押し返されて、広い床でも先へ進めなかった）
       let sidestep = 0;
@@ -497,7 +496,7 @@ export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
         const ahead = dx * hx + dy * hy;
         const cross = dx * hy - dy * hx;
         const side = Math.abs(cross);
-        if (wait || !(ahead > 0 && ahead < gap && side < gap * 0.6)) return;
+        if (!(ahead > 0 && ahead < gap && side < gap * 0.6)) return;
         // 前の仲間がこちらへ向かってくる（向きが逆）なら、列ではなくすれ違い：ゆるめずに脇へよける
         // （以前は向かい合った二匹が互いにゆるめ合い、細い通路で押し戻し合って進めず、苔のそばで飢えていた）
         const od = o.dir === 0 ? [0, 1] : o.dir === 1 ? [0, -1] : o.dir === 2 ? [1, 0] : [-1, 0];
@@ -505,19 +504,9 @@ export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
         // （以前は向きが逆でなければゆるめていたので、仲間がいつもまわりにいるアリの巣のそばでは、横切る仲間のたびに歩みをゆるめ続け、
         //  脚を動かしたままほとんど進まず、足踏みして見えていた）
         const along = od[0] * hx + od[1] * hy;
-        // 近すぎれば立ち止まって待ち、間合いの内なら少しゆるめて続く
-        // （以前は0.15倍・0.5倍で脚を動かしたまま進み、細い通路を行く群れ（外から来たオークなど）の後ろの者が足踏みして見えていた）
-        if (o.act === 1 && o.sleep <= 0 && along > 0.5) {
-          if (ahead < gap * 0.5) wait = true;
-          else slow = 0.75;
-        }
+        if (o.act === 1 && o.sleep <= 0 && along > 0.5) slow = ahead < gap * 0.5 ? 0.15 : 0.5;
         else sidestep = cross > 0 ? -1 : cross < 0 ? 1 : c.id % 2 ? 1 : -1;
       });
-      if (wait) {
-        if (c.act === 1) c.act = 0;
-        this.setDir(c, mx, my);
-        return;
-      }
       if (sidestep) {
         // 進む向きに対して横（仲間のいない側）へ半分、前へ半分
         const px = hy * sidestep;
