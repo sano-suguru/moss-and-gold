@@ -2071,23 +2071,29 @@ function pxShieldBack(g){
 PXR.shieldBack=PXR.shield.map((g,r)=>pxShieldBack(g||PXW.down.shield));
 /** 鉄の脛当て（歴戦から）：脚の型の革と靴を鉄の明暗に置き換える */
 const pxSteelLegs=g=>g&&g.map(r=>r.replace(/[cLlBbv]/g,ch=>({c:'2',L:'4',l:'3',B:'3',b:'2',v:'1'})[ch]));
-/** 水平に構えた剣（Tiny RPG のように、体の横へ突き出して影を左右非対称にする）。左端が柄と鍔、右へ刃。英雄は幅2ピクセルの刃と宝石の鍔 */
+/** 正面で体の脇に下げて構えた剣：柄を握り、刃は上へ向かって少し外へ傾く（3行ごとに1ピクセル外へ）。真上に立てるより自然で、影も左右非対称になる */
+function pxRestBlade(n,heavy){
+ const bl=heavy?'K44K':'K42K',om=Math.floor(n/3),pad=k=>'.'.repeat(k),rows=[pad(3+om)+'KK'+pad(1)];
+ for(let i=n-1;i>=0;i--){const o=Math.floor((i+1)/3);rows.push(pad(2+o)+bl+pad(om-o))}
+ return [...rows,...(heavy?['KGYwGK'+pad(om)]:[]),'KGYGGK'+pad(om),'..KcLK'+pad(om),'..KcLK'+pad(om),'..KYGK'+pad(om),'..KKKK'+pad(om)];
+}
+/** 水平に構えた剣（横向きの突き）。左端が柄と鍔、右へ刃。英雄は幅2ピクセルの刃と宝石の鍔 */
 function pxFlatBlade(n,heavy){
  const rim='KKK'+'.'.repeat(n+2),bar='KGK'+'K'.repeat(n+1)+'.';
  const rows=heavy?['KwG'+'4'.repeat(n)+'3K','KcG'+'3'.repeat(n)+'2K']:['KcG'+'4'.repeat(n)+'3K'];
  return [rim,bar,...rows,bar,rim];
 }
-/** 剣。dir と構え（rest 水平に構えた、raise 振り上げた、strike 振り下ろした・突いた）ごとの型と、体の型に対する位置。刃の長さは位で伸びる（見習いの木剣6、熟練8、歴戦の長剣10、英雄の大剣11。英雄は幅広の刃と宝石の鍔） */
+/** 剣。dir と構え（rest 構えた、raise 振り上げた、strike 振り下ろした・突いた）ごとの型と、体の型に対する位置。刃の長さは位で伸びる（見習いの木剣6、熟練8、歴戦の長剣10、英雄の大剣11。英雄は幅広の刃と宝石の鍔） */
 function pxSword(dir,pose,rank){
  const n=[6,8,10,11][rank],e=n-8,heavy=rank>=3,bl=heavy?'..K44K':'..K42K',blade=r=>Array(n).fill(r);
  if(dir==='down'){
-  if(pose==='rest')return {x:17,y:19,g:pxFlatBlade(n,heavy)};
+  if(pose==='rest')return {x:16,y:10-e-(heavy?1:0),g:pxRestBlade(n,heavy)};
   if(pose==='raise')return {x:16,y:-1-e,g:['...KK.',bl,...blade(bl),'KGYGGK','..KcLK','..KYGK','..KKKK']};
   const d=['KK.........','KGKK.......','KKG4K......'];for(let i=0;i<n-4;i++)d.push('.'.repeat(2+i)+'K42K'+'.'.repeat(Math.max(0,5-i)));d.push('.'.repeat(n-2)+'K4K',' '.repeat(0)+'.'.repeat(n-1)+'KK');
   return {x:15,y:19,g:d};
  }
  if(dir==='side'){
-  if(pose==='rest')return {x:9,y:19,g:pxFlatBlade(n,heavy)};
+  if(pose==='rest'){const d=['KK.......','KGKK.....','KKG4K....'];for(let i=0;i<n-5;i++)d.push('.'.repeat(2+i)+'K42K');d.push('.'.repeat(n-3)+'K4K','.'.repeat(n-2)+'KK');return {x:9,y:20,g:d}}
   if(pose==='raise')return {x:5,y:-9-e,g:['.KK.',...blade('K42K'),'KGYK','.KK.']};
   return {x:11,y:19,g:pxFlatBlade(n,heavy)};
  }
