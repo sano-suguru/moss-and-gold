@@ -172,8 +172,10 @@ export function goTo(this: Ecology, c: Cr, tx: number, ty: number, speed: number
   }
   let p = this.paths.get(c.id);
   const gk = this.tileOf(tx, ty);
-  // 近ければ道筋を探さずにまっすぐ向かう。ただし目的地のマスが壁の中など、立てない所なら、下の探索で近づけるだけ近づいて立ち止まる
-  if (sq(tx - c.x) + sq(ty - c.y) < 24 * 24 && (gk < 0 || this.tilePassable(c, gk))) return this.moveToward(c, tx, ty, speed);
+  // 近ければ道筋を探さずにまっすぐ向かう。ただし目的地のマスが壁の中など、立てない所なら、下の探索で近づけるだけ近づいて立ち止まる。
+  // まっすぐの線が岩の角を斜めに抜けるときも、道筋に従って回り込む（以前は、斜め向かいの畑のマスへ向かうコボルトが、
+  // 間の二つのマスが岩の角に押しつけられたまま足踏みし続けた。seed17 では5〜7匹が1日以上）
+  if (sq(tx - c.x) + sq(ty - c.y) < 24 * 24 && (gk < 0 || this.tilePassable(c, gk)) && this.straightOk(c, c.x, c.y, tx, ty)) return this.moveToward(c, tx, ty, speed);
   // 目的地のマスが変わったとき、または行き詰まったときだけ探し直す（動く獲物を追うたびに探さない）。
   // 道が見つからなかった目的地は、生き物の更新40回ごとに探し直す（掘られて道ができているかもしれない）
   if (!p || (p.gk !== gk && ((p.path.length === 0 && p.miss === 0) || this.step - p.at > 8)) || p.stall > 60 || (p.miss > 0 && this.step - p.at >= 40)) {
@@ -205,6 +207,27 @@ export function goTo(this: Ecology, c: Cr, tx: number, ty: number, speed: number
     p.stall = 0;
   } else p.stall++;
   return false;
+}
+
+/**
+ * (x0, y0) から (x1, y1) までまっすぐ歩けるか：線の通るマスがどれも立てるマスで、斜めに隣のマスへ移るところでは、
+ * 間の二つのマスの少なくとも一つが立てるマスであること（両方とも岩なら、角に押しつけられて抜けられない）
+ */
+export function straightOk(this: Ecology, c: Cr, x0: number, y0: number, x1: number, y1: number): boolean {
+  const m = this.w.map;
+  const n = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) / 2);
+  let px = Math.floor(x0 / TILE);
+  let py = Math.floor(y0 / TILE);
+  for (let i = 1; i <= n; i++) {
+    const qx = Math.floor((x0 + ((x1 - x0) * i) / n) / TILE);
+    const qy = Math.floor((y0 + ((y1 - y0) * i) / n) / TILE);
+    if (qx === px && qy === py) continue;
+    if (qx < 0 || qy < 0 || qx >= m.w || qy >= m.h || !this.tilePassable(c, qy * m.w + qx)) return false;
+    if (qx !== px && qy !== py && !this.tilePassable(c, py * m.w + qx) && !this.tilePassable(c, qy * m.w + px)) return false;
+    px = qx;
+    py = qy;
+  }
+  return true;
 }
 
 export function tileOf(this: Ecology, x: number, y: number): number {
@@ -926,6 +949,7 @@ declare module '../ecology' {
     nearPath: typeof nearPath;
     unreachable: typeof unreachable;
     goTo: typeof goTo;
+    straightOk: typeof straightOk;
     tileOf: typeof tileOf;
     ratOnDry: typeof ratOnDry;
     passable: typeof passable;
@@ -953,4 +977,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, unbury, searchLimit, nearPath, unreachable, findPathAvoid, goTo, tileOf, ratOnDry, passable, stepOk, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, gaitPaused, tryMove, stroll, findMoss, updateForage, nearestForage, trimChews, eatMoss, eat, die, rebuildGrid, nearby });
+Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, unbury, searchLimit, nearPath, unreachable, findPathAvoid, goTo, straightOk, tileOf, ratOnDry, passable, stepOk, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, gaitPaused, tryMove, stroll, findMoss, updateForage, nearestForage, trimChews, eatMoss, eat, die, rebuildGrid, nearby });

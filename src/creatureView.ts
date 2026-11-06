@@ -1304,6 +1304,19 @@ export class CreatureView {
           pushSprite(x + Math.cos(a) * fh * 0.5, yy + 0.1, lift + 2 + ((i * 3 + Math.floor(t * 4)) % Math.max(2, Math.round(fh * 0.8))), false, A.fx('bit:3:7:0'), 0, 4);
         }
       }
+      // 逃げる途中で縮こまっている者（src/eco/combat.ts の cower）：相手の方を向いて小刻みに震え、3秒に一度、0.6秒ほど左右をうかがう。
+      // （立ち止まっているだけだと、動けなくなって固まったように見えるので、怯えていると分かる姿にする）
+      if (!c.dead && c.flee > 0 && c.act === 0 && c.sleep === 0 && !c.caught && sp !== Kind.Wisp && sp !== Kind.Ghost) {
+        x += Math.sin(t * 40 + c.id) * 0.6;
+        const ph = (t + (c.id % 13) * 0.23) % 3;
+        if (ph < 0.6) {
+          if (dir === 2) flip = !flip;
+          else {
+            dir = 2;
+            flip = ph < 0.3;
+          }
+        }
+      }
       // 床から養分を吸うスライム：吸う一口ごと（生き物の更新10回に1回）に、まわりの床から緑の粒が体へ吸い込まれる（src/eco/slime.ts の slimeCanSip）
       if (sp === Kind.Slime && !c.dead && c.elite !== 6 && eco.slimeCanSip(c)) {
         const age = ((((eco.step - (c.id % 10)) % 10) + 10) % 10) + alpha * 0.5;

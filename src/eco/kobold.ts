@@ -289,12 +289,15 @@ export function kobold(this: Ecology, c: Cr): void {
   if (c.st === 3 && c.food >= s.cap * 0.7) c.st = 0;
   if (c.hungry || c.st === 3 || c.st === 4) {
     if (c.hungry && c.st !== 4) c.st = 3;
-    // 集めに出た者は、まず住処の畑で育ったキノコを摘む（腹に入れて持ち帰り、蓄えにする）
+    // 集めに出た者は、まず住処の畑で育ったキノコを摘む（腹に入れて持ち帰り、蓄えにする）。
+    // 住処と歩いてつながっていない畑（岩の角をはさんで斜めにしか接していないマスなど）は摘みに行かない
+    // （以前は seed18 で、そうした畑のマスの手前の角で、集めに出たコボルトが入れ替わりながら1日以上足踏みしていた）
     if (c.st === 4 && wr && !c.hungry) {
       let fk = -1;
       let fv = 49;
+      const r0 = this.regionOf(this.tileOf(wr.x, wr.y));
       for (const k of this.farmTiles(wr))
-        if (this.w.fungus[k] > fv) {
+        if (this.w.fungus[k] > fv && (r0 < 0 || this.regionOf(k) === r0)) {
           fv = this.w.fungus[k];
           fk = k;
         }
