@@ -188,9 +188,17 @@ export function troll(this: Ecology, c: Cr, day: number): void {
       return;
     }
   }
+  // 夜の見回り：生き物の更新32回ごとに、立ち止まってあたりをうかがう番と、大股で歩く番を交互に。
+  // （以前はふつうの速さの0.6倍で歩き続け、脚を動かしながら3秒で半タイルも進まず、足踏みして見えていた）
+  const seg = this.step >> 5;
+  if ((seg + c.id) % 2 === 0) {
+    c.act = 0;
+    if (this.step % 32 === c.id % 32) c.dir = ih(c.id, seg, 113) & 3;
+    return;
+  }
   c.act = 1;
-  const j = DIR16[ih(c.id, this.step >> 5, 112) & 15];
-  this.tryMove(c, j[0] * s.speed * 0.6, j[1] * s.speed * 0.6);
+  const j = DIR16[ih(c.id, seg, 112) & 15];
+  this.tryMove(c, j[0] * s.speed * 0.9, j[1] * s.speed * 0.9);
 }
 
 export function basilisk(this: Ecology, c: Cr): void {
