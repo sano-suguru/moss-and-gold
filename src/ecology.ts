@@ -927,6 +927,13 @@ export class Ecology {
   fxBurns: { t: number; id: number }[] = [];
   /** 大ネズミの巣穴の引っ越し（描画専用：列の先頭が新しい巣穴に着くまで、古い場所に穴を描く。判断に使わない） */
   fxMarch: { t: number; x: number; y: number; tx: number; ty: number }[] = [];
+  /**
+   * この生き物の更新で起きた、苔やキノコを食べた一口と、岩を掘る一振り（描画専用：src/creatureView.ts が、口元に散る苔のかけらと、岩肌から飛ぶ石のかけらと土ぼこりを描く）。
+   * 直前の8回の更新の分だけ残す（描画の1フレームの間に更新が何回も進んでも、まき漏らさないように）。セーブしない。シミュレーションの判断に使わない。
+   * fxBites は [更新の通し番号, 食べた者の id, 食べたマス, 0 苔／1 キノコ] を四つずつ、fxDigs は [更新の通し番号, 掘る者の id, 掘っている岩のマス, 0 振る／1 掘り抜いた] を四つずつ並べる
+   */
+  fxBites: number[] = [];
+  fxDigs: number[] = [];
   noticed = new Map<number, number>();
 
   /** デモの組：攻める側と受ける側 */

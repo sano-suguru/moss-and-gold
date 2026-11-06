@@ -680,6 +680,15 @@ export function nearestForage(this: Ecology, x: number, y: number, R: number, av
   return best;
 }
 
+/** 食べる一口と掘る一振りの記録（描画専用。fxBites・fxDigs）のうち、8回より前の更新の分を捨てる（生き物の更新の初めに） */
+export function trimChews(this: Ecology): void {
+  for (const a of [this.fxBites, this.fxDigs]) {
+    let i = 0;
+    while (i < a.length && a[i] < this.step - 8) i += 4;
+    if (i) a.splice(0, i);
+  }
+}
+
 export function eatMoss(this: Ecology, c: Cr, n: number): boolean {
   const k = this.tileOf(c.x, c.y);
   if (k < 0) return false;
@@ -694,10 +703,12 @@ export function eatMoss(this: Ecology, c: Cr, n: number): boolean {
     c.food += tf;
     c.sinceMeal = 0;
     this.mossTouched = true;
+    this.fxBites.push(this.step, c.id, k, 1);
     return true;
   }
   this.w.moss[k] -= t;
   c.food += t;
+  this.fxBites.push(this.step, c.id, k, 0);
   c.glow = Math.min(255, c.glow + t * (c.k === Kind.Wisp ? 30 : 12));
   c.sinceMeal = 0;
   this.mossTouched = true;
@@ -933,6 +944,7 @@ declare module '../ecology' {
     findMoss: typeof findMoss;
     updateForage: typeof updateForage;
     nearestForage: typeof nearestForage;
+    trimChews: typeof trimChews;
     eatMoss: typeof eatMoss;
     eat: typeof eat;
     die: typeof die;
@@ -941,4 +953,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, unbury, searchLimit, nearPath, unreachable, findPathAvoid, goTo, tileOf, ratOnDry, passable, stepOk, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, gaitPaused, tryMove, stroll, findMoss, updateForage, nearestForage, eatMoss, eat, die, rebuildGrid, nearby });
+Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, unbury, searchLimit, nearPath, unreachable, findPathAvoid, goTo, tileOf, ratOnDry, passable, stepOk, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, gaitPaused, tryMove, stroll, findMoss, updateForage, nearestForage, trimChews, eatMoss, eat, die, rebuildGrid, nearby });

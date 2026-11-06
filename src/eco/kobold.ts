@@ -373,8 +373,10 @@ export function kobold(this: Ecology, c: Cr): void {
       if (c.actT > 4) c.actT = 0;
       c.dir = Math.abs(tx - c.x) > Math.abs(ty - c.y) ? (tx > c.x ? 2 : 3) : ty > c.y ? 0 : 1;
       wr.prog++;
+      this.fxDigs.push(this.step, c.id, wr.target, 0);
       if (wr.prog >= [500, 900, 2400][m.rubble[wr.target] ? 0 : m.hard[wr.target]]) {
         if (this.w.dig(wr.target)) {
+          this.fxDigs.push(this.step, c.id, wr.target, 1);
           wr.len++;
           // 入口側と切り離されていた住処が、いま掘ったマスで入口側とつながった
           if (this.islandIds.has(wr.id) && this.regionOf(this.tileOf(wr.x, wr.y)) === this.mainRegion) this.markJoined(wr.id, wr.x, wr.y, Kind.Kobold, 1);
