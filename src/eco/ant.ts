@@ -143,10 +143,13 @@ export function ant(this: Ecology, c: Cr): void {
     const ty = Math.floor(k / m.w) * TILE + 8;
     if (this.goTo(c, tx, ty, s.speed) || sq(tx - c.x) + sq(ty - c.y) < 8 * 8) {
       let t = Math.min(2, Math.max(0, this.w.fungus[k] - 12), 4 - c.units);
-      if (t > 0) this.w.fungus[k] -= t;
-      else {
+      if (t > 0) {
+        this.w.fungus[k] -= t;
+        this.fxBites.push(this.step, c.id, k, 1);
+      } else {
         t = Math.min(2, Math.max(0, this.w.moss[k] - 12), 4 - c.units);
         this.w.moss[k] -= t;
+        if (t > 0) this.fxBites.push(this.step, c.id, k, 0);
       }
       if (t > 0) this.mossTouched = true;
       c.units += t;

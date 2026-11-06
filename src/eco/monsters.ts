@@ -241,10 +241,12 @@ export function basilisk(this: Ecology, c: Cr): void {
     this.goTo(c, c.hx, c.hy, s.speed);
     return;
   }
+  // 住みかのそばで、たいてい立ち止まり、ときどき、ふつうに近い速さで歩く（もともと足の遅い種なので、それでもゆっくり）。
+  // （以前はふつうの速さの0.6倍で歩き、脚を動かしながらほとんど進まず、足踏みして見えていた）
   c.act = c.actT % 90 < 50 ? 0 : 1;
   if (c.act === 1) {
     const j = DIR16[ih(c.id, this.step >> 5, 113) & 15];
-    this.tryMove(c, j[0] * s.speed * 0.6, j[1] * s.speed * 0.6);
+    this.tryMove(c, j[0] * s.speed * 0.9, j[1] * s.speed * 0.9);
   }
 }
 

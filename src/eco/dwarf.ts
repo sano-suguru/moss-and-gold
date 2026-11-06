@@ -474,7 +474,9 @@ export function dwarf(this: Ecology, c: Cr): void {
     c.dir = Math.abs(kx - c.x) > Math.abs(ky - c.y) ? (kx > c.x ? 2 : 3) : ky > c.y ? 0 : 1;
     c.act = 2;
     c.actT = 0;
+    this.fxDigs.push(this.step, c.id, k, 0);
     if (ih(c.id, this.step, 150) % (m.rubble[k] ? 12 : [18, 30, 60][m.hard[k]]) === 0 && this.w.dig(k)) {
+      this.fxDigs.push(this.step, c.id, k, 1);
       if (h.stage === 1) {
         const i = h.todo.indexOf(k);
         if (i >= 0) h.todo.splice(i, 1);

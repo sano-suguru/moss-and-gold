@@ -530,11 +530,13 @@ export function goblin(this: Ecology, c: Cr): void {
           if (tf > 0) {
             this.w.fungus[k] -= tf;
             c.units += tf;
+            this.fxBites.push(this.step, c.id, k, 1);
           } else {
             const tm = Math.min(4, this.w.moss[k] - 12, 20 - c.units);
             if (tm > 0) {
               this.w.moss[k] -= tm;
               c.units += tm;
+              this.fxBites.push(this.step, c.id, k, 0);
             }
           }
           this.mossTouched = true;
@@ -566,11 +568,9 @@ export function goblin(this: Ecology, c: Cr): void {
     if (c.st === 4) c.st = 0;
     if (!c.hungry) c.st = 0;
   }
-  // 集落のない者と、近くに食べ物の見つからない腹ぺこの者は、あてもなく歩いて探す
+  // 集落のない者と、近くに食べ物の見つからない腹ぺこの者は、立ち止まっては、ふつうに近い速さで少し歩いて探す（src/eco/move.ts の stroll）
   if (!cp || c.hungry > 0) {
-    c.act = 1;
-    const j = DIR16[ih(c.id, this.step >> 4, 92) & 15];
-    this.tryMove(c, j[0] * s.speed * 0.5, j[1] * s.speed * 0.5);
+    this.stroll(c, 4, 92, 0.9);
     return;
   }
   // 食べ残しを畑へ運んでキノコを育てる
@@ -606,10 +606,12 @@ export function goblin(this: Ecology, c: Cr): void {
     c.act = 1;
     this.goTo(c, cp.x, cp.y, s.speed);
   } else {
+    // たいてい立ち止まり、ときどき、ふつうに近い速さで数歩うろつく。
+    // （以前は60回のうち24回、ふつうの速さの0.4倍で歩き、脚を動かしながら3秒で半タイルも進まず、足踏みして見えていた）
     c.act = c.actT % 60 < 36 ? 0 : 1;
     if (c.act === 1) {
       const j = DIR16[ih(c.id, this.step >> 4, 94) & 15];
-      this.tryMove(c, j[0] * s.speed * 0.4, j[1] * s.speed * 0.4);
+      this.tryMove(c, j[0] * s.speed * 0.8, j[1] * s.speed * 0.8);
     }
   }
 }

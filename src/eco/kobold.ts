@@ -289,12 +289,15 @@ export function kobold(this: Ecology, c: Cr): void {
   if (c.st === 3 && c.food >= s.cap * 0.7) c.st = 0;
   if (c.hungry || c.st === 3 || c.st === 4) {
     if (c.hungry && c.st !== 4) c.st = 3;
-    // 集めに出た者は、まず住処の畑で育ったキノコを摘む（腹に入れて持ち帰り、蓄えにする）
+    // 集めに出た者は、まず住処の畑で育ったキノコを摘む（腹に入れて持ち帰り、蓄えにする）。
+    // 住処と歩いてつながっていない畑（岩の角をはさんで斜めにしか接していないマスなど）は摘みに行かない
+    // （以前は seed18 で、そうした畑のマスの手前の角で、集めに出たコボルトが入れ替わりながら1日以上足踏みしていた）
     if (c.st === 4 && wr && !c.hungry) {
       let fk = -1;
       let fv = 49;
+      const r0 = this.regionOf(this.tileOf(wr.x, wr.y));
       for (const k of this.farmTiles(wr))
-        if (this.w.fungus[k] > fv) {
+        if (this.w.fungus[k] > fv && (r0 < 0 || this.regionOf(k) === r0)) {
           fv = this.w.fungus[k];
           fk = k;
         }
@@ -357,10 +360,9 @@ export function kobold(this: Ecology, c: Cr): void {
     if (c.st === 4) c.st = 0;
     if (!c.hungry) c.st = 0;
   }
+  // 住処のない者は、立ち止まっては、ふつうに近い速さで少し歩いて探す（src/eco/move.ts の stroll）
   if (!wr) {
-    c.act = 1;
-    const j = DIR16[ih(c.id, this.step >> 4, 73) & 15];
-    this.tryMove(c, j[0] * s.speed * 0.5, j[1] * s.speed * 0.5);
+    this.stroll(c, 4, 73, 0.9);
     return;
   }
   // 掘る：住処のまわりの岩を少しずつ崩してトンネルを延ばす
@@ -374,8 +376,10 @@ export function kobold(this: Ecology, c: Cr): void {
       if (c.actT > 4) c.actT = 0;
       c.dir = Math.abs(tx - c.x) > Math.abs(ty - c.y) ? (tx > c.x ? 2 : 3) : ty > c.y ? 0 : 1;
       wr.prog++;
+      this.fxDigs.push(this.step, c.id, wr.target, 0);
       if (wr.prog >= [500, 900, 2400][m.rubble[wr.target] ? 0 : m.hard[wr.target]]) {
         if (this.w.dig(wr.target)) {
+          this.fxDigs.push(this.step, c.id, wr.target, 1);
           wr.len++;
           // 入口側と切り離されていた住処が、いま掘ったマスで入口側とつながった
           if (this.islandIds.has(wr.id) && this.regionOf(this.tileOf(wr.x, wr.y)) === this.mainRegion) this.markJoined(wr.id, wr.x, wr.y, Kind.Kobold, 1);
@@ -406,10 +410,12 @@ export function kobold(this: Ecology, c: Cr): void {
     c.act = 1;
     this.goTo(c, wr.x, wr.y, s.speed);
   } else {
+    // たいてい立ち止まり、ときどき、ふつうに近い速さで数歩うろつく。
+    // （以前は60回のうち20回、ふつうの速さの0.4倍で歩き、脚を動かしながら3秒で半タイルも進まず、足踏みして見えていた）
     c.act = c.actT % 60 < 40 ? 0 : 1;
     if (c.act === 1) {
       const j = DIR16[ih(c.id, this.step >> 4, 74) & 15];
-      this.tryMove(c, j[0] * s.speed * 0.4, j[1] * s.speed * 0.4);
+      this.tryMove(c, j[0] * s.speed * 0.9, j[1] * s.speed * 0.9);
     }
   }
 }

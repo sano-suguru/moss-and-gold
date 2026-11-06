@@ -60,14 +60,15 @@ export function salamander(this: Ecology, c: Cr): void {
     if (this.moveToward(c, p.x, p.y, s.speed * 1.4) || sq(p.x - c.x) + sq(p.y - c.y) < 9 * 9) this.fight(c, p);
     return;
   }
-  // 熱の中を這い回る
+  // 熱の中を這い回る：50回のうち30回、ふつうに近い速さで這い、残りは止まる。
+  // （以前はふつうの速さの0.6倍で這い、脚を動かしながら3秒で半タイルも進まず、足踏みして見えていた）
   c.act = c.actT % 50 < 30 ? 1 : 0;
   if (c.act === 1) {
     const j = DIR16[ih(c.id, this.step >> 4, 77) & 15];
     const nx = c.x + j[0] * 8;
     const ny = c.y + j[1] * 8;
     const nk = this.tileOf(nx, ny);
-    if (nk >= 0 && !m.solid[nk] && !m.lava[nk] && this.w.heat[nk] >= 80) this.tryMove(c, j[0] * s.speed * 0.6, j[1] * s.speed * 0.6);
+    if (nk >= 0 && !m.solid[nk] && !m.lava[nk] && this.w.heat[nk] >= 80) this.tryMove(c, j[0] * s.speed * 0.9, j[1] * s.speed * 0.9);
     else c.act = 0;
   }
 }

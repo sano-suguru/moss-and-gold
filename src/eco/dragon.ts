@@ -443,9 +443,8 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
     } else c.act = 1;
     return;
   }
-  c.act = 1;
-  const j = DIR16[ih(c.id, this.step >> 5, 132) & 15];
-  this.tryMove(c, j[0] * s.speed * 0.5, j[1] * s.speed * 0.5);
+  // 獲物が見つからないうちは、立ち止まっては、ふつうに近い速さで歩いて探す（src/eco/move.ts の stroll）
+  this.stroll(c, 5, 132, 0.9);
 }
 
 /** ドラゴン c が、(x, y) にいる相手から一歩下がる（相手の方を向いたまま）。下がれたら true */

@@ -266,6 +266,103 @@ export class CreatureView {
     }
   }
 
+  /** 苔とキノコの粒、石のかけらをまいた生き物の更新の通し番号（同じ更新の記録で二度まかないため） */
+  private chewStep = -1;
+  /** 食べる者が最後に苔やキノコのかけらをまいた tick（生き物の id ごと） */
+  private chewAt = new Map<number, number>();
+  /** ウィスプが苔の光を吸う粒（描画専用）：苔のあった所、吸った者の id、生まれた tick */
+  private sips: { x: number; y: number; id: number; t0: number }[] = [];
+
+  /**
+   * 食べる一口と掘る一振りの演出（eco.fxBites と eco.fxDigs から。すべて描画専用）。
+   * 苔やキノコを食べる者（大ネズミ・コボルト・コウモリ・ドワーフ・アリ・ゴブリンなど）は、一口ごとに口元から苔の緑やキノコの茶色のかけらがこぼれ、
+   * ウィスプは、足元の苔から淡い光の粒を体へ吸い上げる。岩を掘る者（ドワーフ・コボルト）は、一振りごとに岩肌から石のかけらが跳ねて土ぼこりが舞い、
+   * 掘り抜いた瞬間は、そのマスから石のかけらと土ぼこりが大きく弾ける。
+   * 粒は、記録された生き物の更新ごとに一度だけまく（同じ者が毎回まくと多すぎるので、食べる者は前にまいてから6 tick 空け、掘る者は更新2回に1回）
+   */
+  private drawChews(eco: Ecology, A: Atlas, inView: (x: number, y: number, m: number) => boolean, push: (x: number, y: number, lift: number, flip: boolean, frame: number, glow: number, kind: number) => void, alpha: number): void {
+    const now = eco.w.tick;
+    const m = eco.w.map;
+    if (eco.step !== this.chewStep) {
+      // まだまいていない更新の記録だけ（ロードし直した直後などで番号が戻ったら、残っている分から）
+      const from = this.chewStep > eco.step ? -1 : this.chewStep;
+      this.chewStep = eco.step;
+      const B = eco.fxBites;
+      for (let i = 0; i < B.length; i += 4) {
+        if (B[i] <= from) continue;
+        const c = eco.byId.get(B[i + 1]);
+        if (!c || c.dead || !inView(c.x, c.y, 20)) continue;
+        const k = B[i + 2];
+        if (c.k === Kind.Wisp) {
+          // 苔の光を吸い上げる：まわりの苔から三つの光の粒
+          for (let j = 0; j < 3; j++) {
+            const a = ((B[i] * 5 + j * 7 + c.id) % 12) * 0.52;
+            this.sips.push({ x: (k % m.w) * 16 + 8 + Math.cos(a) * 7, y: Math.floor(k / m.w) * 16 + 8 + Math.sin(a) * 4, id: c.id, t0: now });
+          }
+          continue;
+        }
+        // 同じ者が毎回まくと多すぎるので、前にまいてから6 tick（生き物の更新3回）は空ける
+        // （ロードし直して時間が戻ったときは、前の記録を無視する）
+        const last = this.chewAt.get(c.id);
+        if (last !== undefined && now >= last && now - last < 6) continue;
+        this.chewAt.set(c.id, now);
+        const bs = Ecology.bodySize(c.k) || 6;
+        const fx = c.dir === 2 ? 1 : c.dir === 3 ? -1 : 0;
+        const mx = c.x + fx * bs * 0.45;
+        const my = c.y + (c.dir === 0 ? 2 : c.dir === 1 ? -2 : 0);
+        const col = B[i + 3] === 1 ? 1 : 3;
+        for (let j = 0; j < 3; j++) {
+          const a = ((B[i] * 7 + j * 5 + c.id) % 12) * 0.52;
+          this.bits.push({ x: mx, y: my + 1, z: 2 + bs * 0.25, vx: Math.cos(a) * 0.7 + fx * 0.3, vy: Math.sin(a) * 0.35, vz: 1.3 + j * 0.3, kind: 2, col, t0: now, life: 14 });
+        }
+      }
+      if (this.chewAt.size > 300) for (const [id, t0] of this.chewAt) if (now - t0 > 60 || now < t0) this.chewAt.delete(id);
+      const D = eco.fxDigs;
+      for (let i = 0; i < D.length; i += 4) {
+        if (D[i] <= from) continue;
+        const c = eco.byId.get(D[i + 1]);
+        const k = D[i + 2];
+        const tx = (k % m.w) * 16 + 8;
+        const ty = Math.floor(k / m.w) * 16 + 8;
+        if (!inView(tx, ty, 20)) continue;
+        const cx = c ? c.x : tx;
+        const cy = c ? c.y : ty + 16;
+        const L = Math.hypot(cx - tx, cy - ty) || 1;
+        const ux = (cx - tx) / L;
+        const uy = (cy - ty) / L;
+        // 岩肌：岩のマスの、掘る者の側の縁
+        const fx = tx + ux * 8;
+        const fy = ty + uy * 8;
+        if (D[i + 3] === 1) {
+          // 掘り抜いた：マスの中から、石のかけらと土ぼこりが四方へ弾ける
+          for (let j = 0; j < 12; j++) {
+            const a = (j / 12) * 6.283;
+            this.bits.push({ x: tx + Math.cos(a) * 3, y: ty + 4 + Math.sin(a) * 2, z: 4, vx: Math.cos(a) * 1.1, vy: Math.sin(a) * 0.55, vz: j & 1 ? 0.5 : 2.2, kind: j & 1 ? 1 : 0, col: 0, t0: now, life: j & 1 ? 18 : 20 });
+          }
+          continue;
+        }
+        if (!c || (D[i] + c.id) % 2) continue;
+        // 一振り：岩肌から、掘る者の体の外まで石のかけらが三つ跳ね、土ぼこりが二つ舞う
+        for (let j = 0; j < 3; j++) {
+          const s = ((D[i] * 3 + j * 5 + c.id) % 7) / 7 - 0.5;
+          this.bits.push({ x: fx, y: fy, z: 7, vx: ux * 0.9 - uy * s * 2.2, vy: uy * 0.45 + ux * s * 1.1, vz: 1.6 + j * 0.4, kind: 0, col: 0, t0: now, life: 18 });
+        }
+        for (let j = 0; j < 2; j++) this.bits.push({ x: fx - uy * (j ? 4 : -4), y: fy + 1, z: 5, vx: ux * 0.5 - uy * (j ? 0.5 : -0.5), vy: uy * 0.25, vz: 0.5, kind: 1, col: 0, t0: now, life: 16 });
+      }
+    }
+    // 吸い上げられる光の粒：1秒ほどかけて、床から浮かぶウィスプの体へ
+    if (this.sips.length) {
+      this.sips = this.sips.filter((s) => now >= s.t0 && now - s.t0 < 10);
+      for (const s of this.sips) {
+        const c = eco.byId.get(s.id);
+        if (!c || c.dead || !inView(s.x, s.y, 20)) continue;
+        const p = Math.min(1, (now - s.t0 + alpha) / 10);
+        const e = p * p;
+        push(s.x + (c.x - s.x) * e, s.y + (c.y - s.y) * e + 0.2, e * 8, false, A.speck(2, p < 0.7 ? 0 : 1), 0.6, 2);
+      }
+    }
+  }
+
   /**
    * 攻撃の技の演出：記録（eco.fxAttacks）ごとに、技の種類に応じて部品を組み合わせて描く。
    * 振り（斬る、荒い振り、突く、刺す）は打つ側の前に軌跡、噛む・爪は受ける側に跡、殴るは一拍ためてから土ぼこりと弾ける光と床のひび、
@@ -821,6 +918,7 @@ export class CreatureView {
       }
       this.drawAttacks(eco, A, inView, pushSprite, dyn);
       this.drawEats(eco, A, inView, pushSprite, dyn, alpha);
+      this.drawChews(eco, A, inView, pushSprite, alpha);
       // 粒を動かす（tick ごと）：石のかけらは跳ねて転がり、土ぼこりはふくらんで沈み、しずくと氷は落ち、火花は飛んで消える
       {
         const now2 = eco.w.tick;
@@ -1204,6 +1302,19 @@ export class CreatureView {
         for (let i = 0; i < (c.caught ? 3 : 2); i++) {
           const a = t * 2.3 + i * 2.1 + c.id;
           pushSprite(x + Math.cos(a) * fh * 0.5, yy + 0.1, lift + 2 + ((i * 3 + Math.floor(t * 4)) % Math.max(2, Math.round(fh * 0.8))), false, A.fx('bit:3:7:0'), 0, 4);
+        }
+      }
+      // 逃げる途中で縮こまっている者（src/eco/combat.ts の cower）：相手の方を向いて小刻みに震え、3秒に一度、0.6秒ほど左右をうかがう。
+      // （立ち止まっているだけだと、動けなくなって固まったように見えるので、怯えていると分かる姿にする）
+      if (!c.dead && c.flee > 0 && c.act === 0 && c.sleep === 0 && !c.caught && sp !== Kind.Wisp && sp !== Kind.Ghost) {
+        x += Math.sin(t * 40 + c.id) * 0.6;
+        const ph = (t + (c.id % 13) * 0.23) % 3;
+        if (ph < 0.6) {
+          if (dir === 2) flip = !flip;
+          else {
+            dir = 2;
+            flip = ph < 0.3;
+          }
         }
       }
       // 床から養分を吸うスライム：吸う一口ごと（生き物の更新10回に1回）に、まわりの床から緑の粒が体へ吸い込まれる（src/eco/slime.ts の slimeCanSip）
