@@ -281,6 +281,23 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
   const sp = SPEC[c.k].speed * 1.2;
   // コボルトは、追っ手がすぐそば（6マス）にいるあいだは住処へ向かわず、まず追っ手から離れる（追っ手の脇をすり抜けて帰ろうとしない）
   const closeFoe = c.k === Kind.Kobold && f && !f.dead && sq(f.x - c.x) + sq(f.y - c.y) < 6 * TILE * 6 * TILE;
+  // 住みかへ帰る道の途中に相手がいる（住みかへの向きと相手への向きがほぼ同じ）とき、相手が8マスの内なら住みかへは向かわない。
+  // 相手が3マスより離れていればその場で身をひそめ、近ければ離れる向きへ動く（下）。
+  // （以前は相手の方へ帰っては離れるのを、距離の境目で更新ごとに繰り返し、5分以上その場で行き来していた。はじまりの洞窟のコボルト）
+  if ((c.hx || c.hy) && f && !f.dead && !closeFoe && sq(c.hx - c.x) + sq(c.hy - c.y) > 20 * 20) {
+    const fd = Math.sqrt(sq(f.x - c.x) + sq(f.y - c.y)) || 1;
+    const hd = Math.sqrt(sq(c.hx - c.x) + sq(c.hy - c.y)) || 1;
+    const toward = ((f.x - c.x) * (c.hx - c.x) + (f.y - c.y) * (c.hy - c.y)) / (fd * hd);
+    if (toward > 0.5 && fd < 8 * TILE && fd < hd) {
+      if (fd > 3 * TILE) {
+        c.act = 0;
+        return true;
+      }
+      const L = fd;
+      this.tryMove(c, ((c.x - f.x) / L) * sp, ((c.y - f.y) / L) * sp);
+      return true;
+    }
+  }
   if ((c.hx || c.hy) && !closeFoe) {
     // 巣や住みかへ逃げ帰る
     if (sq(c.hx - c.x) + sq(c.hy - c.y) > 20 * 20) {
@@ -289,6 +306,13 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
     }
   }
   if (f && !f.dead) {
+    // 住みかのそば（20px の内）まで逃げ帰っていて、相手が2マスより離れていれば、住みかで身を縮めてじっとする。
+    // （以前はそこでも相手から離れる向きへ一歩ずつ動いたので、行き止まりにある住みかでは壁に押しつけたまま足を動かし続けた。
+    //  seed27 では、住処のそばで休む冒険者への警戒（heedAlarm）が続き、コボルト10匹ほどが4〜6分足踏みしていた）
+    if ((c.hx || c.hy) && sq(c.hx - c.x) + sq(c.hy - c.y) <= 20 * 20 && sq(f.x - c.x) + sq(f.y - c.y) > 2 * TILE * 2 * TILE) {
+      c.act = 0;
+      return true;
+    }
     const dx = c.x - f.x;
     const dy = c.y - f.y;
     const L = Math.sqrt(dx * dx + dy * dy) || 1;
