@@ -571,6 +571,9 @@ export function findMoss(this: Ecology, c: Cr, cx: number, cy: number, R: number
   const needy = (c.k === Kind.Rat || c.k === Kind.Kobold || c.k === Kind.Goblin) && c.hungry > 0;
   let bv = needy ? 0 : 24;
   const per = 4;
+  // 地面を歩く者は、いまいる所と歩いてつながるマスだけを選ぶ（飛ぶ者と岩の中を進む者は除く。goblinForage と同じ理由）
+  const here = flies(c) || c.k === Kind.Worm ? -1 : this.tileOf(c.x, c.y);
+  const reg = here >= 0 ? this.regionOf(here) : -1;
   for (let i = 0; i < (needy ? 40 : 28); i++) {
     const h = ih(c.id, seedStep, salt + i);
     const dx = ((h & 255) % (2 * R + 1)) - R;
@@ -580,6 +583,7 @@ export function findMoss(this: Ecology, c: Cr, cx: number, cy: number, R: number
     if (x < 0 || y < 0 || x >= m.w || y >= m.h) continue;
     const k = y * m.w + x;
     if (m.solid[k] || m.lava[k] || m.sealed[k]) continue;
+    if (reg >= 0 && this.regionOf(k) !== reg) continue;
     if (c.k === Kind.Rat && this.w.water[k] > 40) continue;
     const food = c.k === Kind.Rat || c.k === Kind.Kobold || (c.k === Kind.Goblin && needy) ? Math.max(this.w.moss[k], this.w.fungus[k]) : this.w.moss[k];
     if (needy && food < 20) continue;

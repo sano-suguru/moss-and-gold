@@ -9,13 +9,37 @@ export function rat(this: Ecology, c: Cr, day: number): void {
   const s = SPEC[Kind.Rat];
   // 動いている大トカゲに気づいたら逃げる
   let threat: Cr | null = null;
-  this.nearby(c.x, c.y, 2, (o) => {
+  // 逃げるほどではないが近く（40px の内）にいる怖い相手
+  let wary: Cr | null = null;
+  this.nearby(c.x, c.y, 3, (o) => {
     if (o.dead) return;
     const scary = (o.k === Kind.Lizard && o.act !== 0) || (o.k === Kind.Zombie && o.act !== 0) || o.k === Kind.Ghost || ((o.k === Kind.Kobold || o.k === Kind.Goblin || o.k === Kind.Lizardman || o.k === Kind.Orc || o.k === Kind.Minotaur) && o.hungry > 0);
     if (!scary) return;
     const d = sq(o.x - c.x) + sq(o.y - c.y);
     if (d < (o.k === Kind.Ghost ? 34 * 34 : 26 * 26)) threat = o;
+    else if (d < 40 * 40) wary = o;
   });
+  // 逃げる距離の外でも、40px の内の怖い相手が、次に向かう道筋の点の方向にいれば、近づかずにその場で様子をうかがう
+  // （以前は26px の境目で、相手から離れる一歩と、相手の方を通る道筋へ戻る一歩を更新ごとに繰り返し、その場で行ったり来たりしていた。
+  //  seed35 では巣穴へ帰る大ネズミが40秒以上）
+  if (!threat && wary) {
+    const p = this.paths.get(c.id);
+    const wp = p && p.pi < p.path.length ? p.path[p.pi] : -1;
+    if (wp >= 0) {
+      const m = this.w.map;
+      const w = wary as Cr;
+      const ax = (wp % m.w) * TILE + 8 - c.x;
+      const ay = Math.floor(wp / m.w) * TILE + 8 - c.y;
+      const bx = w.x - c.x;
+      const by = w.y - c.y;
+      const la = Math.hypot(ax, ay) || 1;
+      const lb = Math.hypot(bx, by) || 1;
+      if ((ax * bx + ay * by) / (la * lb) > 0.5) {
+        c.act = 0;
+        return;
+      }
+    }
+  }
   if (threat) {
     const t = threat as Cr;
     const dx = c.x - t.x;
