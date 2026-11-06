@@ -2267,8 +2267,8 @@ function pxHero(job,dir,act,f,torch,L,rank,pc,hairM,opts={}){
  if(J.pauldron&&!side){P.push({g:J.pauldron,x:ux-1,y:uy+10,mats:base},{g:J.pauldron.map(r=>[...r].reverse().join('')),x:ux+10,y:uy+10,mats:base})}
  // 魔法使いのひげ（名簿の頭の形 1）：顎から胸へ垂れる
  if(J.beard&&L.head===1&&!back)P.push({g:J.beard[d],x:ux,y:uy+10,mats:base});
- // 英雄：額に金の小さな冠
- if(hero&&!armored&&job!=='priest')P.push({g:['K.K.K','KGYGK','.KKK.'],x:ux+(side?4:5),y:uy-2,mats:base});
+ // 英雄：額に金の小さな冠（倒れた姿の元にする絵では外す）
+ if(hero&&!armored&&job!=='priest'&&!opts.noCape)P.push({g:['K.K.K','KGYGK','.KKK.'],x:ux+(side?4:5),y:uy-2,mats:base});
  for(const g of gear)if(!g.behind)P.push(g);
  const fr=pxCompose(W,H,P,fix,['steel','gold']);
  if(hero)for(let p=0;p<W*H;p++)if(fr.mat[p]==='hqGold')fr.mat[p]='glw';
