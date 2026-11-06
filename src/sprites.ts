@@ -2294,7 +2294,7 @@ function pxPaste(dst,src,x0,y0){
 }
 /**
  * 倒れる姿（冒険者の全職）。その人の横向きの絵（持ち物なし）を元にする。
- * 0 膝から崩れる（脚が沈む）、1 さらに前へ傾いて沈む、2・3 仰向けに倒れた姿を横から見た形（頭が左で顔は上、目を閉じ、つま先が上を向く）。
+ * 0 膝から崩れる（脚が沈む）、1 さらに前へ傾いて沈む、2・3 腹ばいに倒れた姿を横から見た形（頭が左で顔を伏せ、手は頭の先の地面に、かかとが上を向く）。
  * 倒れた姿のそばには、手から落ちた持ち物（剣と盾、杖など）が転がっている。地面に残る亡骸もこの3の絵を使う
  */
 function pxDeath(job,f,L,rank,pc,hairM){
@@ -2313,10 +2313,10 @@ function pxDeath(job,f,L,rank,pc,hairM){
   }else pxPaste(out,top,16-Math.floor(top.W/2),H-2-top.H+1);
   return {...out,ax:16,ay:H-2,hd:null};
  }
- // 仰向けに倒れた姿を横から見た形（RPG の倒れた仲間の絵）：頭は左で、頭の後ろが地面につき、顔は上を向いて目を閉じる。
- // 胸が上の面、腕は体の脇に沿って先に手、足は右でつま先が上を向く。
- // 役：鉄（1〜4）は頭（兜・帽子・頭巾・髪）、h は前髪、身につける色（R r q）は胸と背、金（G）は胸の飾り、職の布（M m）は腕、革（L l）は脚、靴（B b）
- const PRONE=[".....KK.................","...KKSSKK...............","..KhSSSSSK.KKKKKKKKK....",".K4hEESSsKKRRRGGRRrrK...",".K43hSSsKMMMMMMMMMSSK.KK",".K433hsKRmmmmmmmmmKLLKBK",".K4333KRrrrrrrrrrrrLLLBK","..K222KqqqqqqqqqqqqlllbK","...KKKKKKKKKKKKKKKKKKKK."];
+ // 腹ばいに倒れた姿を横から見た形：頭は左で顔を地面に伏せ、頭の上（兜・帽子・頭巾・髪）が上を向く。背中（身につける色、歴戦からはマント）が上の面、
+ // 腕は体の脇に沿い、もう片方の手は頭の先の地面につく。足は右で、かかとが上を向く。
+ // 役：鉄（1〜4）は頭、h は髪、肌（S s）は頬と手、身につける色（R r q）は背中、職の布（M m）は腕、革（L l）は脚、靴（B b）
+ const PRONE=['...KKKKK................', '..K44333K.KKKKKKKKKK....', '.K443333KKRRRRRRRRRRK.KK', '.K4333332KRRRRRRRRRrKKBK', '.K3hhhh2KMMMMMMMMMMKLLBK', 'KK2hSSh1KrrrrrrrrrrrLLbK', 'KSSsSSsKqqqqqqqqqqqqlllK', 'KKKKKKKKKKKKKKKKKKKKKKK.'];
  const pcM=rank===0?'hqDrab':pc,skM='skin'+Math.min(3,L.skin);
  const headM={warrior:rank===0?hairM:rank>=3?'hqPlate':'hqSteel',wizard:rank===0?'hqDrab':pc,thief:'hqShadow',priest:rank===1?hairM:'hqWhite',bard:pcM,hunter:'hqForest',slayer:rank===0?'hqLeather':'hqDark'}[job];
  const backM={warrior:pcM,wizard:pcM,thief:'hqLeather',priest:'hqWhite',bard:pcM,hunter:'hqForest',slayer:rank===0?'hqLeather':'hqDark'}[job];
