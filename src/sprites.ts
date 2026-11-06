@@ -2329,18 +2329,23 @@ function pxDeath(job,f,L,rank,pc,hairM){
   const swd=pxCompose(24,8,[{g:pxSword('side','strike',rank).g,x:0,y:0,mats:{steel:rank===0?'hqWood':rank>=3?'hqPlate':'hqSteel',gold:rank===0?'hqLeather':'hqGold',leather:'hqLeather',wood:'hqWood'}}],{w:[[236,246,255],'wisp']},[]);
   const shd=pxCompose(12,12,[{g:PXW.shield[rank],x:0,y:0,mats:{pc:rank===0?'hqWood':pc,gold:rank===0?'hqWood':'hqGold',wood:'hqWood',steel:'hqSteel'}}],{w:[[236,246,255],'wisp']},[]);
   const sc=pxCrop(swd),hc=pxCrop(shd);pxPaste(out,sc,bx+tW-sc.W-2,by+sh-sc.H+3);pxPaste(out,hc,bx+tW-3,by+tH-hc.H);
-  // マント（歴戦から）：背中の上の面にかぶせる。肩から膝のあたりまで、輪郭のすぐ下の2段を身につける色に（英雄は裾の列を金に）
-  if(rank>=2){
-   const R=RAMP[pc],gold=RAMP.hqGold,x0=bodyX,x1=tW-3;
-   for(let x=x0;x<=x1;x++){
-    let top=-1;for(let y=0;y<tH;y++)if(g.px[(y*tW+x)*4+3]){top=y;break}
-    if(top<0)continue;
-    for(let k=1;k<=2;k++){const y=top+k;if(y>=tH)break;const p=y*tW+x;if(!g.px[p*4+3]||g.mat[p]==='ol')continue;const c=rank>=3&&x===x1?gold[3]:k===1?R[3]:R[2];g.px[p*4]=c[0];g.px[p*4+1]=c[1];g.px[p*4+2]=c[2];g.mat[p]=rank>=3&&x===x1?'glw':pc}
-   }
-  }
   let fr=g;
   if(q===3){fr={...g,px:Uint8ClampedArray.from(g.px)};for(let p=0;p<fr.W*fr.H;p++){if(!fr.px[p*4+3])continue;const v=(fr.px[p*4]+fr.px[p*4+1]+fr.px[p*4+2])/3;for(let c=0;c<3;c++)fr.px[p*4+c]=Math.round(fr.px[p*4+c]*0.8+v*0.2)}}
   pxPaste(out,fr,bx,by);
+  // マント（歴戦から）：背中の上にかぶせる。肩から膝のあたりまで、背中の輪郭より1〜2ピクセル盛り上げ（裾に近いほど厚い）、
+  // 膝のあたりで裾がふくらはぎの上へ垂れる。上の面は明るく、下へ暗く。英雄は裾の縁が金。輪郭はマントのまわりに1本だけ
+  if(rank>=2){
+   const hero=rank>=3,R=RAMP[pc],gold=RAMP.hqGold,x0=bodyX,x1=tW-5,cape=new Map();
+   const topOf=x=>{for(let y=0;y<tH;y++)if(fr.px[(y*tW+x)*4+3])return y;return -1};
+   for(let x=x0;x<=x1+1;x++){
+    const t0=topOf(Math.min(x,tW-1));if(t0<0)continue;
+    const thick=x-x0<(x1-x0)/2?1:2,hem=x>x1;
+    const yA=t0-thick+1,yB=hem?t0+4:t0+2;
+    for(let y=yA;y<=yB;y++){const k=y-yA;const c=hero&&(hem||x===x1)?gold[k===0?4:3]:k===0?R[4]:k===1?R[3]:k<=yB-yA-1?R[2]:R[1];cape.set((by+y)*W+bx+x,[c,hero&&(hem||x===x1)?'glw':pc])}
+   }
+   for(const [p,[c,m]] of cape){out.px[p*4]=c[0];out.px[p*4+1]=c[1];out.px[p*4+2]=c[2];out.px[p*4+3]=255;out.mat[p]=m}
+   for(const p of cape.keys()){const x=p%W,y=Math.floor(p/W);for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const X=x+dx,Y=y+dy;if(X<0||Y<0||X>=W||Y>=H)continue;const qq=Y*W+X;if(cape.has(qq)||out.px[qq*4+3])continue;out.px[qq*4]=PX_K[0];out.px[qq*4+1]=PX_K[1];out.px[qq*4+2]=PX_K[2];out.px[qq*4+3]=255;out.mat[qq]='ol'}}
+  }
   return {...out,ax:16,ay:H-2,hd:null};
  }
  // 腹ばいに倒れた姿を横から見た形：頭は左で顔を地面に伏せ、頭の上（兜・帽子・頭巾・髪）が上を向く。背中（身につける色、歴戦からはマント）が上の面、
