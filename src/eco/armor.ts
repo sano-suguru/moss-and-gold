@@ -40,7 +40,7 @@
  * 倒れずに強い一打を受けると、最後に手に取った武器か盾を1つ床に落とし、打撃が下がる（armorShed）。落ちた武具にマナは宿っていないので、
  * 拾い直すのは ARMOR_ABSORB_GAP 回の更新おき。その前に冒険者やゴブリンに拾われることもある。強くなり続けず、打ち合うたびに強さが行き来する。
  * 傷は、土のマナの濃い所で立ち番をしているときだけ、ゆっくり直る（続けて来る一行に削られていく）。打たれていないあいだは、体のマナを使って少しずつ傷を直す（マナが ARMOR_LOW の半分を下回ると直せない）。
- * 倒した相手の落とし物は、取り込みの間隔（ARMOR_ABSORB_GAP）を待たずに、強さの上限を超えても ARMOR_ROB_MAX 個まで取り込む（強さは上がらない）。
+ * 倒した相手の落とし物は、取り込みの間隔（ARMOR_ABSORB_GAP）を待たずに（武器を落として体勢を崩している間は除く）、強さの上限を超えても ARMOR_ROB_MAX 個まで取り込む（強さは上がらない）。
  * アンデッドとして扱う（冒険者の一行の目標「アンデッド祓い」の相手になる。src/eco/aim.ts）。
  *
  * 状態（Cr の項目の使い方）：st 10 組み上がり中、0 巡回先へ歩く、1 立ち番。tx, ty 巡回先。sinceMeal 立ち番や歩きの経過（生き物の更新の回数）。
@@ -89,6 +89,9 @@ export const ARMOR_MEND_SOIL = 12;
 export const ARMOR_MEND_EVERY = 30;
 /** 打たれて武器を落とす：倒れずに受けた一打の傷が、体力の上限のこの割合に近いほど落としやすい（この割合以上なら必ず落とす） */
 export const ARMOR_SHED_AT = 0.25;
+/** 武器を落としたあと、奪う物も含めて何も取り込めない長さ（生き物の更新の回数。体勢を崩している間。lureAt を先へずらして表す）。
+ *  これが無いと、打ち合いの中で相手を一人倒すたびに、落とした武器を「奪った物」として拾い直してしまう */
+export const ARMOR_SHED_DAZE = 150;
 /** 立ち番の長さ（生き物の更新の回数） */
 const ARMOR_GUARD = 300;
 
@@ -290,6 +293,7 @@ export function armorShed(this: Ecology, c: Cr, dmg: number, by: Cr): void {
     y = c.y;
   }
   this.dropItem(x, y, kd, 0, this.ownerNote(c, 'shed'));
+  c.lureAt = Math.max(c.lureAt, this.step + ARMOR_SHED_DAZE);
   this.record('settle', { t: this.w.tick, k: Kind.Armor, id: c.id, ev: 'shed', n: kd, by: by.k, x: Math.round(c.x), y: Math.round(c.y) } as never);
 }
 
@@ -427,7 +431,7 @@ export function armor(this: Ecology, c: Cr): void {
   const victim = c.ref && this.step - c.ref2 < 900 ? this.byId.get(c.ref) : undefined;
   const since = this.step - c.lureAt;
   const nHand = this.armorHand(c).length;
-  if (since >= ARMOR_GATHER_GAP || (victim && nHand < ARMOR_ROB_MAX)) {
+  if (since >= ARMOR_GATHER_GAP || (victim && since >= 0 && nHand < ARMOR_ROB_MAX)) {
     let best: Item | null = null;
     let bd2 = sq(8 * TILE);
     for (const it of this.gear) {
