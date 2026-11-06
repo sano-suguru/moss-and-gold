@@ -10,16 +10,21 @@
  *
  * 未練：冒険者が倒れると、落とした職業の道具（剣・盾・杖・鎚矛・短剣・聖印・リュート・弓・大剣）に、持ち主の未練としてマナが宿る
  * （床の道具の fuel。1つにつき ARMOR_REMNANT。新しいマナの湧き口として world.manaBorn に足す。src/eco/adventurer.ts の dropJobItems）。
- * 未練は少しずつ薄れて消え（world.manaFaded）、拾った者がいれば、その者の体のマナ（Cr.mana）に移る。
- * マナの保存則では、床の武具に宿る未練も、生き物が持つマナと同じく総量に数える（heldMana）。未練の宿った武具は、描画で青白くかすかに光る。
+ * 床の職業の道具は、足もとの土のマナが濃い（ARMOR_SOAK_MIN 以上）と、生き物の更新 ARMOR_SOAK_EVERY 回ごとに1ずつ、ARMOR_BIRTH_MANA まで吸って溜める
+ * （土から道具へ移すだけで、総量は変わらない。未練の薄れた古い武具でも、マナの濃い所に置かれていれば、また溜まっていく）。
+ * 溜まったマナは少しずつ薄れて消え（world.manaFaded）、拾った者がいれば、その者の体のマナ（Cr.mana）に移る。
+ * マナの保存則では、床の武具に宿るマナも、生き物が持つマナと同じく総量に数える（heldMana）。マナの宿った武具は、描画で青白い粒が立ちのぼり、
+ * 甲冑が立ち上がる量（ARMOR_BIRTH_MANA）に近づくほど頻くなる。
  *
- * 誕生（生き物の更新50回ごと、armorBirths）：未練の宿った武具から半径 ARMOR_R マスの内に職業の道具が3つ以上あり、それらの未練の合計が
- * ARMOR_BIRTH_MANA 以上なら、立ち上がるのに要る分だけ（未練の合計が ARMOR_BIRTH_MANA 以上になる、少なくとも2個）を体にして甲冑が生まれる。
- * 体には、未練の宿った物を先に、手に持たない道具（杖・聖印・リュート・弓）を先に、近い順に使う。残りの武具は溜まり場に残り、
+ * 誕生（生き物の更新50回ごと、armorBirths）：マナの宿った武具から半径 ARMOR_R マスの内の職業の道具のマナの合計が ARMOR_BIRTH_MANA 以上なら、
+ * 立ち上がるのに要る分だけ（マナの合計が ARMOR_BIRTH_MANA 以上になるまで）を体にして甲冑が生まれる。1個の武具からでも立ち上がる。
+ * （以前は職業の道具が3つ以上要り、冒険者1人の落とす道具は1〜2個なので、2人以上が近くで倒れた所でしか立ち上がらなかった。
+ *  未練は約4日で薄れて消えるので、そのあとは何個溜まっていても立ち上がらなかった）
+ * 体には、マナの宿った物を先に、手に持たない道具（杖・聖印・リュート・弓）を先に、近い順に使う。残りの武具は溜まり場に残り、
  * 立ち上がった甲冑が一つずつ拾い集める（以前は近い順に5個までを一度に体にしていたので、剣や盾が溜まり場に残らず、
  * 取り込む場面がほとんど起きなかった：16シード×25日で取り込みのあったシードは5つ）。明るさは問わない（竜の焼け跡でも生まれる）。
  * 手を下した大物（ドラゴン・ワイバーン・ワーム）や武具を持つ者が8マスの内にいるあいだは立ち上がらない（組み上がる間に倒されないように）。
- * 体にした武具の未練が、甲冑の体のマナになる。同時にいる数は、地図の面積に比例した安全柵（192×144 マスで4体、armorCap）まで。
+ * 体にした武具のマナが、甲冑の体のマナになる。同時にいる数は、地図の面積に比例した安全柵（192×144 マスで4体、armorCap）まで。
  * 生まれてから ARMOR_RISE 回の更新のあいだは、その場で組み上がる（描画は、散らばった武具が寄り集まって立ち上がる演出）。
  *
  * 生き方：体のマナは、生き物の更新 ARMOR_LEAK 回ごとに1ずつ足もとの土へ漏れる。土のマナが濃い所（巡回する宝物庫など）では
@@ -51,8 +56,9 @@ export const ARMOR_REMNANT_FADE = 1200;
 export const ARMOR_R = 6;
 export const ARMOR_BIRTH_MANA = 40;
 export const ARMOR_BODY_MAX = 5;
-/** 誕生のとき体にする武具の少なさ（芯になる数） */
-export const ARMOR_CORE_MIN = 2;
+/** 床の職業の道具が土のマナを吸う：足もとの土のマナがこれ以上のとき、生き物の更新 ARMOR_SOAK_EVERY 回ごとに1ずつ */
+export const ARMOR_SOAK_MIN = 12;
+export const ARMOR_SOAK_EVERY = 200;
 export const ARMOR_RISE = 40;
 /** 体のマナ：1漏れるまでの生き物の更新の回数、土から吸って溜める上限、これを下回ると動きが鈍りマナの濃い所へ向かう量 */
 export const ARMOR_LEAK = 180;
@@ -100,9 +106,18 @@ export function armorFoe(this: Ecology, o: Cr): boolean {
   return o.k === Kind.Adventurer || o.k === Kind.Dwarf || ((o.k === Kind.Goblin || o.k === Kind.Orc) && o.party !== 0);
 }
 
-/** 床の武具に宿る未練が薄れる（生き物の更新ごと。updateItems から） */
+/** 床の武具に宿るマナ：足もとの土が濃ければ吸って溜め、少しずつ薄れる（生き物の更新ごと。updateItems から） */
 export function fadeRemnant(this: Ecology, it: Item): void {
-  if (it.fuel <= 0 || !isJobItem(it.kind)) return;
+  if (!isJobItem(it.kind)) return;
+  // 吸うのは甲冑が立ち上がる量まで（甲冑の数が上限のあいだ、湧き口のそばの武具がマナを溜め続けないように）
+  if (it.fuel < ARMOR_BIRTH_MANA && this.step % ARMOR_SOAK_EVERY === it.id % ARMOR_SOAK_EVERY) {
+    const k = this.tileOf(it.x, it.y);
+    if (k >= 0 && this.w.mana[k] >= ARMOR_SOAK_MIN) {
+      this.w.mana[k]--;
+      it.fuel++;
+    }
+  }
+  if (it.fuel <= 0) return;
   if (this.step % ARMOR_REMNANT_FADE !== it.id % ARMOR_REMNANT_FADE) return;
   it.fuel--;
   this.w.manaFaded++;
@@ -127,7 +142,6 @@ export function armorBirths(this: Ecology): void {
   for (const it of this.gear) {
     if (!isJobItem(it.kind) || it.fuel <= 0 || ih(it.id, this.step, 701) % 3 !== 0 || !onFloor(it)) continue;
     const near = this.gear.filter((o) => isJobItem(o.kind) && sq(o.x - it.x) + sq(o.y - it.y) <= R2 && onFloor(o));
-    if (near.length < 3) continue;
     let mana = 0;
     for (const o of near) mana += o.fuel;
     if (mana < ARMOR_BIRTH_MANA) continue;
@@ -157,7 +171,7 @@ export function armorBirths(this: Ecology): void {
     const body: Item[] = [];
     let got = 0;
     for (const o of near) {
-      if (body.length >= ARMOR_BODY_MAX || (body.length >= ARMOR_CORE_MIN && got >= ARMOR_BIRTH_MANA)) break;
+      if (body.length >= ARMOR_BODY_MAX || got >= ARMOR_BIRTH_MANA) break;
       body.push(o);
       got += o.fuel;
     }
