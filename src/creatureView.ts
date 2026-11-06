@@ -1206,6 +1206,19 @@ export class CreatureView {
           pushSprite(x + Math.cos(a) * fh * 0.5, yy + 0.1, lift + 2 + ((i * 3 + Math.floor(t * 4)) % Math.max(2, Math.round(fh * 0.8))), false, A.fx('bit:3:7:0'), 0, 4);
         }
       }
+      // 床から養分を吸うスライム：吸う一口ごと（生き物の更新10回に1回）に、まわりの床から緑の粒が体へ吸い込まれる（src/eco/slime.ts の slimeCanSip）
+      if (sp === Kind.Slime && !c.dead && c.elite !== 6 && eco.slimeCanSip(c)) {
+        const age = ((((eco.step - (c.id % 10)) % 10) + 10) % 10) + alpha * 0.5;
+        if (age < 5) {
+          const p = age / 5;
+          const bh = 3 + eco.slimeSize(c) * 2;
+          for (let i = 0; i < 6; i++) {
+            const ang = i * 1.047 + (c.id % 7) * 0.9 + p * 0.8;
+            const r = (1 - p) * (10 + (i % 3) * 3);
+            pushSprite(x + Math.cos(ang) * r, yy + Math.sin(ang) * r * 0.5 + 0.2, p * bh, false, A.speck(2, p < 0.8 ? 0 : 1), 0.6, 2);
+          }
+        }
+      }
       // 捕食の演出（drawEats）：繭やさらわれた姿で描く獲物は、ふつうには描かない。くわえて振られている獲物は口元に。食べたミミックは跳ねる
       if (this.eatHide.has(c.id)) continue;
       {
