@@ -268,13 +268,14 @@ export function skeleton(this: Ecology, c: Cr, day: number): void {
     }
     return;
   }
-  // 暗がりをさまよう（生まれた場所から離れすぎない）
+  // 暗がりをさまよう（生まれた場所から離れすぎない）：120回のうち60回、ふつうに近い速さで歩き、残りは立ち止まる。
+  // （以前はふつうの速さの0.6倍で歩き、脚を動かしながら3秒で半タイルも進まず、足踏みして見えていた）
   c.act = c.actT % 120 < 60 ? 1 : 0;
   if (c.act === 1) {
     if (sq(c.hx - c.x) + sq(c.hy - c.y) > 14 * TILE * 14 * TILE) this.goTo(c, c.hx, c.hy, s.speed);
     else {
       const j = DIR16[ih(c.id, this.step >> 5, 143) & 15];
-      this.tryMove(c, j[0] * s.speed * 0.6, j[1] * s.speed * 0.6);
+      this.tryMove(c, j[0] * s.speed * 0.9, j[1] * s.speed * 0.9);
     }
   }
 }
