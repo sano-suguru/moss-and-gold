@@ -2016,21 +2016,49 @@ function pxCompose(W,H,parts,fix,glowRoles){
 // 型の名前は向き（d 正面、s 横、u 後ろ）と位の番号。後ろ姿では、兜のある位は鉄の首当てで髪を短く見せる
 const PXW={
  head:{'d0': ['.....KK.KK....', '....KHKKHHK...', '...KHHJJHHhK..', '..KHJHHHHHhhK.', '.KHJHHHHHHhhK.', 'KqRRRRRRRRRrqK', '.KHJHHJHHJHhK.', '.KjhHSSSSHhjK.', '.KjSSESSESSjK.', '.KjSSeSSeSSjK.', '.KjjpSSSSpjjK.'], 'd1': ['.....KKKK.....', '...KK4433KK...', '..K44333332K..', '.K4433333221K.', '.K4333333221K.', 'K12G22222G221K', '.KhHHhHHhHHhK.', '.KjhHSSSSHhjK.', '.KjSSESSESSjK.', '.KjSSeSSeSSjK.', '.KjjpSSSSpjjK.'], 'd2': ['......KK......', '....KK43KK....', '...K344432K...', '..K23444332K..', '.K2333333221K.', 'K1GYGGGGGGGg1K', '.K3HHhHHhHH2K.', '.K3hHSSSSHh2K.', '.K3SSESSESS2K.', '.K3SSeSSeSS2K.', '.K3jpSSSSpj2K.'], 'd3': ['.....KKKK.....', '...KK4433KK...', '..K44333332K..', '.K4433333221K.', '.K4333333221K.', 'K1GGYGGGGYGG1K', '.KhHHhHHhHHhK.', '.KjhHSSSSHhjK.', '.KjSSESSESSjK.', '.KjSSeSSeSSjK.', '.KjjpSSSSpjjK.'], 'u0': ['.....KK.KK....', '....KHKKHHK...', '...KHHJJHHhK..', '..KHJHHHHHhhK.', '.KHJHHHHHHhhK.', 'KqRRRRRRRRRrqK', '.KHJHHJHHJHhK.', '.KhHJHHJHHhjK.', '.KjhHhjhHhjjK.', '..KjhhjhhjjK..', '...KKKKKKKK...'], 'u1': ['.....KKKK.....', '...KK4433KK...', '..K44333332K..', '.K4433333221K.', '.K4333333221K.', 'K12G22222G221K', '.K1122222211K.', '.KhHJHHJHHhjK.', '.KjhHhjhHhjjK.', '..KjhhjhhjjK..', '...KKKKKKKK...'], 'u2': ['......KK......', '....KK43KK....', '...K344432K...', '..K23444332K..', '.K2333333221K.', 'K1GYGGGGGGGg1K', '.K1122222211K.', '.KhHJHHJHHhjK.', '.KjhHhjhHhjjK.', '..KjhhjhhjjK..', '...KKKKKKKK...'], 'u3': ['.....KKKK.....', '...KK4433KK...', '..K44333332K..', '.K4433333221K.', '.K4333333221K.', 'K1GGYGGGGYGG1K', '.K1122222211K.', '.KhHJHHJHHhjK.', '.KjhHhjhHhjjK.', '..KjhhjhhjjK..', '...KKKKKKKK...'], 's0': ['....KK.KK.....', '...KHKKHHK....', '..KHHJJHHhK...', '.KHJHHHHHhhK..', 'KHJHHHHHHhhK..', 'KqRRRRRRRRrrqK', '.KHJHHJHSSSK..', '.KjhHHhHSSSK..', '.KjhHHhSSESK..', '.KjhHhjSSeSK..', '..KjjhpSSSK...'], 's1': ['....KKKK......', '..KK4433KK....', '.K44333332K...', 'K4433333221K..', 'K4333333221K..', 'K122222G22221K', '.KhHHhHHhHHK..', '.KjhHHhHSSSK..', '.KjhHHhSSESK..', '.KjhHhjSSeSK..', '..KjjhpSSSK...'], 's2': ['.....KK.......', '...KK43KK.....', '..K344432K....', '.K23444332K...', 'K2333333221K..', 'K1GYGGGGGGGg1K', '.KhHHhHHhHHK..', '.KjhHH32SSSK..', '.KjhHH32SESK..', '.KjhHh32SeSK..', '..KjjhpSSSK...'], 's3': ['....KKKK......', '..KK4433KK....', '.K44333332K...', 'K4433333221K..', 'K4333333221K..', 'K1GGYGGGGYGG1K', '.KhHHhHHhHHK..', '.KjhHHhHSSSK..', '.KjhHHhSSESK..', '.KjhHhjSSeSK..', '..KjjhpSSSK...']},
- torso:{'d1': ['K32RRRGGRrq21K', 'K32R44432rq21K', 'K32R43322rq21K', 'KSsRR3322rqSsK', 'KcLLLLGGLLLLcK', 'K2RrRRRRrRRr2K', 'K2qgGGGGGGgq2K'], 'd0': ['KRrLLLqqLLLrrK', 'KRrLLLqqLLlrrK', 'KRrLlLLLLlcrrK', 'KSsLLLLLLLcSsK', 'KdDDDDDDDDDDdK', 'KRrRRRRRRrRRrK', 'KqrrrrrrrrrrqK'], 'd2': ['K443RRGGRr332K', 'K332R4432r221K', 'K32R43322rq21K', 'KSsRR3322rqSsK', 'KcLLLLGGLLLLcK', 'K2RrRRRRrRRr2K', 'K2qgGGGGGGgq2K'], 'd3': ['KRRRRRGGRRRrqK', 'KRrG444432GrqK', 'K32G433322G21K', 'KSsGG3322GGSsK', 'KcLLLLGGLLLLcK', 'K2RrRRRRrRRr2K', 'K2qgGGGGGGgq2K'], 'u1': ['K32RRRRRRrq21K', 'K32RRRRRRrq21K', 'K32RRRRRRrq21K', 'KSsRRRRRRrqSsK', 'KcLLLLLLLLLLcK', 'K2RrRRRRrRRr2K', 'K2qgGGGGGGgq2K'], 'u0': ['KRrLLLLLLLLrrK', 'KRrLLLLLLLlrrK', 'KRrLlLLLLlcrrK', 'KSsLLLLLLLcSsK', 'KdDDDDDDDDDDdK', 'KRrRRRRRRrRRrK', 'KqrrrrrrrrrrqK'], 'u2': ['K443RRRRRr332K', 'K332RRRRRr221K', 'K32RRRRRRrq21K', 'KSsRRRRRRrqSsK', 'KcLLLLLLLLLLcK', 'K2RrRRRRrRRr2K', 'K2qgGGGGGGgq2K'], 'u3': ['K32RRRRRRrq21K', 'K32RRRRRRrq21K', 'K32RRRRRRrq21K', 'KSsRRRRRRrqSsK', 'KcLLLLLLLLLLcK', 'K2RrRRRRrRRr2K', 'K2qgGGGGGGgq2K'], 's1': ['..KqrK443KRrK.', '..KqrK332KRrK.', '..KqrK332KGrK.', '..KcLKSSsKLcK.', '..KcLLLGLLLcK.', '..K2RrRRrRr2K.', '..K2gGGGGGg2K.'], 's0': ['..KrRKRRrKLlK.', '..KrRKRrrKLlK.', '..KrRKRrrKLlK.', '..KlLKSSsKLlK.', '..KdDDDDDDDdK.', '..KRrRRRrRRrK.', '..KqrrrrrrrqK.'], 's2': ['..KqK3443KRrK.', '..KqK2332KRrK.', '..KqrK332KRrK.', '..KcLKSSsKLcK.', '..KcLLLGLLLcK.', '..K2RrRRrRr2K.', '..K2gGGGGGg2K.'], 's3': ['..KRRRRRRKGGK.', '..KRrrrrrKG3K.', '..KqrK332KG3K.', '..KcLKSSsKLcK.', '..KcLLLGLLLcK.', '..K2RrRRrRr2K.', '..K2gGGGGGg2K.']},
+ torso:{'d1': ['K32RRRGGRrq21K', 'K32R44432rq21K', 'K32R43322rq21K', 'KSsRR3322rqSsK', 'KcLLLLGGLLLLcK', 'K2RrRRRRrRRr2K', 'K2qgGGGGGGgq2K'], 'd0': ['KRrLqSSSqLLrrK', 'KRrLLqSqLLcrrK', 'KRrLlLqLLcLrrK', 'KSsLLLLcLLlSsK', 'KdDDcDDDDLLDdK', 'KRrRRRRqRRLlrK', 'KqrrqrrrrrrrqK'], 'd2': ['K443RRGGRr332K', 'K332R4432r221K', 'K32R43322rq21K', 'KSsRR3322rqSsK', 'KcLLLLGGLLLLcK', 'K2RrRRRRrRRr2K', 'K2qgGGGGGGgq2K'], 'd3': ['KRRRRRGGRRRrqK', 'KRrG444432GrqK', 'K32G433322G21K', 'KSsGG3322GGSsK', 'KcLLLLGGLLLLcK', 'K2RrRRRRrRRr2K', 'K2qgGGGGGGgq2K'], 'u1': ['K32RRRRRRrq21K', 'K32RRRRRRrq21K', 'K32RRRRRRrq21K', 'KSsRRRRRRrqSsK', 'KcLLLLLLLLLLcK', 'K2RrRRRRrRRr2K', 'K2qgGGGGGGgq2K'], 'u0': ['KRrLLhhhLLLrrK', 'KRrLLLLLLLcrrK', 'KRrLlLLLLcLrrK', 'KSsLLLLcLLlSsK', 'KdDDcDDDDDDDdK', 'KRrRRRRqRRRrrK', 'KqrrqrrrrrrrqK'], 'u2': ['K443RRRRRr332K', 'K332RRRRRr221K', 'K32RRRRRRrq21K', 'KSsRRRRRRrqSsK', 'KcLLLLLLLLLLcK', 'K2RrRRRRrRRr2K', 'K2qgGGGGGGgq2K'], 'u3': ['K32RRRRRRrq21K', 'K32RRRRRRrq21K', 'K32RRRRRRrq21K', 'KSsRRRRRRrqSsK', 'KcLLLLLLLLLLcK', 'K2RrRRRRrRRr2K', 'K2qgGGGGGGgq2K'], 's1': ['..KqrK443KRrK.', '..KqrK332KRrK.', '..KqrK332KGrK.', '..KcLKSSsKLcK.', '..KcLLLGLLLcK.', '..K2RrRRrRr2K.', '..K2gGGGGGg2K.'], 's0': ['..KrRKRRrKSLK.', '..KrRKRrrKcLK.', '..KrRKRrrKLcK.', '..KlLKSSsKLlK.', '..KdDDDDDDDdK.', '..KRrRRRqRRrK.', '..KqrrqrrrrqK.'], 's2': ['..KqK3443KRrK.', '..KqK2332KRrK.', '..KqrK332KRrK.', '..KcLKSSsKLcK.', '..KcLLLGLLLcK.', '..K2RrRRrRr2K.', '..K2gGGGGGg2K.'], 's3': ['..KRRRRRRKGGK.', '..KRrrrrrKG3K.', '..KqrK332KG3K.', '..KcLKSSsKLcK.', '..KcLLLGLLLcK.', '..K2RrRRrRr2K.', '..K2gGGGGGg2K.']},
  legs:{'d': [['KKKKBBKKKKKKKK', '...KbbK.......', '...KKKK.......'], ['KKKKBBKBBKKKKK', '...KbbKbbK....', '...KKKKKKK....'], ['KKKKKKKBBKKKKK', '......KbbK....', '......KKKK....'], ['KKKKBBKBBKKKKK', '...KbbKbbK....', '...KKKKKKK....']], 's': [['..KKBBKBBKKKK.', '..KbbKbbK.....', '..KKKKKKK.....'], ['..KKKBBBKKKKK.', '....KbbbbK....', '....KKKKKK....'], ['..KKBBKBBKKKK.', '..KbbKbbK.....', '..KKKKKKK.....'], ['..KKKBBBKKKKK.', '....KbbbbK....', '....KKKKKK....']]},
  shield:[['.KKK.', 'KDDdK', 'KD3dK', 'KdddK', '.KKK.'], ['KKKKKKK', 'KGGGGgK', 'KGRGRgK', 'KGGGGgK', 'KGRGRgK', '.KgGgK.', '..KgK..', '...K...'], ['KKKKKKK', 'KGGGGgK', 'KGRGRgK', 'KGGGGgK', 'KGRGRgK', 'KGRGRgK', '.KRGrK.', '.KRGrK.', '..KgK..', '...K...'], ['.KKKKK.', 'KGGGGGK', 'KGRRRgK', 'KGRwRgK', 'KGRRRgK', 'KgggggK', '.KKKKK.']],
  shieldAt:[[11, 13], [11, 10], [11, 9], [11, 11]],
  shieldS:['KKK', 'KGK', 'KRK', 'KRK', 'KRK', 'KgK', '.K.'],
- cape2:['KK..............KK', 'KrK............KrK', 'KrK............KrK', 'KrK............KrK', 'KrK............KrK', 'KrK............KrK', 'KrK............KrK', '.KK............KK.'],
- cape3:['KK..............KK', 'KRK............KrK', 'KRK............KrK', 'KRK............KrK', 'KRK............KrK', 'KRK............KrK', 'KRK............KrK', 'KRK............KrK', 'KRrK..........KrrK', '.KKK..........KKK.'],
- capeS:['KKK', 'KrK', 'KRK', 'KRK', 'KRK', 'KRK', 'KrK', 'KKK'],
- capeU2:['.KKKKKKKKKK.', 'KRRRRRRRRRrK', 'KRRRRRRRRRrK', 'KRRRRRRRRRrK', 'KRRRRRRRRRrK', 'KRRRRRRRRRrK', 'KrrrrrrrrrrK', '.KKKKKKKKKK.'],
- capeU3:['.KKKKKKKKKK.', 'KRRRRGRRRRrK', 'KRRRGGGRRRrK', 'KRRRRGRRRRrK', 'KRRRRGRRRRrK', 'KRRRRRRRRRrK', 'KRrRRrRRrRrK', 'KrrrrrrrrrqK', '.KKKKKKKKKK.'],
  roll:['.KKKKKKKKKK.', 'KdDDDDDDDDdK', '.KKKKKKKKKK.'],
  wingD:['K............K', 'KK..........KK', 'K4K........K4K', 'K44K......K44K', '.KKK......KKK.'],
  wingS:['KK......', 'K4KK....', 'K444K...', 'K4443KK.', '.K44433K', '..KK332K', '....KKK.'],
  death:['..KKKKK.............', '.K44333K.KKKKKKKK...', 'K4333332KRRRGRRRKKK.', 'K12jSES2KR4432RrKBK.', 'K12jSeS2KR4332RrKbK.', 'K4333332KRRRGRRRKKK.', '.K22222K.KKKKKKKK...', '..KKKKK.............'],
 };
+/**
+ * 塗る形を関数で与えて型を作り、まわりに輪郭を1本だけ回す（マントのように、肩から裾へ広がる形に使う）。
+ * fill(x,y) は塗る文字か null を返す。輪郭の点は塗った点として数えないので、輪郭が広がって黒い塊にならない
+ */
+function pxShape(W,H,fill){
+ const g=Array.from({length:H},(_,y)=>Array.from({length:W},(_,x)=>fill(x,y)||'.'));
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(g[y][x]!=='.')continue;if([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>{const c=(g[y+dy]||[])[x+dx];return c&&c!=='.'&&c!=='k'}))g[y][x]='k'}
+ return g.map(r=>r.join('').replace(/k/g,'K'));
+}
+/**
+ * マント（位2 歴戦、位3 英雄）。dir ごとに、体の型との位置 x,y と型を返す。体より先に描くので、体の外へはみ出した所だけが見える。
+ * 正面：腕の下から裾が体の両脇へ広がる。後ろ：肩幅から裾へ広がり、縦のひだと裾の暗い帯（英雄は金の十字と裾の金の縁）。横：背中から後ろへ広がる。
+ */
+function pxCape(dir,hero){
+ const out=hero?3:2;
+ if(dir==='down'){
+  // 幅は体（14）の両側に out ピクセルずつ。上（11行目）は体の幅、下へ行くほど広がる
+  const W=14+2*(out+1),H=10,o=out+1;
+  return {x:-o,y:11,g:pxShape(W,H,(x,y)=>{const e=Math.min(out,Math.floor(y*out/6));if(y>=H-1)return null;const L=o-e,R=o+13+e;if(x<L||x>R)return null;return x<o+7?(y>=H-3?'q':'R'):(y>=H-3?'q':'r')})};
+ }
+ if(dir==='up'){
+  const W=14+2*(out+1),H=hero?11:10,o=out+1;
+  return {x:-o,y:10,g:pxShape(W,H,(x,y)=>{if(y>=H-1)return null;const e=Math.min(out,Math.floor(y*out/7)),L=o+1-e+(y===0?2:0),R=o+12+e-(y===0?2:0);if(x<L||x>R)return null;const c=x-o;
+   if(hero&&((c===6||c===7)&&y>=2&&y<=6||(y===3&&c>=4&&c<=9)))return 'G';
+   if(y===0)return c===3||c===10?'G':'R';
+   if(y>=H-2)return hero?'G':'q';
+   if(c===4||c===9)return 'r';
+   return c<7?'R':'r'})};
+ }
+ // 横向き（右向き）：背中（左）へ広がる
+ const H=10;
+ return {x:-out,y:11,g:pxShape(out+4,H,(x,y)=>{if(y>=H-1)return null;const e=Math.min(out,Math.floor(y*out/6));if(x<out-e||x>out+2)return null;return y>=H-3?'q':x<out+1?'R':'r'})};
+}
 /** 後ろから見た盾：正面の盾の形を左右反転し、縁（輪郭に接する点）はそのまま、内側を盾の裏にする（暗い地の色、まん中の段に革の持ち手） */
 function pxShieldBack(g){
  const H=g.length,W=g[0].length,at=(x,y)=>y<0||y>=H||x<0||x>=W?'.':g[y][x];
@@ -2125,8 +2153,7 @@ function pxWarrior(dir,act,f,torch,L,rank,pc,hairM){
  const tq=torch?pxTorch(q):null;
  const P=[];
  if(down){
-  if(rank===2)P.push({g:PXW.cape2,x:ux-2,y:uy+11,mats:base});
-  if(hero)P.push({g:PXW.cape3,x:ux-2,y:uy+11,mats:base});
+  if(rank>=2){const c=pxCape('down',hero);P.push({g:c.g,x:ux+c.x,y:uy+c.y,mats:base})}
   if(swP&&sw.behind)P.push(swP);
   P.push(lg,td,hd);
   if(hero)P.push({g:PXW.wingD,x:ux,y:uy+1,mats:base});
@@ -2134,7 +2161,7 @@ function pxWarrior(dir,act,f,torch,L,rank,pc,hairM){
   const [sx,sy]=PXW.shieldAt[rank];
   P.push(tq?{g:tq,x:ux+11,y:uy+7-sw1,mats:base}:{g:PXW.shield[rank],x:ux+sx,y:uy+sy-sw1,mats:shieldM});
  }else if(side){
-  if(rank>=2)P.push({g:PXW.capeS,x:ux,y:uy+11,mats:base});
+  if(rank>=2){const c=pxCape('side',hero);P.push({g:c.g,x:ux+c.x,y:uy+c.y,mats:base})}
   P.push(tq?{g:tq,x:ux,y:uy+7-sw1,mats:base}:{g:PXW.shieldS,x:ux,y:uy+11-sw1,mats:shieldM});
   if(swP&&sw.behind)P.push(swP);
   P.push(lg,td,hd);
@@ -2146,8 +2173,7 @@ function pxWarrior(dir,act,f,torch,L,rank,pc,hairM){
   if(!tq)P.push({g:sb,x:ux-sb[0].length+1,y:uy+sy-1-sw1,mats:shieldM});
   if(swP&&sw.behind)P.push(swP);
   P.push(lg,td);
-  if(rank===2)P.push({g:PXW.capeU2,x:ux+1,y:uy+11,mats:base});
-  if(hero)P.push({g:PXW.capeU3,x:ux+1,y:uy+11,mats:base});
+  if(rank>=2){const c=pxCape('up',hero);P.push({g:c.g,x:ux+c.x,y:uy+c.y,mats:base})}
   P.push(hd);
   if(hero)P.push({g:PXW.wingD,x:ux,y:uy+1,mats:base});
   if(novice)P.push({g:PXW.roll,x:ux+1,y:uy+10,mats:base});
