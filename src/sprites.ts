@@ -2294,7 +2294,7 @@ function pxPaste(dst,src,x0,y0){
 }
 /**
  * 倒れる姿（冒険者の全職）。その人の横向きの絵（持ち物なし）を元にする。
- * 0 膝から崩れる（脚が沈む）、1 さらに前へ傾いて沈む、2・3 腹ばいに倒れた姿（頭が左、両腕を頭のほうへ投げ出し、両足を開く。手足が体の外へ出る）。
+ * 0 膝から崩れる（脚が沈む）、1 さらに前へ傾いて沈む、2・3 仰向けに倒れた姿を横から見た形（頭が左で顔は上、目を閉じ、つま先が上を向く）。
  * 倒れた姿のそばには、手から落ちた持ち物（剣と盾、杖など）が転がっている。地面に残る亡骸もこの3の絵を使う
  */
 function pxDeath(job,f,L,rank,pc,hairM){
@@ -2313,25 +2313,16 @@ function pxDeath(job,f,L,rank,pc,hairM){
   }else pxPaste(out,top,16-Math.floor(top.W/2),H-2-top.H+1);
   return {...out,ax:16,ay:H-2,hd:null};
  }
- // 腹ばいに倒れた姿（頭が左の丸、背中、両腕は頭のほうへ斜めに投げ出し、両足は右へ斜めに開く）。手足が体の輪郭の外へ出るので、倒れた人に見える。
- // 図形から作る：役は、鉄（1〜4）が頭（兜・帽子・頭巾・髪）、身につける色（R r）が背中、職の布（M m）が腕、革（L）が脚、靴（B b）、肌（S）が手
- const seg=(x,y,ax,ay,bx,by)=>{const dx=bx-ax,dy=by-ay,t=Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/(dx*dx+dy*dy)));return Math.hypot(x-ax-t*dx,y-ay-t*dy)};
- const PRONE=pxShape(29,19,(x,y)=>{
-  x+=0.5;y+=0.5;
-  const hx=(x-7)/5.6,hy=(y-9.5)/5.2;
-  if(hx*hx+hy*hy<=1)return hx+hy<-0.9?'4':hx+hy<0.2?'3':hx+hy<0.9?'2':'1';
-  if(x>=12&&x<=21&&y>=5&&y<=14)return y<8?'R':y>12?'q':x>18?'r':'R';
-  for(const [hx2,hy2] of [[10.5,1.5],[10.5,17.5]])if(Math.hypot(x-hx2,y-hy2)<=1.4)return 'S';
-  if(seg(x,y,14,6,11,2.2)<=1.3)return 'M';
-  if(seg(x,y,14,13,11,16.8)<=1.3)return 'm';
-  for(const [ex,ey] of [[27,2.5],[27,16.5]]){const d=seg(x,y,21,ey<9?7:12,ex,ey);if(d<=1.4)return Math.hypot(x-ex,y-ey)<=2.4?(ey<9?'B':'b'):(ey<9?'L':'l')}
-  return null});
+ // 仰向けに倒れた姿を横から見た形（RPG の倒れた仲間の絵）：頭は左で、頭の後ろが地面につき、顔は上を向いて目を閉じる。
+ // 胸が上の面、腕は体の脇に沿って先に手、足は右でつま先が上を向く。
+ // 役：鉄（1〜4）は頭（兜・帽子・頭巾・髪）、h は前髪、身につける色（R r q）は胸と背、金（G）は胸の飾り、職の布（M m）は腕、革（L l）は脚、靴（B b）
+ const PRONE=[".....KK.................","...KKSSKK...............","..KhSSSSSK.KKKKKKKKK....",".K4hEESSsKKRRRGGRRrrK...",".K43hSSsKMMMMMMMMMSSK.KK",".K433hsKRmmmmmmmmmKLLKBK",".K4333KRrrrrrrrrrrrLLLBK","..K222KqqqqqqqqqqqqlllbK","...KKKKKKKKKKKKKKKKKKKK."];
  const pcM=rank===0?'hqDrab':pc,skM='skin'+Math.min(3,L.skin);
  const headM={warrior:rank===0?hairM:rank>=3?'hqPlate':'hqSteel',wizard:rank===0?'hqDrab':pc,thief:'hqShadow',priest:rank===1?hairM:'hqWhite',bard:pcM,hunter:'hqForest',slayer:rank===0?'hqLeather':'hqDark'}[job];
  const backM={warrior:pcM,wizard:pcM,thief:'hqLeather',priest:'hqWhite',bard:pcM,hunter:'hqForest',slayer:rank===0?'hqLeather':'hqDark'}[job];
  const armM={warrior:rank===0?'hqDrab':rank>=3?'hqPlate':'hqSteel',wizard:pcM,thief:'hqShadow',priest:'hqWhite',bard:'hqCream',hunter:'hqForest',slayer:rank===0?'hqLeather':'hqDark'}[job];
  // 歴戦からはマントが背中を覆う（身につける色）
- const body=pxCrop(pxCompose(32,21,[{g:PRONE,x:1,y:1,mats:{steel:headM,pc:rank>=2?pc:backM,cloth:armM,skin:skM,boot:job==='slayer'&&rank>=2?'hqDark':'hqBoot',hair:hairM,leather:'hqLeather'}}],{},[]));
+ const body=pxCrop(pxCompose(28,12,[{g:PRONE,x:1,y:1,mats:{steel:headM,pc:rank>=2?pc:backM,cloth:armM,skin:skM,boot:job==='slayer'&&rank>=2?'hqDark':'hqBoot',hair:hairM,leather:'hqLeather',gold:rank===0?'hqWood':'hqGold'}}],{E:[RAMP[skM][1],skM]},[]));
  // 落とした持ち物：戦士は剣と盾、ほかの職は持ち物を横に寝かせる
  const items=[];
  if(job==='warrior'){
@@ -2343,7 +2334,8 @@ function pxDeath(job,f,L,rank,pc,hairM){
  }
  const bx=16-Math.floor(body.W/2)+1,by=H-2-body.H;
  // 持ち物：1つ目（剣や杖）は投げ出した手の先の向こう側（上）に転がり、2つ目（盾）は足のほうの手前（下）に落ちている
- items.forEach((it,i)=>pxPaste(out,it,i===0?Math.max(0,bx-it.W+2):bx+body.W-it.W-6,i===0?by-it.H+1:by-it.H+3));
+ // 持ち物は地面に落ちている：剣や杖は体の向こう側に沿って、盾は足もとに（体より先に描くので、体で少し隠れる）
+ items.forEach((it,i)=>pxPaste(out,it,i===0?bx+3:bx+body.W-it.W+3,i===0?by-it.H+4:by+body.H-it.H));
  let fr=body;
  if(q===3){
   // 地面に残る亡骸：少しくすませる
