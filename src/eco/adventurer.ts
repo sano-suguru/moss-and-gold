@@ -595,10 +595,14 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     }
     c.hx = fx;
     c.hy = fy;
-    if (sq(sx - c.x) + sq(sy - c.y) > 8 * 8) {
+    const d2 = sq(sx - c.x) + sq(sy - c.y);
+    if (d2 > 8 * 8) {
       c.act = 1;
+      const d0 = Math.sqrt(d2);
       this.goTo(c, sx, sy, s.speed);
-      return;
+      // 席のそば（1.5マスの内）まで来て、眠る仲間や壁の角に阻まれてほとんど近づけなければ、その場に座る
+      // （以前は席へ入れないまま、眠る仲間の脇で歩く姿のまま押し返され続け、seed27 では2分近く足踏みしていた）
+      if (!(d0 < 24 && d0 - Math.hypot(sx - c.x, sy - c.y) < 0.2)) return;
     }
     c.act = 0;
     const watch = idx === 0;
@@ -642,8 +646,23 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   }
   const idx = p.members.indexOf(c.id);
   // 先頭の後ろに、少し間をあけて並ぶ
-  const ox = [0, -14, 14, -8, 8][idx % 5];
-  const oy = -[0, 10, 10, 22, 22][idx % 5];
+  let ox = [0, -14, 14, -8, 8][idx % 5];
+  let oy = -[0, 10, 10, 22, 22][idx % 5];
+  // 並ぶ位置が壁の中なら、左右を入れ替えた位置、先頭に寄せた位置、先頭の真後ろの順に、立てる床で先頭と歩いてつながる所にする
+  // （以前は先頭が壁ぎわを歩くと並ぶ位置が壁の中に入り、そこへまっすぐ向かって壁に押しつけたまま足踏みしていた。1回5〜7秒、1日に800回ほど）
+  {
+    const lk = this.tileOf(leader.x, leader.y);
+    const ok = (dx: number, dy: number) => {
+      const k = this.tileOf(leader.x + dx, leader.y + dy);
+      return k >= 0 && lk >= 0 && this.tilePassable(c, k) && this.regionOf(k) === this.regionOf(lk);
+    };
+    for (const [dx, dy] of [[ox, oy], [-ox, oy], [ox / 2, oy / 2], [0, oy / 2], [0, 0]]) {
+      if (!ok(dx, dy)) continue;
+      ox = dx;
+      oy = dy;
+      break;
+    }
+  }
   if (sq(leader.x + ox - c.x) + sq(leader.y + oy - c.y) > 22 * 22) {
     c.act = 1;
     this.goTo(c, leader.x + ox, leader.y + oy, s.speed);
