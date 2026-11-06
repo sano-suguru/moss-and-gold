@@ -1,0 +1,25 @@
+# 依存の更新の PR を dependabot に出させる設定。
+# 自動マージはしない：esbuild・typescript などが変わると、ビルドの中身やシミュレーションの決定性に響くことがあるので、
+# CI（typecheck・test・check）の結果を見て人がマージする。
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      # minor と patch は1つの PR にまとめる。major は1つずつ別の PR になる
+      npm-minor-patch:
+        update-types: [minor, patch]
+    ignore:
+      # @types/node は使う Node の版（.node-version）に合わせる。Node を上げるときに手で合わせる
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
