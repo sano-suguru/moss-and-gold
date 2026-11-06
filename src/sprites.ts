@@ -2150,7 +2150,7 @@ function pxWarrior(dir,act,f,torch,L,rank,pc,hairM,opts={}){
  const P=[];
  if(opts.noGear){
   // 持ち物なし（倒れた姿の元にする絵）
-  if(rank>=2&&!back){const c=pxCape(dir,hero);P.push({g:c.g,x:ux+c.x,y:uy+c.y,mats:base})}
+  if(rank>=2&&!back&&!opts.noCape){const c=pxCape(dir,hero);P.push({g:c.g,x:ux+c.x,y:uy+c.y,mats:base})}
   P.push(lg,td,hd);if(hero)P.push({g:side?PXW.wingS:PXW.wingD,x:ux,y:uy+(side?-1:1),mats:base});
  }else if(down){
   if(rank>=2){const c=pxCape('down',hero);P.push({g:c.g,x:ux+c.x,y:uy+c.y,mats:base})}
@@ -2316,7 +2316,8 @@ function pxDeath(job,f,L,rank,pc,hairM){
  // 戦士：立った横向きの絵（その位の兜・マント・脛当てのまま、目を閉じ、持ち物なし）を倒して作る。
  // 縦横を入れ替えると頭が左・顔が下（地面に伏せる）になる。頭より細い体と足は、まとめて地面まで下げて、地面に伏せた形にする
  if(job==='warrior'){
-  const sd=pxCrop(make('side','idle',{noGear:true,shut:true}));
+  // 立った絵のマントは背中の後ろに垂れているので、倒すと上へ突き立って見える。ここでは外し、あとで背中の上にかぶせて描く
+  const sd=pxCrop(make('side','idle',{noGear:true,shut:true,noCape:true}));
   const tW=sd.H,tH=sd.W,t={W:tW,H:tH,px:new Uint8ClampedArray(tW*tH*4),mat:new Array(tW*tH).fill(null)};
   for(let ny=0;ny<tH;ny++)for(let nx=0;nx<tW;nx++){const p=nx*sd.W+ny,qq=ny*tW+nx;for(let c=0;c<4;c++)t.px[qq*4+c]=sd.px[p*4+c];t.mat[qq]=sd.mat[p]}
   const g={W:tW,H:tH,px:new Uint8ClampedArray(tW*tH*4),mat:new Array(tW*tH).fill(null)};
@@ -2328,6 +2329,15 @@ function pxDeath(job,f,L,rank,pc,hairM){
   const swd=pxCompose(24,8,[{g:pxSword('side','strike',rank).g,x:0,y:0,mats:{steel:rank===0?'hqWood':rank>=3?'hqPlate':'hqSteel',gold:rank===0?'hqLeather':'hqGold',leather:'hqLeather',wood:'hqWood'}}],{w:[[236,246,255],'wisp']},[]);
   const shd=pxCompose(12,12,[{g:PXW.shield[rank],x:0,y:0,mats:{pc:rank===0?'hqWood':pc,gold:rank===0?'hqWood':'hqGold',wood:'hqWood',steel:'hqSteel'}}],{w:[[236,246,255],'wisp']},[]);
   const sc=pxCrop(swd),hc=pxCrop(shd);pxPaste(out,sc,bx+tW-sc.W-2,by+sh-sc.H+3);pxPaste(out,hc,bx+tW-3,by+tH-hc.H);
+  // マント（歴戦から）：背中の上の面にかぶせる。肩から膝のあたりまで、輪郭のすぐ下の2段を身につける色に（英雄は裾の列を金に）
+  if(rank>=2){
+   const R=RAMP[pc],gold=RAMP.hqGold,x0=bodyX,x1=tW-3;
+   for(let x=x0;x<=x1;x++){
+    let top=-1;for(let y=0;y<tH;y++)if(g.px[(y*tW+x)*4+3]){top=y;break}
+    if(top<0)continue;
+    for(let k=1;k<=2;k++){const y=top+k;if(y>=tH)break;const p=y*tW+x;if(!g.px[p*4+3]||g.mat[p]==='ol')continue;const c=rank>=3&&x===x1?gold[3]:k===1?R[3]:R[2];g.px[p*4]=c[0];g.px[p*4+1]=c[1];g.px[p*4+2]=c[2];g.mat[p]=rank>=3&&x===x1?'glw':pc}
+   }
+  }
   let fr=g;
   if(q===3){fr={...g,px:Uint8ClampedArray.from(g.px)};for(let p=0;p<fr.W*fr.H;p++){if(!fr.px[p*4+3])continue;const v=(fr.px[p*4]+fr.px[p*4+1]+fr.px[p*4+2])/3;for(let c=0;c<3;c++)fr.px[p*4+c]=Math.round(fr.px[p*4+c]*0.8+v*0.2)}}
   pxPaste(out,fr,bx,by);
