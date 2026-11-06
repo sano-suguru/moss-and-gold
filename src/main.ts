@@ -291,7 +291,8 @@ function boot(): void {
     toggle.setAttribute('aria-expanded', String(open));
     if (open) seedInput.focus();
   };
-  toggle.addEventListener('click', () => setPanel(panel.hidden));
+  // hidden は boolean か 'until-found'。隠れていれば（どちらでも）開く
+  toggle.addEventListener('click', () => setPanel(panel.hidden !== false));
   const go = (seed: string) => {
     startWorld(seed, false);
     persist();
