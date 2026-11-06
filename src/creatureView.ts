@@ -1240,6 +1240,8 @@ export class CreatureView {
       if (sp === Kind.Adventurer && !isCorpse) {
         const h = thrallOf ? eco.roster.find((q) => q.cid === c.id) ?? null : eco.heroOf(c);
         if (h) frame = this.atlas.hero(csp, !thrallOf && c.torch > 0 && csp !== 1 && csp < 4, h.look, h.rank, dir, act, f);
+        // 英雄（位3）は足もとを淡い金色の光で照らす（絵に点を打たず、描画の柔らかい光で。描画専用）
+        if (h && h.rank >= 3 && !c.dead && !hidden) dyn.push({ x, y: yy - 12, r: 34, i: 0.32, c: 4 });
         // 位が上がって初めての遠征：入ってきてしばらく、金の光の粒が体のまわりを立ちのぼる（「見違えた」）
         const pt = h && h.rank > 0 && h.ret === RANK_AT[h.rank] ? eco.parties.find((q) => q.id === c.party) : undefined;
         if (pt && eco.step - pt.since < 400) {
