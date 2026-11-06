@@ -308,6 +308,9 @@ export function shaftNext(this: Ecology, h: Hold, tp: Pile): number {
   return -1;
 }
 
+/** 仲間を守る：打たれてから何 tick のあいだ、そばのドワーフが加勢するか */
+const DWARF_AID_TICKS = 60;
+
 export function dwarf(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Dwarf];
   const h = this.hold;
@@ -332,6 +335,30 @@ export function dwarf(this: Ecology, c: Cr): void {
         else this.goTo(c, f.x, f.y, s.speed * 1.1);
         return;
       }
+    }
+  }
+  // 仲間を守る：自分か、そば（6マスの内）の仲間が打たれたばかり（6秒の内）なら、坑夫も鍛冶屋も戦士も、その相手に加勢して打ちかかる。
+  // （以前は自分から戦うのは住みかのそばの戦士だけで、坑夫と鍛冶屋は自分が打たれたときに打ち返すだけだった。
+  //  甲冑のように自分から向かってきて逃げない相手に、5人組が一人ずつ倒され、仲間がそばにいると一打が強くなる仕組みも生きなかった）
+  {
+    let foe: Cr | null = null;
+    let bd = sq(6 * TILE);
+    this.nearby(c.x, c.y, 6, (o) => {
+      if (o.dead || o.k !== Kind.Dwarf || this.w.tick - o.hitAt > DWARF_AID_TICKS) return;
+      const f = this.byId.get(o.foe);
+      if (!f || f.dead || f.away || f.k === Kind.Dwarf) return;
+      const d = sq(f.x - c.x) + sq(f.y - c.y);
+      if (d < bd) {
+        bd = d;
+        foe = f;
+      }
+    });
+    if (foe) {
+      const f = foe as Cr;
+      c.act = 1;
+      if (bd < 14 * 14) this.fight(c, f);
+      else this.goTo(c, f.x, f.y, s.speed * 1.2);
+      return;
     }
   }
   // 住みかを守る：ゴブリン、オーク、コボルト、トロール
