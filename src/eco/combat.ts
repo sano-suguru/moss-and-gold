@@ -5,7 +5,7 @@ import { lineOfSight, TILE } from '../mapgen';
 import { thrallStr } from './thrall';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
-import { ARMOR_HAND_MAX, ARMOR_HP_MUL } from './armor';
+import { ARMOR_HAND_MAX } from './armor';
 
 /** 攻める側の勝つ確率は、近くの仲間を含めた強さの比で決まる。負けた側は死ぬことがある */
 /** 強さ：冒険者は職業と一行の格で決まる */
@@ -165,8 +165,8 @@ export function hunt(this: Ecology, c: Cr, R: number, kinds: Kind[], speed: numb
 
 /** 体力の上限（強さに比例） */
 export function maxHp(this: Ecology, c: Cr): number {
-  // リビングアーマー（空の鎧）は固い（src/eco/armor.ts の ARMOR_HP_MUL）
-  if (c.k === Kind.Armor) return Math.round(4 + this.str(c) * ARMOR_HP_MUL);
+  // リビングアーマー（空の鎧）は固い。固さは体になった武具の数で決まり、手に取った武器と盾は打撃（強さ）だけを上げる（src/eco/armor.ts の armorHp）
+  if (c.k === Kind.Armor) return this.armorHp(c);
   return Math.round(4 + this.str(c) * 5);
 }
 
@@ -192,6 +192,8 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1): boolean {
   const sa = this.str(a) * (1 + 0.4 * allies(a));
   const dmg = sa * (1.2 + (ih(a.id, d.id ^ this.step, 161) % 1000) / 1000 * 1.2) * mul;
   d.hp -= dmg;
+  // リビングアーマーは、倒れずに強い一打を受けると、手の武器を落とす（src/eco/armor.ts）
+  if (d.k === Kind.Armor && d.hp > 0) this.armorShed(d, dmg, a);
   // やられそうになったヴァンパイアは、コウモリの群れにばらけて逃げる（1日に1回、光の中ではできない。src/eco/vampire.ts）
   let scatter = false;
   if (d.k === Kind.Vampire && d.hp < this.maxHp(d) * 0.35 && this.vampCanScatter(d)) {

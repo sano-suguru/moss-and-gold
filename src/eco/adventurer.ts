@@ -4,7 +4,7 @@ import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, 
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
-import { ARMOR_HP_MUL, ARMOR_REMNANT, isJobItem } from './armor';
+import { ARMOR_REMNANT, isJobItem } from './armor';
 import type { World } from '../world';
 
 /** 噂の総量（評判） */
@@ -242,12 +242,13 @@ export function partyStr(this: Ecology, p: Party): number {
 
 /**
  * 一行が見積もる相手の強さ：強さに残りの体力の割合を掛ける。リビングアーマー（空の鎧）は、体力が強さのわりに大きい
- * （ふつうは強さの5倍、鎧は ARMOR_HP_MUL 倍。src/eco/combat.ts の maxHp）ので、その分を見積もりに入れる。
+ * （ふつうは 4 + 強さ×5、鎧は体の武具の数で決まる。src/eco/combat.ts の maxHp、src/eco/armor.ts の armorHp）ので、
+ * ふつうの種と比べた体力の比を見積もりに掛ける。
  * 入れないと、武具を取り込んで強くなった鎧に一行が挑みつづけ、宝物庫の入口で次々に倒されていた（倒れた者の武具をまた鎧が取り込む）
  */
 export function foeStr(this: Ecology, o: Cr): number {
   const s = this.str(o) * (o.hp > 0 ? o.hp / this.maxHp(o) : 1);
-  return o.k === Kind.Armor ? (s * ARMOR_HP_MUL) / 5 : s;
+  return o.k === Kind.Armor ? (s * this.maxHp(o)) / (4 + 5 * this.str(o)) : s;
 }
 
 /**
