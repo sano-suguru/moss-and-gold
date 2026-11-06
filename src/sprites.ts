@@ -2010,9 +2010,10 @@ function pxCompose(W,H,parts,fix,glowRoles){
  return {W,H,px,mat};
 }
 // ---- 戦士の型。頭は0〜13行、胴は14〜24行、脚は25〜28行（28行目が足の下の輪郭） ----
+// 熟練の兜は鼻当てと頬当てで顔の大半を覆う（Tiny RPG の騎士の形）。顔は頬当ての間の細い窓と点の目だけ
 const PXW={
  down:{
-  head:['........KKKK........','......KK4432KK......','.....K34443221K.....','....K2344433221K....','...K234443332211K...','...K233333332211K...','..K123Y333333Y221K..','..KjjhjjjhjjjhjjjK..','..KhHJHhHJHHhJHhhK..','..KhHhuhuuuuhuhHhK..','..KhHjSSESSESSjHhK..','..KhHjTSeSSeSsjHhK..','..KjHjTpSSSSpsjHjK..','...KjhsSSSsSSshjK...'],
+  head:['........KKKK........', '......KK4443KK......', '.....K34444332K.....', '....K2344443322K....', '...K234444333221K...', '...K233333333221K...', '..K12333344333221K..', '..K1222K343K12221K..', '..K232KS434SK2321K..', '..K232KE343EK2321K..', '..K233KSS3SSK3321K..', '..K233KSSSSSK3321K..', '...K122KsSsK2211K...', '....KKKKKKKKKKKK....'],
   beard:['..KjHjTSSSSSSsjHjK..','...KjhHHhhhhHHhjK...'],
   torso:['..KKK.KKussuKK.KKK..','.K443KQRRRRRrqK322K.','K2332KgQRRRRrgK2211K','.KKKKKgRRGGRRgKKKKK.','K3232KgRGYGGRgK2121K','K2323KgRRGGRrgK1212K','K3232KgrRGGrrgK2121K','K4332KcLLGYLlcK3221K','K3221KqrRRRRrqK2110K','.KKKK.K2rRRr2K.KKKK.','......K32qq23K......'],
   legs:[['.....KcLLKKLLcK.....','.....KBBbKKBBbK.....','.....KKKKKKbbvK.....','..........KKKKK.....'],['.....KcLLKKLLcK.....','.....KBBbKKBBbK.....','.....KbbvKKbbvK.....','.....KKKKKKKKKK.....'],null,['.....KcLLKKLLcK.....','.....KBBbKKBBbK.....','.....KbbvKKKKKK.....','.....KKKKK..........']],
@@ -2020,7 +2021,7 @@ const PXW={
   cape:['KK................KK','KrK..............KrK','KrK..............KrK','KrK..............KrK','KrK..............KrK','KrK..............KrK','KrK..............KrK','KrK..............KrK','.KrRRRRRRRRRRRRRRrK.','.KrrRRRRRRRRRRRRrrK.','.KqrrrrrrrrrrrrrrqK.','..KKKKKKKKKKKKKKKK..'],
  },
  side:{
-  head:['.......KKKK.......', '.....KK4443KK.....', '....K34444332K....', '...K2344443322K...', '..K234444333221K..', '..K233333332221K..', '.K12333333333Y321K', '.KjjhjjjhjhjjhjhK.', '.KhHJHhHJHHhJHhHK.', '.KhHHhHJHjHhuhuuK.', '.KhHHhHHhjTSSSESK.', '.KhHHhHHjSTSSSeSK.', '.KjhHhHhjsTSpSSsK.', '..KjjhhhjKsSSSsK..'],
+  head:['.......KKKK.......', '.....KK4443KK.....', '....K34444332K....', '...K2344443322K...', '..K234444333221K..', '..K233333332221K..', '.K12333333333Y321K', '.KjjhjjjhjhjjhjhK.', '.KhHJHhHJ32hJHh3K.', '.KhHHhHJH32huhu3K.', '.KhHHhHHh32SSSE3K.', '.KhHHhHHj32SSSeSK.', '.KjhHhHhj32SpSSsK.', '..KjjhhhjKsSSSsK..'],
   beard:['.KjhHhHhjsTHHHHsK.', '..KjjhhhjKhHHHhK..'],
   torso:['.....KKKKKKusK....', '....KqK3444KRgK...', '....KqK3443KRgK...', '....KrrK22KRRgK...', '....KrRK32KRRgK...', '....KrRK23KRGgK...', '....KrRK32KRRgK...', '....KcLK43KLLGK...', '....KqrK32KRrgK...', '.....K2KKKKrrK....', '.....K32qqr2K.....'],
   legs:[['.....KlLKKLlK.....', '....KBBK..KBbK....', '....KbbK..KbbBK...', '....KKKK..KKKKK...'], ['......KlLLlK......', '......KBBBbK......', '......KbbbbBK.....', '......KKKKKKK.....'], ['.....KlLKKLlK.....', '....KbbK..KBBK....', '....KbbK..KbbBK...', '....KKKK..KKKKK...'], ['......KlLLlK......', '......KBBBbK......', '......KbbbbBK.....', '......KKKKKKK.....']],
@@ -2070,19 +2071,25 @@ function pxShieldBack(g){
 PXR.shieldBack=PXR.shield.map((g,r)=>pxShieldBack(g||PXW.down.shield));
 /** 鉄の脛当て（歴戦から）：脚の型の革と靴を鉄の明暗に置き換える */
 const pxSteelLegs=g=>g&&g.map(r=>r.replace(/[cLlBbv]/g,ch=>({c:'2',L:'4',l:'3',B:'3',b:'2',v:'1'})[ch]));
-/** 剣。dir と構え（rest 構えた、raise 振り上げた、strike 振り下ろした）ごとの型と、体の型に対する位置。刃の長さは位で伸びる（見習いの木剣6、熟練8、歴戦の長剣10、英雄の大剣11。英雄は幅広の刃と宝石の鍔） */
+/** 水平に構えた剣（Tiny RPG のように、体の横へ突き出して影を左右非対称にする）。左端が柄と鍔、右へ刃。英雄は幅2ピクセルの刃と宝石の鍔 */
+function pxFlatBlade(n,heavy){
+ const rim='KKK'+'.'.repeat(n+2),bar='KGK'+'K'.repeat(n+1)+'.';
+ const rows=heavy?['KwG'+'4'.repeat(n)+'3K','KcG'+'3'.repeat(n)+'2K']:['KcG'+'4'.repeat(n)+'3K'];
+ return [rim,bar,...rows,bar,rim];
+}
+/** 剣。dir と構え（rest 水平に構えた、raise 振り上げた、strike 振り下ろした・突いた）ごとの型と、体の型に対する位置。刃の長さは位で伸びる（見習いの木剣6、熟練8、歴戦の長剣10、英雄の大剣11。英雄は幅広の刃と宝石の鍔） */
 function pxSword(dir,pose,rank){
  const n=[6,8,10,11][rank],e=n-8,heavy=rank>=3,bl=heavy?'..K44K':'..K42K',blade=r=>Array(n).fill(r);
  if(dir==='down'){
-  if(pose==='rest')return {x:16,y:10-e-(heavy?1:0),g:['...KK.',bl,...blade(bl),...(heavy?['KGYwGK']:[]),'KGYGGK','..KcLK','..KcLK','..KYGK','..KKKK']};
+  if(pose==='rest')return {x:17,y:19,g:pxFlatBlade(n,heavy)};
   if(pose==='raise')return {x:16,y:-1-e,g:['...KK.',bl,...blade(bl),'KGYGGK','..KcLK','..KYGK','..KKKK']};
   const d=['KK.........','KGKK.......','KKG4K......'];for(let i=0;i<n-4;i++)d.push('.'.repeat(2+i)+'K42K'+'.'.repeat(Math.max(0,5-i)));d.push('.'.repeat(n-2)+'K4K',' '.repeat(0)+'.'.repeat(n-1)+'KK');
   return {x:15,y:19,g:d};
  }
  if(dir==='side'){
-  if(pose==='rest'){const d=['KK.......','KGKK.....','KKG4K....'];for(let i=0;i<n-5;i++)d.push('.'.repeat(2+i)+'K42K');d.push('.'.repeat(n-3)+'K4K','.'.repeat(n-2)+'KK');return {x:9,y:20,g:d}}
+  if(pose==='rest')return {x:9,y:19,g:pxFlatBlade(n,heavy)};
   if(pose==='raise')return {x:5,y:-9-e,g:['.KK.',...blade('K42K'),'KGYK','.KK.']};
-  return {x:10,y:19,g:['KK'+'.'.repeat(n),'KGK'+'K'.repeat(n-1)+'.','KG'+'4'.repeat(n-1)+'2K','KGK'+'K'.repeat(n-1)+'.','KK'+'.'.repeat(n)]};
+  return {x:11,y:19,g:pxFlatBlade(n,heavy)};
  }
  // 上向き：構えている間は体に隠れ、振り上げた刃は左肩の上に、振り下ろした刃は頭の向こうに先だけ見える
  if(pose==='rest')return null;
@@ -2099,7 +2106,7 @@ function pxTorch(dir,q){
 }
 /** 手描きの戦士の1コマ。戻り値は raster と同じ形に、頭の飾りの基準点 hd を足したもの */
 function pxWarrior(dir,act,f,torch,L,rank,pc,hairM){
- const W=30,H=Math.ceil(24*1.4)+CREST_PAD,q=mod(f,4),mv=act==='move',at=act==='attack';
+ const W=36,H=Math.ceil(24*1.4)+CREST_PAD,q=mod(f,4),mv=act==='move',at=act==='attack';
  const T=PXW[dir],side=dir==='side',back=dir==='up';
  const bob=mv?[0,-1,0,-1][q]:0;
  // 攻撃：1 振り上げ、2 振り下ろし（体が向きの方へ1ピクセル出る）、3 戻り
@@ -2117,7 +2124,8 @@ function pxWarrior(dir,act,f,torch,L,rank,pc,hairM){
  const shieldM=novice?{...base,pc:'hqWood',gold:'hqWood',steel:'hqSteel'}:base;
  const sk=RAMP[skinM][3],fix={E:[[30,24,44],skinM],e:[PX_EYE[L.hair%PX_EYE.length],skinM],p:[[Math.round(sk[0]*0.7+232*0.3),Math.round(sk[1]*0.7+104*0.3),Math.round(sk[2]*0.7+100*0.3)],skinM],w:[[236,246,255],'wisp']};
  const hv=PXR.head[dir][rank]||T.head;
- const head=L.head===1&&!back?[...hv.slice(0,12),...T.beard]:hv;
+ // ひげ：熟練の正面は頬当ての間の口もとだけ髪の色に
+ const head=L.head===1&&!back?(dir==='down'&&rank===1?[...hv.slice(0,12),'...K122KhHhK2211K...',hv[13]]:[...hv.slice(0,12),...T.beard]):hv;
  const torsoG=(dir==='down'?PXR.torso[rank]:side?PXR.torsoSide[rank]:PXR.torsoUp[rank])||T.torso;
  const sw=pxSword(dir,pose,rank);
  const swP=sw&&{...sw,x:sw.x+ux,y:sw.y+uy,mats:weap,glow:hero};
