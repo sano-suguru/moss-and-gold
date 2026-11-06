@@ -2140,6 +2140,9 @@ function pxWarrior(dir,act,f,torch,L,rank,pc,hairM){
   if(hero)P.push({g:PXR.wings,x:ux+1,y:uy-2,mats:base});
   if(pose!=='raise')P.push(swP);
  }else{
+  // 盾は体の前に構えているので、後ろからは体の向こう側に隠れ、脇から裏側の縁がのぞくだけ（体より先に描き、正面と左右対称の位置から2ピクセル外へ）
+  const [sx,sy]=PXR.shieldAt[rank],sb=PXR.shieldBack[rank];
+  if(!off)P.push({g:sb,x:ux+20-sx-sb[0].length+2,y:uy+sy-1,mats:shieldM});
   if(pose==='strike')P.push(swP);
   P.push(lg,td);
   if(rank===2)P.push({g:T.capeLong,x:ux+3,y:uy+24,mats:base});
@@ -2147,9 +2150,7 @@ function pxWarrior(dir,act,f,torch,L,rank,pc,hairM){
   P.push(hd);
   if(novice)P.push({g:T.roll,x:ux+3,y:uy+12,mats:base});
   if(pose!=='strike')P.push(swP);
-  // 正面の盾と左右対称の位置（体の型の幅20から、正面の位置と盾の幅を引く）
-  const [sx,sy]=PXR.shieldAt[rank],sb=PXR.shieldBack[rank];
-  P.push(off||{g:sb,x:ux+20-sx-sb[0].length,y:uy+sy,mats:shieldM});
+  if(off)P.push(off);
  }
  const fr=pxCompose(W,H,P,fix,['steel','gold']);
  if(hero)for(let p=0;p<W*H;p++)if(fr.mat[p]==='hqGold')fr.mat[p]='glw';
