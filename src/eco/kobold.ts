@@ -357,10 +357,9 @@ export function kobold(this: Ecology, c: Cr): void {
     if (c.st === 4) c.st = 0;
     if (!c.hungry) c.st = 0;
   }
+  // 住処のない者は、立ち止まっては、ふつうに近い速さで少し歩いて探す（src/eco/move.ts の stroll）
   if (!wr) {
-    c.act = 1;
-    const j = DIR16[ih(c.id, this.step >> 4, 73) & 15];
-    this.tryMove(c, j[0] * s.speed * 0.5, j[1] * s.speed * 0.5);
+    this.stroll(c, 4, 73, 0.9);
     return;
   }
   // 掘る：住処のまわりの岩を少しずつ崩してトンネルを延ばす
@@ -406,10 +405,12 @@ export function kobold(this: Ecology, c: Cr): void {
     c.act = 1;
     this.goTo(c, wr.x, wr.y, s.speed);
   } else {
+    // たいてい立ち止まり、ときどき、ふつうに近い速さで数歩うろつく。
+    // （以前は60回のうち20回、ふつうの速さの0.4倍で歩き、脚を動かしながら3秒で半タイルも進まず、足踏みして見えていた）
     c.act = c.actT % 60 < 40 ? 0 : 1;
     if (c.act === 1) {
       const j = DIR16[ih(c.id, this.step >> 4, 74) & 15];
-      this.tryMove(c, j[0] * s.speed * 0.4, j[1] * s.speed * 0.4);
+      this.tryMove(c, j[0] * s.speed * 0.9, j[1] * s.speed * 0.9);
     }
   }
 }

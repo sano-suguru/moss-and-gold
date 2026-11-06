@@ -467,6 +467,26 @@ export function gaitPaused(this: Ecology, c: Cr): boolean {
   return f === 0 && side === 0;
 }
 
+/**
+ * あてもなくぶらつく：生き物の更新 2^shift 回ごとに、立ち止まる番と、ふつうの速さの mul 倍で歩く番を交互にする（番の始まりは個体ごとにずらす）。
+ * 立ち止まる番は、その始めに一度だけ向きを変えて、ただ立ち止まる（見回す動きや、止まっているあいだの効果はない）。歩く番は、その番のあいだ同じ向きへ歩く。
+ * 歩く向きは、生き物の番号と番の通し番号と salt だけで決まる。
+ * （以前は多くの種が、ふつうの速さの0.4〜0.6倍で歩き続け、脚を動かしながら3秒で半タイルほどしか進まず、足踏みして見えていた）
+ */
+export function stroll(this: Ecology, c: Cr, shift: number, salt: number, mul: number): void {
+  const t = this.step + c.id * 7;
+  const seg = t >> shift;
+  if ((seg + c.id) % 2 === 0) {
+    c.act = 0;
+    if ((t & ((1 << shift) - 1)) === 0) c.dir = ih(c.id, seg, salt + 1) & 3;
+    return;
+  }
+  c.act = 1;
+  const s = SPEC[c.k];
+  const j = DIR16[ih(c.id, seg, salt) & 15];
+  this.tryMove(c, j[0] * s.speed * mul, j[1] * s.speed * mul);
+}
+
 export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
   if (c.hp > 0 && c.hp < this.maxHp(c) * 0.35) {
     mx *= 0.6;
@@ -909,6 +929,7 @@ declare module '../ecology' {
     gaitOf: typeof gaitOf;
     gaitPaused: typeof gaitPaused;
     tryMove: typeof tryMove;
+    stroll: typeof stroll;
     findMoss: typeof findMoss;
     updateForage: typeof updateForage;
     nearestForage: typeof nearestForage;
@@ -920,4 +941,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, unbury, searchLimit, nearPath, unreachable, findPathAvoid, goTo, tileOf, ratOnDry, passable, stepOk, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, gaitPaused, tryMove, findMoss, updateForage, nearestForage, eatMoss, eat, die, rebuildGrid, nearby });
+Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, unbury, searchLimit, nearPath, unreachable, findPathAvoid, goTo, tileOf, ratOnDry, passable, stepOk, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, gaitPaused, tryMove, stroll, findMoss, updateForage, nearestForage, eatMoss, eat, die, rebuildGrid, nearby });
