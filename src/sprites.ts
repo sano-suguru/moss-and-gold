@@ -2331,10 +2331,6 @@ function pxDeath(job,f,L,rank,pc,hairM){
   let fr=g;
   if(q===3){fr={...g,px:Uint8ClampedArray.from(g.px)};for(let p=0;p<fr.W*fr.H;p++){if(!fr.px[p*4+3])continue;const v=(fr.px[p*4]+fr.px[p*4+1]+fr.px[p*4+2])/3;for(let c=0;c<3;c++)fr.px[p*4+c]=Math.round(fr.px[p*4+c]*0.8+v*0.2)}}
   pxPaste(out,fr,bx,by);
-  // 頭の先の地面についた手
-  const skM='skin'+Math.min(3,L.skin),sk=RAMP[skM],hx=bx-1,hy=H-4,put=(x,y,c,m)=>{const p=y*W+x;out.px[p*4]=c[0];out.px[p*4+1]=c[1];out.px[p*4+2]=c[2];out.px[p*4+3]=255;out.mat[p]=m};
-  for(const [x,y] of [[hx,hy-1],[hx+1,hy-1],[hx-1,hy],[hx-1,hy+1],[hx+2,hy],[hx,hy+2],[hx+1,hy+2]])if(!out.px[(y*W+x)*4+3])put(x,y,PX_K,'ol');
-  put(hx,hy,sk[3],skM);put(hx+1,hy,sk[3],skM);put(hx,hy+1,sk[2],skM);put(hx+1,hy+1,sk[2],skM);
   return {...out,ax:16,ay:H-2,hd:null};
  }
  // 腹ばいに倒れた姿を横から見た形：頭は左で顔を地面に伏せ、頭の上（兜・帽子・頭巾・髪）が上を向く。背中（身につける色、歴戦からはマント）が上の面、
