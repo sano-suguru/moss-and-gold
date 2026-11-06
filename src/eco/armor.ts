@@ -36,7 +36,10 @@
  * 前に取り込んでから、未練の宿った武具なら ARMOR_GATHER_GAP 回、宿っていない武具なら ARMOR_ABSORB_GAP 回の更新が経っていれば取り込む。
  * 襲う相手：武具を持つ侵入者（冒険者、ドワーフ、武器を拾ったゴブリン・オーク）。アンデッド、獣や虫、他の番人は襲わない（番人の側も甲冑を襲わない）。
  * 賢さは本能だけで、逃げない。強さ（打撃）は6に、手に取り込んだ武器と盾1つごとに +3（ARMOR_HAND_MAX 個まで。src/eco/combat.ts の str）。
- * 体力（固さ）は体になった武具の数で決まる（armorHp）。剣や盾を拾うと打撃が重くなり、杖や聖印を体に取り込むと固くなる。打たれていないあいだは、体のマナを使って少しずつ傷を直す（マナが ARMOR_LOW の半分を下回ると直せない）。
+ * 体力（固さ）は体になった武具の数で決まる（armorHp）。剣や盾を拾うと打撃が重くなり、杖や聖印を体に取り込むと固くなる。
+ * 倒れずに強い一打を受けると、最後に手に取った武器か盾を1つ床に落とし、打撃が下がる（armorShed）。落ちた武具にマナは宿っていないので、
+ * 拾い直すのは ARMOR_ABSORB_GAP 回の更新おき。その前に冒険者やゴブリンに拾われることもある。強くなり続けず、打ち合うたびに強さが行き来する。
+ * 傷は、土のマナの濃い所で立ち番をしているときだけ、ゆっくり直る（続けて来る一行に削られていく）。打たれていないあいだは、体のマナを使って少しずつ傷を直す（マナが ARMOR_LOW の半分を下回ると直せない）。
  * 倒した相手の落とし物は、取り込みの間隔（ARMOR_ABSORB_GAP）を待たずに、強さの上限を超えても ARMOR_ROB_MAX 個まで取り込む（強さは上がらない）。
  * アンデッドとして扱う（冒険者の一行の目標「アンデッド祓い」の相手になる。src/eco/aim.ts）。
  *
@@ -78,8 +81,14 @@ export const ARMOR_SEEK_R = 20;
  *  ミノタウロス並みの打撃が付いて、いる量あたりで冒険者をミノタウロスの約4.5倍倒していた） */
 export const ARMOR_HP_MUL = 12;
 export const ARMOR_BODY_HP = 2;
-/** 傷を直す：打たれてから何 tick 経てば直しはじめるか。直すときは生き物の更新6回ごとに体力の30分の1を直し、体のマナを1使う（足もとの土へ還る） */
+/** 傷を直す：打たれてから何 tick 経てば直しはじめるか。直すのは、足もとの土のマナが ARMOR_MEND_SOIL 以上の所で立ち番をしているときだけで、
+ *  生き物の更新 ARMOR_MEND_EVERY 回ごとに体力の30分の1を直し、体のマナを1使う（足もとの土へ還る）。
+ *  （以前はどこでも生き物の更新6回ごとに直し、約36秒で満タンに戻ったので、続けて来る一行が削っても傷が溜まらなかった） */
 export const ARMOR_MEND_AFTER = 100;
+export const ARMOR_MEND_SOIL = 12;
+export const ARMOR_MEND_EVERY = 30;
+/** 打たれて武器を落とす：倒れずに受けた一打の傷が、体力の上限のこの割合に近いほど落としやすい（この割合以上なら必ず落とす） */
+export const ARMOR_SHED_AT = 0.25;
 /** 立ち番の長さ（生き物の更新の回数） */
 const ARMOR_GUARD = 300;
 
@@ -263,6 +272,27 @@ export function armorHp(this: Ecology, c: Cr): number {
   return Math.round(4 + ARMOR_HP_MUL * (STR[Kind.Armor] + ARMOR_BODY_HP * Math.min(ARMOR_BODY_MAX, kit[0])));
 }
 
+/** 打たれて武器を落とす（倒れずに一打を受けたとき。src/eco/combat.ts の strike から）。傷が大きいほど落としやすい */
+export function armorShed(this: Ecology, c: Cr, dmg: number, by: Cr): void {
+  const kit = this.armorKit.get(c.id);
+  if (!kit || kit.length - 1 - kit[0] <= 0) return;
+  const p = dmg / (this.maxHp(c) * ARMOR_SHED_AT);
+  if ((ih(c.id, this.step ^ by.id, 711) % 1000) / 1000 >= p) return;
+  const kd = kit.pop()!;
+  // 打たれた向きと反対へ、少し転がる
+  const L = Math.hypot(c.x - by.x, c.y - by.y) || 1;
+  const r = 8 + (ih(c.id, this.step, 712) % 8);
+  let x = c.x + ((c.x - by.x) / L) * r;
+  let y = c.y + ((c.y - by.y) / L) * r * 0.7;
+  const k = this.tileOf(x, y);
+  if (k < 0 || this.w.map.solid[k]) {
+    x = c.x;
+    y = c.y;
+  }
+  this.dropItem(x, y, kd, 0, this.ownerNote(c, 'shed'));
+  this.record('settle', { t: this.w.tick, k: Kind.Armor, id: c.id, ev: 'shed', n: kd, by: by.k, x: Math.round(c.x), y: Math.round(c.y) } as never);
+}
+
 /** 甲冑がその床の武具を取り込める（手か体に空きがある）か。間隔は見ない */
 export function armorWants(this: Ecology, c: Cr, it: Item): boolean {
   const kit = this.armorKit.get(c.id) ?? [0];
@@ -346,9 +376,9 @@ export function armor(this: Ecology, c: Cr): void {
     this.die(c, 'faded');
     return;
   }
-  // 傷を直す：打たれていないあいだ、体のマナを使って少しずつ（使ったマナは足もとの土へ）
+  // 傷を直す：打たれていないあいだ、土のマナの濃い所で立ち番をしているときだけ、体のマナを使って少しずつ（使ったマナは足もとの土へ）
   const mx = this.maxHp(c);
-  if (c.hp > 0 && c.hp < mx && this.w.tick - c.hitAt > ARMOR_MEND_AFTER && c.mana > ARMOR_LOW / 2 && this.step % 6 === c.id % 6) {
+  if (c.hp > 0 && c.hp < mx && c.st === 1 && k >= 0 && this.w.mana[k] >= ARMOR_MEND_SOIL && this.w.tick - c.hitAt > ARMOR_MEND_AFTER && c.mana > ARMOR_LOW / 2 && this.step % ARMOR_MEND_EVERY === c.id % ARMOR_MEND_EVERY) {
     c.hp = Math.min(mx, c.hp + mx / 30);
     c.mana--;
     if (k >= 0) this.w.mana[k]++;
@@ -449,6 +479,7 @@ declare module '../ecology' {
     armorFoe: typeof armorFoe;
     armorWants: typeof armorWants;
     armorHp: typeof armorHp;
+    armorShed: typeof armorShed;
     fadeRemnant: typeof fadeRemnant;
     takeRemnant: typeof takeRemnant;
     armorBirths: typeof armorBirths;
@@ -459,4 +490,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { armorCap, armorHand, armorFoe, armorWants, armorHp, fadeRemnant, takeRemnant, armorBirths, pickArmorPost, absorbItem, scatterArmor, armor });
+Object.assign(Ecology.prototype, { armorCap, armorHand, armorFoe, armorWants, armorHp, armorShed, fadeRemnant, takeRemnant, armorBirths, pickArmorPost, absorbItem, scatterArmor, armor });
