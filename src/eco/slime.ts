@@ -110,7 +110,7 @@ export function slime(this: Ecology, c: Cr): void {
     // 死骸がなければ、湿って養分の溜まった床から養分を少しずつ吸って生きる（生き物の更新10回ごとに1。床の養分が体に移るだけなので、養分の総量は変わらない）。
     // 吸うだけでは、食べた物は SLIME_SIP までしか溜まらず、体は育たない。育って二つに分かれるには死骸を食べる。
     // 以前は食べ物が死骸だけで、死骸を食べ尽くすと続かず、スライムが画面から消えている時間が長かった
-    if (k >= 0 && c.food < SLIME_SIP && this.w.nutr[k] >= 20 && this.step % 10 === c.id % 10) {
+    if (this.slimeCanSip(c) && this.step % 10 === c.id % 10) {
       this.w.nutr[k]--;
       c.food++;
     }
@@ -134,6 +134,15 @@ export function slime(this: Ecology, c: Cr): void {
     c.food--;
     c.body++;
   }
+}
+
+/**
+ * 死骸の無いスライムが、いる床から養分を吸える状態か（吸うのは生き物の更新10回ごとに1。slime の中で使う）。
+ * 描画も、吸う場面の粒を出すかの判定にこれを使う（src/creatureView.ts）
+ */
+export function slimeCanSip(this: Ecology, c: Cr): boolean {
+  const k = this.tileOf(c.x, c.y);
+  return k >= 0 && c.ref === 0 && c.food < SLIME_SIP && this.w.nutr[k] >= 20;
 }
 
 /** スライムの大きさの段階（0 小、1 中、2 大） */
@@ -168,8 +177,9 @@ declare module '../ecology' {
   interface Ecology {
     slime: typeof slime;
     slimeSize: typeof slimeSize;
+    slimeCanSip: typeof slimeCanSip;
     spawnSlimes: typeof spawnSlimes;
   }
 }
 
-Object.assign(Ecology.prototype, { slime, slimeSize, spawnSlimes });
+Object.assign(Ecology.prototype, { slime, slimeSize, slimeCanSip, spawnSlimes });
