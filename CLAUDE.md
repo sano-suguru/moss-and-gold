@@ -49,6 +49,7 @@ npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 
 分析ツールはすべて `node tools/analysis/launch.mjs <ツール名>` から起動する（npm run も同じ）。**各ツールの使い方は、そのファイルの先頭のコメント**（tools/analysis/*.ts）にある。
 実行結果と日次スナップショットは、シミュレーションのソースのハッシュごとのキャッシュ `runs/.cache/` に残り、ソースとシードが同じならどのツールからも再利用される（しくみは docs/rework-tools.md。大きくなったら消してよい）。クラウドのセッションでは、SessionStart フックが main のキャッシュを GitHub Release「sim-cache」からバックグラウンドで取得する（ログは runs/.cache/fetched/log.txt）。
 - **main のキャッシュは手元で作らずに待つ**：マージ直後で Release に無ければ、Actions の simcache の実行が終わるのを待つ（数分で終わる。手元の4コアで16シード×25日を流すとずっと長くかかり、できるものは中身のハッシュで決まるので同じ）。ログの「Release にまだない」はフックが動いた時点の話なので、Actions の実行の状態を見て、終わっていたら `node tools/analysis/simcache.mjs fetch --ref origin/main` で取得し直す。
+- **Node の版は `.node-version` の1か所だけに書く**：CI（setup-node）も、手元（mise や fnm なら、リポジトリに入ると自動でこの版になる）も、クラウドの環境のセットアップスクリプトも、このファイルを読む。`.nvmrc` など別のファイルに版を書き足さない。
 
 ```bash
 npm install                       # 初回のみ（クラウドのセッションでは SessionStart フックが入れる）
