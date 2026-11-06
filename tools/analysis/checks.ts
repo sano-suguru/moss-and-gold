@@ -497,6 +497,17 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 食べ物のマスは、いまいる所と歩いてつながるマスだけを選ぶ（src/eco/goblin.ts の goblinForage、src/eco/move.ts の findMoss）。
+    // 以前は斜めにしかつながらない窪みや壁の向こうのマスを選び、壁の角に押しつけたまま足踏みし続けた。
+    // 15シードの10〜18日目のゴブリンの長い足踏み（2分以上）は、main（#64）で89回（seed41 が72回）、直したコードの0日目から 20回、main の10日目から 25回
+    name: 'ゴブリンが行けない食べ物を目指して足踏みし続けない（15シードで、ゴブリンの2分以上の足踏みが45回以下）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.stuck.filter((x) => countsAsStuck(x) && x.k === 12).length);
+      return { ok: sum(n) <= 45, value: `${sum(n)}回（${rs.filter((r, i) => n[i]).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、')}）` };
+    },
+  },
+  {
     // 焚き火の席が壁の中に置かれ、休むあいだ席へ向かって足踏みし続けることがない（変更前のコードでは4シードの合計で約110回、変更後は約15回）
     name: '冒険者が足踏みしない（4シードの合計で40回以下）',
     ...RUN_A,
