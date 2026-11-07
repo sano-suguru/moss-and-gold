@@ -3562,7 +3562,8 @@ function pxStamp(put,g,x0,y0,ch){g.forEach((row,y)=>{for(let x=0;x<row.length;x+
  * 頭は位ごとに：0 太い木の先、1 鉄の小さな頭、2 鉄の大きな頭、3 金の十字
  */
 function pxMacePts(put,hx,hy,ux,uy,rank){
- const len=[3,4,5,8][rank],m=Math.max(Math.abs(ux),Math.abs(uy)),st=i=>[Math.round(i*ux/m),Math.round(i*uy/m)];
+ // 英雄の十字の杖は、上へ向けるコマ（構え・振り上げ）では立ち姿に近い長さに。下へ振るコマは枠の下で切れないよう短く
+ const len=rank===3?(uy<0?(ux?10:13):Math.abs(uy)>Math.abs(ux)?5:Math.abs(uy)===Math.abs(ux)?6:8):[3,4,5,8][rank],m=Math.max(Math.abs(ux),Math.abs(uy)),st=i=>[Math.round(i*ux/m),Math.round(i*uy/m)];
  const ex=ux>0?hx+1:hx,ey=uy>0?hy+1:hy,vert=Math.abs(uy)>=Math.abs(ux);
  const bx=ux>0?hx:ux<0?hx+1:hx,by=uy>0?hy:uy<0?hy+1:hy,[s1x,s1y]=st(1);put(bx-s1x,by-s1y,'d');
  for(let i=1;i<=len;i++){const [a,b]=st(i);put(ex+a,ey+b,'d')}
@@ -3578,6 +3579,8 @@ function pxMacePts(put,hx,hy,ux,uy,rank){
  else if(rank===3){
   const [c2,d2]=st(len+2),[c3,d3]=st(len+3),nx=-Math.sign(uy),ny=Math.sign(ux);
   put(cx,cy,'G');put(ex+c2,ey+d2,'Y');put(ex+c3,ey+d3,'G');put(ex+c2+nx,ey+d2+ny,'G');put(ex+c2-nx,ey+d2-ny,'G');
+  // まっすぐ立てたときは、立ち姿の十字と同じく横木を両脇へ2ピクセルずつ
+  if(!ux||!uy){put(ex+c2+2*nx,ey+d2+2*ny,'G');put(ex+c2-2*nx,ey+d2-2*ny,'G')}
  }else blob(rank===1?0:1);
 }
 /** 弓を張った形の点を打つ。(cx,cy) が握りのまん中、弓の背は向き (fx,fy) の側へ反る。hw は半分の長さ、pull は弦を引いた深さ（0 なら弦はまっすぐ）、arrow は矢をつがえるか */
@@ -3621,7 +3624,10 @@ const pxMirror=a=>[12-a[0],a[1],12-a[2],a[3],-a[4],a[5],a[6]];
 function pxHeroSwing(job,dir,q,rank,J,torch){
  const torso=J.torso[dir==='down'?'d':dir==='up'?'u':'s'],hero=rank>=3,novice=rank===0;
  const S=dir==='down'?'L':dir==='up'?'R':'S';
- const sleeveOf=side=>{const sl=pxSleeve(torso,side),role=PX_MAT[sl[1]][0];return {sl,sd:Object.keys(PX_MAT).find(k=>PX_MAT[k][0]===role&&PX_MAT[k][1]===(role==='steel'||role==='pc'?0:1))||sl[1],glowy:role==='steel'||role==='gold'}};
+ const sleeveOf=side=>{let sl=pxSleeve(torso,side);
+  // 盗賊の暗い袖は、胴の上で見えなくなるので、腕を別に描くときは一段明るくする
+  if(job==='thief')sl=sl.map(c=>({n:'m',m:'M',M:'N'})[c]||c);
+  const role=PX_MAT[sl[1]][0];return {sl,sd:Object.keys(PX_MAT).find(k=>PX_MAT[k][0]===role&&PX_MAT[k][1]===(role==='steel'||role==='pc'?0:1))||sl[1],glowy:role==='steel'||role==='gold'}};
  // 腕と、手に持たせる物（hold は手の位置を受けて点を打つ）。behind なら持ち物だけ体の後ろの部品にする
  const armP=(side,[sx,sy,hx,hy],hold,behind=false)=>{
   const {sl,sd,glowy}=sleeveOf(side);
