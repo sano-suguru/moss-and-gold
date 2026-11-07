@@ -62,8 +62,6 @@ export const MINO_FAR = 30;
 export function minotaur(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Minotaur];
   if (c.act === 2 && c.actT < 5) return;
-  // 離れた所から撃たれたら、縄張りの外でも撃ち手へ突進する（src/eco/combat.ts の chargeShooter）
-  if (this.chargeShooter(c, s.speed)) return;
   const m = this.w.map;
   const home = this.inLair(c.x, c.y);
   const prowl = c.sinceMeal > MINO_PROWL;
@@ -155,8 +153,6 @@ export function troll(this: Ecology, c: Cr, day: number): void {
   }
   if (this.leaveIfStarving(c)) return;
   if (c.act === 2 && c.actT < 5) return;
-  // 撃たれたら、昼の寝床でも飛び起きて撃ち手へ向かう
-  if (this.chargeShooter(c, s.speed)) return;
   if (day > 0.05) {
     // 昼は暗い寝床で眠る
     if (sq(c.hx - c.x) + sq(c.hy - c.y) > 12 * 12) {
@@ -209,7 +205,6 @@ export function basilisk(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Basilisk];
   if (this.leaveIfStarving(c)) return;
   if (c.act === 2 && c.actT < 6) return;
-  if (this.chargeShooter(c, s.speed)) return;
   // 自分より大きなものが近づくと睨みつけ、見通しの通っている相手を石に変える
   if (this.step % 10 === c.id % 10) {
     let target: Cr | null = null;

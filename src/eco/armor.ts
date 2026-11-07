@@ -399,7 +399,6 @@ export function armor(this: Ecology, c: Cr): void {
   }
   if (c.act === 2 && c.actT < 5) return;
   const sp = s.speed * (c.mana < ARMOR_LOW ? 0.6 : 1) * this.limp(c);
-  if (this.chargeShooter(c, sp)) return;
   // 武具を持つ侵入者を襲う
   let foe: Cr | null = null;
   let bd = sq(6 * TILE);

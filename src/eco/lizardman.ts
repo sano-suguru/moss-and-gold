@@ -35,7 +35,6 @@ export function lizardman(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Lizardman];
   if (this.leaveIfStarving(c)) return;
   if (c.act === 2 && c.actT < 4) return;
-  if (this.chargeShooter(c, s.speed)) return;
   const cp = this.campOf(c);
   // 近くの大トカゲを手なずける
   if (cp && this.step % 20 === c.id % 20) {
