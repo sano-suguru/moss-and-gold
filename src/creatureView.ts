@@ -3,6 +3,7 @@ import { BLOOD, Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
 import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
 import { RANK_AT, packLook, unpackLook } from './eco/roster';
+import { WIZ_WINDUP } from './eco/adventurer';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
 import { heroOrbAt } from './sprites';
@@ -1236,7 +1237,8 @@ export class CreatureView {
         act = 2;
         f = braced.get(c.id) === 1 ? 1 : 0;
       } else if (act === 2) {
-        f = Math.min(3, c.actT);
+        // 魔法使いの詠唱中（経過が負の数。src/eco/adventurer.ts の WIZ_WINDUP）は、杖を掲げたコマのまま
+        f = c.actT < 0 ? 1 : Math.min(3, c.actT);
       } else if (act === 1 && c.x === c.px && c.y === c.py && eco.gaitPaused(c)) {
         // 歩き方の止まる番（大ネズミの「止まってあたりをうかがう」、一行の先頭が見回す、など）で、この更新ではその場から動いていない。
         // 行動の多くは移動のあとで「着いていなければ歩く姿」と姿を決め直すので、act は歩く姿のままになっている。
@@ -1423,7 +1425,20 @@ export class CreatureView {
         // 魔法使いの攻撃：掲げた杖の宝玉が光る（掲げる・突き上げる・下ろすのコマで、明るく→いちばん明るく→薄れる。描画専用）
         if (csp === 1 && act === 2 && f >= 1 && !c.dead && !hidden) {
           const [ox, oy] = heroOrbAt(['down', 'up', 'side'][dir], f, adv.rank) as number[];
-          dyn.push({ x: x + (flip ? -ox : ox), y: yy + oy - lift, r: [0, 30, 44, 22][f], i: [0, 0.5, 0.85, 0.3][f] * (adv.rank === 0 ? 0.6 : 1), c: 1 });
+          const qx = x + (flip ? -ox : ox);
+          const qy = yy + oy - lift;
+          if (c.actT < 0) {
+            // 詠唱：溜めるにつれて宝玉の光がふくらんで脈打ち、光の粒が宝玉へ吸い寄せられる
+            const p = Math.max(0, Math.min(1, (WIZ_WINDUP + c.actT) / WIZ_WINDUP));
+            const pulse = 1 + 0.15 * Math.sin(t * 18 + c.id);
+            dyn.push({ x: qx, y: qy, r: (14 + 30 * p) * pulse, i: (0.25 + 0.6 * p) * (adv.rank === 0 ? 0.7 : 1), c: 1 });
+            for (let i = 0; i < 3; i++) {
+              const ph = (t * 1.6 + i / 3 + c.id * 0.11) % 1;
+              const rr = 12 * (1 - ph);
+              const a = i * 2.1 + t * 3;
+              pushSprite(qx + Math.cos(a) * rr, yy, -oy + lift + Math.sin(a) * rr * 0.5, false, A.speck(1, Math.min(3, Math.floor(ph * 4))), 0, 2);
+            }
+          } else dyn.push({ x: qx, y: qy, r: [0, 30, 44, 22][f], i: [0, 0.5, 0.85, 0.3][f] * (adv.rank === 0 ? 0.6 : 1), c: 1 });
         }
         // 位が上がって初めての遠征：入ってきてしばらく、金の光の粒が体のまわりを立ちのぼる（「見違えた」）
         const pt = h && h.rank > 0 && h.ret === RANK_AT[h.rank] ? eco.parties.find((q) => q.id === c.party) : undefined;
