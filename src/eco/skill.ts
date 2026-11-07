@@ -15,17 +15,17 @@ export interface Skill {
   cool: number;
 }
 
-/** 魔法使いの炎の呪文：およそ1.6秒溜め、使ったあと4秒は溜め直さない（多くて5.6秒に1回） */
-export const SKILL_WIZARD_FIRE: Skill = { windup: 8, cool: 20 };
-/** 狩人の弓：およそ0.8秒引き絞り、射たあと1.6秒は引き直さない（多くて2.4秒に1回） */
-export const SKILL_HUNTER_SHOT: Skill = { windup: 4, cool: 8 };
+/** 魔法使いのマジックミサイル：およそ1.6秒溜め、使ったあと4秒は溜め直さない（多くて5.6秒に1回） */
+export const SKILL_WIZARD_MISSILE: Skill = { windup: 8, cool: 20 };
+/** 狩人の矢の雨：およそ0.8秒引き絞り、射たあと3秒は引き直さない */
+export const SKILL_HUNTER_RAIN: Skill = { windup: 4, cool: 15 };
 
-/** 戦士の薙ぎ払い：およそ0.6秒振りかぶり、使ったあと2.4秒は溜め直さない */
-export const SKILL_WARRIOR_SWEEP: Skill = { windup: 3, cool: 12 };
-/** 竜殺しの大薙ぎ：およそ1.2秒溜め、使ったあと4.4秒は溜め直さない */
+/** 戦士の飛ぶ斬撃：およそ0.6秒振りかぶり、使ったあと2.4秒は溜め直さない */
+export const SKILL_WARRIOR_SLASH: Skill = { windup: 3, cool: 12 };
+/** 竜殺しの大剣の薙ぎ払い：およそ1.2秒溜め、使ったあと4.4秒は溜め直さない */
 export const SKILL_SLAYER_CLEAVE: Skill = { windup: 6, cool: 22 };
-/** 僧侶の聖なる波動（メイスで地面を打つ）：およそ0.8秒振りかぶり、使ったあと4秒は溜め直さない */
-export const SKILL_PRIEST_WAVE: Skill = { windup: 4, cool: 20 };
+/** 僧侶のハンマー（打った所で光の十字架が爆ぜる）：およそ0.8秒振りかぶり、使ったあと4秒は溜め直さない */
+export const SKILL_PRIEST_HAMMER: Skill = { windup: 4, cool: 20 };
 /** 盗賊の短剣投げ：およそ0.4秒構え、投げたあと2秒は構え直さない */
 export const SKILL_THIEF_THROW: Skill = { windup: 2, cool: 10 };
 

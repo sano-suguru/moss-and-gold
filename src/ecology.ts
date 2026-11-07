@@ -539,8 +539,24 @@ export interface Cr {
   elite: number;
   /** 技を溜めはじめた時刻（tick。src/eco/skill.ts） */
   cast: number;
+  /** 毒の残り（生き物の更新の回数）と、毒を与えた種（src/eco/attack.ts の poisonTick） */
+  poison: number;
+  poisonBy: number;
   /** 死骸ができたときの養分（腐り具合の目安） */
   init: number;
+}
+
+/** 少し後で当たる攻撃：t（tick）に当たる。d が 0 以上なら、その相手を追いかけて当たる（魔法の矢）。d が −1 なら、(x, y) から半径 r の中にいる者に当たる（矢の雨） */
+export interface Volley {
+  t: number;
+  a: number;
+  d: number;
+  x: number;
+  y: number;
+  r: number;
+  mul: number;
+  /** 当たった者に与える毒（生き物の更新の回数。0 なら毒なし） */
+  poison: number;
 }
 
 export interface Web {
@@ -899,7 +915,7 @@ export class Ecology {
    * sting 刺す、arrow 矢、orb 魔法の弾、beam 光線、drain 吸う、chill 冷たい手、acid 溶かす、spore 胞子。
    * col は色（0 白、1 金、2 炎、3 毒、4 魔、5 血、6 石、7 霜）、size は大きさ（0〜2）。big は強い一撃、kill はとどめ
    */
-  fxAttacks: { t: number; style: string; col: number; size: number; ax: number; ay: number; dx: number; dy: number; did: number; aid: number; big: boolean; kill: boolean; rad?: number; half?: number }[] = [];
+  fxAttacks: { t: number; style: string; col: number; size: number; ax: number; ay: number; dx: number; dy: number; did: number; aid: number; big: boolean; kill: boolean; rad?: number; half?: number; n?: number; fly?: number }[] = [];
   /** 強い一撃があった tick（画面がほんの一瞬「ため」を入れるため。描画専用） */
   lastBigHit = -1;
 
@@ -912,6 +928,8 @@ export class Ecology {
 
   /** 攻撃が当たった所（tick、場所、打った側の場所） */
   fxHits: { t: number; x: number; y: number; ax: number; ay: number; id: number }[] = [];
+  /** 少し後で当たる攻撃（飛んでいる魔法の矢、降ってくる矢の雨。src/eco/attack.ts）。セーブに入れる */
+  volleys: Volley[] = [];
   /** 気づいた印：「！」（敵や獲物）か「？」（害のない相手） */
   fxMarks: { t: number; id: number; m: string }[] = [];
   /** マナから生まれた者（描画専用：生まれる場所にマナが集まって姿が現れる演出。セーブしない。シミュレーションの判断に使わない） */

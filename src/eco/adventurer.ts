@@ -6,13 +6,13 @@ import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
 import { ARMOR_REMNANT, isJobItem } from './armor';
 import type { World } from '../world';
-import { SKILL_HUNTER_SHOT, SKILL_PRIEST_WAVE, SKILL_SLAYER_CLEAVE, SKILL_THIEF_THROW, SKILL_WARRIOR_SWEEP, SKILL_WIZARD_FIRE, type Skill } from './skill';
+import { SKILL_HUNTER_RAIN, SKILL_PRIEST_HAMMER, SKILL_SLAYER_CLEAVE, SKILL_THIEF_THROW, SKILL_WARRIOR_SLASH, SKILL_WIZARD_MISSILE, type Skill } from './skill';
 import { HP_PER_STR } from './combat';
 
 /** 職業ごとの技（src/eco/skill.ts）。吟遊詩人は戦わない */
-const JOB_SKILL: (Skill | undefined)[] = [SKILL_WARRIOR_SWEEP, SKILL_WIZARD_FIRE, SKILL_THIEF_THROW, SKILL_PRIEST_WAVE, undefined, SKILL_HUNTER_SHOT, SKILL_SLAYER_CLEAVE];
-/** 職業ごとの技の届く距離（マス）：戦士の薙ぎ払い4、魔法使いの炎の呪文10、盗賊の短剣投げ8、僧侶の聖なる波動4.5、狩人の弓12、竜殺しの大薙ぎ5.5 */
-const JOB_REACH = [4, 10, 8, 4.5, 0, 12, 5.5];
+const JOB_SKILL: (Skill | undefined)[] = [SKILL_WARRIOR_SLASH, SKILL_WIZARD_MISSILE, SKILL_THIEF_THROW, SKILL_PRIEST_HAMMER, undefined, SKILL_HUNTER_RAIN, SKILL_SLAYER_CLEAVE];
+/** 職業ごとの技の届く距離（マス）：戦士の飛ぶ斬撃5、魔法使いのマジックミサイル10、盗賊の短剣投げ8、僧侶のハンマー3（十字架の腕はさらに3）、狩人の矢の雨12、竜殺しの大剣5.5 */
+const JOB_REACH = [5, 10, 8, 3, 0, 12, 5.5];
 
 /** 噂の総量（評判） */
 export function reputation(this: Ecology): number {
@@ -527,21 +527,45 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
         const fl = Math.sqrt(fd2) || 1;
         const ux = (f.x - c.x) / fl;
         const uy = (f.y - c.y) / fl;
-        if (c.sp === Job.Warrior || c.sp === Job.Slayer) {
-          // 薙ぎ払い：前方の扇（戦士は4マス、竜殺しは溜めた大薙ぎで5.5マス）
-          this.areaStrike(c, c.x, c.y, ux, uy, { kind: 'fan', r: reach, half: c.sp === Job.Slayer ? 1.3 : 1.05 }, c.sp === Job.Slayer ? 2 : 1.2, { style: 'sweep', col: c.sp === Job.Slayer ? 1 : 0 }, who);
+        if (c.sp === Job.Warrior) {
+          // 剣を振り、斬撃の波を前へ飛ばす（5マスの直線。2体まで貫く）
+          this.areaStrike(c, c.x, c.y, ux, uy, { kind: 'line', r: reach, w: 10, max: 2 }, 1.2, { style: 'slashwave', col: 0 }, who);
+        } else if (c.sp === Job.Slayer) {
+          // 光の大剣の刀身が現れ、5.5マスの扇をゆっくり大きく薙ぎ払う（溜めは長く、一撃は重い）
+          this.areaStrike(c, c.x, c.y, ux, uy, { kind: 'fan', r: reach, half: 1.3 }, 2, { style: 'greatsword', col: 1 }, who);
         } else if (c.sp === Job.Priest) {
-          // メイスで地面を打ち、聖なる波動がまわりへ広がる（4.5マス）。アンデッドと夜の眷属には倍効く
+          // ハンマーを振り下ろし、打った所で光の十字架が爆ぜる（縦横に腕3マス）。打つのは敵の足もと（届く距離より遠ければ、届く距離の先）。
+          // アンデッドと夜の眷属には倍効く
+          const hd = Math.min(fl, reach);
+          const hx = c.x + ux * hd;
+          const hy = c.y + uy * hd;
           const holy = (o: Cr) => o.k === Kind.Zombie || o.k === Kind.Skeleton || o.k === Kind.Lich || o.k === Kind.Thrall || o.k === Kind.Vampire;
-          const kin = (o: Cr) => who(o) && holy(o);
-          this.areaStrike(c, c.x, c.y, ux, uy, { kind: 'circle', r: reach }, 1, { style: 'wave', col: 1 }, (o) => who(o) && !holy(o));
-          this.areaStrike(c, c.x, c.y, ux, uy, { kind: 'circle', r: reach }, 2, { style: 'wave', col: 1 }, kin);
+          const cross = { kind: 'cross' as const, r: 3 * TILE, w: 9 };
+          this.fxAttacks.push({ t: this.w.tick, style: 'cross', col: 1, size: 2, ax: c.x, ay: c.y, dx: hx, dy: hy, did: f.id, aid: c.id, big: true, kill: false, rad: cross.r });
+          this.areaStrike(c, hx, hy, ux, uy, cross, 1.2, { style: '', col: 1 }, (o) => who(o) && !holy(o));
+          this.areaStrike(c, hx, hy, ux, uy, cross, 2.4, { style: '', col: 1 }, (o) => who(o) && holy(o));
+        } else if (c.sp === Job.Wizard) {
+          // マジックミサイル：紫の魔力の尾を引く誘導弾を4発。狙う敵と、そのほか近くの敵（最大2体）へ分かれて飛び、届いたときに必ず当たる（1発は軽い）
+          const tg: Cr[] = [f];
+          this.nearby(c.x, c.y, Math.ceil(JOB_REACH[c.sp]), (o) => {
+            if (tg.length >= 3 || o === f || o.dead || o.away || !who(o) || sq(o.x - c.x) + sq(o.y - c.y) > reach * reach || !this.seenBy(c, lights, o)) return;
+            tg.push(o);
+          });
+          for (let i = 0; i < 4; i++) {
+            const t = tg[i % tg.length];
+            const fly = Math.round(6 + Math.sqrt(sq(t.x - c.x) + sq(t.y - c.y)) / 20);
+            this.queueVolley(c, { d: t.id, x: 0, y: 0, r: 0, mul: 0.5, poison: 0 }, fly);
+            this.fxAttacks.push({ t: this.w.tick, style: 'missile', col: 4, size: 1, ax: c.x, ay: c.y, dx: t.x, dy: t.y, did: t.id, aid: c.id, big: false, kill: false, n: i, fly });
+          }
+        } else if (c.sp === Job.Hunter) {
+          // 矢の雨：弧を描いて高く上がった矢が、狙った所のまわりに少しばらけて降る（1.3マス）。落ちたときにそこにいる者に当たり（動いていれば避けられる）、
+          // 当たった所で毒の煙が爆ぜて毒にする
+          const fly = 12;
+          this.queueVolley(c, { d: -1, x: f.x, y: f.y, r: 1.3 * TILE, mul: 1.2, poison: 25 }, fly);
+          this.fxAttacks.push({ t: this.w.tick, style: 'rain', col: 3, size: 1, ax: c.x, ay: c.y, dx: f.x, dy: f.y, did: -1, aid: c.id, big: false, kill: false, rad: 1.3 * TILE, n: 6, fly });
         } else if (fd2 <= sq(reach * 1.2)) {
-          // 一人を狙う技（炎の呪文・矢・短剣投げ）。溜めているあいだに届く距離の外へ出られたら外れる
-          // 魔法使いの炎の呪文は、敵の足もとの苔とキノコも焼いてしまい（scorchMoss。燃える床は作らない）、当たった所で小さく爆ぜる（1.5マス）
-          if (c.sp === Job.Wizard) this.scorchMoss(this.tileOf(f.x, f.y));
-          if (this.strike(c, f, c.sp === Job.Thief ? 1 : 1.5)) this.die(f, 'fight', c.k);
-          if (c.sp === Job.Wizard) this.areaStrike(c, f.x, f.y, ux, uy, { kind: 'circle', r: 1.5 * TILE }, 0.6, { style: 'wave', col: 2 }, (o) => o !== f && who(o));
+          // 盗賊の短剣投げ。構えているあいだに届く距離の外へ出られたら外れる
+          if (this.strike(c, f, 1)) this.die(f, 'fight', c.k);
         }
         return;
       }

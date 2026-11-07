@@ -18,6 +18,8 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   this.corpses = this.list.filter((c) => c.dead === 1 && c.units > 0 && c.k !== Kind.Wisp && c.k !== Kind.Slime && c.k !== Kind.Myconid);
   this.counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (const c of this.list) if (!c.dead) this.counts[c.k]++;
+  // 飛んでいた魔法の矢と、降ってきた矢の雨を当てる（src/eco/attack.ts）
+  this.resolveVolleys();
 
   for (const c of this.list) {
     if (c.dead === 2) continue;
@@ -62,6 +64,8 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       this.metabolism(c);
       continue;
     }
+    // 毒（src/eco/attack.ts）
+    if (c.poison > 0 && !c.away && this.poisonTick(c)) continue;
     if (STR[c.k] > 0 && this.woundsAndFlight(c)) {
       this.metabolism(c);
       continue;
