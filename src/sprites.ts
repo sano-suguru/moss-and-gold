@@ -2147,10 +2147,12 @@ function pxWarriorSwing(dir,q,rank,torso){
  const n=[5,7,8,9][rank],wood=rank===0,hero=rank>=3;
  const side=dir==='down'?'L':dir==='up'?'R':'S',sl=pxSleeve(torso,side);
  const blade=(hx,hy,ux,uy)=>put=>pxBladePts(put,hx,hy,ux,uy,n,wood,hero);
+ // 腕が体に重なるところの輪郭：袖と同じ材質のいちばん暗い段（袖の暗い段だと、胸の前で腕と胴が溶け合う）
+ const role=PX_MAT[sl[1]][0],sd=Object.keys(PX_MAT).find(k=>PX_MAT[k][0]===role&&PX_MAT[k][1]===(role==='steel'||role==='pc'?0:1))||sl[1];
  // 刃を体の後ろに描くときは、腕と剣を別の部品にする（剣を先に描き、腕と手を体より後に）
  const arm=(sx,sy,hx,hy,ux,uy,bladeBehind)=>{
-  if(!bladeBehind)return [{...pxArmHold(sx,sy,hx,hy,sl,blade(hx,hy,ux,uy)),soft:sl[1]}];
-  return [{...pxPaint(blade(hx,hy,ux,uy)),behind:true},{...pxArmHold(sx,sy,hx,hy,sl,null),soft:sl[1]}];
+  if(!bladeBehind)return [{...pxArmHold(sx,sy,hx,hy,sl,blade(hx,hy,ux,uy)),soft:sd}];
+  return [{...pxPaint(blade(hx,hy,ux,uy)),behind:true},{...pxArmHold(sx,sy,hx,hy,sl,null),soft:sd}];
  };
  // 腕の長さは、立ち姿の腕（肩から手まで3〜4ピクセル）と同じくらいにする。頭の上まで届かせず、手は頭の脇まで
  if(dir==='down')return {side,parts:[
