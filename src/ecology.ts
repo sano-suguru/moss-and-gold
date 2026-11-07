@@ -345,6 +345,8 @@ export interface Camp {
   raidT?: number;
   /** 次に通路での掠め取り（つける・待ち伏せ）に出られる tick。夜の盗みとは別に数える（src/eco/raid.ts） */
   snatchT?: number;
+  /** 次に物資の置き場へ食料を取りに出られる tick（src/eco/cache.ts の planCacheRaids） */
+  cacheT?: number;
   /** 1 なら、食べ物の足りる場所が無く、貧しい場所に少ない群れで住みついた集落（`checkGoblinMouths`） */
   poor?: number;
 }

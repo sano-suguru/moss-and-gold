@@ -22,7 +22,7 @@ export function isSentry(this: Ecology, c: Cr, key: string): boolean {
 export function doSleep(this: Ecology, c: Cr, day: number, phase: number): boolean {
   const sp = Ecology.SLEEP[c.k];
   // 盗みに出たゴブリンは眠らない
-  if (!sp || (c.k === Kind.Goblin && (c.st === 15 || c.st === 16 || c.st === 17)) || (c.k === Kind.Rat && c.st === 11)) {
+  if (!sp || (c.k === Kind.Goblin && (c.st === 15 || c.st === 16 || c.st === 17 || c.st === 18)) || (c.k === Kind.Rat && c.st === 11)) {
     c.sleep = 0;
     if (c.drowsy > 0) c.drowsy--;
     return false;

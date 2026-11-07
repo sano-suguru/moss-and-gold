@@ -54,6 +54,7 @@ export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]):
   else if (c.k === Kind.Rat && c.st === 11) state = c.ref2 ? '仲間のあとについて、新しい巣穴へ引っ越している' : '群れの先頭に立って、新しい巣穴へ引っ越している';
   else if (c.k === Kind.Goblin && c.st === 15) state = c.gait > 0 ? '光の縁に身をひそめて、焚き火をうかがっている' : c.gait < 0 ? '眠っている冒険者に忍び寄っている' : '暗がりを選んで、焚き火へ忍び寄っている';
   else if (c.k === Kind.Goblin && c.st === 17) state = c.gait < 0 ? '一行の最後尾へ駆け寄って、荷を掠め取ろうとしている' : '通路を行く冒険者の一行の後ろを、暗がりからつけている';
+  else if (c.k === Kind.Goblin && c.st === 18) state = c.units > 0 && c.ref2 > 0 ? '冒険者の物資の置き場の木箱をあさって、食料を袋に詰めている' : '冒険者の物資の置き場へ、暗がりを選んで食料を取りに向かっている';
   else if (c.k === Kind.Goblin && c.st === 16) state = c.units > 0 ? '盗んだ荷物を抱えて、集落へ逃げ帰っている' : '手ぶらで集落へ逃げ帰っている';
   else if (c.k === Kind.Golem) state = '宝物庫の入口を見張っている';
   else if (c.k === Kind.Armor) state = c.st === 10 ? '散らばった武具が寄り集まり、組み上がろうとしている' : c.mana < ARMOR_LOW ? 'マナが尽きかけ、継ぎ目を軋ませてマナの濃い所へ向かっている' : c.st === 1 ? '立ち番をしている' : '巡回している';

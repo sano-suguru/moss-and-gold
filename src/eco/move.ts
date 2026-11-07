@@ -43,7 +43,7 @@ export function findPath(this: Ecology, c: Cr, from: number, to: number): number
     }
   }
   // 盗みに出たゴブリンは、明るい所をできるだけ避けて、暗がりを進む
-  if (c.k === Kind.Goblin && (c.st === 16 || ((c.st === 15 || c.st === 17) && c.gait >= 0)) && from >= 0 && to >= 0) {
+  if (c.k === Kind.Goblin && (c.st === 16 || c.st === 18 || ((c.st === 15 || c.st === 17) && c.gait >= 0)) && from >= 0 && to >= 0) {
     const p = this.darkPath(c, from, to);
     if (p) return p;
   }
