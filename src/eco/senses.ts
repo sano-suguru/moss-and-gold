@@ -283,6 +283,8 @@ export function lurk(this: Ecology, c: Cr): boolean {
   if (c.k === Kind.Goblin && (c.st === 15 || c.st === 16)) return this.goblinRaid(c);
   // 通路を行く一行の最後尾をつけて、荷を掠め取る（src/eco/raid.ts）
   if (c.k === Kind.Goblin && c.st === 17) return this.goblinSnatch(c);
+  // 冒険者の物資の置き場へ食料を取りに出た（src/eco/cache.ts）
+  if (c.k === Kind.Goblin && c.st === 18) return this.goblinCacheRaid(c);
   // 住処を持つコボルトの群れは、冒険者の灯りに自分から寄っていかない
   if (c.k === Kind.Kobold && (this.warrenOf(c) || c.st === 10)) {
     c.lure = 0;

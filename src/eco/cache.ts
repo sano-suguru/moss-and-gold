@@ -4,11 +4,13 @@
  * 見せたい瞬間：深部の探索の一行が、行けた一番奥に木箱と寝具（物資の置き場）を残して引き返す。
  * 次の一行はそこで食料を補ってさらに奥へ進み、新しい置き場を残す。遠征を重ねるたびに置き場が奥へ伸び、
  * ついに竜退治の一行が置き場をたどって寝床に着く。置き場は大ネズミにあさられることがあり、空になった木箱は残骸として残る。
+ * 蓄えの乏しいゴブリンの集落からは、歩いて行ける所にある置き場へ、1〜2匹が暗がりづたいに食料を取りに出る。
+ * 木箱をあさって袋に詰め、集落へ持ち帰る（人がそばにいれば手を出さずに帰る）。
  *
  * 状態：Ecology.caches（SupplyCache。セーブデータでは SC）、町の知識 Lore.caches、一行の cacheKnown / cacheVis / cacheD / cacheGo / cacheMine。
  * 深部の探索の一行の者は、置き場に残す食料の荷（Cr.units）を背負って入ってくる（入るときに imported に足す。養分の保存則に含まれる）。
  */
-import { Cr, Ecology, Kind, Party, SPEC, SupplyCache, sq } from '../ecology';
+import { Cr, DAY_TICKS_ECO, Ecology, Kind, Party, SPEC, SupplyCache, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 深部の探索の一行の者が背負ってくる、置き場に残す食料の荷 */
@@ -19,6 +21,17 @@ const CACHE_MIN_D = 30;
 const CACHE_MAX = 14;
 /** 置き場で食料を補う間合い（px） */
 const CACHE_R = 3.5 * TILE;
+
+/** 置き場へ食料を取りに出る集落の、蓄えの乏しさ（蓄えの目安に対する割合） */
+const CRAID_STORE = 0.9;
+/** 置き場へ食料を取りに出る遠さ（集落から歩いて、マス）。置き場は深部へ向かう道に残るので、集落からは歩いて70〜160マス離れていることが多い */
+const CRAID_R = 120;
+/** 置かれてから、ゴブリンに嗅ぎつけられるまで（tick）。そのあいだは置いた一行のあとの一行が先に使える */
+const CRAID_AGE = DAY_TICKS_ECO / 4;
+/** 置き場へ食料を取りに出た者があきらめて帰るまで（出てからの生き物の更新の回数。歩いて120マスを行くのに約3000回かかる） */
+const CRAID_GIVEUP = 5000;
+/** 木箱をあさる長さ（生き物の更新の回数。1回に3ずつ袋に詰める） */
+const CRAID_DIG = 12;
 
 /** 置き場をたどる一行：深部の探索と竜退治 */
 function followsCaches(p: Party): boolean {
@@ -259,6 +272,113 @@ export function ratRaidCache(this: Ecology, c: Cr): boolean {
   return true;
 }
 
+/** 置き場のそば（R マス）に、生きている冒険者かドワーフがいるか */
+function peopleNear(eco: Ecology, o: SupplyCache, R: number): boolean {
+  let people = false;
+  eco.nearby(o.x, o.y, R, (q) => {
+    if (!q.dead && !q.away && (q.k === Kind.Adventurer || q.k === Kind.Dwarf)) people = true;
+  });
+  return people;
+}
+
+/**
+ * 置き場へ食料を取りに出る（生き物の更新50回ごと。昼も夜も）：蓄えが目安の9割に足りない集落から、歩いて120マスの内に
+ * 置かれてゲーム内の1/4日より古い、食料の残る置き場があれば（そばに人がいなければ）、1匹（ときどき2匹）が取りに出る。
+ * 出た者が戻るまでと、出てからゲーム内の1/3日は、次は出ない。行ける置き場がなければ、ゲーム内の1/8日は探し直さない
+ */
+export function planCacheRaids(this: Ecology): void {
+  if (!this.caches.some((o) => o.food >= 10)) return;
+  const s = SPEC[Kind.Goblin];
+  for (const cp of this.camps) {
+    if (cp.id < 0 || cp.kind !== 0 || cp.hide || (cp.cacheT ?? 0) > this.w.tick) continue;
+    if ((cp.store ?? 0) >= this.campStoreGoal(cp) * CRAID_STORE) continue;
+    const members = this.campMembers(cp);
+    if (!members.length || members.some((c) => c.st >= 15 && c.st <= 18)) continue;
+    const ready = members.filter((c) => c.flee <= 0 && c.sleep === 0 && !c.away && (c.st === 0 || c.st === 3 || c.st === 4) && c.hungry < s.starve * 0.6 && c.units < 10);
+    if (!ready.length) continue;
+    const wd = this.walkDist(this.tileOf(cp.x, cp.y), CRAID_R);
+    let o: SupplyCache | undefined;
+    let bd = 1e9;
+    for (const q of this.caches) {
+      if (q.food < 10 || this.w.tick - q.at < CRAID_AGE) continue;
+      const d = wd[this.tileOf(q.x, q.y)];
+      if (d < 0 || d > bd || (d === bd && o && q.id > o.id) || peopleNear(this, q, 6)) continue;
+      bd = d;
+      o = q;
+    }
+    if (!o) {
+      cp.cacheT = this.w.tick + DAY_TICKS_ECO / 8;
+      continue;
+    }
+    const tgt = o;
+    ready.sort((a, b) => sq(a.x - tgt.x) + sq(a.y - tgt.y) - (sq(b.x - tgt.x) + sq(b.y - tgt.y)) || a.id - b.id);
+    const n = Math.min(ready.length, ih(cp.id, this.step, 300) % 3 === 0 ? 2 : 1);
+    for (let i = 0; i < n; i++) {
+      const c = ready[i];
+      c.st = 18;
+      c.lure = tgt.id;
+      c.lureAt = this.step;
+      c.gait = 0;
+      c.ref2 = 0;
+    }
+    cp.cacheT = this.w.tick + DAY_TICKS_ECO / 3;
+    this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'cacheGo', n, to: tgt.id, how: bd, x: Math.round(tgt.x), y: Math.round(tgt.y) } as never);
+    if (this.step - (this.lastLogged[979] ?? -99999) > 1500) {
+      this.lastLogged[979] = this.step;
+      this.log(cp.x, cp.y, `蓄えの乏しい集落の{k:${Kind.Goblin}}が、冒険者の残した物資の置き場へ、食料を取りに暗がりを出ていった`);
+    }
+  }
+}
+
+/**
+ * 置き場へ食料を取りに出たゴブリン（st 18。lure は置き場の番号、gait はあさった回数、ref2 は袋に詰めた分）。true なら、この回の更新はこれで終わり。
+ * 暗がりを選んで置き場へ行き、木箱をあさって袋（40まで）に詰め、集落へ逃げ帰る（st 16。持ち帰った分は蓄えに）。
+ * 置き場のそば（5マス）に人がいるか、空になっていたか、長くかかりすぎたら、手ぶら（か、それまでに詰めた分だけ）で帰る
+ */
+export function goblinCacheRaid(this: Ecology, c: Cr): boolean {
+  const s = SPEC[Kind.Goblin];
+  const cp = this.campOf(c);
+  if (!cp || cp.kind !== 0) {
+    c.st = 0;
+    c.lure = 0;
+    return false;
+  }
+  const o = this.caches.find((q) => q.id === c.lure);
+  const back = () => {
+    if (o && c.ref2 > 0) {
+      this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'cacheLoot', n: c.ref2, to: o.id, how: o.food, x: Math.round(o.x), y: Math.round(o.y) } as never);
+      if (this.step - (this.lastLogged[978] ?? -99999) > 1500) {
+        this.lastLogged[978] = this.step;
+        this.log(o.x, o.y, o.food > 0 ? `{k:${Kind.Goblin}}が冒険者の物資の置き場の木箱をあさり、食料を袋に詰めて集落へ持ち帰った` : `{k:${Kind.Goblin}}が冒険者の物資の置き場の食料を持ち去った。木箱は空になった`);
+      }
+    }
+    c.st = 16;
+    c.lure = 0;
+    c.gait = 0;
+    return this.goblinRaid(c);
+  };
+  if (!o || o.food <= 0 || this.step - c.lureAt > CRAID_GIVEUP || c.hungry > s.starve * 0.8 || peopleNear(this, o, 5)) return back();
+  const d2 = sq(o.x - c.x) + sq(o.y - c.y);
+  if (d2 > 12 * 12) {
+    c.act = 1;
+    this.goTo(c, o.x + ((c.id % 3) - 1) * 6, o.y + 4, s.speed * 1.1);
+    return true;
+  }
+  // 木箱をあさって、袋に詰める
+  const take = Math.min(3, o.food, 40 - c.units);
+  if (take > 0) {
+    o.food -= take;
+    c.units += take;
+    c.ref2 += take;
+  }
+  o.rt = this.w.tick;
+  c.act = 2;
+  c.actT = 0;
+  c.dir = o.x > c.x ? 2 : 3;
+  if (take <= 0 || c.units >= 40 || o.food <= 0 || ++c.gait >= CRAID_DIG) return back();
+  return true;
+}
+
 declare module '../ecology' {
   interface Ecology {
     packForCaches: typeof packForCaches;
@@ -270,7 +390,9 @@ declare module '../ecology' {
     cacheUnsafe: typeof cacheUnsafe;
     tellCaches: typeof tellCaches;
     ratRaidCache: typeof ratRaidCache;
+    planCacheRaids: typeof planCacheRaids;
+    goblinCacheRaid: typeof goblinCacheRaid;
   }
 }
 
-Object.assign(Ecology.prototype, { packForCaches, nextCache, cacheTarget, cacheAhead, cacheStep, dropCache, cacheUnsafe, tellCaches, ratRaidCache });
+Object.assign(Ecology.prototype, { packForCaches, nextCache, cacheTarget, cacheAhead, cacheStep, dropCache, cacheUnsafe, tellCaches, ratRaidCache, planCacheRaids, goblinCacheRaid });
