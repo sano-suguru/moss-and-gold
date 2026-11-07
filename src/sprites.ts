@@ -437,7 +437,7 @@ function bones(sp){
  if(sp==='bat'){[[10,5,2,2],[10,5,4,7],[10,5,18,1],[10,5,17,6],[10,5,7,8]].forEach(([a,b,c,d])=>P.push(LN(a,b,c,d,'bone',2,{no:1})));P.push(E(12,4.5,1.7,1.4,'bone',{ol:1}),D(12,4,COL.K));return {...raster(20,9,P),ax:10,ay:7}}
  P.push(E(11,8,4.2,2.6,'zspi',{ol:1,flat:2}));[[8,8,5,4,7,2],[9.5,7,9,3,11,1.6],[12.5,7,13,3,11,1.6],[14,8,17,4,15,2],[7,9,3,9,4,6],[15,9,19,9,18,6]].forEach(([a,b,c,d,e,g])=>P.push(LN(a,b,c,d,'bone',1,{no:1}),LN(c,d,e,g,'bone',1,{no:1})));return {...raster(22,12,P),ax:11,ay:11};
 }
-const DEADF={rat:()=>ratDead(1),lizard:()=>lizDead(1),bat:()=>batDead(0),spider:()=>spider('side','death',3),kobold:()=>kobold('side','death',3),ant:()=>ant('side','death',0),salamander:()=>salamander('side','death',3),goblin:()=>goblin('side','death',3),orc:()=>orc('side','death',3),lizardman:()=>lizardman('side','death',3),minotaur:()=>minotaur('side','death',3),troll:()=>troll('side','death',3),basilisk:()=>basilisk('side','death',3),gargoyle:()=>gargoyle('side','death',3),vampire:()=>vampire('side','death',3),mimic:()=>mimic('side','death',3),golem:()=>golem('side','death',3),wyvern:()=>wyvern('side','death',3),dragon:()=>dragon('side','death',3),adventurer:()=>adventurer('warrior','side','death',3,false),skeleton:()=>skeleton('none','side','death',3),lich:()=>lich('side','death',3),dwarf:()=>dwarf('miner','side','death',3)};
+const DEADF={rat:()=>ratDead(1),lizard:()=>lizDead(1),bat:()=>batDead(0),spider:()=>spider('side','death',3),kobold:()=>kobold('side','death',3),ant:()=>ant('side','death',0),salamander:()=>salamander('side','death',3),goblin:()=>goblin('side','death',3),orc:()=>orc('side','death',3),lizardman:()=>lizardman('side','death',3),minotaur:()=>minotaur('side','death',3),troll:()=>troll('side','death',3),basilisk:()=>basilisk('side','death',3),gargoyle:()=>gargoyle('side','death',3),vampire:()=>vampire('side','death',3),mimic:()=>mimic('side','death',3),golem:()=>golem('side','death',3),wyvern:()=>wyvern('side','death',3),dragon:()=>dragon('side','death',3),adventurer:()=>heroSprite('warrior','down','death',3,false,0,1),skeleton:()=>skeleton('none','side','death',3),lich:()=>lich('side','death',3),dwarf:()=>dwarf('miner','side','death',3)};
 /** 死骸の段階：0 新しい、1 腐りかけ、2 骨 */
 function corpse(sp,stage){if(stage===2){if(sp==='ant')return rotFrame(ant('side','death',0),0.5,3,false);if(sp==='gargoyle')return gargoyle('side','death',3);if(sp==='wyvern'||sp==='dragon')return bones('lizard');if(sp==='adventurer'||sp==='skeleton'||sp==='lich'||sp==='dwarf')return bones('kobold');if(sp==='mimic')return mimic('side','death',3);if(sp==='golem')return golem('side','death',3);if(sp==='salamander'||sp==='lizardman'||sp==='basilisk')return bones('lizard');if(sp==='goblin'||sp==='orc'||sp==='minotaur'||sp==='troll'||sp==='vampire')return bones('kobold');return bones(sp)}const fr=DEADF[sp]();return stage===0?fr:rotFrame(fr,0.28,13,false)}
 // ===== スライム =====
@@ -1654,28 +1654,6 @@ function weave(fr,mat,step){
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=y*W+x;if(fr.mat[p]!==mat)continue;if(((x+(y>>1))&1)!==0||(y&1)!==step)continue;
   const i=m.findIndex(c=>c[0]===px[p*4]&&c[1]===px[p*4+1]&&c[2]===px[p*4+2]);if(i<=0)continue;const d=m[i-1];px[p*4]=d[0];px[p*4+1]=d[1];px[p*4+2]=d[2]}
 }
-/** 冒険者。job: warrior|wizard|thief|priest。torch: 空いた手に松明を持つ */
-function adventurer(job,dir,act,f,torch){
- const o={s:1.4,leg:5,bw:3.2,bh:3.4,hh:9.2,decor:DECOR[job]};
- if(job==='warrior')Object.assign(o,{skin:'mail',skinD:'mail',cloth:'mail',hand:'leather',boot:'boot',pad:'iron',head:humanHead('helm'),tool:sword,off:torch?torchHeld:shieldOff,offFront:torch,bw:3.6,limb:1.1});
- else if(job==='wizard')Object.assign(o,{skin:'robeB',skinD:'robeB',cloth:'robeB',hand:'hskin',head:humanHead('hat'),tool:staffOf(),cape:robeCape('robeB','goldT'),off:torch?torchHeld:null,offFront:torch});
- else if(job==='thief')Object.assign(o,{skin:'hood',skinD:'hood',cloth:'leather',hand:'boot',boot:'boot',head:humanHead('hood'),tool:dagger,leg:5,bw:2.9});
- else Object.assign(o,{skin:'robeW',skinD:'robeW',cloth:'robeW',hand:'hskin',head:humanHead('plain'),tool:mace,cape:robeCape('robeW','goldT'),off:torch?torchHeld:symbolOff,offFront:torch});
- const fr=humanoid(dir,act,f,o);
- if(job==='warrior')weave(fr,'mail',0);
- if(job==='thief')weave(fr,'leather',1);
- const {W,H,px,mat}=fr;
- for(let p=0;p<W*H;p++){
-  const r=px[p*4],g=px[p*4+1],b=px[p*4+2];
-  if(FLAME.some(c=>c[0]===r&&c[1]===g&&c[2]===b))mat[p]='wisp';
-  // 魔法使いの杖の宝玉：光の呪文で青白く光り、攻撃では炎の呪文で橙に燃える
-  const isOrb=r===ORB[0]&&g===ORB[1]&&b===ORB[2],isOrb2=r===ORB2[0]&&g===ORB2[1]&&b===ORB2[2];
-  if(isOrb||isOrb2){mat[p]='wisp';if(act==='attack'&&mod(f,4)>0){const c=isOrb?FLAME[0]:FLAME[2];px[p*4]=c[0];px[p*4+1]=c[1];px[p*4+2]=c[2]}}
-  // 盗賊の目の光
-  if(job==='thief'&&r===230&&g===230&&b===200)mat[p]='wisp';
- }
- return fr;
-}
 /** 床に落ちた道具：torch（燃えている）, stub（燃えさし）, sword, shield, staff, mace, dagger, symbol */
 function item(kind,f){
  const P=[],W=16,H=12,q=mod(f,4);
@@ -1799,19 +1777,7 @@ function headSlayer(dir,P,x,y,dead,open,k){
  if(back)return;
  if(side)P.push(LN(x+1*K,y,x+3.8*K,y,'boot',0,{no:1}));else P.push(LN(x-2.4*K,y,x+2.4*K,y,'boot',0,{no:1}),LN(x,y+0.6*K,x,y+3*K,'plate',1,{no:1}));
 }
-/** 冒険者（6b の3職）。job: bard|hunter|slayer */
-function adventurer2(job,dir,act,f,torch){
- let o;
- if(job==='bard')o={s:1.4,leg:5,bw:3,bh:3.3,hh:9.2,skin:'bardR',skinD:'bardR',cloth:'bardR',hand:'hskin',boot:'boot',head:headBard,tool:null,off:luteOff,offFront:true,decor:bardDecor};
- else if(job==='hunter')o={s:1.4,leg:5.2,bw:3,bh:3.3,hh:9.2,skin:'forest',skinD:'forest',cloth:'leather',hand:'leather',boot:'boot',head:headHunter,tool:null,off:bowOff,offFront:true,decor:quiver};
- else o={s:1.55,leg:5,bw:3.8,bh:3.6,hh:9.4,limb:1.25,skin:'plate',skinD:'plate',cloth:'plate',hand:'plate',boot:'plate',pad:'plate',head:headSlayer,tool:greatsword,decor:slayerDecor};
- // 狩人は攻撃のときだけ弓を両手で構える
- if(job==='hunter'&&act==='attack'){o.tool=bow;o.off=null}
- const fr=humanoid(dir,act,f,o);
- if(job==='slayer')weave(fr,'plate',3);
- glowFlame(fr);
- return fr;
-}
+
 // ===== 町の名簿の冒険者（冒険者の作り直しの五歩目）：一人ひとりの姿と、位ごとの装備 =====
 // 姿（look）：髪の色、肌の色、身につける色（首の布、兜の飾り、マント）、体つき、頭の形（髭・羽根飾り・長い髪など）。
 // 位（rank）：0 見習い、1 熟練（盾や胸に紋章）、2 歴戦（身につける色のマント。ローブの者は肩掛け）、3 英雄（武器がほのかに光る。マントに金の縁）
@@ -1860,7 +1826,7 @@ function noviceClub(dir,P,hx,hy,sw,rest,k){
 }
 /** 武器を大きく持つ（歴戦から） */
 const bigTool=(t,m)=>t&&((dir,P,hx,hy,sw,rest,k)=>t(dir,P,hx,hy,sw,rest,k*m));
-/** 冒険者の基本の組み立て（adventurer と adventurer2 と同じ。熟練の姿） */
+/** 冒険者の基本の組み立て（熟練の姿。heroSprite が位と姿で手を加える） */
 function heroBase(job,act,torch){
  let o;
  if(job==='bard')o={s:1.4,leg:5,bw:3,bh:3.3,hh:9.2,skin:'bardR',skinD:'bardR',cloth:'bardR',hand:'hskin',boot:'boot',head:headBard,tool:null,off:luteOff,offFront:true,decor:bardDecor};
@@ -3944,7 +3910,7 @@ function heroSprite(job,dir,act,f,torch,look,rank){
   for(let p=0;p<W*H;p++)if(mat[p]==='goldT'||mat[p]==='regal')mat[p]=mat[p]==='goldT'?'glw':'regal';
  }
  }
- // 炎と宝玉の光、盗賊の目の光（adventurer と同じ）
+ // 炎と宝玉の光、盗賊の目の光
  for(let p=0;p<W*H;p++){
   const r=px[p*4],g=px[p*4+1],b=px[p*4+2];
   if(FLAME.some(c=>c[0]===r&&c[1]===g&&c[2]===b))mat[p]='wisp';
@@ -3972,22 +3938,54 @@ function withCrest(fr,job,rank,crest,pc,hd){
  }
  return fr;
 }
-/** 名簿の冒険者の寝具：身につける色の毛布（見習いはくすんだ古い毛布、英雄は金の縁）、髪と肌の色 */
+/**
+ * 焚き火のそばで眠る冒険者：その人の横向きの手描きの体（職と位の兜・帽子・頭巾、髪と肌の色）を仰向けに寝かせ、首から下を毛布でくるむ。
+ * 倒れた姿（pxDeath）と同じく、立った横向きの絵を倒して作る（倒れた姿はうつ伏せ、眠る姿は仰向けで顔が上）。
+ * 毛布は身につける色（見習いはくすんだ古い毛布に継ぎ当て、英雄は金の縁）。上の面は明るく、下へ暗く。首もとに折り返し。
+ * 輪郭は外側だけ（毛布と頭の境には引かない）。f の 1・2 は息を吸って、胸のあたりの毛布が1ピクセル盛り上がる
+ */
 function heroBed(job,look,rank,f){
- const L={hair:look&7,skin:(look>>3)&3,color:(look>>5)&7};
- const q=mod(f,4),W=26,H=14,P=[],pc=rank===0?'drab':'pc'+Math.min(5,L.color),hairM='hair'+Math.min(5,L.hair);
- const br=q===1||q===2?0.5:0;
- P.push(E(14,8,10+br,4.4+br*0.5,pc,{ol:1}),LN(6,6,22,6,pc,1,{no:1}),LN(8,10,21,10,pc,1,{no:1}));
- if(rank===0)P.push(E(17,7,2,1.6,'leather',{flat:2}));
- if(rank>=3)P.push(LN(5,11.6,23,11.6,'goldT',3,{no:1}),LN(4.6,5.2,22,5.2,'goldT',3,{no:1}));
- P.push(E(4,7,3.2,3.2,'skin'+Math.min(3,L.skin),{ol:1}));
- if(job==='warrior'&&rank>=1)P.push(E(4,5.6,3.2,2,rank>=3?'regal':'mail',{ol:1}));
- else if(job==='wizard'&&rank>=1)P.push(PL([[1,6],[7,6],[3,1]],rank>=3?'royal':'robeB',2,{ol:1}));
- else if(job==='thief')P.push(E(4,6,3.4,3.2,rank===0?'drab':'hood',{ol:1}));
- else P.push(E(4,5.4,3,1.8,hairM,{ol:1}));
- const fr=raster(W,H,P);
- setPx(fr,3,7,[60,40,36],false);setPx(fr,5,7,[60,40,36],false);
- return {...fr,ax:13,ay:11};
+ const L={hair:look&7,skin:(look>>3)&3,color:(look>>5)&7,build:(look>>8)&3,head:(look>>10)&1,crest:((look>>11)&15)-1,scar:(look>>15)&3};
+ const pc='pc'+Math.min(5,L.color),hairM='hair'+Math.min(5,L.hair);
+ const q=mod(f,4);
+ const make=(opts)=>job==='warrior'?pxWarrior('side','idle',0,false,L,rank,pc,hairM,opts):pxHero(job,'side','idle',0,false,L,rank,pc,hairM,opts);
+ // 立った横向きの絵（目を閉じ、持ち物とマントなし）を、頭が左・顔が上になるよう倒す（縦横を入れ替えて上下を返す）
+ const sd=pxCrop(make({noGear:true,shut:true,noCape:true}));
+ // コマの高さは寝た姿の高さに合わせる（眠りの Z はコマの高さから位置を決めるので、上に余白を残さない）
+ const tW=sd.H,tH=sd.W,W=32,H=tH+3,out={W,H,px:new Uint8ClampedArray(W*H*4),mat:new Array(W*H).fill(null)},t={W:tW,H:tH,px:new Uint8ClampedArray(tW*tH*4),mat:new Array(tW*tH).fill(null)};
+ for(let ny=0;ny<tH;ny++)for(let nx=0;nx<tW;nx++){const p=nx*sd.W+(sd.W-1-ny),qq=ny*tW+nx;for(let c=0;c<4;c++)t.px[qq*4+c]=sd.px[p*4+c];t.mat[qq]=sd.mat[p]}
+ // 頭（左の列）はそのまま、頭より細い胴と足（右の10列）は地面まで下げる
+ const bodyX=tW-10,g={W:tW,H:tH,px:new Uint8ClampedArray(tW*tH*4),mat:new Array(tW*tH).fill(null)};
+ let low=-1;for(let y=0;y<tH;y++)for(let x=bodyX;x<tW;x++)if(t.px[(y*tW+x)*4+3])low=Math.max(low,y);const sh=low<0?0:tH-1-low;
+ for(let x=0;x<tW;x++)for(let y=0;y<tH;y++){const p=y*tW+x;if(!t.px[p*4+3])continue;const ny=x>=bodyX?y+sh:y;if(ny>=tH)continue;const qq=ny*tW+x;for(let c=0;c<4;c++)g.px[qq*4+c]=t.px[p*4+c];g.mat[qq]=t.mat[p]}
+ // 首から下（毛布の下になる所）は消して、毛布だけを描く（肩や腕が毛布から突き出ないように）
+ for(let x=bodyX;x<tW;x++)for(let y=0;y<tH;y++){const p=y*tW+x;g.px[p*4+3]=0;g.mat[p]=null}
+ const bx=16-Math.floor(tW/2)-1,by=H-2-tH+1;
+ pxPaste(out,g,bx,by);
+ // 毛布：首（bodyX）から足の先の2列向こうまでの、低く長い丸い塊。地面からの高さは胸がいちばん高く、足へ低くなる（息を吸うと胸が1ピクセル盛り上がる）
+ const bm=rank===0?'hqDrab':pc,R=RAMP[bm],gold=RAMP.hqGold,hero=rank>=3,x0=bodyX,x1=tW+1;
+ const HT=[4,5,6,6,6,5,5,5,5,5,4,4,3];
+ const blanket=new Map();
+ for(let x=x0;x<=x1;x++){
+  const k=x-x0,ht=HT[Math.min(HT.length-1,Math.round(k*(HT.length-1)/(x1-x0)))]+(k>=1&&k<=4&&(q===1||q===2)?1:0);
+  const yA=tH-1-ht,yB=tH-1;
+  if(bx+x>=W)continue;
+  for(let y=yA;y<=yB;y++){
+   const d=y-yA,fold=k<=1,hem=hero&&(k===2||x===x1);
+   let c=d===0?R[4]:d===1?R[3]:y===yB?R[1]:R[2],m=bm;
+   // 首もとの折り返し：明るい布の帯
+   if(fold)c=d===0?R[4]:R[3];
+   if(hem){c=gold[d===0?4:3];m='glw'}
+   blanket.set((by+y)*W+bx+x,[c,m]);
+  }
+ }
+ const topOf=x=>tH-1-HT[Math.min(HT.length-1,Math.round((x-x0)*(HT.length-1)/(x1-x0)))];
+ // 見習い：毛布の継ぎ当て（革の四角）
+ if(rank===0){const px0=x0+5,py0=topOf(x0+5)+1;for(let y=py0;y<py0+2;y++)for(let x=px0;x<px0+2;x++){const k=(by+y)*W+bx+x;if(blanket.has(k))blanket.set(k,[RAMP.hqLeather[2+((x+y)&1)],'hqLeather'])}}
+ for(const [p,[c,m]] of blanket){out.px[p*4]=c[0];out.px[p*4+1]=c[1];out.px[p*4+2]=c[2];out.px[p*4+3]=255;out.mat[p]=m}
+ // 外側の輪郭：毛布のまわりの空いた所だけ（体の上には引かない）
+ for(const p of blanket.keys()){const x=p%W,y=Math.floor(p/W);for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const X=x+dx,Y=y+dy;if(X<0||Y<0||X>=W||Y>=H)continue;const qq=Y*W+X;if(blanket.has(qq)||out.px[qq*4+3])continue;out.px[qq*4]=PX_K[0];out.px[qq*4+1]=PX_K[1];out.px[qq*4+2]=PX_K[2];out.px[qq*4+3]=255;out.mat[qq]='ol'}}
+ return {...out,ax:16,ay:H-2};
 }
 /** 祈りの光：墓標の上に立ちのぼる、光る小さな聖印（f 0〜3 で薄れる） */
 function prayLight(f){
@@ -4437,22 +4435,6 @@ function dragonSleep(f){
  for(const [x,y] of [[16,39],[17,39],[18,40]])setPx(fr,x,y,[30,10,10],false);
  if(q===2){setPx(fr,7,41,[255,170,70],true);setPx(fr,6,40,[200,120,60],true)}
  return {...fr,ax:44,ay:48};
-}
-/** 焚き火を囲んで眠る冒険者：毛布にくるまって横になり、頭だけ出す。毛布の色は職業ごと */
-function bedroll(job,f){
- const q=mod(f,4),W=26,H=14,P=[];
- const cols={warrior:'tabard',wizard:'robeB',thief:'hood',priest:'robeW',bard:'bardR',hunter:'forest',slayer:'plate'};
- const m=cols[job]||'leather';
- const br=q===1||q===2?0.5:0;
- P.push(E(14,8,10+br,4.4+br*0.5,m,{ol:1}),LN(6,6,22,6,m,1,{no:1}),LN(8,10,21,10,m,1,{no:1}));
- P.push(E(4,7,3.2,3.2,'hskin',{ol:1}));
- if(job==='warrior')P.push(E(4,5.6,3.2,2,'mail',{ol:1}));
- else if(job==='wizard')P.push(PL([[1,6],[7,6],[3,1]],'robeB',2,{ol:1}));
- else if(job==='thief')P.push(E(4,6,3.4,3.2,'hood',{ol:1}));
- else P.push(E(4,5.4,3,1.8,'hair',{ol:1}));
- const fr=raster(W,H,P);
- setPx(fr,3,7,[60,40,36],false);setPx(fr,5,7,[60,40,36],false);
- return {...fr,ax:13,ay:11};
 }
 /** ねぐらで眠るコウモリ：逆さにぶら下がり、翼で体を包む */
 function batSleep(f){
@@ -5147,4 +5129,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

@@ -2,7 +2,7 @@ import type { Atlas } from './atlas';
 import { BLOOD, Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
 import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
-import { RANK_AT, unpackLook } from './eco/roster';
+import { RANK_AT, packLook, unpackLook } from './eco/roster';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
 import { heroOrbAt } from './sprites';
@@ -26,6 +26,13 @@ export interface CreatureFrame {
 }
 
 /** 生き物の描き方（どのコマを、どこに、どれだけ浮かせて）を毎フレーム組み立てる */
+/**
+ * 名簿の見た目がわからない冒険者の既定の見た目（職ごと。戦士、魔法使い、盗賊、僧侶、吟遊詩人、狩人、竜殺しの順）。
+ * 演出の見本の冒険者や、ロード直後で生前の姿を覚えていない亡骸・眷属・石像に使う。位は熟練（ADV_DEFAULT_RANK）
+ */
+const ADV_DEFAULT_LOOK = [packLook(1, 0, 0, 2, 0), packLook(4, 1, 3, 0, 1), packLook(0, 2, 5, 0, 0), packLook(2, 0, 1, 1, 1), packLook(3, 1, 4, 1, 0), packLook(5, 3, 2, 1, 0), packLook(0, 2, 0, 2, 1)];
+const ADV_DEFAULT_RANK = 1;
+
 export class CreatureView {
   /** 技の残した床の跡（描画専用） */
   private marks: { x: number; y: number; key: string; t: number }[] = [];
@@ -590,6 +597,43 @@ export class CreatureView {
 
   /** 幼竜と若い竜が左を向いているか（生き物の id ごと）。描画だけの記憶で、セーブしない */
   private youngFaceL = new Map<number, boolean>();
+  /**
+   * 名簿の冒険者の姿と位を、生き物の番号ごとに覚えておく（描画専用。セーブしない）。
+   * 倒れた冒険者は次の生き物の更新で名簿から外れる（src/eco/roster.ts の rosterStep）ので、そのあとの倒れる動き・亡骸・眷属を、生前の姿のまま描くため
+   */
+  private heroLooks = new Map<number, { look: number; rank: number }>();
+  private heroLooksEco: Ecology | null = null;
+
+  /** 冒険者の姿と位：名簿の人 → 覚えている生前の姿 → 倒れた所の墓標（ロード直後の亡骸） → 職ごとの既定の見た目 */
+  private advLook(eco: Ecology, c: Cr, job: number): { look: number; rank: number } {
+    if (this.heroLooksEco !== eco) {
+      this.heroLooks.clear();
+      this.heroLooksEco = eco;
+    }
+    const h = c.k === Kind.Adventurer ? eco.heroOf(c) : eco.roster.find((q) => q.cid === c.id);
+    if (h) {
+      const m = this.heroLooks.get(c.id);
+      if (!m || m.look !== h.look || m.rank !== h.rank) this.heroLooks.set(c.id, { look: h.look, rank: h.rank });
+      return h;
+    }
+    const m = this.heroLooks.get(c.id);
+    if (m) return m;
+    if (c.dead) {
+      const g = eco.graves.find((q) => q.job === job && Math.abs(q.x - c.x) < 16 && Math.abs(q.y - c.y) < 16);
+      if (g) {
+        const r = { look: g.look, rank: g.rank };
+        this.heroLooks.set(c.id, r);
+        return r;
+      }
+    }
+    return { look: ADV_DEFAULT_LOOK[job] ?? ADV_DEFAULT_LOOK[0], rank: ADV_DEFAULT_RANK };
+  }
+
+  /** 覚えている姿のうち、もういない生き物の分を捨てる */
+  private pruneHeroLooks(eco: Ecology): void {
+    if (this.heroLooks.size < 64) return;
+    for (const id of [...this.heroLooks.keys()]) if (!eco.byId.has(id)) this.heroLooks.delete(id);
+  }
   constructor(private atlas: Atlas) {}
 
   /** 種・向き・動作・コマから、アトラスのコマ番号を引く */
@@ -616,7 +660,8 @@ export class CreatureView {
       case Kind.Worm: return A.named('worm', dir, act, f);
       case Kind.Wyvern: return A.named('wyvern', dir, act, f);
       case Kind.Dragon: return A.named(['dragonH', 'dragonY', 'dragon', 'dragonB'][Math.min(3, orig)], dir, act, f, v);
-      case Kind.Adventurer: return v >= 8 ? A.named('adv2', dir, act, f, v - 8) : A.named('adv', dir, act, f, v);
+      // 姿のわからない冒険者（石像、丸のみにされる獲物など）：職ごとの既定の見た目（orig が職）
+      case Kind.Adventurer: return A.hero(orig, false, ADV_DEFAULT_LOOK[orig] ?? ADV_DEFAULT_LOOK[0], ADV_DEFAULT_RANK, dir, act, f);
       case Kind.Skeleton: return A.named('skel', dir, act, f, v);
       case Kind.Lich: return A.named('lich', dir, act, f);
       case Kind.Dwarf: return A.named('dwarf', dir, act, f, v);
@@ -1149,6 +1194,7 @@ export class CreatureView {
     for (const p of eco.parties) if (p.trophy && p.trophyBy) trophyOf.set(p.trophyBy, p.trophy);
     // 物音に耳を澄ます一行：前に出た前衛だけが構える
     for (const p of eco.parties) if ((p.listenT ?? 0) > eco.step && p.listenBy) braced.set(p.listenBy, 2);
+    this.pruneHeroLooks(eco);
     for (const ord of this.order) {
       const c = ord.c;
       let x = ord.x;
@@ -1360,22 +1406,24 @@ export class CreatureView {
       const hidden = eco.isHidden(c);
       const isCorpse = c.dead === 1 && c.actT >= 4 && sp !== Kind.Wisp && sp !== Kind.Slime && sp !== Kind.Ghost && sp !== Kind.Myconid;
       const eliteName = ['', 'firespirit', 'pknight', '', '', '', 'wspirit', 'lspirit', '', 'mlord'][c.elite] ?? '';
-      let frame = !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : csp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Adventurer ? (csp >= 4 ? 8 + csp - 4 : csp * 2 + (c.torch > 0 && csp !== 1 ? 1 : 0)) : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][csp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? csp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
-      // 倒れた名簿の冒険者の亡骸（白骨になる前）：その人の倒れた姿（src/sprites.ts の pxDeath の4コマ目）
-      if (sp === Kind.Adventurer && isCorpse && eco.corpseStage(c) < 2) {
-        const h = eco.heroOf(c);
-        if (h) frame = this.atlas.hero(csp, false, h.look, h.rank, 0, 3, 3);
-      }
-      // 名簿の冒険者：一人ひとりの姿と位の装備（src/eco/roster.ts、src/sprites.ts の heroSprite）
-      if (sp === Kind.Adventurer && !isCorpse) {
+      // 冒険者は、名簿の人でも、名簿から外れた亡骸や眷属でも、手描きの体で描く（src/sprites.ts の heroSprite。姿は advLook）
+      const adv = sp === Kind.Adventurer ? this.advLook(eco, c, csp) : null;
+      let frame = adv
+        ? isCorpse
+          ? eco.corpseStage(c) < 2
+            ? this.atlas.hero(csp, false, adv.look, adv.rank, 0, 3, 3)
+            : this.atlas.corpse(sp, 2)
+          : this.atlas.hero(csp, !thrallOf && c.torch > 0 && csp !== 1 && csp < 4, adv.look, adv.rank, dir, act, f)
+        : !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : csp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][csp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? csp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
+      // 名簿の冒険者の演出（位の光、位が上がったときの光の粒など。src/eco/roster.ts）
+      if (adv && !isCorpse) {
         const h = thrallOf ? eco.roster.find((q) => q.cid === c.id) ?? null : eco.heroOf(c);
-        if (h) frame = this.atlas.hero(csp, !thrallOf && c.torch > 0 && csp !== 1 && csp < 4, h.look, h.rank, dir, act, f);
         // 英雄（位3）は足もとを淡い金色の光で照らす（絵に点を打たず、描画の柔らかい光で。描画専用）
         if (h && h.rank >= 3 && !c.dead && !hidden) dyn.push({ x, y: yy - 12, r: 34, i: 0.32, c: 4 });
         // 魔法使いの攻撃：掲げた杖の宝玉が光る（掲げる・突き上げる・下ろすのコマで、明るく→いちばん明るく→薄れる。描画専用）
-        if (h && csp === 1 && act === 2 && f >= 1 && !c.dead && !hidden) {
-          const [ox, oy] = heroOrbAt(['down', 'up', 'side'][dir], f, h.rank) as number[];
-          dyn.push({ x: x + (flip ? -ox : ox), y: yy + oy - lift, r: [0, 30, 44, 22][f], i: [0, 0.5, 0.85, 0.3][f] * (h.rank === 0 ? 0.6 : 1), c: 1 });
+        if (csp === 1 && act === 2 && f >= 1 && !c.dead && !hidden) {
+          const [ox, oy] = heroOrbAt(['down', 'up', 'side'][dir], f, adv.rank) as number[];
+          dyn.push({ x: x + (flip ? -ox : ox), y: yy + oy - lift, r: [0, 30, 44, 22][f], i: [0, 0.5, 0.85, 0.3][f] * (adv.rank === 0 ? 0.6 : 1), c: 1 });
         }
         // 位が上がって初めての遠征：入ってきてしばらく、金の光の粒が体のまわりを立ちのぼる（「見違えた」）
         const pt = h && h.rank > 0 && h.ret === RANK_AT[h.rank] ? eco.parties.find((q) => q.id === c.party) : undefined;
@@ -1423,10 +1471,7 @@ export class CreatureView {
         if (sp === Kind.Dragon) frame = A.sleep(c.elite === 8 ? 'dragonB' : ['dragonH', 'dragonY', 'dragon'][Math.min(2, c.sp)], sf);
         else if (sp === Kind.Worm) frame = A.sleep('worm', sf);
         else if (sp === Kind.Bat && (lift === 0 || (c.ref2 > 0 && act === 0))) frame = A.sleep('bat', sf);
-        else if (sp === Kind.Adventurer) {
-          const h = eco.heroOf(c);
-          frame = h ? A.heroBed(c.sp, h.look, h.rank, sf) : A.sleep('bed-' + ['warrior', 'wizard', 'thief', 'priest', 'bard', 'hunter', 'slayer'][c.sp], sf);
-        }
+        else if (adv) frame = A.heroBed(csp, adv.look, adv.rank, sf);
       }
       // 攻める側：打つ前にわずかに身を引き、打つ瞬間に相手の方へ踏み込む
       {
@@ -1503,7 +1548,11 @@ export class CreatureView {
         if (cl) pushSprite(x + (flip ? -3 : 3) + Math.sin(cl.age * 1.3) * 1.5, yy + 0.05, lift + (sp === Kind.Wyvern ? 2 : 0) + Math.abs(Math.sin(cl.age * 0.9)) * 1.5, flip, cl.frame, 0, 0);
       }
       // 隠れている者の目：影の姿の上で光る（ときどきまばたき）。暗がりで灯りを狙って潜む者（待ち伏せのゴブリンなど）も、暗ければ目だけ光る
-      if (thrallOf && !hidden) {
+      if (thrallOf && !hidden && adv) {
+        // 眷属になった冒険者の目：手描きの体の目の位置（足もとから12ピクセル上）に赤く光る。後ろ向きのときは見えない
+        const ph = Math.floor(t * 2 + c.id * 0.37) % 9;
+        if (dir !== 1) pushSprite(x + (dir === 2 ? (flip ? -2 : 2) : 0), yy + 0.05, lift + 12, flip, A.heroRedEyes(dir === 2, ph === 8 ? 3 : ph & 1), 0, 0);
+      } else if (thrallOf && !hidden) {
         // 眷属の目：いつも赤く光る（ときどきまばたき）
         const ph = Math.floor(t * 2 + c.id * 0.37) % 9;
         pushSprite(x + (flip ? -1 : 1) * (dir === 2 ? 1 : 0), yy + 0.05, lift + Math.max(4, (Ecology.bodySize(sp) || 6) * 1.5), false, A.redEyes(ph === 8 ? 3 : ph & 1), 0, 0);

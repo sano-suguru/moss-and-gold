@@ -6,7 +6,7 @@
  *   npm run shot -- --seed abc --find kind:24 --day 6 --zoom 3 --lit
  *   npm run shot -- --seed abc --find xy:120,40 --day 10
  *
- * --find：warren（横穴を掘り終え罠が2つ以上の住処）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、bless（冒険者の亡骸の前で祈る一行）、slimefeast（一つの死骸を2匹以上のスライムが食べている所）、kind:番号（その種の生き物）、xy:マスx,マスy
+ * --find：warren（横穴を掘り終え罠が2つ以上の住処）、advcorpse（白骨になる前の冒険者の亡骸）、thralladv（ヴァンパイアの眷属になった冒険者）、advsleep（焚き火のそばで眠る冒険者）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、bless（冒険者の亡骸の前で祈る一行）、slimefeast（一つの死骸を2匹以上のスライムが食べている所）、kind:番号（その種の生き物）、xy:マスx,マスy
  * --day 探し始める日（既定 0）、--until 探すのをやめる日（既定 25）、--every 探す間隔（tick、既定 200）、--zoom 拡大率（既定 4）、--lit 確認用の明かり（#lit）、
  * --fog 霧をそのまま（既定は地図全体を見えたマスにする）、--name 出力の名前（既定は find から）、--out 出力先（既定 build/shots）
  *
@@ -100,6 +100,16 @@ function look(): Hit | null {
       return { cam: { x: Math.round(o.x), y: Math.round(o.y), zoom }, marks: [{ x: o.x, y: o.y, label: `${NAMES[o.k] ?? o.k}の死骸`, color: '#ffd24a', size: 2 }, ...ss.map((c: any) => ({ x: c.x, y: c.y, label: 'スライム', color: '#80ff9a' }))], title: '死骸に群がるスライム' };
     }
     return null;
+  }
+  if (find === 'advcorpse' || find === 'thralladv' || find === 'advsleep') {
+    // 冒険者の亡骸（倒れた姿のあと、白骨になる前）、眷属になった冒険者（sp に元の種）、毛布にくるまって眠る冒険者。
+    // 見やすいように、まわり（20ピクセル以内）にほかの生き物が重なっていない者を選ぶ
+    const alone = (o: any) => !e.list.some((q: any) => q !== o && !q.dead && !q.away && q.k !== 0 && (q.x - o.x) ** 2 + (q.y - o.y) ** 2 < 20 * 20);
+    const c = e.list.find((o: any) =>
+      (find === 'advcorpse' ? o.k === 25 && o.dead === 1 && o.actT >= 4 && e.corpseStage(o) < 2 : find === 'thralladv' ? o.k === 30 && !o.dead && o.sp === 25 : o.k === 25 && !o.dead && !o.away && o.sleep === 2) && alone(o),
+    );
+    const label = find === 'advcorpse' ? '冒険者の亡骸' : find === 'thralladv' ? '冒険者の眷属' : '眠る冒険者';
+    return c ? { cam: { x: Math.round(c.x), y: Math.round(c.y), zoom }, marks: [{ x: c.x, y: c.y, label: `${label} ${c.id}`, color: '#ffd24a', size: 2 }], title: label } : null;
   }
   if (find.startsWith('kind:')) {
     const k = +find.slice(5);

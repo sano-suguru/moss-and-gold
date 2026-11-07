@@ -1,4 +1,4 @@
-import { vampMist, livingArmor, heroSprite, heroBed, graveMarker, prayLight, adventurer, adventurer2, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
+import { vampMist, livingArmor, heroSprite, heroBed, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -54,6 +54,8 @@ export interface Atlas {
   furrow: (grown: number) => number;
   eyes: (f: number) => number;
   redEyes: (f: number) => number;
+  /** 眷属になった冒険者の赤い目（side は横向きの片目） */
+  heroRedEyes: (side: boolean, f: number) => number;
   /** 宝の山（大きさ 0..2、きらめきのコマ） */
   treasure: (size: number, f: number) => number;
   wormSeg: (kind: number) => number;
@@ -74,7 +76,7 @@ export interface Atlas {
   mist: (f: number) => number;
   forge: (f: number) => number;
   campfire: (f: number) => number;
-  /** 眠り：Z / z / eye（半分だけ眠る片目）/ dragon / bat / worm / bed-職業 */
+  /** 眠り：Z / z / eye（半分だけ眠る片目）/ dragon / bat / worm（冒険者の眠る姿は heroBed） */
   sleep: (key: string, f: number) => number;
   /** 見た目の粒：0 塵、1 火の粉、2 胞子、3 しずく。f は消えていく段 */
   speck: (kind: number, f: number) => number;
@@ -308,6 +310,11 @@ const EYES = [0, 1, 2, 3].map((f) =>
 const RED_EYES = [0, 1, 2, 3].map((f) =>
   pattern(f === 3 ? ['.....', '.k.k.', '.....'] : ['.....', '.E.E.', '.....'], { E: f === 1 ? [255, 90, 80, 1] : [235, 50, 44, 1], k: [70, 20, 20] }, 2, 1),
 );
+/** 眷属になった冒険者の赤い目：手描きの体の目の位置に重ねる（正面は足もとの中心から左へ2・右へ1、横向きは前へ2。src/sprites.ts の heroSprite） */
+const HERO_RED_EYES = [0, 1, 2, 3].map((f) =>
+  pattern(f === 3 ? ['......', '.k..k.', '......'] : ['......', '.E..E.', '......'], { E: f === 1 ? [255, 90, 80, 1] : [235, 50, 44, 1], k: [70, 20, 20] }, 3, 1),
+);
+const HERO_RED_EYE_SIDE = [0, 1, 2, 3].map((f) => pattern(f === 3 ? ['...', '.k.', '...'] : ['...', '.E.', '...'], { E: f === 1 ? [255, 90, 80, 1] : [235, 50, 44, 1], k: [70, 20, 20] }, 1, 1));
 
 export function buildAtlas(): Atlas {
   const raws: RawFrame[] = [];
@@ -363,8 +370,6 @@ export function buildAtlas(): Atlas {
     ['worm', 1, (d, a, f) => wormHead(d, a, f) as RawFrame],
     ['wyvern', 1, (d, a, f) => wyvern(d, a, f) as RawFrame],
     // 冒険者：v = 職業×2 + 松明を持つか
-    ['adv', 8, (d, a, f, v) => adventurer(['warrior', 'wizard', 'thief', 'priest'][v >> 1], d, a, f, (v & 1) === 1) as RawFrame],
-    ['adv2', 3, (d, a, f, v) => adventurer2(['bard', 'hunter', 'slayer'][v], d, a, f, false) as RawFrame],
     // スケルトン：v = 0 素手、1 戦士、2 盗賊、3 僧侶、4 狩人、5 吟遊詩人、6 竜殺しの装備
     ['skel', 7, (d, a, f, v) => skeleton(['none', 'warrior', 'thief', 'priest', 'hunter', 'bard', 'slayer'][v], d, a, f) as RawFrame],
     ['lich', 1, (d, a, f) => lich(d, a, f) as RawFrame],
@@ -658,7 +663,6 @@ export function buildAtlas(): Atlas {
     addS('dragonY', dragonlingSleep(1, f) as RawFrame);
     addS('bat', batSleep(f) as RawFrame);
     addS('worm', wormCoil(f) as RawFrame);
-    for (const j of ['warrior', 'wizard', 'thief', 'priest', 'bard', 'hunter', 'slayer']) addS('bed-' + j, bedroll(j, f) as RawFrame);
   }
   const fireFrames: number[] = [];
   for (let f = 0; f < 4; f++) {
@@ -756,6 +760,10 @@ export function buildAtlas(): Atlas {
     return raws.length - 1;
   });
   const redEyeFrames = RED_EYES.map((e) => {
+    raws.push(e);
+    return raws.length - 1;
+  });
+  const heroRedEyeFrames = [...HERO_RED_EYES, ...HERO_RED_EYE_SIDE].map((e) => {
     raws.push(e);
     return raws.length - 1;
   });
@@ -884,6 +892,7 @@ export function buildAtlas(): Atlas {
     furrow: (g) => furrowFrames[g ? 1 : 0],
     eyes: (f) => eyeFrames[f & 3],
     redEyes: (f) => redEyeFrames[f & 3],
+    heroRedEyes: (side, f) => heroRedEyeFrames[(side ? 4 : 0) + (f & 3)],
     treasure: (size, f) => treasureFrames[size * 4 + (f & 3)],
     wormSeg: (kind) => segFrames[kind],
     wormBody: (r, v) => bodyFrames[(Math.max(3, Math.min(12, Math.round(r))) - 3) * 2 + (v & 1)],
