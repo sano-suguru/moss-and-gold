@@ -50,4 +50,5 @@ import './kobold';
 import './salamander';
 import './armor';
 import './skill';
+import './attack';
 import './save';

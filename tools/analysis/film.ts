@@ -8,6 +8,7 @@
  * --at 始める日（小数可）か --tick 始める tick、--frames フレーム数（既定 6）、--every フレームの間隔（tick、既定 40）、
  * --follow party:<一行の id>（先頭にカメラを合わせ続ける）か id:<生き物の id>、--xy x,y（px。カメラを固定する）、--zoom 拡大率（既定 3）、
  * --ticks tick,tick,...（各フレームの tick を並べて指定。--tick/--at はその最初の tick 以下にする）、
+ * --pure 作業ツリーで0日目から実行したスナップショットだけを使う（無ければ0日目から実行する。ベースのスナップショットから続けると、変えた挙動の起きる時刻がずれるときに）、
  * --dy カメラを縦にずらす量（px、負で上。寄って撮るとき体の真ん中へ）、--run <実行結果のフォルダ>（その実行の日次スナップショットから始める）、--name 出力の名前、--title 見出し、--out 出力先（既定 build/img。コミットしない）、--lit 確認用の明かり、--cols 1行のフレーム数（既定 3）
  */
 import { mkdirSync, writeFileSync } from 'fs';
@@ -35,7 +36,7 @@ mkdirSync('build/film', { recursive: true });
 mkdirSync(out, { recursive: true });
 
 async function main(): Promise<void> {
-const { w, from } = await openAt(seed, t0, opt('run') ? { run: opt('run') } : {});
+const { w, from } = await openAt(seed, t0, opt('run') ? { run: opt('run') } : argv.includes('--pure') ? { pure: true } : {});
 const e = w.eco as any;
 const all = new Uint8Array(w.seen.length).fill(1);
 let cam = { x: 0, y: 0, zoom };

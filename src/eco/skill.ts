@@ -20,6 +20,15 @@ export const SKILL_WIZARD_FIRE: Skill = { windup: 8, cool: 20 };
 /** 狩人の弓：およそ0.8秒引き絞り、射たあと1.6秒は引き直さない（多くて2.4秒に1回） */
 export const SKILL_HUNTER_SHOT: Skill = { windup: 4, cool: 8 };
 
+/** 戦士の薙ぎ払い：およそ0.6秒振りかぶり、使ったあと2.4秒は溜め直さない */
+export const SKILL_WARRIOR_SWEEP: Skill = { windup: 3, cool: 12 };
+/** 竜殺しの大薙ぎ：およそ1.2秒溜め、使ったあと4.4秒は溜め直さない */
+export const SKILL_SLAYER_CLEAVE: Skill = { windup: 6, cool: 22 };
+/** 僧侶の聖なる波動（メイスで地面を打つ）：およそ0.8秒振りかぶり、使ったあと4秒は溜め直さない */
+export const SKILL_PRIEST_WAVE: Skill = { windup: 4, cool: 20 };
+/** 盗賊の短剣投げ：およそ0.4秒構え、投げたあと2秒は構え直さない */
+export const SKILL_THIEF_THROW: Skill = { windup: 2, cool: 10 };
+
 /** 使ったあとの間が明けていて、技を溜めはじめられるか */
 export function skillCanStart(this: Ecology, c: Cr, s: Skill): boolean {
   return this.w.tick - c.cast >= (s.windup + s.cool) * CR_EVERY;

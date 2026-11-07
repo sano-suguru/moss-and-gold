@@ -33,8 +33,9 @@ export function scorchMoss(this: Ecology, k: number): void {
 /** 燃える床の上にいる者が受けるダメージ（生き物の更新4回ごとに、最大の体力のこの割合。逃げ遅れると数回で倒れる） */
 const FLOOR_BURN = 0.2;
 /** ドラゴンの炎の扇の中にいる者が、炎を吐く間に生き物の更新ごとに受けるダメージ（ドラゴンの強さに対する割合の幅。居続けると打ち合いの2〜3回分） */
-const BREATH_MIN = 0.4;
-const BREATH_RANGE = 0.4;
+// （体力を 4 + 強さ×5 から 4 + 強さ×9 にしたとき（src/eco/combat.ts の HP_PER_STR）、炎の傷も同じ割合で重くした：0.4 → 0.72）
+const BREATH_MIN = 0.72;
+const BREATH_RANGE = 0.72;
 /** 焼かれた記録（settle.jsonl の burn）を新しく残すまでの、前に傷を受けてからの間（tick。生き物の更新100回） */
 const BURN_EPISODE = 200;
 /** 炎に焼かれない者 */

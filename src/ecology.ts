@@ -899,7 +899,7 @@ export class Ecology {
    * sting 刺す、arrow 矢、orb 魔法の弾、beam 光線、drain 吸う、chill 冷たい手、acid 溶かす、spore 胞子。
    * col は色（0 白、1 金、2 炎、3 毒、4 魔、5 血、6 石、7 霜）、size は大きさ（0〜2）。big は強い一撃、kill はとどめ
    */
-  fxAttacks: { t: number; style: string; col: number; size: number; ax: number; ay: number; dx: number; dy: number; did: number; aid: number; big: boolean; kill: boolean }[] = [];
+  fxAttacks: { t: number; style: string; col: number; size: number; ax: number; ay: number; dx: number; dy: number; did: number; aid: number; big: boolean; kill: boolean; rad?: number; half?: number }[] = [];
   /** 強い一撃があった tick（画面がほんの一瞬「ため」を入れるため。描画専用） */
   lastBigHit = -1;
 

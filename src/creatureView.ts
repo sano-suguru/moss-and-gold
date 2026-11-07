@@ -448,6 +448,57 @@ export class CreatureView {
             if (sz >= 2) this.marks.push({ x: r.dx, y: r.dy + 3, key: `crack:${r.t % 3}`, t: now });
           }
           break;
+        case 'sweep': {
+          // 扇の薙ぎ払い（src/eco/attack.ts）：刃の軌跡が、扇の片側から反対側へ弧を描いて走る。弧の大きさが当たる範囲そのもの
+          const R = r.rad ?? 48;
+          const H = r.half ?? 1;
+          const a0 = Math.atan2(uy, ux);
+          if (age < 9) {
+            // 刃の先は3 tick で扇の片側から反対側へ走り、通ったあとに光の粒の弧が残って薄れる
+            const lead = Math.min(1, (age + 1) / 3);
+            const n = Math.max(10, Math.round((R * 2 * H) / 6));
+            const fr = Math.min(3, Math.max(0, age - 2) >> 1);
+            for (let i = 0; i <= n * lead; i++) {
+              const a = a0 - H + (2 * H * i) / n;
+              for (let k = 0.4; k <= 1.001; k += 0.15) push(r.ax + Math.cos(a) * R * k, r.ay + Math.sin(a) * R * k, 4, false, A.fx(`bit:4:${r.col}:${Math.min(3, fr + (k > 0.95 ? 0 : 1))}`), 0, 4);
+            }
+            if (age < 4) {
+              const a = a0 - H + 2 * H * lead;
+              push(r.ax + Math.cos(a) * R, r.ay + Math.sin(a) * R, lift - 2, Math.cos(a) < 0, A.fx(`slash2:2:${r.col}:${f6(age)}`), 0, 4);
+            }
+            if (age < 5) dyn.push({ x: r.ax + ux * R * 0.6, y: r.ay + uy * R * 0.6 - 8, r: R * 0.9, i: 0.35 * damp * (1 - age / 5), c: r.col === 1 ? 1 : 0 });
+          }
+          if (once)
+            for (let i = 0; i < 8; i++) {
+              const a = a0 - H + (2 * H * i) / 7;
+              this.bits.push({ x: r.ax + Math.cos(a) * R * 0.9, y: r.ay + Math.sin(a) * R * 0.9, z: 2, vx: Math.cos(a) * 0.8, vy: Math.sin(a) * 0.4, vz: 0.6, kind: 1, col: 0, t0: now, life: 14 });
+            }
+          break;
+        }
+        case 'wave': {
+          // 円の衝撃波（src/eco/attack.ts）：打った所から光の輪が広がる。輪が届く大きさが当たる範囲そのもの（僧侶の聖なる波動は金、火球の爆ぜは橙）
+          const R = r.rad ?? 48;
+          if (age < 10) {
+            const rr = R * Math.min(1, (age + 1) / 6);
+            const n = Math.max(8, Math.round((6.283 * rr) / 12));
+            const fr = Math.min(3, age >> 1);
+            for (let i = 0; i < n; i++) {
+              const a = (i / n) * 6.283;
+              push(r.ax + Math.cos(a) * rr, r.ay + Math.sin(a) * rr, 3, false, A.fx(`ring:1:${r.col}:${Math.min(5, 1 + fr)}`), 0, 4);
+              push(r.ax + Math.cos(a + 0.2) * rr * 0.92, r.ay + Math.sin(a + 0.2) * rr * 0.92, 5, false, A.fx(`bit:4:${r.col}:${fr}`), 0, 4);
+            }
+            if (age < 6) push(r.ax, r.ay + 3, 1, false, A.fx(`ring:2:${r.col}:${f6(age)}`), 0, 4);
+            dyn.push({ x: r.ax, y: r.ay - 6, r: rr + 20, i: 0.4 * damp * (1 - age / 10), c: r.col === 2 ? 2 : 1 });
+          }
+          if (once && R > 40) {
+            this.marks.push({ x: r.ax, y: r.ay + 3, key: `crack:${r.t % 3}`, t: now });
+            for (let i = 0; i < 10; i++) {
+              const a = (i / 10) * 6.283;
+              this.bits.push({ x: r.ax + Math.cos(a) * 8, y: r.ay + Math.sin(a) * 8, z: 2, vx: Math.cos(a) * 1.4, vy: Math.sin(a) * 0.7, vz: 1.2, kind: 0, col: 6, t0: now, life: 16 });
+            }
+          }
+          break;
+        }
         case 'breath':
           break;
         case 'puff':

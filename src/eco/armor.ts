@@ -76,10 +76,10 @@ export const ARMOR_ABSORB_GAP = 300;
 export const ARMOR_GATHER_GAP = 30;
 /** 巡回先を決めるとき、取り込める武具を探す半径（マス） */
 export const ARMOR_SEEK_R = 20;
-/** 体力：4 + ARMOR_HP_MUL ×（もとの強さ + 体の武具1つにつき ARMOR_BODY_HP）。ほかの種は 4 + 強さ×5。空の鎧は固い（src/eco/combat.ts の maxHp）。
+/** 体力：4 + ARMOR_HP_MUL ×（もとの強さ + 体の武具1つにつき ARMOR_BODY_HP）。ほかの種は 4 + 強さ×9（src/eco/combat.ts の HP_PER_STR。鎧はその2.4倍ほど）。空の鎧は固い（src/eco/combat.ts の maxHp）。
  *  手に取った武器と盾は体力を上げない（以前は武器で上がった強さにも12倍がかかり、武器5つで体力256＝ミノタウロスの約2.5倍の固さに、
  *  ミノタウロス並みの打撃が付いて、いる量あたりで冒険者をミノタウロスの約4.5倍倒していた） */
-export const ARMOR_HP_MUL = 12;
+export const ARMOR_HP_MUL = 22;
 export const ARMOR_BODY_HP = 2;
 /** 傷を直す：打たれてから何 tick 経てば直しはじめるか。直すのは、足もとの土のマナが ARMOR_MEND_SOIL 以上の所で立ち番をしているときだけで、
  *  生き物の更新 ARMOR_MEND_EVERY 回ごとに体力の30分の1を直し、体のマナを1使う（足もとの土へ還る）。

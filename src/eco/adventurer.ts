@@ -6,11 +6,13 @@ import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
 import { ARMOR_REMNANT, isJobItem } from './armor';
 import type { World } from '../world';
-import { SKILL_HUNTER_SHOT, SKILL_WIZARD_FIRE } from './skill';
+import { SKILL_HUNTER_SHOT, SKILL_PRIEST_WAVE, SKILL_SLAYER_CLEAVE, SKILL_THIEF_THROW, SKILL_WARRIOR_SWEEP, SKILL_WIZARD_FIRE, type Skill } from './skill';
+import { HP_PER_STR } from './combat';
 
-/** 炎の呪文1発と、矢1本の重さ（打ち合いの一打ちに対する倍率） */
-const WIZ_MUL = 1.5;
-const SHOT_MUL = 1.5;
+/** 職業ごとの技（src/eco/skill.ts）。吟遊詩人は戦わない */
+const JOB_SKILL: (Skill | undefined)[] = [SKILL_WARRIOR_SWEEP, SKILL_WIZARD_FIRE, SKILL_THIEF_THROW, SKILL_PRIEST_WAVE, undefined, SKILL_HUNTER_SHOT, SKILL_SLAYER_CLEAVE];
+/** 職業ごとの技の届く距離（マス）：戦士の薙ぎ払い4、魔法使いの炎の呪文10、盗賊の短剣投げ8、僧侶の聖なる波動4.5、狩人の弓12、竜殺しの大薙ぎ5.5 */
+const JOB_REACH = [4, 10, 8, 4.5, 0, 12, 5.5];
 
 /** 噂の総量（評判） */
 export function reputation(this: Ecology): number {
@@ -247,13 +249,13 @@ export function partyStr(this: Ecology, p: Party): number {
 
 /**
  * 一行が見積もる相手の強さ：強さに残りの体力の割合を掛ける。リビングアーマー（空の鎧）は、体力が強さのわりに大きい
- * （ふつうは 4 + 強さ×5、鎧は体の武具の数で決まる。src/eco/combat.ts の maxHp、src/eco/armor.ts の armorHp）ので、
+ * （ふつうは 4 + 強さ×HP_PER_STR、鎧は体の武具の数で決まる。src/eco/combat.ts の maxHp、src/eco/armor.ts の armorHp）ので、
  * ふつうの種と比べた体力の比を見積もりに掛ける。
  * 入れないと、武具を取り込んで強くなった鎧に一行が挑みつづけ、宝物庫の入口で次々に倒されていた（倒れた者の武具をまた鎧が取り込む）
  */
 export function foeStr(this: Ecology, o: Cr): number {
   const s = this.str(o) * (o.hp > 0 ? o.hp / this.maxHp(o) : 1);
-  return o.k === Kind.Armor ? (s * this.maxHp(o)) / (4 + 5 * this.str(o)) : s;
+  return o.k === Kind.Armor ? (s * this.maxHp(o)) / (4 + HP_PER_STR * this.str(o)) : s;
 }
 
 /**
@@ -368,8 +370,8 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       }
     }
   }
-  // 離れた所から撃つ技（魔法使いの炎の呪文、狩人の弓）の溜め（src/eco/skill.ts）：構えて動かずに溜め、溜めの途中で打たれると止まる（呪文は散って消える）
-  const skill = c.sp === Job.Wizard ? SKILL_WIZARD_FIRE : c.sp === Job.Hunter ? SKILL_HUNTER_SHOT : null;
+  // 職業の技の溜め（src/eco/skill.ts）：構えて動かずに溜め、溜めの途中で打たれると止まる（呪文は散って消える）
+  const skill = JOB_SKILL[c.sp] ?? null;
   const sk = skill ? this.skillStep(c, skill) : '';
   if (sk === 'charging') return;
   if (sk === 'broken') {
@@ -512,25 +514,45 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     const f = foe as Cr;
     this.markNotice(c, f, '!');
     c.dir = Math.abs(f.x - c.x) > Math.abs(f.y - c.y) ? (f.x > c.x ? 2 : 3) : f.y > c.y ? 0 : 1;
+    const fd2 = sq(f.x - c.x) + sq(f.y - c.y);
+    const reach = JOB_REACH[c.sp] * TILE;
     if (skill) {
-      // 離れた所から撃つ技：溜め終わった回に放つ（当たれば打ち合いの一打ちの1.5倍）。使ったあとの間は撃たない（src/eco/skill.ts）。
-      // 魔法使いの炎の呪文は、敵の足もとの苔とキノコも焼いてしまう（scorchMoss）。燃える床は作らない
-      // （以前は敵の足もとに火をつけ、そばで打ち合う仲間の冒険者がその火で焼け死んでいた。燃える床はドラゴンの炎だけ）。
-      // （以前は溜めなしで、魔法使いは生き物の更新4回ごとに、狩人は3回に1回ほど撃ち続け、大物は近づく前に倒れていた。
+      // 職業の技（src/eco/skill.ts）：届く距離に敵がいれば溜め、溜め終わった回に放つ。使ったあとの間は溜め直さない。
+      // （以前は、近接の職は体が触れるくらい（1マス弱）でしか打てず、魔法使いは生き物の更新4回ごとに、狩人は3回に1回ほど、溜めなしで撃ち続けていた。
       //  8シード×12日で、近接の一打ちを受ける前に死んだ大物が6割、魔法使いが打たれたのは25時間に1回、狩人は0回）
       if (ready) {
         c.act = 2;
         c.actT = 0;
-        if (c.sp === Job.Wizard) this.scorchMoss(this.tileOf(f.x, f.y));
-        if (this.strike(c, f, c.sp === Job.Wizard ? WIZ_MUL : SHOT_MUL)) this.die(f, 'fight', c.k);
+        const who = (o: Cr) => o.k !== Kind.Adventurer && o.k !== Kind.Dwarf && (o === f || o.foe === c.id || MINOR.includes(o.k) || (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)));
+        const fl = Math.sqrt(fd2) || 1;
+        const ux = (f.x - c.x) / fl;
+        const uy = (f.y - c.y) / fl;
+        if (c.sp === Job.Warrior || c.sp === Job.Slayer) {
+          // 薙ぎ払い：前方の扇（戦士は4マス、竜殺しは溜めた大薙ぎで5.5マス）
+          this.areaStrike(c, c.x, c.y, ux, uy, { kind: 'fan', r: reach, half: c.sp === Job.Slayer ? 1.3 : 1.05 }, c.sp === Job.Slayer ? 2 : 1.2, { style: 'sweep', col: c.sp === Job.Slayer ? 1 : 0 }, who);
+        } else if (c.sp === Job.Priest) {
+          // メイスで地面を打ち、聖なる波動がまわりへ広がる（4.5マス）。アンデッドと夜の眷属には倍効く
+          const holy = (o: Cr) => o.k === Kind.Zombie || o.k === Kind.Skeleton || o.k === Kind.Lich || o.k === Kind.Thrall || o.k === Kind.Vampire;
+          const kin = (o: Cr) => who(o) && holy(o);
+          this.areaStrike(c, c.x, c.y, ux, uy, { kind: 'circle', r: reach }, 1, { style: 'wave', col: 1 }, (o) => who(o) && !holy(o));
+          this.areaStrike(c, c.x, c.y, ux, uy, { kind: 'circle', r: reach }, 2, { style: 'wave', col: 1 }, kin);
+        } else if (fd2 <= sq(reach * 1.2)) {
+          // 一人を狙う技（炎の呪文・矢・短剣投げ）。溜めているあいだに届く距離の外へ出られたら外れる
+          // 魔法使いの炎の呪文は、敵の足もとの苔とキノコも焼いてしまい（scorchMoss。燃える床は作らない）、当たった所で小さく爆ぜる（1.5マス）
+          if (c.sp === Job.Wizard) this.scorchMoss(this.tileOf(f.x, f.y));
+          if (this.strike(c, f, c.sp === Job.Thief ? 1 : 1.5)) this.die(f, 'fight', c.k);
+          if (c.sp === Job.Wizard) this.areaStrike(c, f.x, f.y, ux, uy, { kind: 'circle', r: 1.5 * TILE }, 0.6, { style: 'wave', col: 2 }, (o) => o !== f && who(o));
+        }
         return;
       }
-      if (this.skillCanStart(c, skill)) {
+      if (fd2 <= reach * reach && this.skillCanStart(c, skill)) {
         this.skillStart(c, skill);
         return;
       }
-      // 使ったあとの間：敵が近ければ（2.5マス）離れ、遠ければその場で構える
-      if (sq(f.x - c.x) + sq(f.y - c.y) < 2.5 * TILE * 2.5 * TILE) {
+    }
+    if (c.sp === Job.Wizard || c.sp === Job.Hunter) {
+      // 離れて撃つ者が、使ったあとの間を待つあいだ：敵が近ければ（2.5マス）離れ、遠ければその場で構える
+      if (fd2 < 2.5 * TILE * 2.5 * TILE) {
         c.act = 1;
         this.fleeFrom(c, f, s.speed);
         this.setDir(c, f.x - c.x, f.y - c.y);

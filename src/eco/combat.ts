@@ -163,11 +163,17 @@ export function hunt(this: Ecology, c: Cr, R: number, kinds: Kind[], speed: numb
   return true;
 }
 
+/**
+ * 体力の上限は 4 + 強さ × HP_PER_STR。一打ちの傷は強さの1.2〜2.4倍なので、強さが同じ相手なら、ふつうの一打ちでおよそ5打、技なら3打ほどで倒れる。
+ * （以前は 4 + 強さ×5 で、近くの仲間1人ごとに一打ちが4割重くなった（最大2.2倍）ので、一行に囲まれた大物は1〜2打で倒れていた）
+ */
+export const HP_PER_STR = 9;
+
 /** 体力の上限（強さに比例） */
 export function maxHp(this: Ecology, c: Cr): number {
   // リビングアーマー（空の鎧）は固い。固さは体になった武具の数で決まり、手に取った武器と盾は打撃（強さ）だけを上げる（src/eco/armor.ts の armorHp）
   if (c.k === Kind.Armor) return this.armorHp(c);
-  return Math.round(4 + this.str(c) * 5);
+  return Math.round(4 + this.str(c) * HP_PER_STR);
 }
 
 export function bleed(this: Ecology, c: Cr, n: number): void {
@@ -179,17 +185,14 @@ export function bleed(this: Ecology, c: Cr, n: number): void {
   if (this.blood.length > 400) this.blood.splice(0, this.blood.length - 400);
 }
 
-/** 一打ち：強さと仲間の数で傷を与える。倒せば true */
-export function strike(this: Ecology, a: Cr, d: Cr, mul = 1): boolean {
-  const allies = (c: Cr) => {
-    let n = 0;
-    this.nearby(c.x, c.y, 2, (o) => {
-      if (o !== c && !o.dead && o.k === c.k && sq(o.x - c.x) + sq(o.y - c.y) < 40 * 40) n++;
-    });
-    return Math.min(3, n);
-  };
+/**
+ * 一打ち：強さで傷を与える。倒せば true。fx が false なら、打つ者の攻撃のエフェクトを出さない（形のある攻撃は、形のエフェクトを別に一つ出す。src/eco/attack.ts）。
+ * （以前は、近くにいる同じ種の仲間1人ごとに一打ちが4割重くなっていた（最大2.2倍）。画面では1人が打っているだけなのに、
+ *  一行がそばにいるだけで倍の傷になり、囲まれた大物が1〜2打で倒れていた。数の力は、形のある攻撃で実際に皆が打つことで出す）
+ */
+export function strike(this: Ecology, a: Cr, d: Cr, mul = 1, fx = true): boolean {
   if (d.hp <= 0) d.hp = this.maxHp(d);
-  const sa = this.str(a) * (1 + 0.4 * allies(a));
+  const sa = this.str(a);
   const dmg = sa * (1.2 + (ih(a.id, d.id ^ this.step, 161) % 1000) / 1000 * 1.2) * mul;
   d.hp -= dmg;
   // リビングアーマーは、倒れずに強い一打を受けると、手の武器を落とす（src/eco/armor.ts）
@@ -208,7 +211,7 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1): boolean {
   if (d.k === Kind.Adventurer) this.campHit(d, a);
   this.fxHits.push({ t: this.w.tick, x: d.x, y: d.y, ax: a.x, ay: a.y, id: d.id });
   if (this.fxHits.length > 120) this.fxHits.splice(0, 40);
-  this.pushAttackFx(a, d, dmg > this.maxHp(d) * 0.4, d.hp <= 0);
+  if (fx) this.pushAttackFx(a, d, dmg > this.maxHp(d) * 0.4, d.hp <= 0);
   this.raiseAlarm(d, a);
   this.bleed(d, 1);
   // 焚き火のそばの小物との小競り合い（コウモリに血を吸われて払うなど）は、一行の皆を起こすほどの音を立てない
@@ -230,11 +233,7 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
   // 寝込みの一打ち：焚き火で眠っている冒険者への最初の一打ちは重く（1.5倍）、その打ち合いでは打ち返されない（src/eco/night.ts）
   const asleep = this.nightHit(a, d);
   if (this.strike(a, d, asleep ? 1.5 : 1)) {
-    if (a.k === Kind.Skeleton || a.k === Kind.Lich || a.k === Kind.Dwarf || a.k === Kind.Golem || a.k === Kind.Gargoyle || a.k === Kind.Armor || a.k === Kind.Thrall || (a.k === Kind.Adventurer && d.k !== Kind.Rat)) this.die(d, 'fight', a.k);
-    else this.eat(a, d, true);
-    // ヴァンパイアと、その眷属が倒した者は、眷属として起き上がることがある（src/eco/thrall.ts）
-    if (a.k === Kind.Vampire) this.vampClaim(a, d);
-    else if (a.k === Kind.Thrall) this.thrallClaim(a, d);
+    this.slay(a, d);
     return true;
   }
   // 打ち返し（逃げている者と、寝込みを打たれて飛び起きたばかりの者は打ち返さない）
