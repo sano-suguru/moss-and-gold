@@ -6,6 +6,13 @@ import { RANK_AT, unpackLook } from './eco/roster';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
 
+/** 冒険者の攻撃で、技の演出を振り下ろしのコマまで遅らせる tick 数（攻撃のコマ 0 構え・1 振り上げのあと） */
+const ADV_STRIKE_LAG = 4;
+/** その攻撃の記録が、冒険者の振る技か（演出を振り下ろしのコマに合わせるもの） */
+function advStrike(eco: Ecology, r: { aid: number; style: string }): boolean {
+  return eco.byId.get(r.aid)?.k === Kind.Adventurer && r.style !== 'grow' && r.style !== 'puff';
+}
+
 const MAX_SPRITES = 4096;
 
 export interface CreatureFrame {
@@ -372,7 +379,7 @@ export class CreatureView {
   private drawAttacks(eco: Ecology, A: Atlas, inView: (x: number, y: number, m: number) => boolean, push: (x: number, y: number, lift: number, flip: boolean, frame: number, glow: number, kind: number) => void, dyn: { x: number; y: number; r: number; i: number; c?: number }[]): void {
     const now = eco.w.tick;
     for (const r of eco.fxAttacks) {
-      const age = now - r.t;
+      const age = now - r.t - (advStrike(eco, r) ? ADV_STRIKE_LAG : 0);
       if (age < 0 || age > 24) continue;
       if (!inView(r.dx, r.dy, 60) && !inView(r.ax, r.ay, 60)) continue;
       const vx = r.dx - r.ax;
@@ -903,18 +910,24 @@ export class CreatureView {
     const dyn: { x: number; y: number; r: number; i: number; c?: number }[] = [];
     // 当たった印（のけぞりのための記録）と、攻撃の技の演出。気づいた印：「！」「？」
     {
+      // 冒険者の攻撃は4コマ（構え・振り上げ・振り下ろし・戻り。1コマは生き物の更新1回＝2 tick）なので、
+      // 技の演出と打たれた側ののけぞりは振り下ろしのコマ（攻撃から4 tick 後）に、踏み込みはその手前の振り上げから始める（描画だけの遅れ）
+      const hitLag = new Map<string, number>();
+      for (const r of eco.fxAttacks) if (eco.w.tick - r.t <= 30 && advStrike(eco, r)) hitLag.set(r.t + ':' + r.did, ADV_STRIKE_LAG);
       this.lastHit.clear();
       for (const h of eco.fxHits) {
-        const age = eco.w.tick - h.t;
-        if (age > 8) continue;
-        this.lastHit.set(h.id, h);
+        const lag = hitLag.get(h.t + ':' + h.id) ?? 0;
+        const age = eco.w.tick - h.t - lag;
+        if (age < 0 || age > 8) continue;
+        this.lastHit.set(h.id, lag ? { ...h, t: h.t + lag } : h);
       }
       this.lunge.clear();
       for (const r of eco.fxAttacks) {
-        if (eco.w.tick - r.t > 6) continue;
+        const lag = advStrike(eco, r) ? ADV_STRIKE_LAG - 2 : 0;
+        if (eco.w.tick - r.t - lag > 6 || eco.w.tick - r.t - lag < 0) continue;
         const L = Math.hypot(r.dx - r.ax, r.dy - r.ay) || 1;
         if (r.style === 'arrow' || r.style === 'orb' || r.style === 'beam') continue;
-        this.lunge.set(r.aid, { t: r.t, ux: (r.dx - r.ax) / L, uy: (r.dy - r.ay) / L });
+        this.lunge.set(r.aid, { t: r.t + lag, ux: (r.dx - r.ax) / L, uy: (r.dy - r.ay) / L });
       }
       this.drawAttacks(eco, A, inView, pushSprite, dyn);
       this.drawEats(eco, A, inView, pushSprite, dyn, alpha);

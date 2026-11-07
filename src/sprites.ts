@@ -2095,13 +2095,13 @@ function pxPaint(draw){
  for(const [x,y,c] of pts.values())g[y-y0+1][x-x0+1]=c;
  return {g:pxO(g.map(r=>r.join(''))),x:x0-1,y:y0-1};
 }
-/** 胴の型から、持ち物を握る腕を外す（腕の列を胴の続きの色で埋め、外側の列を透明にする）。side：'L' 画面の左の腕、'R' 右の腕、'S' 横向きの前の腕。肩から手の行（11〜14行、胴の型では0〜3行）だけ */
+/** 胴の型から、持ち物を握る腕を外す（腕の列を胴の続きの色で埋める。体の幅は変えない）。side：'L' 画面の左の腕、'R' 右の腕、'S' 横向きの前の腕。肩から手の行（11〜14行、胴の型では0〜3行）だけ */
 function pxNoArm(torso,side){
  return torso.map((row,y)=>{
   if(y>3)return row;
   const r=[...row];
-  if(side==='L'){r[0]='.';r[1]='K';r[2]=r[3]}
-  else if(side==='R'){r[13]='.';r[12]='K';r[11]=r[10]}
+  if(side==='L'){r[1]=r[2]=r[3]}
+  else if(side==='R'){r[11]=r[12]=r[10]}
   else{let f=r[10];if('cLlK'.includes(f))f=[...torso[2]][10];for(let x=5;x<=9;x++)r[x]=f}
   return r.join('');
  });
@@ -2134,14 +2134,14 @@ function pxBladePts(put,hx,hy,ux,uy,n,wood,hero){
  if(!wood){
   // 鍔は刃と直角に：まっすぐな刃なら刃の両脇へ1ピクセルずつ（幅4）、斜めの刃なら斜めに3ピクセル
   const nx=-Math.sign(uy),ny=Math.sign(ux),ax=!ux||!uy;
-  put(E[0],E[1],hero?'w':'G');put(E[0]+wx,E[1]+wy,'G');
-  if(ax){put(E[0]-nx-wx*0,E[1]-ny,'G');put(E[0]+wx+nx,E[1]+wy+ny,'G')}else{put(E[0]+nx,E[1]+ny,'G');put(E[0]-nx,E[1]-ny,'G')}
+  put(E[0],E[1],hero?'w':'G');
+  if(ax){put(E[0]+wx,E[1]+wy,'G');put(E[0]-nx,E[1]-ny,'G');put(E[0]+wx+nx,E[1]+wy+ny,'G')}else{put(E[0]+nx,E[1]+ny,'G');put(E[0]-nx,E[1]-ny,'G')}
  }
- for(let i=wood?0:1;i<=n;i++){const [a,b]=st(i),x=E[0]+a,y=E[1]+b;put(x,y,wood?'D':'4');if(i<n)put(x+wx,y+wy,wood?'d':'2')}
+ for(let i=wood?0:1;i<=n;i++){const [a,b]=st(i),x=E[0]+a,y=E[1]+b;put(x,y,wood?'D':'4');if(i<n)put(x+wx,y+wy,wood?'D':'2')}
 }
 /**
  * 戦士の攻撃の1コマ：腕を外す胴の側と、描く部品（{g,x,y,behind,soft}。体の座標）。
- * 0 構え（剣を体の脇に立てて持ち上げる）、1 振り上げ（頭の上へ、刃は後ろへ倒す）、2 振り下ろし（腕を伸ばして斜めに斬り下ろす）、3 戻り（下ろした剣を体の脇へ戻す）
+ * 0 構え（剣を体の脇に立てて持ち上げる）、1 振り上げ（手を頭の脇まで上げ、刃を頭の後ろへ倒す）、2 振り下ろし（腕を伸ばして斜めに斬り下ろす）、3 戻り（下ろした剣を体の脇へ戻す）
  */
 function pxWarriorSwing(dir,q,rank,torso){
  const n=[5,7,8,9][rank],wood=rank===0,hero=rank>=3;
@@ -2152,26 +2152,25 @@ function pxWarriorSwing(dir,q,rank,torso){
   if(!bladeBehind)return [{...pxArmHold(sx,sy,hx,hy,sl,blade(hx,hy,ux,uy)),soft:sl[1]}];
   return [{...pxPaint(blade(hx,hy,ux,uy)),behind:true},{...pxArmHold(sx,sy,hx,hy,sl,null),soft:sl[1]}];
  };
- // 腕ごと頭の向こうに描く（横向きで頭の上へ振り上げた腕。頭より上に出た手と前腕だけが見える）
- const armBack=(sx,sy,hx,hy,ux,uy)=>[{...pxPaint(blade(hx,hy,ux,uy)),behind:true},{...pxArmHold(sx,sy,hx,hy,sl,null),behind:true}];
+ // 腕の長さは、立ち姿の腕（肩から手まで3〜4ピクセル）と同じくらいにする。頭の上まで届かせず、手は頭の脇まで
  if(dir==='down')return {side,parts:[
-  arm(1,11,-2,8,0,-1,false),
-  arm(0,11,-3,3,1,-1,true),
+  arm(1,11,-2,9,0,-1,false),
+  arm(1,11,-2,7,-1,-1,false),
   arm(1,11,-3,12,-1,1,false),
   arm(1,12,0,15,-1,2,false),
  ][q]};
  if(dir==='side')return {side,parts:[
   arm(8,11,11,8,0,-1,false),
-  armBack(6,11,4,-4,-2,1),
+  arm(6,11,3,7,-1,-1,true),
   arm(8,11,13,12,2,1,false),
   arm(7,11,10,15,1,1,false),
  ][q]};
  return {side,parts:[
   arm(12,11,14,8,0,-1,false),
-  arm(12,11,14,2,-1,-1,false),
-  [{...pxPaint(blade(12,13,2,1)),behind:true}],
-  [{...pxPaint(blade(11,14,1,1)),behind:true}],
- ][q],keepArm:q>=2};
+  arm(12,11,14,7,1,-1,false),
+  arm(12,11,14,13,2,1,false),
+  arm(12,12,13,15,1,2,false),
+ ][q]};
 }
 /** 下げて構えた剣（右下向き）：柄と鍔から、刃が横2ピクセル・縦1ピクセルずつ斜め下へ伸びる。輪郭は塗った点のまわりに自動で1本だけ回す（黒い線が2本並ばない） */
 function pxLowBlade(n,wood,hero){
@@ -2240,7 +2239,7 @@ function pxWarrior(dir,act,f,torch,L,rank,pc,hairM,opts={}){
  // 攻撃のコマは、剣を握る腕を胴から外して別に描く（pxWarriorSwing）
  let torso=PXW.torso[d+rank];
  const swing=at&&!opts.noGear?pxWarriorSwing(dir,q,rank,torso):null;
- if(swing&&!swing.keepArm)torso=pxNoArm(torso,swing.side);
+ if(swing)torso=pxNoArm(torso,swing.side);
  const swB=swing?swing.parts.filter(p=>p.behind).map(p=>({g:p.g,x:ux+p.x,y:uy+p.y,mats:weap,glow:hero})):[];
  const swF=swing?swing.parts.filter(p=>!p.behind).map(p=>({g:p.g,x:ux+p.x,y:uy+p.y,mats:{...weap,skin:skinM,steel:base.steel,pc:base.pc,leather:base.leather},soft:p.soft,glow:hero})):[];
  const sw=opts.noGear||swing?null:pxSword(dir,pose,rank);
