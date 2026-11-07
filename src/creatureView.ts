@@ -504,19 +504,27 @@ export class CreatureView {
           break;
         }
         case 'slashwave': {
-          // 戦士の飛ぶ斬撃（src/eco/adventurer.ts）：三日月形の斬撃の波（src/sprites.ts の fxCrescent）が、剣の先から前へ走る。
-          // 走った長さが当たった範囲（2体まで貫いて止まる）。うしろに薄い残像を二つ引く
+          // 戦士の飛ぶ斬撃（src/eco/adventurer.ts）：三日月形の斬撃の波（src/sprites.ts の fxCrescent2）。
+          // 振り抜きの引き伸ばされた弧から三日月にまとまって前へ飛び（4 tick）、止まった所で細くなって光の破片に砕けて散る。
+          // 走った長さが当たった範囲（2体まで貫いて止まる）。最初に当たった者には、斬撃が通るときに火花が散る
           const len = r.rad ?? dist;
           const d16 = (Math.round(Math.atan2(uy, ux) / (Math.PI / 8)) + 16) % 16;
-          if (age < 9) {
-            const q = Math.min(1, (age + 1) / 5);
-            const fr = age < 5 ? 0 : Math.min(3, age - 4);
-            for (let k = 2; k >= 0; k--) {
-              const qq = q - k * 0.1;
-              if (qq <= 0 || (k > 0 && age >= 6)) continue;
-              push(r.ax + ux * len * qq, r.ay + uy * len * qq, lift, false, A.fx(`crescent:${d16}:${Math.min(3, fr + k)}`), 0, 4);
-            }
-            dyn.push({ x: r.ax + ux * len * q, y: r.ay + uy * len * q - 8, r: 34, i: 0.35 * damp * (1 - age / 9), c: 0 });
+          const qAt = (g: number) => Math.min(1, (g + 0.6) / 4.6);
+          if (age < 8) {
+            const q = qAt(age);
+            const drift = age > 4 ? (age - 4) * 2 : 0;
+            const x = r.ax + ux * (len * q + drift);
+            const y = r.ay + uy * (len * q + drift);
+            push(x, y, lift, false, A.fx(`crescent2:${d16}:${age}`), 0, 4);
+            // 飛ぶあいだ、ひとつ前の位置に薄い残像
+            if (age >= 1 && age <= 4) push(r.ax + ux * len * qAt(age - 1), r.ay + uy * len * qAt(age - 1), lift, false, A.fx(`crescent2:${d16}:5`), 0, 4);
+            dyn.push({ x, y: y - 8, r: 38, i: 0.45 * damp * (1 - age / 8), c: 0 });
+          }
+          const tgt = eco.byId.get(r.did);
+          if (tgt) {
+            const qh = Math.max(0, Math.min(1, ((tgt.x - r.ax) * ux + (tgt.y - r.ay) * uy) / (len || 1)));
+            const hAge = age - Math.round(qh * 4);
+            if (hAge >= 0 && hAge < 4) push(tgt.x, tgt.y, lift, false, A.fx(`slashhit:${hAge}`), 0, 4);
           }
           break;
         }

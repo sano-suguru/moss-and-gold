@@ -4738,6 +4738,96 @@ function fxCrescent(d,f){
  }
  return {...fr,ax:S,ay:S};
 }
+/** 飛ぶ斬撃（高品質版）の色：白 → 水色 → 青 → 青紫 → 藍の縁取り。暗い所ほど紫へ寄せる */
+const CRES=[[255,255,255],[214,246,255],[150,214,255],[96,150,240],[78,96,206],[40,40,112]];
+/**
+ * 戦士の飛ぶ斬撃（高品質版）：三日月形の斬撃の波。d は向き（16方向、0 が右、時計回り）、f 0〜7。
+ *   0 振り抜き（引き伸ばされた細い弧と長い勢いの筋）、1 まとまる（一回り大きく明るい）、2〜4 満ちて飛ぶ（外の縁を光の帯が角から角へ走り、4 は角に星が光る）、
+ *   5 細くなる、6 光の破片に砕けて散る、7 消えかけの破片
+ * 形は、1ドットを4×4に分けて、そのうち形にかかる割合で決める（半分より多ければ塗り、少しかかるだけなら縁取りの色を置いて、縁の段差をなめらかにする）。
+ * 色は外の縁からの深さで、白・水色・青・青紫と変わり、外側に藍の縁取り。白と水色は光る（暗がりでも光って見える）。
+ * 向きごとに描き直すので、斜めでも線が崩れない
+ */
+function fxCrescent2(d,f){
+ const S=20,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const a=d*Math.PI/8,ca=Math.cos(a),sa=Math.sin(a);
+ const R=[15,15.5,14.5,14.5,14.5,14,14,14][f];
+ const K=[2.6,8,7.5,7.5,7.5,4.4,4.6,3.4][f];  // 中央の厚み
+ const back=[4,0,0,0,0,0,0,0][f];            // 振り抜きは少しうしろ
+ const span=[1.55,1.25,1.15,1.15,1.15,1.05,1.1,1.1][f]; // 角の角度（ラジアン）
+ const shade=[0,0,0,0,0,1,2,3][f];
+ const sheen=[-9,-9,-0.6,0.3,9,-9,-9,-9][f];  // 光の帯の位置（角度。範囲外なら無し）
+ const shards=f>=6, disp=f===6?2.2:4.2;
+ const inside=(u,v)=>{
+  // 外の縁の円（中心 0,0、半径 R）の中で、うしろの円（中心 −K,0）の外。角の角度まで
+  let uu=u+back,vv=v;
+  const phi=Math.atan2(vv,uu);
+  if(shards){
+   // 破片：角度を区切り、区切りごとに外へずらす
+   const seg=0.5,idx=Math.round(phi/seg),pc=idx*seg;
+   if(Math.abs(phi-pc)>seg*(f===6?0.36:0.28))return -1;
+   uu-=Math.cos(pc)*disp;vv-=Math.sin(pc)*disp;
+  }
+  const r1=Math.hypot(uu,vv),r2=Math.hypot(uu+K,vv),ph=Math.atan2(vv,uu);
+  if(Math.abs(ph)>span||r1>R||r2<R)return -1;
+  return R-r1;                                // 外の縁からの深さ
+ };
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+  let cover=0,dsum=0,ph0=0;
+  for(let sy=0;sy<4;sy++)for(let sx=0;sx<4;sx++){
+   const px=x-S+(sx+0.5)/4-0.5,py=y-S+(sy+0.5)/4-0.5;
+   const u=px*ca+py*sa+2,v=-px*sa+py*ca;
+   const dep=inside(u,v);
+   if(dep>=0){cover++;dsum+=dep;ph0+=Math.atan2(v,u+back)}
+  }
+  if(!cover)continue;
+  const cv=cover/16;
+  if(cv<0.5){ if(cv>=0.19)setPx(fr,x,y,CRES[Math.min(5,4+(shade>1?1:0))],false); continue; }
+  const dep=dsum/cover,ph=ph0/cover;
+  const th=Math.max(0.9,K*(1-Math.pow(Math.abs(ph)/span,2)));
+  let i=dep<1.7?0:dep<th*0.5?1:dep<th*0.78?2:dep<th*0.93?3:4;
+  if(Math.abs(ph-sheen)<0.16&&i>0)i--;       // 光の帯
+  i=Math.min(5,i+shade);
+  setPx(fr,x,y,CRES[i],i<=1&&f<=5);
+ }
+ // 振り抜きと満ちたコマの、うしろの勢いの筋（長さの違う三本）
+ if(f<=3){
+  const L=f===0?14:f===1?10:7;
+  for(const [sv,ln,ci] of [[0,L,2],[-5,L*0.65,3],[5,L*0.65,3]]){
+   for(let t=0;t<ln;t++){
+    const u=-K-2-back-t+R*0.55,v=sv;
+    const x=Math.round(S+u*ca-v*sa-2*ca),y=Math.round(S+u*sa+v*ca-2*sa);
+    setPx(fr,x,y,CRES[Math.min(5,ci+(t>ln*0.6?1:0))],false);
+   }
+  }
+ }
+ // 角に光る星（4コマ目）
+ if(f===4){
+  for(const sg of [-1,1]){
+   const u=Math.cos(span*0.92)*(R-1)+2,v=sg*Math.sin(span*0.92)*(R-1);
+   const cx=Math.round(S+u*ca-v*sa-2*ca),cy=Math.round(S+u*sa+v*ca-2*sa);
+   setPx(fr,cx,cy,CRES[0],true);
+   for(const [ox,oy] of [[1,0],[-1,0],[0,1],[0,-1]])setPx(fr,cx+ox,cy+oy,CRES[1],true);
+   for(const [ox,oy] of [[2,0],[-2,0],[0,2],[0,-2]])setPx(fr,cx+ox,cy+oy,CRES[3],false);
+  }
+ }
+ return {...fr,ax:S,ay:S};
+}
+/** 斬撃が当たった瞬間の火花：f 0〜3。白い芯から、青白い光の筋が八方へ伸び、細く短くなって消える */
+function fxSlashHit(f){
+ const S=9,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const L=[6,11,9,5][f],core=[2,2,1,0][f];
+ for(let k=0;k<8;k++){
+  const a=k*Math.PI/4+(k%2?0.2:0),ln=L*(k%2?0.6:1);
+  for(let t=0;t<=ln;t++){
+   const x=Math.round(S+Math.cos(a)*t),y=Math.round(S+Math.sin(a)*t);
+   const i=t<ln*0.35?(f<2?0:1):t<ln*0.7?2:3;
+   setPx(fr,x,y,CRES[Math.min(5,i+(f>=3?1:0))],i<=1);
+  }
+ }
+ for(let y=-core;y<=core;y++)for(let x=-core;x<=core;x++)if(Math.abs(x)+Math.abs(y)<=core)setPx(fr,S+x,S+y,CRES[0],true);
+ return {...fr,ax:S,ay:S};
+}
 /** 爪痕：三本の裂け目。f 0〜2で伸び、3〜5で薄れる。裂け目の芯は暗く、片側の縁が明るい */
 function fxClaw2(col,f){
  const W=21,H=21,fr=blank(W,H),C=FXR[col],grow=[0.4,0.75,1,1,1,1][f],keep=[1,1,1,0.7,0.4,0.18][f];
@@ -5167,4 +5257,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxCrescent, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxCrescent, fxCrescent2, fxSlashHit, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
