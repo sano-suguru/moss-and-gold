@@ -5,6 +5,7 @@ import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor'
 import { RANK_AT, unpackLook } from './eco/roster';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
+import { heroOrbAt } from './sprites';
 
 /** 冒険者の攻撃で、技の演出を振り下ろしのコマまで遅らせる tick 数（攻撃のコマ 0 構え・1 振り上げのあと） */
 const ADV_STRIKE_LAG = 4;
@@ -1371,6 +1372,11 @@ export class CreatureView {
         if (h) frame = this.atlas.hero(csp, !thrallOf && c.torch > 0 && csp !== 1 && csp < 4, h.look, h.rank, dir, act, f);
         // 英雄（位3）は足もとを淡い金色の光で照らす（絵に点を打たず、描画の柔らかい光で。描画専用）
         if (h && h.rank >= 3 && !c.dead && !hidden) dyn.push({ x, y: yy - 12, r: 34, i: 0.32, c: 4 });
+        // 魔法使いの攻撃：掲げた杖の宝玉が光る（掲げる・突き上げる・下ろすのコマで、明るく→いちばん明るく→薄れる。描画専用）
+        if (h && csp === 1 && act === 2 && f >= 1 && !c.dead && !hidden) {
+          const [ox, oy] = heroOrbAt(['down', 'up', 'side'][dir], f, h.rank) as number[];
+          dyn.push({ x: x + (flip ? -ox : ox), y: yy + oy - lift, r: [0, 30, 44, 22][f], i: [0, 0.5, 0.85, 0.3][f] * (h.rank === 0 ? 0.6 : 1), c: 1 });
+        }
         // 位が上がって初めての遠征：入ってきてしばらく、金の光の粒が体のまわりを立ちのぼる（「見違えた」）
         const pt = h && h.rank > 0 && h.ret === RANK_AT[h.rank] ? eco.parties.find((q) => q.id === c.party) : undefined;
         if (pt && eco.step - pt.since < 400) {
