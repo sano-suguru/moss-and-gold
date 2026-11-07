@@ -1431,13 +1431,15 @@ export class CreatureView {
             // 詠唱：溜めるにつれて宝玉の光がふくらんで脈打ち、光の粒が宝玉へ吸い寄せられる
             const p = Math.max(0, Math.min(1, (WIZ_WINDUP + c.actT) / WIZ_WINDUP));
             const pulse = 1 + 0.15 * Math.sin(t * 18 + c.id);
-            dyn.push({ x: qx, y: qy, r: (14 + 30 * p) * pulse, i: (0.25 + 0.6 * p) * (adv.rank === 0 ? 0.7 : 1), c: 1 });
-            for (let i = 0; i < 3; i++) {
-              const ph = (t * 1.6 + i / 3 + c.id * 0.11) % 1;
-              const rr = 12 * (1 - ph);
-              const a = i * 2.1 + t * 3;
-              pushSprite(qx + Math.cos(a) * rr, yy, -oy + lift + Math.sin(a) * rr * 0.5, false, A.speck(1, Math.min(3, Math.floor(ph * 4))), 0, 2);
+            dyn.push({ x: qx, y: qy, r: (18 + 34 * p) * pulse, i: (0.35 + 0.65 * p) * (adv.rank === 0 ? 0.8 : 1), c: 1 });
+            for (let i = 0; i < 5; i++) {
+              const ph = (t * 1.4 + i / 5 + c.id * 0.11) % 1;
+              const rr = 16 * (1 - ph);
+              const a = i * 1.26 + t * 2.5;
+              pushSprite(qx + Math.cos(a) * rr, yy + 0.1, -oy + lift + Math.sin(a) * rr * 0.6, false, A.fx(`bit:4:2:${3 - Math.min(3, Math.floor(ph * 4))}`), 0, 4);
             }
+            // 溜めの後半は、宝玉の先に火の玉が灯る
+            if (p > 0.45) pushSprite(qx, yy + 0.1, -oy + lift + 2, false, A.fx(`orb2:2:${Math.floor(t * 12) & 3}`), 0, 4);
           } else dyn.push({ x: qx, y: qy, r: [0, 30, 44, 22][f], i: [0, 0.5, 0.85, 0.3][f] * (adv.rank === 0 ? 0.6 : 1), c: 1 });
         }
         // 位が上がって初めての遠征：入ってきてしばらく、金の光の粒が体のまわりを立ちのぼる（「見違えた」）
