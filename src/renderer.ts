@@ -8,7 +8,7 @@ import { FS_BLIT, FS_BLUR, FS_BRIGHT, FS_LIGHT, FS_SCENE, FS_SHADOW, FS_SPRITE, 
 export interface FrameLights {
   /** 光源ごとに4つずつ：位置 x, y、半径 r、強さ intensity */
   pos: Float32Array;
-  /** 光源ごとに4つずつ：色 r, g, b と、壁で遮られるか occ（1 なら影を落とす） */
+  /** 光源ごとに4つずつ：色 r, g, b と、4つ目は壁で遮られるか（1 なら影を落とす）に、炎の光なら 2 を足した値 */
   col: Float32Array;
   n: number;
 }

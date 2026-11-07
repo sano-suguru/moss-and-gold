@@ -580,8 +580,26 @@ function boot(): void {
     for (const l of vis) {
       if (lights.n >= MAX_LIGHTS) break;
       const k = lights.n * 4;
-      lights.pos.set([l.x, l.y, l.r, l.i], k);
-      lights.col.set([l.c[0], l.c[1], l.c[2], l.occ ? 1 : 0], k);
+      // 炎の光（松明・焚き火・かがり火・鍛冶場の火。橙の 'torch'）：溶岩の光と同じく揺らがせ、まわりの空気に光暈を描く（描画だけ。シミュレーションの光は変えない）
+      const flame = l.kind === 'torch' && l.c[0] >= 0.95 && l.c[1] <= 0.7 && l.c[2] <= 0.35;
+      let i = l.i;
+      let r = l.r;
+      if (flame) {
+        // 揺らぎ：速さの違う三つの波を重ねる。位置ごとに位相をずらし、並んだ炎が一斉に明滅しないようにする（64px 四方ごとの位相なので、歩く松明でも位相はめったに跳ばない）
+        const ph = ((Math.floor(l.x / 64) * 7 + Math.floor(l.y / 64) * 13) % 31) * 0.71;
+        const fl = Math.sin(t * 7.3 + ph) * 0.05 + Math.sin(t * 11.9 + ph * 1.7) * 0.04 + Math.sin(t * 2.9 + ph * 2.3) * 0.05;
+        i *= 1 + fl;
+        r *= 1 + fl * 0.4;
+        if (halos.n < MAX_LIGHTS) {
+          const h = halos.n * 4;
+          // 光暈：炎のまわり（光の届く半径の4割）に、加算で淡い暖色の光を4段の網点で描く（光の筋の帯と同じ描き方）
+          halos.pos.set([l.x, l.y, l.r * 0.4, Math.min(1, 0.55 * i)], h);
+          halos.col.set([1.0, 0.7, 0.42, 0], h);
+          halos.n++;
+        }
+      }
+      lights.pos.set([l.x, l.y, r, i], k);
+      lights.col.set([l.c[0], l.c[1], l.c[2], (l.occ ? 1 : 0) + (flame ? 2 : 0)], k);
       lights.n++;
     }
     let ns = 0;

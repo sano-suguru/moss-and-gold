@@ -84,6 +84,8 @@ void main() {
   float fb = texture(uFx, fu).r * 0.4 + (texture(uFx, fu + vec2(fd.x, 0.0)).r + texture(uFx, fu - vec2(fd.x, 0.0)).r + texture(uFx, fu + vec2(0.0, fd.y)).r + texture(uFx, fu - vec2(0.0, fd.y)).r) * 0.15
     + (texture(uFx, fu + 2.0 * vec2(fd.x, 0.0)).r + texture(uFx, fu - 2.0 * vec2(fd.x, 0.0)).r + texture(uFx, fu + 2.0 * vec2(0.0, fd.y)).r + texture(uFx, fu - 2.0 * vec2(0.0, fd.y)).r) * 0.08;
   L += fb * vec3(1.0, 0.5, 0.16) * 2.4;
+  // 炎の光（松明・焚き火・かがり火・鍛冶場の火と、炎の色の動く光）は、ほかの光と分けて Lf に集め、最後にまとめて頭打ちにする（下の説明）
+  vec3 Lf = vec3(0.0);
   // 光を帯びた生き物（遮らない小さな光）
   for (int i = 0; i < 48; i++) {
     if (i >= uNumD) break;
@@ -95,17 +97,40 @@ void main() {
     float inten = dl.w - ci * 10.0;
     // 色：0 青白、1 炎、2 紫、3 白、4 金、5 毒（緑）、6 血（赤）、7 霜
     vec3 dc = ci < 0.5 ? uDCol : (ci < 1.5 ? vec3(1.0, 0.55, 0.22) : (ci < 2.5 ? vec3(0.72, 0.52, 1.0) : (ci < 3.5 ? vec3(1.0) : (ci < 4.5 ? vec3(1.0, 0.85, 0.5) : (ci < 5.5 ? vec3(0.6, 1.0, 0.45) : (ci < 6.5 ? vec3(1.0, 0.35, 0.3) : vec3(0.7, 0.9, 1.0)))))));
-    L += f * f * inten * dc;
+    if (ci > 0.5 && ci < 1.5) Lf += f * f * inten * dc;
+    else L += f * f * inten * dc;
   }
   for (int i = 0; i < ${MAX_LIGHTS}; i++) {
     if (i >= uNum) break;
     vec4 l = uL[i];
+    // uC.w：1 の位は壁で遮られるか、2 を足してあれば炎の光
+    bool flame = uC[i].w > 1.5;
+    bool occ = mod(uC[i].w, 2.0) > 0.5;
+    // 炎の光は、光の筋（天井からの光）と同じく二層にする：狭い芯と、その1.6倍まで広がる淡い照り返し
+    float R = flame ? l.z * 1.6 : l.z;
     float d = distance(p, l.xy);
-    if (d >= l.z) continue;
-    float f = 1.0 - d / l.z;
-    float v = f * (0.45 + 0.55 * f) * l.w;
-    if (uC[i].w > 0.5) v *= vis(l.xy, p);
-    L += v * uC[i].rgb;
+    if (d >= R) continue;
+    float vv = occ ? vis(l.xy, p) : 1.0;
+    float f = max(0.0, 1.0 - d / l.z);
+    float v = f * (0.45 + 0.55 * f) * l.w * vv;
+    if (flame) {
+      float f2 = 1.0 - d / R;
+      // 照り返しは炎より淡く白っぽい暖色（光の筋の照り返しが芯より白いのと同じ考え）
+      Lf += v * uC[i].rgb + f2 * f2 * l.w * 0.14 * vv * vec3(1.0, 0.84, 0.7);
+    } else {
+      L += v * uC[i].rgb;
+    }
+  }
+  // 炎の光の頭打ち：炎は強い橙なので、そのまま足すと照らされた床も生き物も赤が飽和し、模様の消えた橙の面になる。
+  // 光る苔に上限をつけたのと同じ考えで、強さ（いちばん強い色の成分）を 0.7 からゆるやかに頭打ちにし（上限 1.15）、
+  // 強いほど色味を白へ寄せる（芯は光の筋と同じ淡い暖色になり、縁へ行くほど炎の橙が残る）
+  {
+    float m = max(Lf.r, max(Lf.g, Lf.b));
+    if (m > 1e-4) {
+      vec3 hue = Lf / m;
+      float me = m < 0.7 ? m : 0.7 + 0.45 * (1.0 - exp(-(m - 0.7) / 0.45));
+      L += mix(hue, vec3(1.0, 0.92, 0.8), 0.55 * smoothstep(0.35, 1.3, m)) * me;
+    }
   }
   // α には溶岩から来た光の強さだけを入れる（場面の側で、閉じた空洞の色抜きからこの分を外し、照り返しの橙を残すのに使う）
   o = vec4(L * 0.5, clamp(lavaL * 0.9, 0.0, 1.0));
@@ -950,15 +975,16 @@ void main() {
     }
   }
 
-  // 光暈（苔のにじみ）
+  // 光暈：炎のまわりの空気の光（src/main.ts で松明・焚き火などの炎の光ごとに入れる）。
+  // 加算で、網点を使わず滑らかに描く（HD-2D：地形と生き物はドット絵のまま、光の効果は滑らかに。面で広がる光に網点を使うと、床一面が市松模様に汚れる）。
+  // 芯の近くほど急に明るく（距離の3乗）、縁はかすかに消える
   for (int i = 0; i < ${MAX_LIGHTS}; i++) {
     if (i >= uNumHalo) break;
     vec4 H = uH[i];
     float d = distance(wp + 0.5, H.xy);
     if (d >= H.z) continue;
     float a = 1.0 - d / H.z;
-    a = floor(a * a * H.w * 4.0 + bq) / 4.0;
-    col += uHC[i].rgb * a * (120.0 / 255.0);
+    col += uHC[i].rgb * (a * a * a * 0.8 + a * a * 0.2) * H.w * (120.0 / 255.0);
   }
 
   // 光の筋と塵
@@ -1233,10 +1259,25 @@ void main() {
     if (e > 0.12) { o = vec4(mix(tx.rgb * 0.4, vec3(0.74, 0.92, 1.0), 0.35 + 0.65 * e) * (0.55 + 0.6 * e), 1.0); return; }
   }
   vec3 L = lightAt(wp + vec2(0.0, vPos.z));
+  // 生き物に当てる光のトーンマッピング（HD-2D：光は暖かい色味を足すが、ドット絵の明暗の段と色の違いは潰さない）。
+  // 光の地図は各色 0〜2 まで届くので、そのまま掛けると焚き火や松明のそばでは赤が2倍を超え、肌も髪も服も赤が頭打ちになって
+  // 同じ明るさの橙の塊になる。そこで光を「強さ（いちばん強い色の成分）」と「色味（強さで割ったもの）」に分け、
+  //  - 強さは 0.85 を超えるとゆるやかに頭打ちにし（上限 1.1）、絵のいちばん明るい色でも飽和しにくくする
+  //  - 色味は明るいほど白に寄せ（強い光でも半分まで）、光の色が絵の色を塗りつぶさないようにする
+  // 暗い所（強さ 0.6 未満）は今までと同じ掛け方のまま（夜や苔明かりの色合いは変えない）。
+  float Lm = max(L.r, max(L.g, L.b));
+  vec3 Lhue = L / max(Lm, 1e-4);
+  float Lsat = mix(1.0, 0.5, smoothstep(0.6, 1.4, Lm));
+  float Lme = Lm < 0.85 ? Lm : 0.85 + 0.25 * (1.0 - exp(-(Lm - 0.85) / 0.25));
+  vec3 Ls = mix(vec3(1.0), Lhue, Lsat) * Lme;
   float bq = bayer(wi);
-  vec3 q = floor(L * 6.0 + bq * clamp(L * 5.0, 0.0, 1.0)) / 6.0;
+  // 光の段：暗い所は 1/6 刻みの網点（暗がりの質感）。明るい所では刻みを細かくして、体の上に市松模様が出て絵柄を乱さないようにする
+  float qn = mix(6.0, 24.0, smoothstep(0.6, 1.0, Lme));
+  vec3 q = floor(Ls * qn + bq * clamp(Ls * 5.0, 0.0, 1.0)) / qn;
   float lum = (q.r + q.g + q.b) / 3.0;
   vec3 col = tx.rgb * q * 1.15;
+  // 頭打ちにした分の光は、絵の明暗に関係なく一様に暖かい色味として足す（差は変えないので、明暗の段は残る）
+  col += Lhue * min(max(Lm - 1.0, 0.0), 1.0) * 0.07;
   // 暗がりでも、姿は青く沈んだ色でいつも見える
   if (terrLit) {
     // （地形の岩の上面と同じ下限：光がなくても地層の色と模様が読める明るさ）
@@ -1264,7 +1305,7 @@ void main() {
     if (length(g) > 0.03) {
       vec2 d = normalize(g);
       ivec2 s = ivec2(abs(d.x) > 0.38 ? int(sign(d.x)) : 0, abs(d.y) > 0.38 ? int(sign(d.y)) : 0);
-      if (!solidPx(l + s)) col += normalize(L + 0.001) * 0.42 * min(1.0, lum * 1.6);
+      if (!solidPx(l + s)) col += normalize(Ls + 0.001) * 0.42 * min(1.0, lum * 1.6);
     }
   }
   if (fxLit) {
