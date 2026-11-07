@@ -4794,9 +4794,9 @@ function fxSlashHit(f){
  * 高品質版のエフェクトの共通の描き方：1ドットを4×4に分け、形の中にある分け目の割合で塗るかを決める。
  * fn(x, y) は中心からの位置（ドットの小数）で、色の番号（0 がいちばん明るい）か、形の外なら −1 を返す。
  * 半分より多くかかるドットは、かかった分け目の色の番号の平均で塗る。少しだけかかるドットには、色の表の最後（縁取りの色）を置いて縁の段差をなめらかにする。
- * 色の番号が emisMax 以下のドットは光る（暗がりでも光って見える）
+ * 色の番号が emisMax 以下のドットは光る（暗がりでも光って見える）。edge が false なら縁取りの色を置かない（重ねて帯にする絵は、縁取りが帯の中に点々と残る）
  */
-function aaDraw(fr,cx,cy,pal,emisMax,fn){
+function aaDraw(fr,cx,cy,pal,emisMax,fn,edge=true){
  const out=pal.length-1;
  for(let y=0;y<fr.H;y++)for(let x=0;x<fr.W;x++){
   let cover=0,sum=0;
@@ -4805,7 +4805,7 @@ function aaDraw(fr,cx,cy,pal,emisMax,fn){
    if(i>=0){cover++;sum+=i}
   }
   if(!cover)continue;
-  if(cover<8){if(cover>=3&&!fr.px[(y*fr.W+x)*4+3])setPx(fr,x,y,pal[out],false);continue}
+  if(cover<8){if(edge&&cover>=3&&!fr.px[(y*fr.W+x)*4+3])setPx(fr,x,y,pal[out],false);continue}
   const i=Math.min(out,Math.round(sum/cover));
   setPx(fr,x,y,pal[i],i<=emisMax);
  }
@@ -4901,24 +4901,42 @@ function fxHolyCross(f){
  return {...fr,ax:S,ay:S};
 }
 
-/** マジックミサイルの弾：f 0〜3（白い芯がちらつく紫の魔力の玉） */
+/**
+ * マジックミサイルの弾：f 0〜3。白い芯と淡い紫の内側の紫の玉（直径9ドットほど）。芯の大きさがわずかに脈打つ
+ * （玉のまわりに光の輪を出すと、尾が輪に埋もれて紫の塊に見え、細い輪は点線に見えた）
+ */
 function fxMissileHead(f){
- const S=6,W=S*2+1,H=S*2+1,fr=blank(W,H);
- const R=[3.6,3.9,3.6,3.3][f],core=[1.3,1.6,1.1,1.4][f];
- aaDraw(fr,S,S,PURPL,2,(x,y)=>{const r=Math.hypot(x,y);if(r>R)return -1;return r<core?0:r<R*0.55?1:r<R*0.8?2:3});
+ const S=9,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const R=4.6,core=[1.8,2.2,1.8,1.5][f];
+ aaDraw(fr,S,S,PURPL,2,(x,y)=>{
+  const r=Math.hypot(x,y);
+  if(r<=R){
+   // 左上に小さな光沢
+   if(Math.hypot(x+1.3,y+1.3)<1.1)return 0;
+   return r<core?0:r<3.1?1:r<4?2:3;
+  }
+  return -1;
+ });
  return {...fr,ax:S,ay:S};
 }
-/** マジックミサイルの尾の一節：d は向き（16方向）、w 0〜3（0 がいちばん太く明るい。弾から離れるほど細く暗い）。つないで、細くなっていく帯にする */
-function fxMissileTrail(d,w){
- const S=7,W=S*2+1,H=S*2+1,fr=blank(W,H);
- const a=d*Math.PI/8,ca=Math.cos(a),sa=Math.sin(a);
- const hw=[2.4,1.8,1.25,0.8][w];
- aaDraw(fr,S,S,PURPL,w<=1?2:-1,(x,y)=>{
-  const s=x*ca+y*sa,t=Math.abs(-x*sa+y*ca);
-  if(s<-5||s>5||t>hw)return -1;
-  const r=t/hw;
-  return Math.min(4,(r<0.35?1:r<0.75?2:3)+(w>=2?1:0));
- });
+/**
+ * マジックミサイルの尾をつくる丸：k 0〜5（0 が弾のすぐうしろで、太く明るい。5 がいちばん先で、細く暗い）。
+ * 通り道に沿って密に重ねて、少しずつ細くなっていく帯にする（向きごとの絵をつなぐと、つなぎ目が段になった）
+ */
+function fxMissileDisc(k){
+ const S=5,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const R=[3.4,2.9,2.4,1.9,1.4,0.9][k];
+ const core=[0,1,1,2,2,3][k];
+ aaDraw(fr,S,S,PURPL,k<=3?2:-1,(x,y)=>{const r=Math.hypot(x,y);if(r>R)return -1;return Math.min(4,r<R*0.45?core:core+1)},false);
+ return {...fr,ax:S,ay:S};
+}
+/** マジックミサイルの尾からこぼれる魔力の粒：f 0〜3（小さな四つ角の星が、光ってしぼむ） */
+function fxMissileSpark(f){
+ const S=3,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const c=PURPL[[0,1,2,3][f]];
+ setPx(fr,S,S,c,f<2);
+ if(f<3)for(const [ox,oy] of [[1,0],[-1,0],[0,1],[0,-1]])setPx(fr,S+ox,S+oy,PURPL[Math.min(4,f+2)],f<1);
+ if(f===0)for(const [ox,oy] of [[2,0],[-2,0],[0,2],[0,-2]])setPx(fr,S+ox,S+oy,PURPL[3],false);
  return {...fr,ax:S,ay:S};
 }
 /** マジックミサイルが届いたときの弾け：f 0〜5。白い芯から紫の四つの光の筋が伸び、輪が広がって薄れる */
@@ -5409,4 +5427,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileTrail, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

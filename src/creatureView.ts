@@ -570,36 +570,57 @@ export class CreatureView {
           break;
         }
         case 'missile': {
-          // 魔法使いのマジックミサイル（src/eco/adventurer.ts）：白い芯の紫の魔力の弾（src/sprites.ts の fxMissileHead）が、弧を描いて狙った相手を追いかけ、
-          // 細くなっていく紫の帯の尾（fxMissileTrail をつないだもの）を引く。届くと紫に弾ける（fxMissileBurst）
+          // 魔法使いのマジックミサイル（src/eco/adventurer.ts）：白い芯の紫の魔力の弾（src/sprites.ts の fxMissileHead）が、
+          // 杖からまず左右へ分かれて飛び出し、それから曲がって狙った相手を追いかける。通り道に沿って、細くなっていく紫の帯の尾（fxMissileDisc を密に重ねたもの）を引き、
+          // 尾から魔力の粒がこぼれる。届くと紫に弾ける（fxMissileBurst）。4発は少しずつずれて飛び出す
           const fly = r.fly ?? 8;
           const tgt = eco.byId.get(r.did);
           const ex = tgt && !tgt.dead ? tgt.x : r.dx;
           const ey = tgt && !tgt.dead ? tgt.y : r.dy;
-          const side = [-1, 1, -0.55, 0.55][(r.n ?? 0) % 4];
-          const mx = (r.ax + ex) / 2 - uy * dist * 0.45 * side;
-          const my = (r.ay + ey) / 2 + ux * dist * 0.45 * side;
+          const ni = (r.n ?? 0) % 4;
+          const side = [-1, 1, -0.65, 0.65][ni];
+          const spread = Math.min(30, 14 + dist * 0.25) * (ni < 2 ? 1 : 0.7);
+          const ox = r.ax + ux * 4;
+          const oy = r.ay + uy * 4;
+          // 三次ベジェ：飛び出し（横へ、少しうしろへ）→ 相手の手前から真っすぐ相手へ
+          const c1x = ox - uy * spread * side - ux * 6;
+          const c1y = oy + ux * spread * side - uy * 6;
+          const c2x = ex - ux * dist * 0.35 - uy * spread * side * 0.3;
+          const c2y = ey - uy * dist * 0.35 + ux * spread * side * 0.3;
           const at = (q: number) => {
             const k = 1 - q;
-            return [k * k * r.ax + 2 * k * q * mx + q * q * ex, k * k * r.ay + 2 * k * q * my + q * q * ey];
+            const a1 = k * k * k, a2 = 3 * k * k * q, a3 = 3 * k * q * q, a4 = q * q * q;
+            return [a1 * ox + a2 * c1x + a3 * c2x + a4 * ex, a1 * oy + a2 * c1y + a3 * c2y + a4 * ey];
           };
-          if (age < fly) {
-            const q = age / fly;
+          const start = ni * 0.6;
+          const qa = (age - start) / (fly - start);
+          if (qa >= 0 && qa < 1) {
+            const q = qa;
             const [hx, hy] = at(q);
-            // 尾：弾から後ろへ、3ドットおきに一節ずつ、離れるほど細く
-            let [px0, py0] = [hx, hy];
-            for (let k = 1; k <= 8; k++) {
-              const qq = q - k * 0.03;
-              if (qq <= 0) break;
+            // 尾：弾から後ろへ、通り道に沿って密に（長さはおよそ弾の道のりの半分まで）
+            const tail = Math.min(q, 0.5);
+            const steps = Math.max(6, Math.round(tail * (dist + spread) / 1.6));
+            for (let i = steps; i >= 1; i--) {
+              const qq = q - (tail * i) / steps;
               const [tx, ty] = at(qq);
-              const d16 = (Math.round(Math.atan2(py0 - ty, px0 - tx) / (Math.PI / 8)) + 16) % 16;
-              push((tx + px0) / 2, (ty + py0) / 2, lift + 3, false, A.fx(`mmtrail:${d16}:${Math.min(3, (k - 1) >> 1)}`), 0, 4);
-              px0 = tx;
-              py0 = ty;
+              const k = Math.min(5, Math.floor((i / steps) * 6));
+              push(tx, ty, lift + 3, false, A.fx(`mmdisc:${k}`), 0, 4);
+            }
+            // こぼれる粒：尾の途中から、少し外へ流れて光ってしぼむ
+            for (let j = 0; j < 2; j++) {
+              const ph = ((age + j * 1.9 + ni) % 4) / 4;
+              const [sx, sy] = at(Math.max(0, q - tail * (0.45 + j * 0.3)));
+              const ang = (r.t * 3 + j * 2.1 + ni) % 6.283;
+              push(sx + Math.cos(ang) * ph * 6, sy + Math.sin(ang) * ph * 4, lift + 3 + ph * 4, false, A.fx(`mmspark:${Math.min(3, Math.floor(ph * 4))}`), 0, 4);
             }
             push(hx, hy, lift + 3, false, A.fx(`mmhead:${age & 3}`), 0, 4);
-            dyn.push({ x: hx, y: hy - lift, r: 28, i: 0.4 * damp, c: 2 });
-          } else if (age < fly + 6) push(ex, ey, lift, false, A.fx(`mmburst:${age - fly}`), 0, 4);
+            dyn.push({ x: hx, y: hy - lift, r: 44, i: 0.6 * damp, c: 2 });
+            const [mx2, my2] = at(Math.max(0, q - tail * 0.5));
+            dyn.push({ x: mx2, y: my2 - lift, r: 30, i: 0.3 * damp, c: 2 });
+          } else if (age >= fly && age < fly + 6) {
+            push(ex, ey, lift, false, A.fx(`mmburst:${age - fly}`), 0, 4);
+            dyn.push({ x: ex, y: ey - lift, r: 48, i: 0.6 * damp * (1 - (age - fly) / 6), c: 2 });
+          }
           break;
         }
         case 'rain': {
