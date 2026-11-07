@@ -163,6 +163,56 @@ export function hunt(this: Ecology, c: Cr, R: number, kinds: Kind[], speed: numb
   return true;
 }
 
+/** 撃たれた大物が撃ち手へ向かうのは、最後に撃たれてから何 tick の内か（呪文はおよそ8 tick ごとに飛ぶので、撃たれ続けるあいだは続く） */
+export const SHOT_CHARGE_T = 150;
+/** 撃ち手へ向かう大物が、撃ち手を見失う距離（マス） */
+const SHOT_CHARGE_R = 9;
+
+/**
+ * 撃たれた大物の仕返し：離れた所から呪文や矢で打ってきた冒険者（魔法使い・狩人）へ、いちばん近い獲物をおいて突っ込んでいく。
+ * 途中で別の冒険者（前衛）が体のそば（14px の内）まで来たら、その者と打ち合う（前衛が割って入る）。
+ * 前衛に打たれると、打ってきた相手（foe）がその前衛に替わるので、撃ち手へ向かうのはやめる。また撃たれれば、また撃ち手へ向かう。
+ * 撃ち手かどうかは、最後に打ってきた相手（foe）とその時刻（hitAt）だけで決める（どちらもセーブに入っている）。
+ * 知性ある者（賢さの段階3以上）は、ふだんの狩りと同じく、かなわない撃ち手には向かわない。true なら今は仕返しをしている
+ */
+export function chargeShooter(this: Ecology, c: Cr, speed: number): boolean {
+  if (c.flee > 0 || this.w.tick - c.hitAt > SHOT_CHARGE_T) return false;
+  const f = this.byId.get(c.foe);
+  if (!f || f.dead || f.away || f.k !== Kind.Adventurer || (f.sp !== Job.Wizard && f.sp !== Job.Hunter)) return false;
+  const d2 = sq(f.x - c.x) + sq(f.y - c.y);
+  if (d2 > SHOT_CHARGE_R * TILE * SHOT_CHARGE_R * TILE) return false;
+  if ((TIER[c.k] ?? 1) >= 3 && this.str(f) * (f.hp > 0 ? f.hp / this.maxHp(f) : 1) > this.str(c) * 1.1) return false;
+  // 割って入った前衛：体のそばにいる、撃ち手でない冒険者
+  let block: Cr | null = null;
+  let bd = 14 * 14;
+  this.nearby(c.x, c.y, 1, (o) => {
+    if (o === f || o.dead || o.away || o.k !== Kind.Adventurer) return;
+    const d = sq(o.x - c.x) + sq(o.y - c.y);
+    if (d < bd) {
+      bd = d;
+      block = o;
+    }
+  });
+  const t = (block as Cr | null) ?? f;
+  this.markNotice(c, t, '!');
+  c.dir = Math.abs(t.x - c.x) > Math.abs(t.y - c.y) ? (t.x > c.x ? 2 : 3) : t.y > c.y ? 0 : 1;
+  if (block || d2 < 11 * 11) {
+    // 分析用：撃ち手に打ちかかった（how 1）／割って入った前衛に打ちかかった（how 2）。その相手への最初の一打ちのときだけ記録する
+    if (t.foe !== c.id) this.record('settle', { t: this.w.tick, k: c.k, ev: 'shotCharge', id: c.id, how: block ? 2 : 1, n: t.sp, x: Math.round(c.x), y: Math.round(c.y) } as never);
+    this.fight(c, t);
+    return true;
+  }
+  c.act = 1;
+  if (c.k === Kind.Minotaur && d2 > 2 * TILE * 2 * TILE) {
+    // ミノタウロスは一直線に突進する（狩りと同じ。壁にぶつかると一瞬よろめく）
+    const x0 = c.x;
+    const y0 = c.y;
+    this.moveToward(c, f.x, f.y, speed * 1.8);
+    if (Math.abs(c.x - x0) + Math.abs(c.y - y0) < speed * 0.5) c.gait = 14;
+  } else this.goTo(c, f.x, f.y, speed * 1.3);
+  return true;
+}
+
 /** 体力の上限（強さに比例） */
 export function maxHp(this: Ecology, c: Cr): number {
   // リビングアーマー（空の鎧）は固い。固さは体になった武具の数で決まり、手に取った武器と盾は打撃（強さ）だけを上げる（src/eco/armor.ts の armorHp）
@@ -353,6 +403,7 @@ declare module '../ecology' {
     defend: typeof defend;
     leaveIfStarving: typeof leaveIfStarving;
     hunt: typeof hunt;
+    chargeShooter: typeof chargeShooter;
     maxHp: typeof maxHp;
     bleed: typeof bleed;
     strike: typeof strike;
@@ -364,4 +415,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { str, defend, leaveIfStarving, hunt, maxHp, bleed, strike, fight, woundsAndFlight, fleeFrom, cower, limp });
+Object.assign(Ecology.prototype, { str, defend, leaveIfStarving, hunt, chargeShooter, maxHp, bleed, strike, fight, woundsAndFlight, fleeFrom, cower, limp });

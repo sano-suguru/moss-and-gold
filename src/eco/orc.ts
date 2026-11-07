@@ -37,6 +37,7 @@ export function orc(this: Ecology, c: Cr): void {
   if ((c.st === 0 || c.st === 9) && this.step % 10 === c.id % 10 && this.goCollect(c)) return;
   if (this.leaveIfStarving(c)) return;
   if (c.act === 2 && c.actT < 4) return;
+  if (this.chargeShooter(c, s.speed)) return;
   if (c.hungry) {
     if (this.hunt(c, 10, HUNT_ORC, s.speed * 1.2)) return;
     // 近くのコボルトの住処を襲いに行く（ゴブリンの集落は襲わない：従える相手）
