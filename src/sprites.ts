@@ -2080,6 +2080,102 @@ const pxSteelLegs=g=>g&&g.map(r=>r.replace(/[Bbv]/g,ch=>({B:'3',b:'2',v:'1'})[ch
 const pxPad=k=>'.'.repeat(Math.max(0,k));
 /** 型の中の柄（c）の位置。剣を手に合わせて置くのに使う */
 function pxGrip(g){for(let y=0;y<g.length;y++){const x=g[y].indexOf('c');if(x>=0)return [x,y]}return [0,0]}
+// 手描きの冒険者の1コマの大きさ（アトラスの1区画 HERO_CELL=48 に収まる）。体の左に PX_FX、足の下に PX_FB-1 ピクセルの余白があり、攻撃で振る持ち物が切れずに収まる
+const PX_FW=48,PX_FH=48,PX_FX=17,PX_FB=6;
+// ---- 攻撃の腕と持ち物（体の座標で点を打って作る部品） ----
+// 攻撃のコマでは、持ち物を握る腕を胴の型から外し、肩から手までの腕を別の部品として描く。持ち物はその手に握らせる（柄が手の中を通る）。
+// 体の座標：頭の型の左上が (0,0)。胴は11〜17行、腕は正面と後ろでは胴の1〜2列（右腕は11〜12列）、横向きでは5〜9列。
+/** 点を打って部品を作る。draw に put(x,y,文字) と line(x0,y0,x1,y1,文字) を渡す。外側に輪郭を1本だけ回し、{g, x, y}（型と、体の座標での左上）を返す */
+function pxPaint(draw){
+ const pts=new Map(),put=(x,y,c)=>{if(c)pts.set(x+','+y,[x,y,c])};
+ const line=(x0,y0,x1,y1,c)=>{const n=Math.max(Math.abs(x1-x0),Math.abs(y1-y0));for(let i=0;i<=n;i++)put(Math.round(x0+(x1-x0)*i/(n||1)),Math.round(y0+(y1-y0)*i/(n||1)),c)};
+ draw(put,line);
+ let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const [x,y] of pts.values()){x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y)}
+ const g=Array.from({length:y1-y0+3},()=>Array(x1-x0+3).fill('.'));
+ for(const [x,y,c] of pts.values())g[y-y0+1][x-x0+1]=c;
+ return {g:pxO(g.map(r=>r.join(''))),x:x0-1,y:y0-1};
+}
+/** 胴の型から、持ち物を握る腕を外す（腕の列を胴の続きの色で埋める。体の幅は変えない）。side：'L' 画面の左の腕、'R' 右の腕、'S' 横向きの前の腕。肩から手の行（11〜14行、胴の型では0〜3行）だけ */
+function pxNoArm(torso,side){
+ return torso.map((row,y)=>{
+  if(y>3)return row;
+  const r=[...row];
+  if(side==='L'){r[1]=r[2]=r[3]}
+  else if(side==='R'){r[11]=r[12]=r[10]}
+  else{let f=r[10];if('cLlK'.includes(f))f=[...torso[2]][10];for(let x=5;x<=9;x++)r[x]=f}
+  return r.join('');
+ });
+}
+/** 胴の型の腕の明るい段と暗い段の文字（腕を別の部品で描くときの袖の色） */
+function pxSleeve(torso,side){const r=torso[1],a=side==='L'?[r[1],r[2]]:side==='R'?[r[11],r[12]]:[r[6],r[8]];return PX_MAT[a[0]]&&PX_MAT[a[1]]&&PX_MAT[a[0]][1]<PX_MAT[a[1]][1]?[a[1],a[0]]:a}
+/**
+ * 腕（肩 (sx,sy) から手 (hx,hy) まで、太さ2）と、手に握った持ち物。
+ * hold(put,line) は手の位置を基準に持ち物の点を打つ関数で、腕の袖より上・手より下に塗る（柄が手の中を通って見える）。
+ * 手は2×2の肌の塊（上の段が明るい）
+ */
+function pxArmHold(sx,sy,hx,hy,sl,hold,noHand=false){
+ return pxPaint((put,line)=>{
+  const vert=Math.abs(hy-sy)>=Math.abs(hx-sx);
+  line(sx,sy,hx,hy,sl[0]);line(sx+(vert?1:0),sy+(vert?0:1),hx+(vert?1:0),hy+(vert?0:1),sl[1]);
+  if(hold)hold(put,line);
+  if(!noHand){put(hx,hy,'S');put(hx+1,hy,'S');put(hx,hy+1,'s');put(hx+1,hy+1,'s')}
+ });
+}
+/**
+ * 剣の点を打つ（手 (hx,hy) が柄を握り、刃が向き (ux,uy) へ n ピクセル伸びる）。刃は太さ2で、明るい段と暗い段。
+ * 鍔は刃の根もとに刃と直角に3ピクセル、柄頭は手の反対側。wood は見習いの木の棒（鍔なし）、hero は宝石の鍔
+ */
+function pxBladePts(put,hx,hy,ux,uy,n,wood,hero,wide=false){
+ // 向きは整数の比（(0,-1) 真上、(1,-1) 斜め45度、(2,1) 横2・縦1）。手の2×2の塊の、向きの側の縁から1歩先が鍔、その先が刃
+ const m=Math.max(Math.abs(ux),Math.abs(uy)),st=i=>[Math.round(i*ux/m),Math.round(i*uy/m)];
+ const vert=Math.abs(uy)>=Math.abs(ux),wx=vert?1:0,wy=vert?0:1;
+ const ex=ux>0?hx+1:hx,ey=uy>0?hy+1:hy,[s1x,s1y]=st(1),E=[ex+s1x,ey+s1y];
+ const bx=ux>0?hx:ux<0?hx+1:hx,by=uy>0?hy:uy<0?hy+1:hy;put(bx-s1x,by-s1y,wood?'d':'G');
+ if(!wood){
+  // 鍔は刃と直角に：まっすぐな刃なら刃の両脇へ1ピクセルずつ（幅4）、斜めの刃なら斜めに3ピクセル
+  const nx=-Math.sign(uy),ny=Math.sign(ux),ax=!ux||!uy;
+  put(E[0],E[1],hero?'w':'G');
+  if(ax){put(E[0]+wx,E[1]+wy,'G');put(E[0]-nx,E[1]-ny,'G');put(E[0]+wx+nx,E[1]+wy+ny,'G')}else{put(E[0]+nx,E[1]+ny,'G');put(E[0]-nx,E[1]-ny,'G')}
+ }
+ // wide：竜殺しの大剣は刃が太さ3（明るい段2つと暗い段）、鍔も両脇へ1ピクセルずつ長い
+ if(wide&&!wood){const nx=-Math.sign(uy),ny=Math.sign(ux),ax=!ux||!uy;if(ax){put(E[0]+2*wx+nx,E[1]+2*wy+ny,'G');put(E[0]-2*nx,E[1]-2*ny,'G');put(E[0]+2*wx,E[1]+2*wy,'G')}else{put(E[0]+2*nx,E[1]+2*ny,'G');put(E[0]-2*nx,E[1]-2*ny,'G')}}
+ for(let i=wood?0:1;i<=n;i++){const [a,b]=st(i),x=E[0]+a,y=E[1]+b;put(x,y,wood?'D':'4');if(i<n)put(x+wx,y+wy,wood?'D':wide?'4':'2');if(wide&&i<n-1)put(x+2*wx,y+2*wy,'2')}
+}
+/**
+ * 戦士の攻撃の1コマ：腕を外す胴の側と、描く部品（{g,x,y,behind,soft}。体の座標）。
+ * 0 構え（剣を体の脇に立てて持ち上げる）、1 振り上げ（手を頭の脇まで上げ、刃を頭の後ろへ倒す）、2 振り下ろし（腕を伸ばして斜めに斬り下ろす）、3 戻り（下ろした剣を体の脇へ戻す）
+ */
+function pxWarriorSwing(dir,q,rank,torso){
+ const n=[5,7,8,9][rank],wood=rank===0,hero=rank>=3;
+ const side=dir==='down'?'L':dir==='up'?'R':'S',sl=pxSleeve(torso,side);
+ const blade=(hx,hy,ux,uy)=>put=>pxBladePts(put,hx,hy,ux,uy,n,wood,hero);
+ // 腕が体に重なるところの輪郭：袖と同じ材質のいちばん暗い段（袖の暗い段だと、胸の前で腕と胴が溶け合う）
+ const role=PX_MAT[sl[1]][0],sd=Object.keys(PX_MAT).find(k=>PX_MAT[k][0]===role&&PX_MAT[k][1]===(role==='steel'||role==='pc'?0:1))||sl[1];
+ // 刃を体の後ろに描くときは、腕と剣を別の部品にする（剣を先に描き、腕と手を体より後に）
+ const arm=(sx,sy,hx,hy,ux,uy,bladeBehind)=>{
+  if(!bladeBehind)return [{...pxArmHold(sx,sy,hx,hy,sl,blade(hx,hy,ux,uy)),soft:sd}];
+  return [{...pxPaint(blade(hx,hy,ux,uy)),behind:true},{...pxArmHold(sx,sy,hx,hy,sl,null),soft:sd}];
+ };
+ // 腕の長さは、立ち姿の腕（肩から手まで3〜4ピクセル）と同じくらいにする。頭の上まで届かせず、手は頭の脇まで
+ if(dir==='down')return {side,parts:[
+  arm(1,11,-2,9,0,-1,false),
+  arm(1,11,-2,7,-1,-1,false),
+  arm(1,11,-3,12,-1,1,false),
+  arm(1,12,0,15,-1,2,false),
+ ][q]};
+ if(dir==='side')return {side,parts:[
+  arm(8,11,11,8,0,-1,false),
+  arm(6,11,3,7,-1,-1,true),
+  arm(8,11,13,12,2,1,false),
+  arm(7,11,10,15,1,1,false),
+ ][q]};
+ return {side,parts:[
+  arm(12,11,14,8,0,-1,false),
+  arm(12,11,14,7,1,-1,false),
+  arm(12,11,14,13,2,1,false),
+  arm(12,12,13,15,1,2,false),
+ ][q]};
+}
 /** 下げて構えた剣（右下向き）：柄と鍔から、刃が横2ピクセル・縦1ピクセルずつ斜め下へ伸びる。輪郭は塗った点のまわりに自動で1本だけ回す（黒い線が2本並ばない） */
 function pxLowBlade(n,wood,hero){
  const m=Math.ceil(n/2),W=2*m+5,H=m+4,g=Array.from({length:H},()=>Array(W).fill('.'));
@@ -2122,13 +2218,13 @@ function pxSword(dir,pose,rank){
 function pxTorch(q){return [q%2?'.K.':'K..',q%2?'K8K':'K7K','K6K','KdK','KdK','KDK','KDK','KcK','.K.']}
 /** 手描きの戦士の1コマ（幅14・高さ21の塊の体）。戻り値は raster と同じ形に、頭の飾りの基準点 hd を足したもの */
 function pxWarrior(dir,act,f,torch,L,rank,pc,hairM,opts={}){
- const W=32,H=Math.ceil(24*1.4)+CREST_PAD,q=mod(f,4),mv=act==='move',at=act==='attack',dead=act==='death';
+ const W=PX_FW,H=PX_FH,q=mod(f,4),mv=act==='move',at=act==='attack',dead=act==='death';
  const side=dir==='side',back=dir==='up',down=dir==='down',d=side?'s':back?'u':'d';
  const bob=mv?[0,-1,0,-1][q]:0;
  // 攻撃：1 振り上げ、2 振り下ろし（体が向きの方へ1ピクセル出る）、3 戻り
  const pose=at?['rest','raise','strike','rest'][q]:'rest';
  const lx=at&&q===2&&side?1:0,ly=at&&q===2?(back?-1:down?1:0):0;
- const X0=9+lx,Y0=H-2-20+ly,ux=X0,uy=Y0+bob;
+ const X0=PX_FX+lx,Y0=H-PX_FB-20+ly,ux=X0,uy=Y0+bob;
  const novice=rank===0,hero=rank>=3;
  const skinM='skin'+Math.min(3,L.skin);
  // 役 → 材質。見習いは古着（身につける色の代わりにくすんだ布）と鉢巻きだけ身につける色。英雄は青みの銀の鎧
@@ -2144,10 +2240,16 @@ function pxWarrior(dir,act,f,torch,L,rank,pc,hairM,opts={}){
  if(rank>=2)legs=pxSteelLegs(legs);
  // 歩くとき、剣と盾（松明）を交互に1ピクセル上下させる（腕の振り）
  const sw1=mv?[1,0,-1,0][q]:0;
- const sw=opts.noGear?null:pxSword(dir,pose,rank);
+ // 攻撃のコマは、剣を握る腕を胴から外して別に描く（pxWarriorSwing）
+ let torso=PXW.torso[d+rank];
+ const swing=at&&!opts.noGear?pxWarriorSwing(dir,q,rank,torso):null;
+ if(swing)torso=pxNoArm(torso,swing.side);
+ const swB=swing?swing.parts.filter(p=>p.behind).map(p=>({g:p.g,x:ux+p.x,y:uy+p.y,mats:weap,glow:hero})):[];
+ const swF=swing?swing.parts.filter(p=>!p.behind).map(p=>({g:p.g,x:ux+p.x,y:uy+p.y,mats:{...weap,skin:skinM,steel:base.steel,pc:base.pc,leather:base.leather},soft:p.soft,glow:hero})):[];
+ const sw=opts.noGear||swing?null:pxSword(dir,pose,rank);
  let swP=null;
  if(sw){const [gx,gy]=pxGrip(sw.g);const [hx,hy]=sw.hand||[0,0];swP={g:sw.g,x:sw.at?ux+sw.at[0]:ux+hx-gx,y:(sw.at?uy+sw.at[1]:uy+hy-gy)+sw1,mats:weap,glow:hero}}
- const hd={g:head,x:ux,y:uy,mats:novice?{...base,pc}:base},td={g:PXW.torso[d+rank],x:ux,y:uy+11,mats:base},lg={g:legs,x:X0,y:Y0+18,mats:base};
+ const hd={g:head,x:ux,y:uy,mats:novice?{...base,pc}:base},td={g:torso,x:ux,y:uy+11,mats:base},lg={g:legs,x:X0,y:Y0+18,mats:base};
  const tq=torch?pxTorch(q):null;
  const P=[];
  if(opts.noGear){
@@ -2182,9 +2284,11 @@ function pxWarrior(dir,act,f,torch,L,rank,pc,hairM,opts={}){
   if(swP&&!sw.behind)P.push(swP);
   if(tq)P.push({g:tq,x:ux,y:uy+7-sw1,mats:base});
  }
+ if(swB.length)P.splice(P.indexOf(lg),0,...swB);
+ P.push(...swF);
  const fr=pxCompose(W,H,P,fix,['steel','gold']);
  if(hero)for(let p=0;p<W*H;p++)if(fr.mat[p]==='hqGold')fr.mat[p]='glw';
- return {...fr,ax:16,ay:H-2,hd:{d:dir,x:ux+7,y:uy+4.6,k:1}};
+ return {...fr,ax:PX_FX+7,ay:H-PX_FB,hd:{d:dir,x:ux+7,y:uy+4.6,k:1}};
 }
 // ---- ほかの職の型（戦士と同じ幅14・高さ21の塊の体）。m n M N は職の布の役 ----
 // 位（0 見習い・1 熟練・2 歴戦・3 英雄）ごとに、帽子・頭巾・兜の形と持ち物（pxGear）の形と大きさを変え、影だけで位が分かるようにする。
@@ -3378,6 +3482,16 @@ RAMP.hqBone=hueRamp([226,214,180]);
 // 竜殺しの黒ずんだ鉄（戦士の明るい鉄と見分ける）
 RAMP.hqDark=hueRamp([112,114,132]);
 const PXJ_CLOTH={wizard:'hqDrab',priest:'hqWhite',thief:'hqShadow',bard:'hqCream',hunter:'hqForest',slayer:'hqBone'};
+/** 魔法使いの杖の型と、柄の列、構えたときの先の高さ（pxGear の pole の引数）。o は宝玉の色の文字 */
+function pxStaff(rank,o){
+ const shaft=(n,c)=>Array(n).fill(c);
+ return [
+  [pxO(['.....','.DDD.','.D.D.',...shaft(13,'...D.'),'.....']),3,4],
+  [['.KK.','K'+o+o+'K','K'+o+o+'K','.KK.',...shaft(13,'.KDK'),'.KK.'],2,3],
+  [pxO(['........','.D....D.','..D..D..','..D'+o+o+'D..','..D'+o+o+'D..','...Dd...',...shaft(16,'...Dd...'),'........']),3,-1],
+  [pxO(['........','.G.'+o+o+'.G.','.G'+o+o+o+o+'G.','.G'+o+o+o+o+'G.','..G'+o+o+'G..','...GG...',...shaft(18,'...Dd...'),'........']),3,-4],
+ ][rank];
+}
 /**
  * ほかの職の持ち物（右手・左手）。dir と構え（rest 構えた、raise 振り上げた、strike 振り下ろした）ごとに、型と体の型に対する位置、体より先に描くかを返す（配列で複数）。
  * 魔法使い：杖。僧侶：棍棒・鎚矛・十字の杖。盗賊：短剣（熟練から両手）。吟遊詩人：体の前の楽器（リュート、英雄は竪琴）。狩人：弓（後ろと横は背の矢筒も）。竜殺し：担いだ大剣。
@@ -3394,13 +3508,7 @@ function pxGear(job,dir,pose,rank,torch,q){
  const shaft=(n,c)=>Array(n).fill(c);
  if(job==='wizard'){
   // 杖は位ごとに形と長さが変わる：0 先の曲がった木の枝、1 小さな宝玉、2 二股の先に宝玉をはさむ太い杖、3 金の爪でつかんだ大きな宝玉。型は塗る点だけを書き、輪郭は pxO で回す
-  const o=orb;
-  pole(...[
-   [pxO(['.....','.DDD.','.D.D.',...shaft(13,'...D.'),'.....']),3,4],
-   [['.KK.','K'+o+o+'K','K'+o+o+'K','.KK.',...shaft(13,'.KDK'),'.KK.'],2,3],
-   [pxO(['........','.D....D.','..D..D..','..D'+o+o+'D..','..D'+o+o+'D..','...Dd...',...shaft(16,'...Dd...'),'........']),3,-1],
-   [pxO(['........','.G.'+o+o+'.G.','.G'+o+o+o+o+'G.','.G'+o+o+o+o+'G.','..G'+o+o+'G..','...GG...',...shaft(18,'...Dd...'),'........']),3,-4],
-  ][rank]);
+  pole(...pxStaff(rank,orb));
  }else if(job==='priest'){
   // 位ごとに：0 木の棍棒、1 鎚矛、2 頭の大きな鎚矛（長い柄）、3 頭より高い、金の十字の杖
   pole(...[
@@ -3447,13 +3555,152 @@ function pxGear(job,dir,pose,rank,torch,q){
  if(torch&&job!=='bard'){const tq=pxTorch(q);if(dir==='down')at(tq,11,7);else if(dir==='side')at(tq,0,7,true);else at(tq,0,7)}
  return out;
 }
+/** 型 g（輪郭 K を含む）の塗った点を、左上 (x0,y0) に置いて打つ（輪郭は pxPaint が回し直す）。ch(c) で文字を置き換えられる */
+function pxStamp(put,g,x0,y0,ch){g.forEach((row,y)=>{for(let x=0;x<row.length;x++){const c=row[x];if(c!=='.'&&c!=='K')put(x0+x,y0+y,ch?ch(c):c)}})}
+/**
+ * 鎚矛・棍棒・十字の杖の点を打つ（僧侶）。手 (hx,hy) が柄を握り、柄が向き (ux,uy) へ len ピクセル、その先に頭。
+ * 頭は位ごとに：0 太い木の先、1 鉄の小さな頭、2 鉄の大きな頭、3 金の十字
+ */
+function pxMacePts(put,hx,hy,ux,uy,rank){
+ // 英雄の十字の杖は、上へ向けるコマ（構え・振り上げ）では立ち姿に近い長さに。下へ振るコマは枠の下で切れないよう短く
+ const len=rank===3?(uy<0?(ux?10:13):Math.abs(uy)>Math.abs(ux)?5:Math.abs(uy)===Math.abs(ux)?6:8):[3,4,5,8][rank],m=Math.max(Math.abs(ux),Math.abs(uy)),st=i=>[Math.round(i*ux/m),Math.round(i*uy/m)];
+ const ex=ux>0?hx+1:hx,ey=uy>0?hy+1:hy,vert=Math.abs(uy)>=Math.abs(ux);
+ const bx=ux>0?hx:ux<0?hx+1:hx,by=uy>0?hy:uy<0?hy+1:hy,[s1x,s1y]=st(1);put(bx-s1x,by-s1y,'d');
+ for(let i=1;i<=len;i++){const [a,b]=st(i);put(ex+a,ey+b,'d')}
+ const [a,b]=st(len+1),cx=ex+a,cy=ey+b,sx=Math.sign(ux),sy=Math.sign(uy);
+ // 頭の形（cx,cy を柄の先の1歩先とし、向きの側へ広げる）
+ // 鉄の頭：熟練は2×2、歴戦は3×3の角を欠いた塊（光の側が明るい段）
+ const blob=r=>{
+  // 頭は柄の先から向きの側へ広げる（2×2 なら向きが負の軸では1つ手前へずらす、3×3 は1歩先をまん中に）
+  const ox=r?cx+sx:cx-(sx<0?1:0),oy=r?cy+sy:cy-(sy<0?1:0);
+  for(let dy=-r;dy<=1;dy++)for(let dx=-r;dx<=1;dx++){if(r&&Math.abs(dx)+Math.abs(dy)===2)continue;put(ox+dx,oy+dy,dx+dy<0||(!r&&dx+dy===0&&dx<=0)?'4':'2')}
+ };
+ if(rank===0){put(cx,cy,'D');put(cx+(vert?1:0),cy+(vert?0:1),'d');const [c2,d2]=st(len+2);put(ex+c2,ey+d2,'D');put(ex+c2+(vert?1:0),ey+d2+(vert?0:1),'D')}
+ else if(rank===3){
+  const [c2,d2]=st(len+2),[c3,d3]=st(len+3),nx=-Math.sign(uy),ny=Math.sign(ux);
+  put(cx,cy,'G');put(ex+c2,ey+d2,'Y');put(ex+c3,ey+d3,'G');put(ex+c2+nx,ey+d2+ny,'G');put(ex+c2-nx,ey+d2-ny,'G');
+  // まっすぐ立てたときは、立ち姿の十字と同じく横木を両脇へ2ピクセルずつ
+  if(!ux||!uy){put(ex+c2+2*nx,ey+d2+2*ny,'G');put(ex+c2-2*nx,ey+d2-2*ny,'G')}
+ }else blob(rank===1?0:1);
+}
+/** 弓を張った形の点を打つ。(cx,cy) が握りのまん中、弓の背は向き (fx,fy) の側へ反る。hw は半分の長さ、pull は弦を引いた深さ（0 なら弦はまっすぐ）、arrow は矢をつがえるか */
+function pxBowPts(put,cx,cy,fx,fy,hw,rank,pull,arrow,to=null){
+ const hero=rank>=3,lx=fy?1:0,ly=fx?1:0;
+ for(let t=-hw;t<=hw;t++){
+  const bend=Math.round(2*(1-(t/hw)*(t/hw))),x=cx+lx*t+fx*bend,y=cy+ly*t+fy*bend;
+  put(x,y,hero&&Math.abs(t)===hw?'G':Math.abs(t)<=1?'L':'D');
+ }
+ // to：弦を引く点を直接与える（後ろ向き・正面で、弦を体の上へ斜めに渡すとき）
+ const [px,py]=to||[cx-fx*pull,cy-fy*pull];
+ // 弦：両端から引いた点まで（引いていなければ両端を結ぶまっすぐな線）
+ const tip=s2=>[cx+lx*s2*hw,cy+ly*s2*hw];
+ for(const s2 of [-1,1]){const [tx,ty]=tip(s2);const n=Math.max(Math.abs(px-tx),Math.abs(py-ty));for(let i=1;i<n;i++)put(Math.round(tx+(px-tx)*i/n),Math.round(ty+(py-ty)*i/n),'4')}
+ if(pull>0||to)put(px,py,'4');
+ // 矢：引いた点から弓の外へ（向きは弓の背の側）
+ if(arrow){const L=to?Math.abs(px-cx)+3:pull+3;for(let i=0;i<=L;i++)put(px+fx*i,py+(to?0:fy*i),i>=L-1?'4':'c');put(px-fx,py-(to?0:fy),'G')}
+}
+/** 魔法使いが杖を握る手（[肩x,肩y,手x,手y]。攻撃の4コマ×向き）：構え、掲げる、さらに突き上げる、下ろす */
+const PX_WIZ_HAND={down:[[1,11,-1,10],[1,11,-1,6],[1,11,-2,7],[1,12,0,12]],side:[[8,11,10,10],[8,11,11,6],[8,11,12,7],[8,11,10,12]],up:[[12,11,13,10],[12,11,13,6],[12,11,14,7],[12,12,13,12]]};
+/**
+ * 魔法使いの攻撃のコマで、杖の先（宝玉、見習いは枝の先）のまん中が、絵の基準点（足もと）からどれだけずれているか（px。横向きは右向きのとき）。
+ * creatureView が、宝玉の光を描画の光（dyn）として置くのに使う
+ */
+function heroOrbAt(dir,f,rank){
+ const q=mod(f,4),[,,hx,hy]=PX_WIZ_HAND[dir][q],[g,col,top]=pxStaff(rank,'5');
+ let sx=0,sy=0,n=0;g.forEach((row,y)=>{for(let x=0;x<row.length;x++)if(row[x]==='5'){sx+=x;sy+=y;n++}});
+ if(!n){sx=2;sy=1;n=1}
+ const lx=q===2&&dir==='side'?1:0,ly=q===2?(dir==='up'?-1:dir==='down'?1:0):0;
+ return [hx-col+sx/n+0.5+lx-7,hy-(15-top)+sy/n+0.5+ly-20];
+}
+/** 体の座標の点を、左右反転する（正面の右手の構えを左手に、など）。手は2ピクセル幅なので 12-x */
+const pxMirror=a=>[12-a[0],a[1],12-a[2],a[3],-a[4],a[5],a[6]];
+/**
+ * ほかの職の攻撃の1コマ：腕を外す胴の側（複数）と、描く部品（{g,x,y,behind,soft,noGlow}。体の座標）。
+ * 魔法使い：杖を掲げ、宝玉が光る（0 構え、1 掲げる、2 さらに突き上げて宝玉がいちばん明るい、3 下ろす）。宝玉の光は描画の光（creatureView の heroOrb）。
+ * 僧侶：鎚矛を振る（戦士と同じ、構え・振り上げ・振り下ろし・戻り）。盗賊：短剣で突く（0 構え、1 引く、2 突く、3 戻す）。
+ * 吟遊詩人：右手で弦をかき鳴らす（0 構え、1 振り上げ、2 かき下ろす、3 戻す。楽器は振り下ろしで1ピクセル沈む）。
+ * 狩人：弓を引いて放つ（0 つがえる、1 引き絞る、2 放つ（弦はまっすぐ、矢はない）、3 下ろす）。竜殺し：担いだ大剣を振り下ろす（右肩から）
+ */
+function pxHeroSwing(job,dir,q,rank,J,torch){
+ const torso=J.torso[dir==='down'?'d':dir==='up'?'u':'s'],hero=rank>=3,novice=rank===0;
+ const S=dir==='down'?'L':dir==='up'?'R':'S';
+ const sleeveOf=side=>{let sl=pxSleeve(torso,side);
+  // 盗賊の暗い袖は、胴の上で見えなくなるので、腕を別に描くときは一段明るくする
+  if(job==='thief')sl=sl.map(c=>({n:'m',m:'M',M:'N'})[c]||c);
+  const role=PX_MAT[sl[1]][0];return {sl,sd:Object.keys(PX_MAT).find(k=>PX_MAT[k][0]===role&&PX_MAT[k][1]===(role==='steel'||role==='pc'?0:1))||sl[1],glowy:role==='steel'||role==='gold'}};
+ // 腕と、手に持たせる物（hold は手の位置を受けて点を打つ）。behind なら持ち物だけ体の後ろの部品にする
+ const armP=(side,[sx,sy,hx,hy],hold,behind=false)=>{
+  const {sl,sd,glowy}=sleeveOf(side);
+  if(!behind)return [{...pxArmHold(sx,sy,hx,hy,sl,hold?put=>hold(put,hx,hy):null),soft:sd,noGlow:glowy}];
+  return [{...pxPaint(put=>hold(put,hx,hy)),behind:true},{...pxArmHold(sx,sy,hx,hy,sl,null),soft:sd,noGlow:true}];
+ };
+ const torchP=()=>torch&&job!=='bard'?pxGear('none',dir,'rest',rank,torch,q).map(g=>({...g})):[];
+ // 振る武器の構え（戦士と同じ。正面は左手、後ろは右手）：[肩x,肩y,手x,手y,向きx,向きy,持ち物を体の後ろに]
+ const SWING={down:[[1,11,-2,9,0,-1,0],[1,11,-2,7,-1,-1,0],[1,11,-3,12,-1,1,0],[1,12,0,15,-1,2,0]],side:[[8,11,11,8,0,-1,0],[6,11,3,7,-1,-1,1],[8,11,13,12,2,1,0],[7,11,10,15,1,1,0]],up:[[12,11,14,8,0,-1,0],[12,11,14,7,1,-1,0],[12,11,14,13,2,1,0],[12,12,13,15,1,2,0]]};
+ if(job==='priest'){
+  const a=SWING[dir][q];
+  return {sides:[S],parts:[...armP(S,a,(put,hx,hy)=>pxMacePts(put,hx,hy,a[4],a[5],rank),!!a[6]),...torchP()]};
+ }
+ if(job==='slayer'){
+  // 大剣は右肩に担いでいるので、正面は右手、後ろは左手で振る。刃が長いので、戻りは斜め下へ下ろさず肩へ担ぎ直す
+  const n=[8,10,12,13][rank];
+  const T={down:[[11,11,14,9,0,-1,0],[11,11,14,7,1,-1,0],[11,11,15,12,2,1,0],[11,12,13,12,0,-1,0]],side:[[8,11,11,8,0,-1,0],[6,11,3,7,-1,-1,1],[8,11,13,12,2,1,0],[8,11,10,9,0,-1,0]],up:[[1,11,-2,8,0,-1,0],[1,11,-2,7,-1,-1,0],[1,11,-3,13,-2,1,0],[1,12,-1,13,0,-1,0]]}[dir][q];
+  const side=dir==='down'?'R':dir==='up'?'L':'S';
+  return {sides:[side],parts:armP(side,T,(put,hx,hy)=>pxBladePts(put,hx,hy,T[4],T[5],n,false,hero,true),!!T[6])};
+ }
+ if(job==='thief'){
+  // 短剣で突く。刃は位ごとに長くなる（2・3・5・6）。熟練からは、もう一方の手の短剣はいつもの構えのまま
+  const n=[2,3,5,6][rank];
+  const T={down:[[1,11,-1,12,0,1,0],[1,11,-2,9,0,1,0],[2,12,3,15,0,1,0],[1,12,0,14,-1,2,0]],side:[[8,11,9,13,1,0,0],[7,11,5,12,1,0,0],[8,11,14,12,1,0,0],[8,11,11,13,2,1,0]],up:[[12,11,13,12,0,-1,0],[12,11,14,13,0,-1,0],[12,11,13,8,0,-1,0],[12,12,13,13,0,-1,0]]}[dir][q];
+  const parts=armP(S,T,(put,hx,hy)=>pxBladePts(put,hx,hy,T[4],T[5],n,false,hero));
+  if(dir==='down'&&!torch&&!novice){const dg=pxLowBlade(n,false,hero),[gx,gy]=pxGrip(dg);parts.push({g:dg,x:12-gx,y:14-gy,behind:true})}
+  return {sides:[S],parts:[...parts,...torchP()]};
+ }
+ if(job==='wizard'){
+  const o=['w','6','5','7'][q],T=PX_WIZ_HAND[dir][q];
+  const [g,col,top]=pxStaff(rank,novice?'D':o);
+  return {sides:[S],parts:armP(S,T,(put,hx,hy)=>pxStamp(put,g,hx-col,hy-(15-top)))};
+ }
+ if(job==='bard'){
+  // 楽器はいつもの位置（pxGear）。右手（横向きは前の手）で弦をかき鳴らす。後ろからは楽器が体の向こうなので、動く肘と手だけ
+  const dy=[0,0,1,0][q];
+  const inst=pxGear('bard',dir,'rest',rank,false,q).map(g=>({...g,y:g.y+dy}));
+  const side=dir==='down'?'R':dir==='up'?'R':'S';
+  const T={down:[[11,11,9,14],[11,11,10,12],[11,11,8,16],[11,11,9,14]],side:[[8,11,10,14],[8,11,11,12],[8,11,10,16],[8,11,10,14]],up:[[11,11,13,13],[11,11,14,12],[11,11,13,15],[11,11,13,13]]}[dir][q];
+  // 袖は楽器の後ろ、手だけを弦の上に重ねる（楽器が腕に隠れない）。後ろ向きは楽器が体の向こうなので腕をそのまま
+  if(dir==='up')return {sides:[side],parts:[...inst,...armP(side,T,null)]};
+  const {sl,sd,glowy}=sleeveOf(side),[sx,sy,hx,hy]=T;
+  const hand=pxPaint(put=>{put(hx,hy,'S');put(hx+1,hy,'S');put(hx,hy+1,'s');put(hx+1,hy+1,'s')});
+  return {sides:[side],parts:[{...pxArmHold(sx,sy,hx,hy,sl,null,true),soft:sd,noGlow:glowy},...inst,{...hand,soft:'s',noGlow:true}]};
+ }
+ if(job==='hunter'){
+  const hw=[3,4,6,7][rank],pull=[1,4,0,0][q],arrow=q<2,low=q===3?1:0;
+  const quiver=['KK.KK','KwKwK','KcccK','KcLcK','KcLcK','KcLcK','.KKK.'];
+  if(dir==='side'){
+   // 前へ弓を立て、前の手で握る。引く手（奥の腕）は手だけが顔の前に見える
+   const bx=14,cy=12+low,A=sleeveOf('S');
+   const bow=pxPaint(put=>pxBowPts(put,bx,cy,1,0,hw,rank,pull+(q===1?2:0),arrow));
+   const hand=q===2?pxPaint(put=>{put(6,11,'S');put(7,11,'S');put(6,12,'s');put(7,12,'s')}):pxPaint(put=>{const x=bx-pull-(q===1?2:0)-1;put(x,cy-1,'S');put(x+1,cy-1,'S');put(x,cy,'s');put(x+1,cy,'s')});
+   return {sides:['S'],parts:[{g:quiver,x:0,y:9,behind:true},bow,{...pxArmHold(8,11,bx-1,cy-1,A.sl,null),soft:A.sd,noGlow:true},{...hand,soft:'s'}]};
+  }
+  // 正面と後ろ：弓を左の外に立てて左手で握り、右手で弦を引く（正面は胸の前まで、後ろは右肩まで。弦が体の上を斜めに渡る）。矢は弓の外へ向く
+  const bx=-3,cy=(dir==='down'?13:10)+low,L=sleeveOf('L'),R=sleeveOf('R');
+  const pp=q<2?(dir==='down'?[q===0?3:6,cy]:[q===0?7:11,cy-1]):null;
+  const bow=pxPaint(put=>pxBowPts(put,bx,cy,-1,0,hw,rank,0,arrow,pp));
+  const parts=dir==='up'?[{g:quiver,x:8,y:8}]:[];
+  parts.push({...pxArmHold(1,11,bx+1,cy-1,L.sl,null),soft:L.sd,noGlow:true},bow);
+  parts.push({...(pp?pxArmHold(12,11,pp[0],pp[1]-1,R.sl,null):pxArmHold(12,11,13,14,R.sl,null)),soft:R.sd,noGlow:true});
+  return {sides:['L','R'],parts};
+ }
+ return null;
+}
 /** ほかの職の1コマ（戦士と同じ幅14・高さ21の塊の体）。型は PXJ（職ごとの頭・胴と、帽子の先や羽根、角などの飾り） */
 function pxHero(job,dir,act,f,torch,L,rank,pc,hairM,opts={}){
- const J=PXJ[job],W=32,H=Math.ceil(24*1.4)+CREST_PAD,q=mod(f,4),mv=act==='move',at=act==='attack',dead=act==='death';
+ const J=PXJ[job],W=PX_FW,H=PX_FH,q=mod(f,4),mv=act==='move',at=act==='attack',dead=act==='death';
  const side=dir==='side',back=dir==='up',down=dir==='down',d=side?'s':back?'u':'d';
  const bob=mv?[0,-1,0,-1][q]:0,pose=at?['rest','raise','strike','rest'][q]:'rest';
  const lx=at&&q===2&&side?1:0,ly=at&&q===2?(back?-1:down?1:0):0;
- const X0=9+lx,Y0=H-2-20+ly,ux=X0,uy=Y0+bob;
+ const X0=PX_FX+lx,Y0=H-PX_FB-20+ly,ux=X0,uy=Y0+bob;
  const novice=rank===0,hero=rank>=3,armored=job==='slayer';
  const skinM='skin'+Math.min(3,L.skin);
  const cloth=novice&&job!=='thief'?'hqDrab':PXJ_CLOTH[job];
@@ -3464,11 +3711,15 @@ function pxHero(job,dir,act,f,torch,L,rank,pc,hairM,opts={}){
  let legs=PXW.legs[side?'s':'d'][mv?q:1];
  if(armored&&rank>=2)legs=pxSteelLegs(legs);
  const sw1=mv?[1,0,-1,0][q]:0;
- const gear=(opts.noGear?[]:pxGear(job,dir,pose,rank,torch,q)).map(g=>({g:g.g,x:ux+g.x,y:uy+g.y+sw1,mats:g.mats||base,behind:g.behind,glow:hero}));
+ // 攻撃のコマは、持ち物を握る腕を胴から外して別に描く（pxHeroSwing）
+ const swing=at&&!opts.noGear?pxHeroSwing(job,dir,q,rank,J,torch):null;
+ let torso=J.torso[d];
+ if(swing)for(const sd of swing.sides)torso=pxNoArm(torso,sd);
+ const gear=(opts.noGear?[]:swing?swing.parts:pxGear(job,dir,pose,rank,torch,q)).map(g=>({g:g.g,x:ux+g.x,y:uy+g.y+sw1,mats:g.mats||base,behind:g.behind,glow:hero&&!g.noGlow,soft:g.soft}));
  const P=[];
  if(rank>=2&&!back&&!opts.noCape){const c=pxCape(dir,hero);P.push({g:c.g,x:ux+c.x,y:uy+c.y,mats:base})}
  for(const g of gear)if(g.behind)P.push(g);
- P.push({g:legs,x:X0,y:Y0+18,mats:base},{g:J.torso[d],x:ux,y:uy+11,mats:base});
+ P.push({g:legs,x:X0,y:Y0+18,mats:base},{g:torso,x:ux,y:uy+11,mats:base});
  if(rank>=2&&back){const c=pxCape(dir,hero);P.push({g:c.g,x:ux+c.x,y:uy+c.y,mats:base})}
  // 頭の型は、幅14より広い分（帽子の鍔）を左右へ等しく出し、11行より高い分（高い帽子）を上へ出す
  P.push({g:head,x:ux-(head[0].length-14)/2,y:uy-(head.length-11),mats:novice&&J.novicePc?{...base,pc}:base});
@@ -3492,7 +3743,7 @@ function pxHero(job,dir,act,f,torch,L,rank,pc,hairM,opts={}){
  // 頭の飾りの基準：頭の型のまん中の列で、いちばん上の点（帽子や頭巾の上の縁）。cb は crestBase の代わりのずれ（頭の型ごと。J.crestAt）
  const cx=(head[0].length-14)/2+(side?5:6);let top=0;while(top<head.length-1&&head[top][cx]==='.'&&head[top][cx+1]==='.')top++;
  const ca=J.crestAt&&J.crestAt[d]&&J.crestAt[d][rank];
- return {...fr,ax:16,ay:H-2,hd:{d:dir,x:ux+7,y:uy-(head.length-11)+top+4.4,k:1,cb:ca?[ca[0],ca[0],-4.4+ca[1]]:[0,0,-4.4]}};
+ return {...fr,ax:PX_FX+7,ay:H-PX_FB,hd:{d:dir,x:ux+7,y:uy-(head.length-11)+top+4.4,k:1,cb:ca?[ca[0],ca[0],-4.4+ca[1]]:[0,0,-4.4]}};
 }
 /** 1コマの絵の、塗られた範囲を切り出す */
 function pxCrop(fr){
@@ -4896,4 +5147,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, adventurer, item, adventurer2, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
