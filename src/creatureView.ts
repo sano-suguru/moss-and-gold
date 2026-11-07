@@ -504,25 +504,19 @@ export class CreatureView {
           break;
         }
         case 'slashwave': {
-          // 戦士の飛ぶ斬撃（src/eco/adventurer.ts）：三日月形の白い斬撃の波が、剣の先から前へ走る。走った長さが当たった範囲（2体まで貫いて止まる）
+          // 戦士の飛ぶ斬撃（src/eco/adventurer.ts）：三日月形の斬撃の波（src/sprites.ts の fxCrescent）が、剣の先から前へ走る。
+          // 走った長さが当たった範囲（2体まで貫いて止まる）。うしろに薄い残像を二つ引く
           const len = r.rad ?? dist;
-          const px = -uy;
-          const py = ux;
-          const at = (q: number) => [r.ax + ux * len * q, r.ay + uy * len * q];
-          const crescent = (q: number, fr: number, big: boolean) => {
-            const [cx, cy] = at(q);
-            for (let j = -8; j <= 8; j++) {
-              const fwd = (64 - j * j) * 0.15;
-              push(cx + px * j * 1.8 + ux * fwd, cy + py * j * 1.8 + uy * fwd, lift, false, A.fx(`bit:4:0:${Math.min(3, fr + (Math.abs(j) > 5 ? 1 : 0))}`), 0, 4);
-            }
-            if (big) push(cx + ux * 6, cy + uy * 6, lift, flip, A.fx(`slash2:2:0:${Math.min(5, fr + 1)}`), 0, 4);
-          };
+          const d16 = (Math.round(Math.atan2(uy, ux) / (Math.PI / 8)) + 16) % 16;
           if (age < 9) {
             const q = Math.min(1, (age + 1) / 5);
-            const fr = age < 5 ? 0 : Math.min(3, age - 5);
-            crescent(q, fr, age < 6);
-            for (let k = 1; k <= 3; k++) if (q - k * 0.12 > 0) crescent(q - k * 0.12, Math.min(3, fr + k), false);
-            dyn.push({ x: at(q)[0], y: at(q)[1] - 8, r: 34, i: 0.35 * damp * (1 - age / 9), c: 0 });
+            const fr = age < 5 ? 0 : Math.min(3, age - 4);
+            for (let k = 2; k >= 0; k--) {
+              const qq = q - k * 0.1;
+              if (qq <= 0 || (k > 0 && age >= 6)) continue;
+              push(r.ax + ux * len * qq, r.ay + uy * len * qq, lift, false, A.fx(`crescent:${d16}:${Math.min(3, fr + k)}`), 0, 4);
+            }
+            dyn.push({ x: r.ax + ux * len * q, y: r.ay + uy * len * q - 8, r: 34, i: 0.35 * damp * (1 - age / 9), c: 0 });
           }
           break;
         }

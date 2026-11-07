@@ -4700,6 +4700,44 @@ function fxSlash2(size,col,f){
  }
  return {...fr,ax:R+2,ay:R+2};
 }
+/**
+ * 戦士の飛ぶ斬撃：三日月形の斬撃の波。d は向き（16方向、0 が右、時計回り）、f 0〜3（0・1 満ちる、2 薄れる、3 消えかけ）。
+ * 前へふくらむ外の縁が白く光り、内へ向かって青白く、内の縁は青。外側に細い濃紺の縁取り。両端の角は細く尖る。
+ * 薄れるときは、間引かずに、細く短く、色を暗くする（点々に見えないように）。満ちているコマは、三日月のうしろに飛ぶ勢いの短い筋を三本引く。点ではなく塗りで描く（一つの絵を回すのではなく、向きごとに描き直すので、斜めでも線が崩れない）
+ */
+function fxCrescent(d,f){
+ const R=12,S=17,W=S*2+1,H=S*2+1,fr=blank(W,H),C=FXR[7];
+ const a=d*Math.PI/8,ca=Math.cos(a),sa=Math.sin(a);
+ // 薄れるときは、間引かずに、細く短く、色を暗くする
+ const K=[6,6,4.2,2.6][f],tipCut=[1,1,0.82,0.62][f],shade=[0,0,1,2][f];
+ const tipV=Math.sqrt(R*R-(K/2)*(K/2));
+ const col=(i)=>C[Math.min(4,i+shade)];
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+  const dx=x-S,dy=y-S;
+  const u=dx*ca+dy*sa+3,v=-dx*sa+dy*ca;      // u 前、v 横（三日月の中心を少し前へ）
+  const r1=Math.hypot(u,v),r2=Math.hypot(u+K,v);
+  const tip=Math.abs(v)/tipV;                 // 0 中央 → 1 角
+  // 飛ぶ勢いの筋（三日月のうしろに三本。満ちているコマだけ）
+  if(f<2&&r2<R&&u<-K+1){
+   for(const sv of [-5,0,5]){
+    const len=sv===0?9:6;
+    if(Math.abs(v-sv)<0.5&&u>-K+1-len)setPx(fr,x,y,C[sv===0?2:3],false);
+   }
+   continue;
+  }
+  if(r1>R+0.7||r2<R||tip>tipCut)continue;
+  const depth=R-r1;                           // 外の縁からの深さ（中央で K、角で 0）
+  const th=Math.max(0.8,K*(1-tip*tip));      // その横の位置での厚み（角ほど薄い）
+  let c;
+  if(depth<0)c=C[4];                          // 縁取り
+  else if(depth<1.2)c=col(0);                 // 外の縁の光
+  else if(depth<th*0.5)c=col(1);
+  else if(depth<th*0.8)c=col(2);
+  else c=col(3);
+  setPx(fr,x,y,c,depth>=0&&depth<th*0.5&&f<2);
+ }
+ return {...fr,ax:S,ay:S};
+}
 /** 爪痕：三本の裂け目。f 0〜2で伸び、3〜5で薄れる。裂け目の芯は暗く、片側の縁が明るい */
 function fxClaw2(col,f){
  const W=21,H=21,fr=blank(W,H),C=FXR[col],grow=[0.4,0.75,1,1,1,1][f],keep=[1,1,1,0.7,0.4,0.18][f];
@@ -5129,4 +5167,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxCrescent, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
