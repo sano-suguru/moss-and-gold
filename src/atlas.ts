@@ -1,4 +1,4 @@
-import { fxCrescent, fxCrescent2, fxSlashHit, vampMist, livingArmor, heroSprite, heroBed, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
+import { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileTrail, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, vampMist, livingArmor, heroSprite, heroBed, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -610,11 +610,18 @@ export function buildAtlas(): Atlas {
   }
   for (let col = 0; col < 8; col++) for (let f = 0; f < 4; f++) addFx(`orb2:${col}:${f}`, fxOrb2(col, f) as RawFrame);
   for (let d = 0; d < 8; d++) addFx(`arrow2:${d}`, fxArrow2(d) as RawFrame);
-  // 戦士の飛ぶ斬撃（16方向×4コマ）
-  for (let d = 0; d < 16; d++) for (let f = 0; f < 4; f++) addFx(`crescent:${d}:${f}`, fxCrescent(d, f) as RawFrame);
   // 戦士の飛ぶ斬撃（高品質版。16方向×8コマ）と、当たった瞬間の火花
   for (let d = 0; d < 16; d++) for (let f = 0; f < 8; f++) addFx(`crescent2:${d}:${f}`, fxCrescent2(d, f) as RawFrame);
   for (let f = 0; f < 4; f++) addFx(`slashhit:${f}`, fxSlashHit(f) as RawFrame);
+  // 竜殺しの光の大剣の部品（16方向×3部品×4コマ）、僧侶の十字架（8コマ）、マジックミサイル（弾4コマ、尾16方向×4段、弾け6コマ）、毒の煙（8コマ）・小さな煙・泡
+  for (let d = 0; d < 16; d++) for (let part = 0; part < 3; part++) for (let f = 0; f < 4; f++) addFx(`gblade:${d}:${part}:${f}`, fxGreatBlade(d, part, f) as RawFrame);
+  for (let f = 0; f < 8; f++) addFx(`holycross:${f}`, fxHolyCross(f) as RawFrame);
+  for (let f = 0; f < 4; f++) addFx(`mmhead:${f}`, fxMissileHead(f) as RawFrame);
+  for (let d = 0; d < 16; d++) for (let w = 0; w < 4; w++) addFx(`mmtrail:${d}:${w}`, fxMissileTrail(d, w) as RawFrame);
+  for (let f = 0; f < 6; f++) addFx(`mmburst:${f}`, fxMissileBurst(f) as RawFrame);
+  for (let f = 0; f < 8; f++) addFx(`pcloud:${f}`, fxPoisonCloud(f) as RawFrame);
+  for (let f = 0; f < 4; f++) addFx(`ppuff:${f}`, fxPoisonPuff(f) as RawFrame);
+  for (let f = 0; f < 4; f++) addFx(`pbubble:${f}`, fxPoisonBubble(f) as RawFrame);
   for (let kind = 0; kind < 5; kind++) for (let col = 0; col < 8; col++) for (let f = 0; f < 4; f++) addFx(`bit:${kind}:${col}:${f}`, fxBit(kind, col, f) as RawFrame);
   for (let v = 0; v < 3; v++) addFx(`crack:${v}`, fxCrack(v) as RawFrame);
   // クモの糸の繭（クモの巣にかかった獲物を巻いたもの）：0 大、1 中、2 小（食べられて細っていく）

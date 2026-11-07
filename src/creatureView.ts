@@ -40,8 +40,6 @@ export class CreatureView {
   /** 技の残した床の跡（描画専用） */
   private marks: { x: number; y: number; key: string; t: number }[] = [];
   private seenFx = new WeakSet<object>();
-  /** 矢の雨の、落ちたときの毒の煙の粒をまいたもの（描画専用） */
-  private seenRain = new WeakSet<object>();
   private lunge = new Map<number, { t: number; ux: number; uy: number }>();
   /** 飛び散る粒（描画専用）：位置、高さ、速さ、種類、色、生まれた tick、寿命 */
   private bits: { x: number; y: number; z: number; vx: number; vy: number; vz: number; kind: number; col: number; t0: number; life: number }[] = [];
@@ -529,27 +527,26 @@ export class CreatureView {
           break;
         }
         case 'greatsword': {
-          // 竜殺しの大剣（src/eco/adventurer.ts）：光の大剣の刀身が竜殺しの手から伸び、扇の片側から反対側へゆっくり薙ぎ払う。残像が弧を描いて薄れる。刀身の長さが当たる範囲
+          // 竜殺しの光の大剣（src/eco/adventurer.ts）：光の大剣（src/sprites.ts の fxGreatBlade の柄と鍔・刀身の一節・切っ先をつないだもの）が竜殺しの手から伸び、
+          // 扇の片側から反対側へゆっくり薙ぎ払う。うしろに薄れていく残像の剣が弧を描く。刀身の長さが当たる範囲
           const R = r.rad ?? 88;
           const H = r.half ?? 1.3;
           const a0 = Math.atan2(uy, ux);
-          const blade = (a: number, fr: number) => {
+          const blade = (a: number, f: number, hilt: boolean) => {
             const cx = Math.cos(a);
             const cy = Math.sin(a);
-            for (let d = 0.12; d <= 1.001; d += 2.5 / R) {
-              const w = d < 0.9 ? 1 : 0;
-              for (let k = -w; k <= w; k++) push(r.ax + cx * R * d - cy * k * 2.5, r.ay + cy * R * d + cx * k * 2.5, lift + 2, false, A.fx(`bit:4:${d > 0.2 ? r.col : 0}:${Math.min(3, fr + (k !== 0 ? 1 : 0))}`), 0, 4);
-            }
-            // 鍔
-            for (let k = -3; k <= 3; k++) push(r.ax + cx * R * 0.12 - cy * k * 3, r.ay + cy * R * 0.12 + cx * k * 3, lift + 2, false, A.fx(`bit:4:0:${fr}`), 0, 4);
+            const d16 = (Math.round(a / (Math.PI / 8)) + 32) % 16;
+            if (hilt) push(r.ax + cx * 8, r.ay + cy * 8, lift + 2, false, A.fx(`gblade:${d16}:0:${f}`), 0, 4);
+            for (let d = 22; d < R - 10; d += 10) push(r.ax + cx * d, r.ay + cy * d, lift + 2, false, A.fx(`gblade:${d16}:1:${f}`), 0, 4);
+            push(r.ax + cx * (R - 8), r.ay + cy * (R - 8), lift + 2, false, A.fx(`gblade:${d16}:2:${f}`), 0, 4);
           };
-          if (age < 12) {
+          if (age < 9) {
             const prog = Math.min(1, (age + 1) / 6);
-            const fr = age < 7 ? 0 : Math.min(3, age - 7);
             const a = a0 - H + 2 * H * prog;
-            blade(a, fr);
-            for (let k = 1; k <= 4; k++) if (prog - k * 0.1 > 0) blade(a0 - H + 2 * H * (prog - k * 0.1), Math.min(3, fr + k));
-            dyn.push({ x: r.ax + Math.cos(a) * R * 0.7, y: r.ay + Math.sin(a) * R * 0.7 - 8, r: R * 0.7, i: 0.45 * damp * (1 - age / 12), c: 1 });
+            // 残像は振っているあいだだけ、淡く細く2本
+            if (age < 6) for (let k = 2; k >= 1; k--) if (prog - k * 0.12 > 0) blade(a0 - H + 2 * H * (prog - k * 0.12), k === 1 ? 2 : 3, false);
+            blade(a, age === 0 ? 0 : age < 6 ? 1 : age < 8 ? 2 : 3, true);
+            dyn.push({ x: r.ax + Math.cos(a) * R * 0.6, y: r.ay + Math.sin(a) * R * 0.6 - 8, r: R * 0.75, i: 0.5 * damp * (1 - age / 9), c: 1 });
           }
           if (once)
             for (let i = 0; i < 10; i++) {
@@ -559,17 +556,12 @@ export class CreatureView {
           break;
         }
         case 'cross': {
-          // 僧侶のハンマー（src/eco/adventurer.ts）：打った所に衝撃の輪が出て、光の十字架が縦横に伸びて爆ぜる。十字の腕の長さが当たる範囲
-          const L = r.rad ?? 48;
-          if (age < 4) push(r.dx, r.dy + 3, 1, false, A.fx(`ring:2:1:${f6(age + 1)}`), 0, 4);
-          if (age >= 1 && age < 12) {
-            const grow = Math.min(1, age / 4);
-            const fr = age < 7 ? 0 : Math.min(3, age - 7);
-            for (let d = 0; d <= L * grow; d += 2.5)
-              for (const [vx2, vy2] of [[1, 0], [-1, 0], [0, 1], [0, -1]])
-                for (let k = -1; k <= 1; k++) push(r.dx + vx2 * d + vy2 * k * 3, r.dy + vy2 * d + vx2 * k * 3, 4 + (vy2 < 0 ? d * 0.15 : 0), false, A.fx(`bit:4:1:${Math.min(3, fr + (k !== 0 ? 1 : 0))}`), 0, 4);
-            if (age < 7) push(r.dx, r.dy, 10, false, A.fx(`blast:2:0:${f6(age - 1)}`), 0, 4);
-            dyn.push({ x: r.dx, y: r.dy - 10, r: L + 24, i: 0.55 * damp * (1 - age / 12), c: 1 });
+          // 僧侶のハンマー（src/eco/adventurer.ts）：打った所に光の十字架（src/sprites.ts の fxHolyCross）。衝撃の閃光から、地面を縦横に光が走り（当たる範囲そのもの、腕3マス）、
+          // 光の十字架が立ち上がって砕け、光の粒が立ちのぼる
+          if (age < 16) {
+            const f = Math.min(7, age < 2 ? age : 2 + Math.floor((age - 2) / 2));
+            push(r.dx, r.dy, 0, false, A.fx(`holycross:${f}`), 0, 4);
+            dyn.push({ x: r.dx, y: r.dy - 18, r: 70, i: 0.6 * damp * (1 - age / 16), c: 1 });
           }
           if (once) {
             spray(0, 6, 8, 1.2, 2.0);
@@ -578,7 +570,8 @@ export class CreatureView {
           break;
         }
         case 'missile': {
-          // 魔法使いのマジックミサイル（src/eco/adventurer.ts）：紫の魔力の弾が、弧を描いて狙った相手を追いかけ、紫の尾を引く。届くと紫に弾ける
+          // 魔法使いのマジックミサイル（src/eco/adventurer.ts）：白い芯の紫の魔力の弾（src/sprites.ts の fxMissileHead）が、弧を描いて狙った相手を追いかけ、
+          // 細くなっていく紫の帯の尾（fxMissileTrail をつないだもの）を引く。届くと紫に弾ける（fxMissileBurst）
           const fly = r.fly ?? 8;
           const tgt = eco.byId.get(r.did);
           const ex = tgt && !tgt.dead ? tgt.x : r.dx;
@@ -593,19 +586,25 @@ export class CreatureView {
           if (age < fly) {
             const q = age / fly;
             const [hx, hy] = at(q);
-            push(hx, hy, lift + 3, false, A.fx(`orb2:4:${age & 3}`), 0, 4);
-            for (let k = 1; k <= 6; k++) {
-              const qq = q - k * 0.05;
+            // 尾：弾から後ろへ、3ドットおきに一節ずつ、離れるほど細く
+            let [px0, py0] = [hx, hy];
+            for (let k = 1; k <= 8; k++) {
+              const qq = q - k * 0.03;
               if (qq <= 0) break;
               const [tx, ty] = at(qq);
-              push(tx, ty, lift + 3, false, A.fx(`bit:4:4:${Math.min(3, k >> 1)}`), 0, 4);
+              const d16 = (Math.round(Math.atan2(py0 - ty, px0 - tx) / (Math.PI / 8)) + 16) % 16;
+              push((tx + px0) / 2, (ty + py0) / 2, lift + 3, false, A.fx(`mmtrail:${d16}:${Math.min(3, (k - 1) >> 1)}`), 0, 4);
+              px0 = tx;
+              py0 = ty;
             }
-            dyn.push({ x: hx, y: hy - lift, r: 26, i: 0.35 * damp, c: 2 });
-          } else if (age < fly + 6) push(ex, ey, lift, false, A.fx(`blast:1:4:${f6(age - fly)}`), 0, 4);
+            push(hx, hy, lift + 3, false, A.fx(`mmhead:${age & 3}`), 0, 4);
+            dyn.push({ x: hx, y: hy - lift, r: 28, i: 0.4 * damp, c: 2 });
+          } else if (age < fly + 6) push(ex, ey, lift, false, A.fx(`mmburst:${age - fly}`), 0, 4);
           break;
         }
         case 'rain': {
-          // 狩人の矢の雨（src/eco/adventurer.ts）：矢が弧を描いて高く上がり、狙った所のまわりに少しばらけて降る。落ちた所で毒の煙が爆ぜる（落ちたときにそこにいた者に当たる）
+          // 狩人の矢の雨（src/eco/adventurer.ts）：矢が弧を描いて高く上がり、狙った所のまわりに少しばらけて降る。落ちた所ごとに小さな毒の煙（fxPoisonPuff）、
+          // 落ちきると毒の煙の塊（fxPoisonCloud）がふくらんで散る（落ちたときにそこにいた者に当たる）
           const fly = r.fly ?? 12;
           const n = r.n ?? 6;
           const R = r.rad ?? 20;
@@ -619,21 +618,16 @@ export class CreatureView {
               const x = r.ax + (lx - r.ax) * q;
               const y = r.ay + (ly - r.ay) * q;
               const z = 8 + Math.sin(q * Math.PI) * H;
-              // 矢の向き：画面の上での進む向き（上がるときは上、落ちるときは下）
               const sx = lx - r.ax;
               const sy = ly - r.ay - Math.cos(q * Math.PI) * Math.PI * H;
               const d8 = (Math.round(Math.atan2(sy, sx) / (Math.PI / 4)) + 8) % 8;
               push(x, y, z, false, A.fx(`arrow2:${d8}`), 0, 4);
-            } else if (q * fly < fly + 6) push(lx, ly, 3, false, A.fx(`blast:0:3:${f6(Math.floor((q - 1) * fly))}`), 0, 4);
-          }
-          if (age >= fly && age < fly + 10) {
-            const a2 = age - fly;
-            push(r.dx, r.dy, 6, false, A.fx(`blast:1:3:${f6(a2)}`), 0, 4);
-            if (!this.seenRain.has(r)) {
-              this.seenRain.add(r);
-              for (let i = 0; i < 10; i++) this.bits.push({ x: r.dx + Math.cos(i) * R * 0.6, y: r.dy + Math.sin(i) * R * 0.4, z: 3, vx: Math.cos(i * 2.3) * 0.3, vy: 0, vz: 0.5 + (i % 3) * 0.2, kind: 2, col: 3, t0: now, life: 22 });
+            } else {
+              const pa = Math.floor((q - 1) * fly);
+              if (pa < 4) push(lx, ly, 3, false, A.fx(`ppuff:${pa}`), 0, 4);
             }
           }
+          if (age >= fly && age < fly + 16) push(r.dx, r.dy, 4, false, A.fx(`pcloud:${Math.min(7, (age - fly) >> 1)}`), 0, 4);
           break;
         }
         case 'breath':
@@ -1481,9 +1475,9 @@ export class CreatureView {
       if (!c.dead && c.poison > 0) {
         const t = eco.w.tick + alpha;
         const bh = Ecology.bodySize(sp) * 0.8 + 4;
-        for (let i = 0; i < 4; i++) {
-          const ph = (t * 0.04 + i * 0.27 + c.id * 0.13) % 1;
-          pushSprite(x + Math.sin(t * 0.15 + i * 1.9) * (3 + (i % 2) * 3), yy + 0.06, lift + 2 + ph * bh, false, A.fx(`bit:4:3:${Math.min(3, Math.floor(ph * 4))}`), 0, 2);
+        for (let i = 0; i < 3; i++) {
+          const ph = (t * 0.035 + i * 0.33 + c.id * 0.13) % 1;
+          pushSprite(x + Math.sin(t * 0.15 + i * 1.9) * (3 + (i % 2) * 3), yy + 0.06, lift + 2 + ph * bh, false, A.fx(`pbubble:${Math.min(3, Math.floor(ph * 4))}`), 0, 2);
         }
       }
       // マナから生まれた者の出現（描画専用）：生まれる場所にマナの粒が渦を巻いて集まり、影の姿から白く光って形が固まる。
