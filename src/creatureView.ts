@@ -3,7 +3,7 @@ import { BLOOD, Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
 import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
 import { RANK_AT, packLook, unpackLook } from './eco/roster';
-import { WIZ_WINDUP } from './eco/adventurer';
+import { SKILL_WIZARD_FIRE } from './eco/skill';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
 import { heroOrbAt } from './sprites';
@@ -1237,7 +1237,7 @@ export class CreatureView {
         act = 2;
         f = braced.get(c.id) === 1 ? 1 : 0;
       } else if (act === 2) {
-        // 魔法使いの詠唱中（経過が負の数。src/eco/adventurer.ts の WIZ_WINDUP）は、杖を掲げたコマのまま
+        // 魔法使いの詠唱中（経過が負の数。src/eco/skill.ts）は、杖を掲げたコマのまま
         f = c.actT < 0 ? 1 : Math.min(3, c.actT);
       } else if (act === 1 && c.x === c.px && c.y === c.py && eco.gaitPaused(c)) {
         // 歩き方の止まる番（大ネズミの「止まってあたりをうかがう」、一行の先頭が見回す、など）で、この更新ではその場から動いていない。
@@ -1429,7 +1429,7 @@ export class CreatureView {
           const qy = yy + oy - lift;
           if (c.actT < 0) {
             // 詠唱：溜めるにつれて宝玉の光がふくらんで脈打ち、光の粒が宝玉へ吸い寄せられる
-            const p = Math.max(0, Math.min(1, (WIZ_WINDUP + c.actT) / WIZ_WINDUP));
+            const p = Math.max(0, Math.min(1, (SKILL_WIZARD_FIRE.windup + c.actT) / SKILL_WIZARD_FIRE.windup));
             const pulse = 1 + 0.15 * Math.sin(t * 18 + c.id);
             dyn.push({ x: qx, y: qy, r: (18 + 34 * p) * pulse, i: (0.35 + 0.65 * p) * (adv.rank === 0 ? 0.8 : 1), c: 1 });
             for (let i = 0; i < 5; i++) {

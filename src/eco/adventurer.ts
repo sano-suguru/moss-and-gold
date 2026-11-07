@@ -6,14 +6,11 @@ import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
 import { ARMOR_REMNANT, isJobItem } from './armor';
 import type { World } from '../world';
+import { SKILL_HUNTER_SHOT, SKILL_WIZARD_FIRE } from './skill';
 
-/** 魔法使いの詠唱：撃つ前に杖を掲げて溜める生き物の更新の回数（およそ1.6秒） */
-export const WIZ_WINDUP = 8;
-/** 魔法使いが溜めを始められるのは、生き物の更新 WIZ_CYCLE 回（およそ5秒）のうち、はじめの WIZ_START 回の番だけ（撃つのは多くて5秒に1回） */
-const WIZ_CYCLE = 25;
-const WIZ_START = 4;
-/** 炎の呪文1発の重さ（打ち合いの一打ちに対する倍率） */
+/** 炎の呪文1発と、矢1本の重さ（打ち合いの一打ちに対する倍率） */
 const WIZ_MUL = 1.5;
+const SHOT_MUL = 1.5;
 
 /** 噂の総量（評判） */
 export function reputation(this: Ecology): number {
@@ -371,20 +368,15 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       }
     }
   }
-  // 魔法使いの詠唱（WIZ_WINDUP）：杖を掲げて動かずに溜める。溜めの途中で打たれると、呪文は散って消える
-  let ready = false;
-  if (c.sp === Job.Wizard && c.act === 2 && c.actT <= 0) {
-    const spent = WIZ_WINDUP + c.actT;
-    if (c.hitAt > this.w.tick - spent * CR_EVERY) {
-      this.fxAttacks.push({ t: this.w.tick, style: 'puff', col: 2, size: 0, ax: c.x, ay: c.y, dx: c.x, dy: c.y - 14, did: -1, aid: c.id, big: false, kill: false });
-      c.act = 0;
-      c.actT = 0;
-      return;
-    }
-    // 生き物の更新ごとに経過が1ずつ増え、0 になった回（それより前に攻撃で0にした回は、ここへ来る前に1へ増えている）が溜め終わり
-    if (c.actT < 0) return;
-    ready = true;
+  // 離れた所から撃つ技（魔法使いの炎の呪文、狩人の弓）の溜め（src/eco/skill.ts）：構えて動かずに溜め、溜めの途中で打たれると止まる（呪文は散って消える）
+  const skill = c.sp === Job.Wizard ? SKILL_WIZARD_FIRE : c.sp === Job.Hunter ? SKILL_HUNTER_SHOT : null;
+  const sk = skill ? this.skillStep(c, skill) : '';
+  if (sk === 'charging') return;
+  if (sk === 'broken') {
+    if (c.sp === Job.Wizard) this.fxAttacks.push({ t: this.w.tick, style: 'puff', col: 2, size: 0, ax: c.x, ay: c.y, dx: c.x, dy: c.y - 14, did: -1, aid: c.id, big: false, kill: false });
+    return;
   }
+  const ready = sk === 'ready';
   if (!ready && c.act === 2 && c.actT < 4) return;
   const lights = this.partyLights(p);
   const leader = this.byId.get(p.members[0]);
@@ -520,36 +512,29 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     const f = foe as Cr;
     this.markNotice(c, f, '!');
     c.dir = Math.abs(f.x - c.x) > Math.abs(f.y - c.y) ? (f.x > c.x ? 2 : 3) : f.y > c.y ? 0 : 1;
-    if (c.sp === Job.Wizard) {
-      // 炎の呪文：離れた所から敵を焼き（当たれば打ち合いの一打ちの1.5倍）、敵の足もとの苔とキノコも焼いてしまう（scorchMoss）。
-      // 燃える床は作らない（以前は敵の足もとに火をつけ、そばで打ち合う仲間の冒険者がその火で焼け死んでいた。燃える床はドラゴンの炎だけ）。
-      // 撃つ前に杖を掲げて溜め（WIZ_WINDUP）、撃ったあとは次の溜めの番まで撃たない（WIZ_CYCLE）。
-      // （以前は溜めなしで生き物の更新4回ごとに撃ち続け、大物は近づく前に焼け死んでいた。8シード×12日で、近接の一打ちを受ける前に死んだ大物が6割、魔法使いが打たれたのは25時間に1回）
+    if (skill) {
+      // 離れた所から撃つ技：溜め終わった回に放つ（当たれば打ち合いの一打ちの1.5倍）。使ったあとの間は撃たない（src/eco/skill.ts）。
+      // 魔法使いの炎の呪文は、敵の足もとの苔とキノコも焼いてしまう（scorchMoss）。燃える床は作らない
+      // （以前は敵の足もとに火をつけ、そばで打ち合う仲間の冒険者がその火で焼け死んでいた。燃える床はドラゴンの炎だけ）。
+      // （以前は溜めなしで、魔法使いは生き物の更新4回ごとに、狩人は3回に1回ほど撃ち続け、大物は近づく前に倒れていた。
+      //  8シード×12日で、近接の一打ちを受ける前に死んだ大物が6割、魔法使いが打たれたのは25時間に1回、狩人は0回）
       if (ready) {
         c.act = 2;
         c.actT = 0;
-        this.scorchMoss(this.tileOf(f.x, f.y));
-        if (this.strike(c, f, WIZ_MUL)) this.die(f, 'fight', c.k);
+        if (c.sp === Job.Wizard) this.scorchMoss(this.tileOf(f.x, f.y));
+        if (this.strike(c, f, c.sp === Job.Wizard ? WIZ_MUL : SHOT_MUL)) this.die(f, 'fight', c.k);
         return;
       }
-      if ((this.step + c.id * 7) % WIZ_CYCLE < WIZ_START) {
-        c.act = 2;
-        c.actT = -WIZ_WINDUP;
+      if (this.skillCanStart(c, skill)) {
+        this.skillStart(c, skill);
         return;
       }
-      // 次の溜めの番を待つあいだ：敵が近ければ（2.5マス）離れ、遠ければその場で構える
+      // 使ったあとの間：敵が近ければ（2.5マス）離れ、遠ければその場で構える
       if (sq(f.x - c.x) + sq(f.y - c.y) < 2.5 * TILE * 2.5 * TILE) {
         c.act = 1;
         this.fleeFrom(c, f, s.speed);
         this.setDir(c, f.x - c.x, f.y - c.y);
       } else c.act = 0;
-      return;
-    }
-    if (c.sp === Job.Hunter) {
-      // 弓：離れたところから射る（反撃を受けにくい）
-      c.act = 2;
-      c.actT = 0;
-      if (ih(c.id, f.id, this.step) % 3 === 0 && this.strike(c, f, 0.9)) this.die(f, 'fight', c.k);
       return;
     }
     if (sq(f.x - c.x) + sq(f.y - c.y) < 14 * 14) {

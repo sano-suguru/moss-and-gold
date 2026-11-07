@@ -49,4 +49,5 @@ import './ant';
 import './kobold';
 import './salamander';
 import './armor';
+import './skill';
 import './save';
