@@ -12,8 +12,9 @@
  *
  * ゴーレム（宝物庫の入口の番人）：入口から動かずに、2つの技を使う。
  *   両腕の振り下ろし（周りの円、3マス）：入口のそば（3マスの内）の相手に。当たった者はゴーレムを中心に外へはね飛ばされ、着地で怯む（入口から押し返す）。
- *   地割れ（直線8マス）：入口から8マスの内で、入口の方を向いて近づいてくる強さのある者（冒険者・ドワーフ・大物）か、宝を抱えた者に。
- *     地面の下を走るので、通り道の全員に当たり（戦士や僧侶でも止められない）、当たった者は怯む。向きは溜めはじめに決まる（Cr.kbx・kby に持つ）。
+ *   跳ねる衝撃波（直線8マス）：入口から8マスの内で、入口の方を向いて近づいてくる強さのある者（冒険者・ドワーフ・大物）か、宝を抱えた者に。
+ *     丸い衝撃波が1.6マスおきに5回、少しずつ間を置いて跳ねていき、落ちたときに輪の中（半径およそ1マス）にいる者に当たって怯ませる（戦士や僧侶でも止められない）。
+ *     輪と輪のあいだにいれば当たらない。向きは溜めはじめに決まる（Cr.kbx・kby に持つ）。
  *   どちらも重いが、冒険者を一撃では倒さない（体力の半分〜7割ほど）。冒険者は両方の予兆を見て避ける（戦士と僧侶は、振り下ろしからは下がらずに受ける）。
  */
 import { CR_EVERY, Cr, Ecology, HUNT3, Job, Kind, ih, sq } from '../ecology';
@@ -310,9 +311,14 @@ export function advBrace(this: Ecology, c: Cr): boolean {
 /** ゴーレムの技の重さ（打ち合いの一打ちに対する倍率。ゴーレムは強さ40なので、冒険者の体力の半分〜7割ほど） */
 const SLAM_MUL = 0.7;
 const QUAKE_MUL = 0.6;
-/** 地割れの長さと、通り道の半分の幅（px） */
-const QUAKE_LEN = 8 * TILE;
-const QUAKE_W = 11;
+/** 跳ねる衝撃波：落ちる回数、間隔（px）、輪の半径（px）、落ちる間（tick）。届く長さは HOP_N × HOP_GAP（およそ8マス） */
+const HOP_N = 5;
+const HOP_GAP = 1.6 * TILE;
+const HOP_R = 17;
+const HOP_DT = 1.5;
+const QUAKE_LEN = HOP_N * HOP_GAP;
+/** 冒険者が下がる、衝撃波の通り道の半分の幅（px） */
+const QUAKE_W = HOP_R;
 
 /** ゴーレムの技の相手になれる者（強さのある者。霊・ウィスプ・飛んでいる者・ゴーレム自身は除く） */
 function golemFoe(o: Cr): boolean {
@@ -340,32 +346,27 @@ export function golemSkill(this: Ecology, c: Cr): boolean {
   const who = (o: Cr) => golemFoe(o) && !this.airborne(o);
   if (quake) {
     c.run = 0;
-    // 地割れ：向きの線（長さ8マス、幅22px）の上の全員。壁の向こうには届かない
-    const ux = c.kbx;
-    const uy = c.kby;
+    // 跳ねる衝撃波：向きの線の上に、HOP_GAP おきに HOP_N 回、HOP_DT tick ずつ間を置いて落ちる。それぞれ落ちたときに、輪の中（半径 HOP_R）にいる者に当たって怯ませる
+    // （矢の雨と同じ、少し後で当たる攻撃。src/eco/attack.ts の resolveVolleys）。見通しの利かない所（壁の向こう）には落ちない
     const m = this.w.map;
-    const hits: Cr[] = [];
-    this.nearby(c.x + ux * QUAKE_LEN * 0.5, c.y + uy * QUAKE_LEN * 0.5, 6, (o) => {
-      if (o === c || o.dead || o.away || o.caught || !who(o)) return;
-      const px = o.x - c.x;
-      const py = o.y - c.y;
-      const along = px * ux + py * uy;
-      if (along < 0 || along > QUAKE_LEN || Math.abs(px * uy - py * ux) > QUAKE_W) return;
-      if (!lineOfSight(m, c.x, c.y, o.x, o.y)) return;
-      hits.push(o);
-    });
-    // 壁で止まる長さ（エフェクトの長さ）：線の上を少しずつ進み、岩に当たった所まで
-    let len = 0;
-    while (len < QUAKE_LEN && lineOfSight(m, c.x, c.y, c.x + ux * (len + 8), c.y + uy * (len + 8))) len += 8;
-    this.fxAttacks.push({ t: this.w.tick, style: 'gquake', col: 0, size: 2, ax: c.x, ay: c.y, dx: c.x + ux * len, dy: c.y + uy * len, did: -1, aid: c.id, big: true, kill: false, rad: len, fly: 40 });
-    this.lastBigHit = this.w.tick;
-    let advHit = 0;
-    for (const o of hits) {
-      if (o.k === Kind.Adventurer) advHit++;
-      if (this.strike(c, o, QUAKE_MUL, false)) this.slay(c, o, false);
-      else o.stun = Math.max(o.stun, STUN_N);
+    let n = 0;
+    for (let i = 1; i <= HOP_N; i++) {
+      const hx = c.x + c.kbx * HOP_GAP * i;
+      const hy = c.y + c.kby * HOP_GAP * i;
+      if (!lineOfSight(m, c.x, c.y, hx, hy)) break;
+      this.queueVolley(c, { d: -1, x: hx, y: hy, r: HOP_R, mul: QUAKE_MUL, poison: 0, stun: STUN_N }, Math.round(i * HOP_DT));
+      n = i;
     }
-    if (advHit) this.record('settle', { t: this.w.tick, k: Kind.Golem, ev: 'quake', id: c.id, n: advHit, x: Math.round(c.x), y: Math.round(c.y) } as never);
+    this.fxAttacks.push({ t: this.w.tick, style: 'gquake', col: 0, size: 2, ax: c.x, ay: c.y, dx: c.x + c.kbx * HOP_GAP * n, dy: c.y + c.kby * HOP_GAP * n, did: -1, aid: c.id, big: true, kill: false, n, fly: Math.round(n * HOP_DT) });
+    this.lastBigHit = this.w.tick;
+    // 狙った冒険者が、どの輪にも入っていなければ（予兆を見て避けた）。輪は少し後で落ちるので、いまの位置で見る
+    if (aim && !aim.dead && aim.k === Kind.Adventurer) {
+      let inside = false;
+      for (let i = 1; i <= n; i++) if (sq(aim.x - (c.x + c.kbx * HOP_GAP * i)) + sq(aim.y - (c.y + c.kby * HOP_GAP * i)) <= HOP_R * HOP_R) inside = true;
+      if (!inside) this.record('settle', { t: this.w.tick, k: Kind.Golem, ev: 'golemDodge', id: c.id, n: aim.sp, x: Math.round(aim.x), y: Math.round(aim.y) } as never);
+    }
+    c.aim = 0;
+    return true;
   } else {
     // 振り下ろし：周りの円（3マス）。当たった者は外へはね飛ばす（入口から押し返す）
     this.areaStrike(c, c.x, c.y, 1, 0, { kind: 'circle', r: 3 * TILE }, SLAM_MUL, { style: 'gslam', col: 0 }, who);
@@ -378,7 +379,7 @@ export function golemSkill(this: Ecology, c: Cr): boolean {
       if (o.k === Kind.Adventurer) this.record('settle', { t: this.w.tick, k: Kind.Golem, ev: 'slamKnock', id: c.id, n: o.sp, x: Math.round(o.x), y: Math.round(o.y) } as never);
     });
   }
-  // 狙った冒険者に当たらなかった（予兆を見て避けた）
+  // 狙った冒険者に振り下ろしが当たらなかった（予兆を見て避けた）
   if (aim && !aim.dead && aim.k === Kind.Adventurer && aim.hitAt !== this.w.tick) this.record('settle', { t: this.w.tick, k: Kind.Golem, ev: 'golemDodge', id: c.id, n: aim.sp, x: Math.round(aim.x), y: Math.round(aim.y) } as never);
   c.aim = 0;
   return true;

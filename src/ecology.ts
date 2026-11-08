@@ -567,6 +567,8 @@ export interface Volley {
   mul: number;
   /** 当たった者に与える毒（生き物の更新の回数。0 なら毒なし） */
   poison: number;
+  /** 当たった者を怯ませる長さ（生き物の更新の回数。0 なら怯ませない。src/eco/charge.ts） */
+  stun?: number;
 }
 
 export interface Web {

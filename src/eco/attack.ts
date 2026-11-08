@@ -136,7 +136,7 @@ export function queueVolley(this: Ecology, a: Cr, v: Omit<import('../ecology').V
 
 /**
  * 時刻の来た攻撃を当てる（生き物の更新のはじめに）。打った者がもういなければ（外へ出た、消えた）当たらない。
- * 魔法の矢（d が 0 以上）は、その相手が生きていれば必ず当たる。矢の雨（d が −1）は、落ちた所（半径 r）にそのときいる者に当たる（動いていれば避けられる）
+ * 魔法の矢（d が 0 以上）は、その相手が生きていれば必ず当たる。矢の雨とゴーレムの跳ねる衝撃波（d が −1）は、落ちた所（半径 r）にそのときいる者に当たる（動いていれば避けられる）
  */
 export function resolveVolleys(this: Ecology): void {
   if (!this.volleys.length) return;
@@ -153,7 +153,7 @@ export function resolveVolleys(this: Ecology): void {
       if (this.strike(a, d, v.mul, false)) this.slay(a, d, false);
       continue;
     }
-    // 矢の雨：打った者と同じ種には当たらない（冒険者の矢はドワーフにも当たらない）。霊とウィスプは矢がすり抜ける
+    // 落ちる攻撃：打った者と同じ種には当たらない（冒険者の矢はドワーフにも当たらない）。霊とウィスプはすり抜ける
     const who = (o: Cr) => o.k !== a.k && !(a.k === Kind.Adventurer && o.k === Kind.Dwarf) && o.k !== Kind.Ghost && o.k !== Kind.Wisp;
     let first = true;
     this.nearby(v.x, v.y, Math.ceil(v.r / TILE) + 1, (o) => {
@@ -162,7 +162,9 @@ export function resolveVolleys(this: Ecology): void {
       if (this.strike(a, o, v.mul, false)) {
         this.slay(a, o, first);
         first = false;
-      }
+      } else if (v.stun) o.stun = Math.max(o.stun, v.stun);
+      // 分析用：ゴーレムの跳ねる衝撃波に打たれた冒険者（lib/moments.ts が、一度の技で2人以上かを数える）
+      if (a.k === Kind.Golem && o.k === Kind.Adventurer) this.record('settle', { t: this.w.tick, k: Kind.Golem, ev: 'quakeHit', id: a.id, at: a.cast, n: o.sp, x: Math.round(o.x), y: Math.round(o.y) } as never);
     });
   }
 }

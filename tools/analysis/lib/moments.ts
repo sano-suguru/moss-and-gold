@@ -29,8 +29,8 @@ export const MOMENTS: Moment[] = [
   { key: 'chargeKnock2', label: 'ミノタウロス：一度の突進で冒険者を2人以上はね飛ばした' },
   { key: 'chargeBlock', label: 'ミノタウロス：突進を戦士か僧侶が受け止めた' },
   { key: 'chargeDodge', label: 'ミノタウロス：突進の溜めを見た冒険者が避け、空振りさせた' },
-  { key: 'golemQuake2', label: 'ゴーレム：一度の地割れで冒険者を2人以上怯ませた' },
-  { key: 'golemDodge', label: 'ゴーレム：振り下ろしか地割れの予兆を見た冒険者が避け、空振りさせた' },
+  { key: 'golemQuake2', label: 'ゴーレム：一度の跳ねる衝撃波で冒険者を2人以上打った' },
+  { key: 'golemDodge', label: 'ゴーレム：振り下ろしか跳ねる衝撃波の予兆を見た冒険者が避け、空振りさせた' },
   { key: 'golemKnock', label: 'ゴーレム：振り下ろしで入口の冒険者をはね飛ばした' },
   { key: 'webEat', label: '狩り：クモが巣にかかった獲物を食べた' },
   { key: 'webCatch', label: 'クモの巣：大ネズミかアリが捕まった' },
@@ -213,7 +213,11 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     })(),
     chargeBlock: s.filter((x) => x.k === K.Minotaur && x.ev === 'chargeBlock').length,
     chargeDodge: s.filter((x) => x.k === K.Minotaur && x.ev === 'chargeDodge').length,
-    golemQuake2: s.filter((x) => x.k === 21 && x.ev === 'quake' && x.n >= 2).length,
+    golemQuake2: (() => {
+      const g = new Map<string, number>();
+      for (const x of s) if (x.k === 21 && x.ev === 'quakeHit') g.set(`${x.id}:${x.at}`, (g.get(`${x.id}:${x.at}`) ?? 0) + 1);
+      return [...g.values()].filter((n) => n >= 2).length;
+    })(),
     golemDodge: s.filter((x) => x.k === 21 && x.ev === 'golemDodge').length,
     golemKnock: s.filter((x) => x.k === 21 && x.ev === 'slamKnock').length,
     lairFound: s.filter((x) => x.k === K.Adventurer && x.ev === 'aim' && x.how === 6 && x.reason === 1).length,
