@@ -597,7 +597,9 @@ export const HUNT1: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, K
 /** オークの獲物：ゴブリンは従える相手なので獲物にしない */
 export const HUNT_ORC: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Kobold, Kind.Ant, Kind.Adventurer, Kind.Dwarf];
 export const HUNT2: Kind[] = [Kind.Rat, Kind.Ant, Kind.Kobold];
-export const HUNT3: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Orc, Kind.Lizardman, Kind.Spider, Kind.Slime, Kind.Zombie, Kind.Adventurer];
+// ミノタウロスの獲物。スライムは狙わない（小さすぎる。突進と斧の薙ぎ払いを持たせてから、縄張りのスライムがまとめて倒され、
+// 8シードの10〜18日目でミノタウロスに倒されるスライムが main の14匹から38匹に増え、スライムが0匹の日が増えていた。ほかの獲物を狙った攻撃の巻き込みには当たる）
+export const HUNT3: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Orc, Kind.Lizardman, Kind.Spider, Kind.Zombie, Kind.Adventurer];
 export const HUNT4: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Lizardman, Kind.Orc, Kind.Slime, Kind.Zombie, Kind.Myconid, Kind.Adventurer];
 export const HUNT5: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Ant, Kind.Kobold, Kind.Goblin];
 export const HUNT6: Kind[] = [Kind.Rat];
