@@ -191,11 +191,14 @@ export function minoRun(this: Ecology, c: Cr): void {
     hit.push(o);
   });
   hit.sort((p, q) => (p.x - x0) * ux + (p.y - y0) * uy - ((q.x - x0) * ux + (q.y - y0) * uy) || p.id - q.id);
+  // 突進で倒した獲物のうち、まだ食べていなければ最初の1体を食べる（寝床まで引きずる。src/eco/monsters.ts の dragToLair）
+  let ate = c.feed > 0;
+  const fed0 = c.feed;
   for (const o of hit) {
     if (blocker(o)) {
       // 戦士と僧侶が受け止める：突進はここで止まり、受けた者の傷は半分。受けた者は少し押し戻される
       this.fxAttacks.push({ t: this.w.tick, style: 'minoimpact', col: 1, size: 2, ax: c.x, ay: c.y, dx: o.x, dy: o.y, did: o.id, aid: c.id, big: true, kill: false });
-      if (this.strike(c, o, RUN_MUL * 0.5, false)) this.slay(c, o, false);
+      if (this.strike(c, o, RUN_MUL * 0.5, false)) ate = this.slay(c, o, !ate) || ate;
       else {
         o.kb = 2;
         o.kbx = ux * 5;
@@ -211,7 +214,7 @@ export function minoRun(this: Ecology, c: Cr): void {
     const kx = uy * sg * 0.85 + ux * 0.5;
     const ky = -ux * sg * 0.85 + uy * 0.5;
     this.fxAttacks.push({ t: this.w.tick, style: 'minoimpact', col: 0, size: 1, ax: c.x, ay: c.y, dx: o.x, dy: o.y, did: o.id, aid: c.id, big: true, kill: false });
-    if (this.strike(c, o, RUN_MUL, false)) this.slay(c, o, false);
+    if (this.strike(c, o, RUN_MUL, false)) ate = this.slay(c, o, !ate) || ate;
     else this.knock(o, kx, ky);
     this.record('settle', { t: this.w.tick, k: Kind.Minotaur, ev: 'chargeKnock', id: c.id, at: c.cast, n: o.k, x: Math.round(o.x), y: Math.round(o.y) } as never);
   }
@@ -221,6 +224,8 @@ export function minoRun(this: Ecology, c: Cr): void {
     this.fxAttacks.push({ t: this.w.tick, style: 'minoimpact', col: 2, size: 2, ax: c.x, ay: c.y, dx: c.x + ux * 10, dy: c.y + uy * 10, did: -1, aid: c.id, big: true, kill: false });
     stop = true;
   }
+  // 獲物を食べたら、突進はそこで終わる（次の更新から食べる。src/eco/move.ts の feeding）
+  if (c.feed !== fed0) stop = true;
   if (stop || c.run <= 0 || L < 4) this.minoRunEnd(c);
 }
 
