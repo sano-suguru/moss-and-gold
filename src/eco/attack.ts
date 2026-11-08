@@ -105,6 +105,18 @@ export function slay(this: Ecology, a: Cr, d: Cr, canEat = true): boolean {
   return ate;
 }
 
+/** 冒険者が雑魚として扱う小物（src/eco/adventurer.ts） */
+export const ADV_MINOR: number[] = [Kind.Rat, Kind.Bat, Kind.Ant, Kind.Myconid, Kind.Salamander, Kind.Lizard, Kind.Spider, Kind.Slime];
+
+/**
+ * 冒険者の技が当たってよい小物か：技で狙った相手（tgt）か、その冒険者を襲ってきた相手だけ。
+ * 冒険者が大物と戦うそばにいただけの大ネズミやスライムまで巻き込んでいたので（8シードの10〜18日目で、冒険者に倒される大ネズミが main の153匹から276匹、
+ * スライムが154匹から227匹に増え、どちらも画面から消える日が増えた）。大物やゴブリンなどの敵には、今までどおり形の中の全員に当たる
+ */
+export function advMinorOk(o: Cr, a: Cr, tgt: number): boolean {
+  return !ADV_MINOR.includes(o.k) || o.id === tgt || o.foe === a.id;
+}
+
 /** 毒の効かない者（血の通わない者：骨・石・霊・鎧・スライムなど） */
 export function poisonable(c: Cr): boolean {
   return BLOOD[c.k] >= 0 && c.k !== Kind.Gargoyle && c.k !== Kind.Golem && c.k !== Kind.Dragon;
@@ -157,7 +169,7 @@ export function resolveVolleys(this: Ecology): void {
       continue;
     }
     // 落ちる攻撃：打った者と同じ種には当たらない（冒険者の矢はドワーフにも当たらない）。霊とウィスプはすり抜ける
-    const who = (o: Cr) => o.k !== a.k && !(a.k === Kind.Adventurer && o.k === Kind.Dwarf) && o.k !== Kind.Ghost && o.k !== Kind.Wisp;
+    const who = (o: Cr) => o.k !== a.k && !(a.k === Kind.Adventurer && (o.k === Kind.Dwarf || !advMinorOk(o, a, v.tgt ?? 0))) && o.k !== Kind.Ghost && o.k !== Kind.Wisp;
     let first = true;
     this.nearby(v.x, v.y, Math.ceil(v.r / TILE) + 1, (o) => {
       if (o.dead || o.away || o.caught || !who(o) || sq(o.x - v.x) + sq(o.y - v.y) > v.r * v.r) return;

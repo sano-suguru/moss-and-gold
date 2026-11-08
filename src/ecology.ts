@@ -569,6 +569,8 @@ export interface Volley {
   poison: number;
   /** 当たった者を怯ませる長さ（生き物の更新の回数。0 なら怯ませない。src/eco/charge.ts） */
   stun?: number;
+  /** 落ちる攻撃で狙った相手（冒険者の矢の雨。関係のない小物には当てないため。src/eco/attack.ts） */
+  tgt?: number;
 }
 
 export interface Web {

@@ -525,7 +525,8 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       if (ready) {
         c.act = 2;
         c.actT = 0;
-        const who = (o: Cr) => o.k !== Kind.Adventurer && o.k !== Kind.Dwarf && (o === f || o.foe === c.id || MINOR.includes(o.k) || (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)));
+        // 関係のない小物（大ネズミ・スライムなど）は、狙った相手か自分を襲ってきた相手でなければ巻き込まない（src/eco/attack.ts の advMinorOk）
+        const who = (o: Cr) => o.k !== Kind.Adventurer && o.k !== Kind.Dwarf && (o === f || o.foe === c.id || (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)));
         const fl = Math.sqrt(fd2) || 1;
         const ux = (f.x - c.x) / fl;
         const uy = (f.y - c.y) / fl;
@@ -563,7 +564,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
           // 矢の雨：弧を描いて高く上がった矢が、狙った所のまわりに少しばらけて降る（1.3マス）。落ちたときにそこにいる者に当たり（動いていれば避けられる）、
           // 当たった所で毒の煙が爆ぜて毒にする
           const fly = 12;
-          this.queueVolley(c, { d: -1, x: f.x, y: f.y, r: 1.3 * TILE, mul: 1.2, poison: 25 }, fly);
+          this.queueVolley(c, { d: -1, x: f.x, y: f.y, r: 1.3 * TILE, mul: 1.2, poison: 25, tgt: f.id }, fly);
           this.fxAttacks.push({ t: this.w.tick, style: 'rain', col: 3, size: 1, ax: c.x, ay: c.y, dx: f.x, dy: f.y, did: -1, aid: c.id, big: false, kill: false, rad: 1.3 * TILE, n: 6, fly });
         } else if (fd2 <= sq(reach * 1.2)) {
           // 盗賊の短剣投げ。構えているあいだに届く距離の外へ出られたら外れる
