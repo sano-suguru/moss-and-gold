@@ -296,11 +296,29 @@ export function kobold(this: Ecology, c: Cr): void {
       let fk = -1;
       let fv = 49;
       const r0 = this.regionOf(this.tileOf(wr.x, wr.y));
+      const m0 = this.w.map;
+      // ほかのコボルトが立っているか、摘みに向かっている畑のマスは選ばない（空いたマスがなければ、集めに出るのをやめる）。
+      // （以前は皆がいちばん育ったマスを選び、3マスしかない畑の1マスに6匹ほどが群がって、狭い住処の中で歩く姿のまま詰まっていた。abc・かしたれ）
+      const taken = (k: number) => {
+        const kx = (k % m0.w) * TILE + 8;
+        const ky = Math.floor(k / m0.w) * TILE + 8;
+        let busy = false;
+        this.nearby(kx, ky, 1, (o) => {
+          if (busy || o === c || o.dead || o.k !== Kind.Kobold) return;
+          if (sq(o.x - kx) + sq(o.y - ky) < 10 * 10 || this.paths.get(o.id)?.gk === k) busy = true;
+        });
+        return busy;
+      };
       for (const k of this.farmTiles(wr))
-        if (this.w.fungus[k] > fv && (r0 < 0 || this.regionOf(k) === r0)) {
+        if (this.w.fungus[k] > fv && (r0 < 0 || this.regionOf(k) === r0) && (this.tileOf(c.x, c.y) === k || this.paths.get(c.id)?.gk === k || !taken(k))) {
           fv = this.w.fungus[k];
           fk = k;
         }
+      if (fk < 0 && this.farmTiles(wr).some((k) => this.w.fungus[k] > 49)) {
+        c.st = 0;
+        c.act = 0;
+        return;
+      }
       if (fk >= 0) {
         const m = this.w.map;
         c.act = 1;
