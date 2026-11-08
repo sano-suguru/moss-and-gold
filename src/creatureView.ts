@@ -6,11 +6,31 @@ import { RANK_AT, packLook, unpackLook } from './eco/roster';
 import { SKILL_WIZARD_MISSILE } from './eco/skill';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
+import { lineOfSight } from './mapgen';
 import { heroOrbAt } from './sprites';
 
 /** 冒険者の攻撃で、技の演出を振り下ろしのコマまで遅らせる tick 数（攻撃のコマ 0 構え・1 振り上げのあと） */
 const ADV_STRIKE_LAG = 4;
 /** その攻撃の記録が、冒険者の振る技か（演出を振り下ろしのコマに合わせるもの） */
+/**
+ * ゴーレムの地割れのジグザグの割れ目の点（9ドットおき、横へ ±3ドットずれる）。形は、ゴーレムの番号と向きだけで決まる（予兆と放ったあとで同じ形になる）
+ */
+function fissurePts(id: number, ax: number, ay: number, ux: number, uy: number, len: number): [number, number][] {
+  const a32 = Math.round(Math.atan2(uy, ux) / (Math.PI / 16));
+  const pts: [number, number][] = [];
+  for (let i = 0, d = 0; d <= len; i++, d += 9) {
+    const h = ((id * 73856093) ^ (a32 * 19349663) ^ (i * 83492791)) >>> 0;
+    const off = i === 0 ? 0 : ((h % 7) - 3) * 1.1;
+    pts.push([ax + ux * d - uy * off, ay + uy * d + ux * off]);
+  }
+  return pts;
+}
+/** 割れ目の一節を描く（点から点へ、向きをそろえた絵を中点に置く） */
+function fissureSeg(p: [number, number], q: [number, number]): [number, number, number] {
+  const d16 = (Math.round(Math.atan2(q[1] - p[1], q[0] - p[0]) / (Math.PI / 8)) + 16) % 16;
+  return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, d16];
+}
+
 /** 冒険者の職業の技のエフェクト（技は溜めてから放つので、打ち合いの一打ちのように遅らせない。src/eco/adventurer.ts） */
 const JOB_FX = new Set(['slashwave', 'greatsword', 'cross', 'missile', 'rain']);
 function advStrike(eco: Ecology, r: { aid: number; style: string }): boolean {
@@ -709,25 +729,32 @@ export class CreatureView {
           break;
         }
         case 'gquake': {
-          // ゴーレムの地割れ（src/eco/charge.ts）：地面を青白い光の筋が走り（4 tick で端まで）、通ったあとから岩の棘が順に突き出して崩れ、暗いひびが残る
+          // ゴーレムの地割れ（src/eco/charge.ts）：予兆のジグザグの割れ目に沿って、光の先が4 tick で端まで走り、通ったあとから大きな岩の柱が左右交互に噴き上がって
+          // 土ぼこりが立ち、柱は崩れて瓦礫になる。割れ目は口を開けてから閉じていく
           const len = r.rad ?? dist;
-          const d16 = (Math.round(Math.atan2(uy, ux) / (Math.PI / 8)) + 16) % 16;
-          const front = Math.min(len, ((age + 1) / 4) * len);
-          for (let d = 4; d < len; d += 8) {
-            const pass = (d / Math.max(1, len)) * 4;
+          const pts = fissurePts(r.aid, r.ax, r.ay, ux, uy, len);
+          for (let i = 0; i + 1 < pts.length; i++) {
+            const pass = ((i * 9) / Math.max(1, len)) * 4;
             const g = age - pass;
             if (g < 0) continue;
-            const f = g < 2 ? 1 : g < 9 ? 2 : g < 14 ? 3 : -1;
-            if (f >= 0) push(r.ax + ux * d, r.ay + uy * d, 0, false, A.fx(`qcrack:${d16}:${f}`), 0, 4);
+            const f = g < 10 ? 2 : g < 20 ? 3 : -1;
+            if (f < 0) continue;
+            const [mx, my, d16] = fissureSeg(pts[i], pts[i + 1]);
+            push(mx, my, 0, false, A.fx(`fiss:${d16}:${f}`), 0, 4);
           }
-          for (let d = 10, i = 0; d < len; d += 12, i++) {
+          for (let d = 8, i = 0; d < len; d += 10, i++) {
             const pass = (d / Math.max(1, len)) * 4 + 0.5;
-            const g = Math.floor(age - pass);
-            if (g < 0 || g > 5) continue;
-            const side = (i % 2 ? 1 : -1) * 3;
-            push(r.ax + ux * d - uy * side, r.ay + uy * d + ux * side, 0, false, A.fx(`rspike:${g}`), 0, 4);
+            const g = Math.floor((age - pass) * 0.8);
+            if (g < 0 || g > 6) continue;
+            const side = (i % 2 ? 1 : -1) * (6 + (i % 3));
+            const px = r.ax + ux * d - uy * side;
+            const py = r.ay + uy * d + ux * side;
+            push(px, py, 0, false, A.fx(`pillar:${(i * 7 + r.aid) % 3}:${g}`), 0, 4);
+            if (g <= 3) push(px - uy * side * 0.4, py + ux * side * 0.4 + 2, 1, false, A.fx(`dpuff:${g}`), 0, 4);
           }
-          if (age < 6) dyn.push({ x: r.ax + ux * front, y: r.ay + uy * front - 6, r: 36, i: 0.55 * damp, c: 2 });
+          const front = Math.min(len, ((age + 1) / 4) * len);
+          if (age < 8) dyn.push({ x: r.ax + ux * front, y: r.ay + uy * front - 6, r: 40, i: 0.5 * damp * (1 - age / 8), c: 2 });
+          if (once) spray(0, 6, 10, 1.4, 2.4);
           break;
         }
         case 'breath':
@@ -1590,15 +1617,17 @@ export class CreatureView {
         }
         dyn.push({ x, y: yy - bh * 0.6, r: 46, i: 0.5 + 0.2 * Math.sin(t * 0.5), c: 2 });
         if (c.run === -2) {
-          const d16 = (Math.round(Math.atan2(c.kby, c.kbx) / (Math.PI / 8)) + 16) % 16;
-          const blink = Math.floor(t / 3) % 2;
-          for (let d = 10; d < 8 * 16; d += 8) {
-            const px = c.x + c.kbx * d;
-            const py = c.y + c.kby * d;
-            const k = eco.tileOf(px, py);
-            if (k < 0 || eco.w.map.solid[k]) break;
-            // 途切れさせない一本の筋（途切れ途切れにすると点線に見えた）。溜めの後半は太く光る
-            pushSprite(px, py + 0.02, 0, false, A.fx(`qcrack:${d16}:${eco.w.tick - c.cast > 12 && blink ? 1 : 0}`), 0, 2);
+          // 地割れの予兆：ゴーレムの足もとから、走る向きへジグザグの暗い割れ目が少しずつ伸び、奥から水色の光がにじむ（溜めの後半は光が強まって脈打つ）
+          const spent = eco.w.tick + alpha - c.cast;
+          const grow = Math.min(1, spent / 14);
+          // 長さは地割れそのもの（src/eco/charge.ts の golemSkill）と同じく、見通しの利く所まで
+          let len = 0;
+          while (len < 8 * 16 && lineOfSight(eco.w.map, c.x, c.y, c.x + c.kbx * (len + 8), c.y + c.kby * (len + 8))) len += 8;
+          const pts = fissurePts(c.id, c.x, c.y, c.kbx, c.kby, len * grow);
+          const strong = spent > 12 && Math.floor(t / 2) % 2 === 0;
+          for (let i = 0; i + 1 < pts.length; i++) {
+            const [mx, my, d16] = fissureSeg(pts[i], pts[i + 1]);
+            pushSprite(mx, my + 0.02, 0, false, A.fx(`fiss:${d16}:${strong ? 1 : 0}`), 0, 2);
           }
         }
       }

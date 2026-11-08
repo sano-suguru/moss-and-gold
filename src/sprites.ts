@@ -5062,31 +5062,51 @@ const ROCKL=[[222,216,206],[178,172,162],[134,128,120],[96,92,86],[64,60,56],[34
 /** ゴーレムの符文の光：白 → 淡い水色 → 水色 → 青 → 深い青 */
 const RUNEL=[[240,255,255],[170,240,255],[96,200,240],[52,140,210],[30,84,150],[14,40,80]];
 /**
- * ゴーレムの地割れの一節：d は向き（16方向）、f 0 予兆（細く光る水色の筋）、1 走る（太く白く光る）、2 割れたあと（暗いひびと縁の石）、3 消えかけのひび。
- * 向きをそろえて並べて、まっすぐな筋にする（向きが同じなので、つなぎ目は出ない）
+ * ゴーレムの地割れの割れ目の一節（ジグザグの線をつくる短い一節）：d は向き（16方向）、f 0 予兆（暗い割れ目の奥に、細く水色の光がにじむ）、1 予兆の光が強まる、
+ * 2 口を開けた割れ目（暗く広い溝と、縁の明るい石）、3 閉じかけ（細く暗い）。一節の長さは10ドットで、両端を少し重ねて並べる
  */
-function fxQuakeCrack(d,f){
- const S=7,W=S*2+1,H=S*2+1,fr=blank(W,H);
+function fxFissure(d,f){
+ const S=8,W=S*2+1,H=S*2+1,fr=blank(W,H);
  const a=d*Math.PI/8,ca=Math.cos(a),sa=Math.sin(a);
- if(f<=1){
-  const hw=f===0?0.9:1.9;
-  aaDraw(fr,S,S,RUNEL,2,(x,y)=>{const s=x*ca+y*sa,t=Math.abs(-x*sa+y*ca);if(Math.abs(s)>5.6||t>hw)return -1;return f===0?(t<0.5?1:2):(t<0.7?0:t<1.3?1:2)},false);
- } else {
-  const hw=f===2?1.6:1;
-  aaDraw(fr,S,S,ROCKL,-1,(x,y)=>{const s=x*ca+y*sa,t=-x*sa+y*ca;if(Math.abs(s)>5.6)return -1;const w=hw+(Math.sin(s*1.7+d)*0.5);if(Math.abs(t)>w)return -1;return Math.abs(t)<w*0.45?5:(t<0?(f===2?1:2):3)},false);
- }
+ const hw=[1.3,1.5,2.6,1.1][f];
+ // 割れ目は岩の暗い色、奥の光は符文の水色
+ const pal=[ROCKL[0],ROCKL[1],ROCKL[2],ROCKL[4],[20,18,22],RUNEL[1],RUNEL[2],[40,36,40]];
+ aaDraw(fr,S,S,pal,-1,(x,y)=>{
+  const s=x*ca+y*sa,t=-x*sa+y*ca,at=Math.abs(t);
+  if(Math.abs(s)>5.8)return -1;
+  const w=hw*(1-0.25*Math.abs(s)/5.8);
+  if(at<=w){
+   if(f<=1&&at<(f===0?0.45:0.7))return f===0?6:5;   // 奥の光
+   return 4;                                           // 暗い溝
+  }
+  // 縁の石：片側は光が当たって明るく、片側は暗い
+  if(at<=w+(f===2?1.4:0.8))return t<0?(f===2?1:2):3;
+  return -1;
+ },false);
  return {...fr,ax:S,ay:S};
 }
-/** 地割れで突き出す岩の棘：f 0〜5（0〜2 突き出す、3 いちばん高い、4・5 崩れる）。左から光の当たる尖った岩。根もとに砕けた石 */
-function fxRockSpike(f){
- const W=15,H=22,fr=blank(W,H),cx=7,by=19;
- const h=[5,11,15,16,10,5][f],w=[3,4,4.5,4.5,4,3.5][f];
+/**
+ * 地割れで噴き上がる岩の柱：v 形の違い（0 尖った柱、1 二つに割れた柱、2 ずんぐりした塊）、f 0〜6（0〜2 噴き上がる、3 いちばん高い、4 ひびが入る、5・6 崩れて瓦礫になる）。
+ * 左から光の当たる面と、影になる面。根もとに砕けた石
+ */
+function fxRockPillar(v,f){
+ const W=21,H=34,fr=blank(W,H),cx=10,by=30;
+ const top=[24,26,16][v]*[0.35,0.75,1,1,0.95,0.55,0.25][f];
+ const w0=[5.5,6.5,7.5][v];
+ const shade=[0,0,0,0,1,1,2][f];
  aaDraw(fr,cx,by,ROCKL,-1,(x,y)=>{
-  // 棘：根もと（y=0）から上（−）へ、幅が細くなる
-  if(y<=0.5&&y>=-h){const ww=w*(1+y/h);if(Math.abs(x)<=ww){const lit=x<-ww*0.2?1:x<ww*0.4?2:3;return f>=4&&((Math.floor(-y/3)+(x>0?1:0))%2)?-1:lit}}
-  // 根もとの砕けた石
-  if(y>-1.5&&y<=1.5&&Math.abs(x)<=w+2.5&&Math.abs(x)>w*0.6)return 3;
-  return -1;
+  const h=-y;
+  // 根もとの瓦礫
+  if(h>-2&&h<2.5&&Math.abs(x)<w0+3&&(Math.abs(x)>w0*0.5||f>=5))return Math.min(4,3+(shade>1?1:0));
+  if(h<0||h>top)return -1;
+  const ww=w0*Math.pow(1-h/(top+0.01),v===2?0.4:0.8);
+  // 二つに割れた柱：真ん中に溝
+  if(v===1&&Math.abs(x)<0.9&&h>top*0.35)return -1;
+  if(Math.abs(x)>ww)return -1;
+  // ひびと崩れ：段ごとに欠ける
+  if(f>=4&&((Math.floor(h/4)+(x>0?1:0)+v)%3===0)&&h>2)return f>=5?-1:4;
+  const face=x<-ww*0.15?0:x<ww*0.45?1:2;
+  return Math.min(4,face+shade+(h<3?1:0));
  });
  return {...fr,ax:cx,ay:by};
 }
@@ -5554,4 +5574,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxQuakeCrack, fxRockSpike, fxGolemSlam, fxRuneGlow, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxGolemSlam, fxRuneGlow, fxFissure, fxRockPillar, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
