@@ -4,7 +4,7 @@ import { TROPHY } from './eco/loot';
 import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
 import { RANK_AT, packLook, unpackLook } from './eco/roster';
 import { SKILL_WIZARD_MISSILE } from './eco/skill';
-import { hopAt } from './eco/charge';
+import { HOP_DT, HOP_N, hopAt } from './eco/charge';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
 import { lineOfSight } from './mapgen';
@@ -711,20 +711,20 @@ export class CreatureView {
           break;
         }
         case 'gquake': {
-          // ゴーレムの跳ねる衝撃波（src/eco/charge.ts）：ゴーレムから相手の方へ、丸い衝撃波が1.6マスおきに5回、1.5 tick ずつ間を置いて跳ねる。
+          // ゴーレムの跳ねる衝撃波（src/eco/charge.ts）：ゴーレムから相手の方へ、小さな丸い衝撃波が1マスおきに8回、1 tick ずつ間を置いて跳ねる（落ちる所は少し散らばる）。
           // 落ちた所ごとに、中心が白く光って白っぽい輪が広がり（輪の大きさが当たる範囲）、灰色の破片が外へ散る。地面の種類を選ばない（白と灰色だけ）
-          const n = r.n ?? 5;
+          const n = r.n ?? HOP_N;
           for (let i = 1; i <= n; i++) {
-            const g = age - i * 1.5;
+            const g = age - i * HOP_DT;
             if (g < 0 || g >= 9) continue;
             const [hx, hy] = hopAt(r.aid, r.rad ?? 0, r.ax, r.ay, ux, uy, i);
             push(hx, hy, 1, false, A.fx(`shock:${Math.min(5, Math.floor(g * 0.7))}`), 0, 4);
-            if (g < 3) dyn.push({ x: hx, y: hy - 6, r: 30, i: 0.4 * damp * (1 - g / 3), c: 0 });
-            if (g < 7)
-              for (let j = 0; j < 4; j++) {
-                const a = (j / 4) * 6.283 + i;
-                const q = g / 7;
-                push(hx + Math.cos(a) * (6 + 12 * q), hy + Math.sin(a) * (6 + 12 * q) * 0.8, Math.sin(q * Math.PI) * 6, false, A.fx(`pebble:${(i + j) % 3}`), 0, 4);
+            if (g < 3) dyn.push({ x: hx, y: hy - 6, r: 22, i: 0.35 * damp * (1 - g / 3), c: 0 });
+            if (g < 6)
+              for (let j = 0; j < 2; j++) {
+                const a = j * 3.14 + i * 1.3;
+                const q = g / 6;
+                push(hx + Math.cos(a) * (4 + 8 * q), hy + Math.sin(a) * (4 + 8 * q) * 0.8, Math.sin(q * Math.PI) * 4, false, A.fx(`pebble:${(i + j) % 2}`), 0, 4);
               }
           }
           break;
@@ -1579,7 +1579,7 @@ export class CreatureView {
         pushSprite(x + fx * 11, yy + fy * 4 + 0.05, lift + 14, false, A.fx(`snort:${ph}`), 0, 2);
         pushSprite(x - fx * 6 + ((Math.floor(t / 3) & 1) ? 3 : -3), yy - fy * 3 + 0.05, lift + 1, false, A.fx(`dpuff:${Math.floor(t / 1.5) % 4}`), 0, 2);
       }
-      // ゴーレムの溜め（src/eco/charge.ts）：体の符文が水色に光り、まわりに符文が浮かぶ。地割れの溜めでは、走る向きの地面に細く光る筋が脈打つ（描画専用）
+      // ゴーレムの溜め（src/eco/charge.ts）：体の符文が水色に光り、まわりに符文が浮かぶ（跳ねる衝撃波の溜めでは、走る向きを向いて構える。地面には何も出さない）（描画専用）
       if (sp === Kind.Golem && !c.dead && c.act === 2 && c.actT < 0) {
         const t = eco.w.tick + alpha;
         const bh = Ecology.bodySize(sp);
@@ -1588,16 +1588,6 @@ export class CreatureView {
           pushSprite(x + Math.cos(a) * 10, yy + Math.sin(a) * 3 + 0.06, lift + bh * 0.6 + Math.sin(t * 0.3 + i) * 2, false, A.fx(`rune:${(i + Math.floor(t / 6)) % 4}`), 0, 2);
         }
         dyn.push({ x, y: yy - bh * 0.6, r: 46, i: 0.5 + 0.2 * Math.sin(t * 0.5), c: 2 });
-        if (c.run === -2) {
-          // 跳ねる衝撃波の予兆：衝撃波が落ちる5か所に、薄い輪の印がゴーレムに近い所から順に浮かび上がり、溜めの後半は脈打つ（地面の種類を選ばない）
-          const spent = eco.w.tick + alpha - c.cast;
-          for (let i = 1; i <= 5; i++) {
-            if (spent < i * 2.5) break;
-            const [hx, hy] = hopAt(c.id, c.cast, c.x, c.y, c.kbx, c.kby, i);
-            if (!lineOfSight(eco.w.map, c.x, c.y, hx, hy)) break;
-            pushSprite(hx, hy + 0.02, 0, false, A.fx(`shockmark:${spent > 12 && Math.floor(t / 2) % 2 === 0 ? 1 : 0}`), 0, 2);
-          }
-        }
       }
       // 怯んだ者（src/eco/charge.ts）：頭の上で小さな星が三つ回る（描画専用）
       if (!c.dead && c.stun > 0) {
