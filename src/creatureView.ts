@@ -697,6 +697,39 @@ export class CreatureView {
           if (once) spray(r.col === 2 ? 0 : 1, r.col === 1 ? 1 : 6, 6, 1.3, 1.4);
           break;
         }
+        case 'gslam': {
+          // ゴーレムの両腕の振り下ろし（src/eco/charge.ts）：打った所から、岩の破片と土の輪が3マスまで広がる（当たる範囲）。地面にひびが残る
+          if (age < 10) push(r.ax, r.ay, 1, false, A.fx(`gslam:${Math.min(5, Math.floor(age * 0.7))}`), 0, 4);
+          if (age < 6) dyn.push({ x: r.ax, y: r.ay - 10, r: 70, i: 0.45 * damp * (1 - age / 6), c: 0 });
+          if (once) {
+            spray(0, 6, 12, 1.6, 2.4);
+            spray(1, 0, 8, 1.0, 0.8);
+            this.marks.push({ x: r.ax, y: r.ay + 3, key: `crack:${r.t % 3}`, t: now });
+          }
+          break;
+        }
+        case 'gquake': {
+          // ゴーレムの地割れ（src/eco/charge.ts）：地面を青白い光の筋が走り（4 tick で端まで）、通ったあとから岩の棘が順に突き出して崩れ、暗いひびが残る
+          const len = r.rad ?? dist;
+          const d16 = (Math.round(Math.atan2(uy, ux) / (Math.PI / 8)) + 16) % 16;
+          const front = Math.min(len, ((age + 1) / 4) * len);
+          for (let d = 4; d < len; d += 8) {
+            const pass = (d / Math.max(1, len)) * 4;
+            const g = age - pass;
+            if (g < 0) continue;
+            const f = g < 2 ? 1 : g < 9 ? 2 : g < 14 ? 3 : -1;
+            if (f >= 0) push(r.ax + ux * d, r.ay + uy * d, 0, false, A.fx(`qcrack:${d16}:${f}`), 0, 4);
+          }
+          for (let d = 10, i = 0; d < len; d += 12, i++) {
+            const pass = (d / Math.max(1, len)) * 4 + 0.5;
+            const g = Math.floor(age - pass);
+            if (g < 0 || g > 5) continue;
+            const side = (i % 2 ? 1 : -1) * 3;
+            push(r.ax + ux * d - uy * side, r.ay + uy * d + ux * side, 0, false, A.fx(`rspike:${g}`), 0, 4);
+          }
+          if (age < 6) dyn.push({ x: r.ax + ux * front, y: r.ay + uy * front - 6, r: 36, i: 0.55 * damp, c: 2 });
+          break;
+        }
         case 'breath':
           break;
         case 'puff':
@@ -1546,6 +1579,28 @@ export class CreatureView {
         const ph = Math.floor(t / 2) % 4;
         pushSprite(x + fx * 11, yy + fy * 4 + 0.05, lift + 14, false, A.fx(`snort:${ph}`), 0, 2);
         pushSprite(x - fx * 6 + ((Math.floor(t / 3) & 1) ? 3 : -3), yy - fy * 3 + 0.05, lift + 1, false, A.fx(`dpuff:${Math.floor(t / 1.5) % 4}`), 0, 2);
+      }
+      // ゴーレムの溜め（src/eco/charge.ts）：体の符文が水色に光り、まわりに符文が浮かぶ。地割れの溜めでは、走る向きの地面に細く光る筋が脈打つ（描画専用）
+      if (sp === Kind.Golem && !c.dead && c.act === 2 && c.actT < 0) {
+        const t = eco.w.tick + alpha;
+        const bh = Ecology.bodySize(sp);
+        for (let i = 0; i < 3; i++) {
+          const a = t * 0.12 + (i * Math.PI * 2) / 3;
+          pushSprite(x + Math.cos(a) * 10, yy + Math.sin(a) * 3 + 0.06, lift + bh * 0.6 + Math.sin(t * 0.3 + i) * 2, false, A.fx(`rune:${(i + Math.floor(t / 6)) % 4}`), 0, 2);
+        }
+        dyn.push({ x, y: yy - bh * 0.6, r: 46, i: 0.5 + 0.2 * Math.sin(t * 0.5), c: 2 });
+        if (c.run === -2) {
+          const d16 = (Math.round(Math.atan2(c.kby, c.kbx) / (Math.PI / 8)) + 16) % 16;
+          const blink = Math.floor(t / 3) % 2;
+          for (let d = 10; d < 8 * 16; d += 8) {
+            const px = c.x + c.kbx * d;
+            const py = c.y + c.kby * d;
+            const k = eco.tileOf(px, py);
+            if (k < 0 || eco.w.map.solid[k]) break;
+            // 途切れさせない一本の筋（途切れ途切れにすると点線に見えた）。溜めの後半は太く光る
+            pushSprite(px, py + 0.02, 0, false, A.fx(`qcrack:${d16}:${eco.w.tick - c.cast > 12 && blink ? 1 : 0}`), 0, 2);
+          }
+        }
       }
       // 怯んだ者（src/eco/charge.ts）：頭の上で小さな星が三つ回る（描画専用）
       if (!c.dead && c.stun > 0) {

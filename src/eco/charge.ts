@@ -9,10 +9,16 @@
  * 冒険者は突進の溜めを見ると、通り道にいる者が横へ下がる（盗賊と狩人はすぐ、魔法使いと吟遊詩人は少し遅れて。位の高い者ほど早い。技を溜めている者は下がれない）。
  * 戦士と僧侶は下がらず、ミノタウロスと狙われた仲間のあいだへ移って構え、突進を受け止める（advBrace）。
  * 怯み（Cr.stun）：歩く速さが半分になり、技の溜めを始められない。頭の上で小さな星が回る。
+ *
+ * ゴーレム（宝物庫の入口の番人）：入口から動かずに、2つの技を使う。
+ *   両腕の振り下ろし（周りの円、3マス）：入口のそば（3マスの内）の相手に。当たった者はゴーレムを中心に外へはね飛ばされ、着地で怯む（入口から押し返す）。
+ *   地割れ（直線8マス）：入口から8マスの内で、入口の方を向いて近づいてくる強さのある者（冒険者・ドワーフ・大物）か、宝を抱えた者に。
+ *     地面の下を走るので、通り道の全員に当たり（戦士や僧侶でも止められない）、当たった者は怯む。向きは溜めはじめに決まる（Cr.kbx・kby に持つ）。
+ *   どちらも重いが、冒険者を一撃では倒さない（体力の半分〜7割ほど）。冒険者は両方の予兆を見て避ける（戦士と僧侶は、振り下ろしからは下がらずに受ける）。
  */
 import { CR_EVERY, Cr, Ecology, HUNT3, Job, Kind, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
-import { SKILL_MINO_CHARGE, SKILL_MINO_SWEEP } from './skill';
+import { SKILL_GOLEM_QUAKE, SKILL_GOLEM_SLAM, SKILL_MINO_CHARGE, SKILL_MINO_SWEEP } from './skill';
 
 /** 突進の長さ（px）と、走る生き物の更新の回数 */
 const RUN_LEN = 8 * TILE;
@@ -38,6 +44,8 @@ export function breakWindup(this: Ecology, c: Cr): void {
 
 /** はね飛ばす：(ux, uy) の向きへ、KB_N 回の更新で KB_LEN 飛ぶ */
 export function knock(this: Ecology, o: Cr, ux: number, uy: number): void {
+  // ゴーレムは重くて動かない（ゴーレムの kbx・kby は、地割れの向きを持つのに使う）
+  if (o.k === Kind.Golem) return;
   o.kb = KB_N;
   o.kbx = (ux * KB_LEN) / KB_N;
   o.kby = (uy * KB_LEN) / KB_N;
@@ -249,9 +257,13 @@ export function minoRunEnd(this: Ecology, c: Cr): void {
  */
 export function advBrace(this: Ecology, c: Cr): boolean {
   let m: Cr | null = null;
+  let g: Cr | null = null;
   this.nearby(c.x, c.y, 10, (o) => {
-    if (!m && o.k === Kind.Minotaur && !o.dead && o.run === -1 && o.act === 2 && o.actT < 0) m = o;
+    if (o.dead || o.act !== 2 || o.actT >= 0) return;
+    if (!m && o.k === Kind.Minotaur && o.run === -1) m = o;
+    if (!g && o.k === Kind.Golem) g = o;
   });
+  if (g && this.advDodgeGolem(c, g)) return true;
   if (!m) return false;
   const mm = m as Cr;
   const dx = mm.tx - mm.x;
@@ -289,6 +301,163 @@ export function advBrace(this: Ecology, c: Cr): boolean {
   return true;
 }
 
+/** ゴーレムの技の重さ（打ち合いの一打ちに対する倍率。ゴーレムは強さ40なので、冒険者の体力の半分〜7割ほど） */
+const SLAM_MUL = 0.7;
+const QUAKE_MUL = 0.6;
+/** 地割れの長さと、通り道の半分の幅（px） */
+const QUAKE_LEN = 8 * TILE;
+const QUAKE_W = 11;
+
+/** ゴーレムの技の相手になれる者（強さのある者。霊・ウィスプ・飛んでいる者・ゴーレム自身は除く） */
+function golemFoe(o: Cr): boolean {
+  return o.k !== Kind.Golem && o.k !== Kind.Ghost && o.k !== Kind.Wisp && o.k !== Kind.Dragon && o.k !== Kind.Worm && o.k !== Kind.Mimic && o.k !== Kind.Gargoyle && o.k !== Kind.Armor;
+}
+
+/**
+ * ゴーレムの技の進み（生き物の更新ごと、ほかの行いより先に）。true なら今は技の最中（ほかの行いをしない）。
+ * c.run が −2 なら地割れの溜め、それ以外は振り下ろしの溜め
+ */
+export function golemSkill(this: Ecology, c: Cr): boolean {
+  const quake = c.run === -2;
+  const sk = this.skillStep(c, quake ? SKILL_GOLEM_QUAKE : SKILL_GOLEM_SLAM, false);
+  if (sk === 'charging') {
+    if (quake) this.setDir(c, c.kbx, c.kby);
+    return true;
+  }
+  if (sk !== 'ready') {
+    if (quake && !(c.act === 2 && c.actT <= 0)) c.run = 0;
+    return false;
+  }
+  c.act = 2;
+  c.actT = 0;
+  const aim = this.byId.get(c.aim);
+  const who = (o: Cr) => golemFoe(o) && !this.airborne(o);
+  if (quake) {
+    c.run = 0;
+    // 地割れ：向きの線（長さ8マス、幅22px）の上の全員。壁の向こうには届かない
+    const ux = c.kbx;
+    const uy = c.kby;
+    const m = this.w.map;
+    const hits: Cr[] = [];
+    this.nearby(c.x + ux * QUAKE_LEN * 0.5, c.y + uy * QUAKE_LEN * 0.5, 6, (o) => {
+      if (o === c || o.dead || o.away || o.caught || !who(o)) return;
+      const px = o.x - c.x;
+      const py = o.y - c.y;
+      const along = px * ux + py * uy;
+      if (along < 0 || along > QUAKE_LEN || Math.abs(px * uy - py * ux) > QUAKE_W) return;
+      if (!lineOfSight(m, c.x, c.y, o.x, o.y)) return;
+      hits.push(o);
+    });
+    // 壁で止まる長さ（エフェクトの長さ）：線の上を少しずつ進み、岩に当たった所まで
+    let len = 0;
+    while (len < QUAKE_LEN && lineOfSight(m, c.x, c.y, c.x + ux * (len + 8), c.y + uy * (len + 8))) len += 8;
+    this.fxAttacks.push({ t: this.w.tick, style: 'gquake', col: 0, size: 2, ax: c.x, ay: c.y, dx: c.x + ux * len, dy: c.y + uy * len, did: -1, aid: c.id, big: true, kill: false, rad: len });
+    this.lastBigHit = this.w.tick;
+    let advHit = 0;
+    for (const o of hits) {
+      if (o.k === Kind.Adventurer) advHit++;
+      if (this.strike(c, o, QUAKE_MUL, false)) this.slay(c, o, false);
+      else o.stun = Math.max(o.stun, STUN_N);
+    }
+    if (advHit) this.record('settle', { t: this.w.tick, k: Kind.Golem, ev: 'quake', id: c.id, n: advHit, x: Math.round(c.x), y: Math.round(c.y) } as never);
+  } else {
+    // 振り下ろし：周りの円（3マス）。当たった者は外へはね飛ばす（入口から押し返す）
+    this.areaStrike(c, c.x, c.y, 1, 0, { kind: 'circle', r: 3 * TILE }, SLAM_MUL, { style: 'gslam', col: 0 }, who);
+    this.nearby(c.x, c.y, 4, (o) => {
+      if (o.dead || o.foe !== c.id || o.hitAt !== this.w.tick) return;
+      const dx = o.x - c.x;
+      const dy = o.y - c.y;
+      const L = Math.sqrt(dx * dx + dy * dy) || 1;
+      this.knock(o, dx / L, dy / L);
+      if (o.k === Kind.Adventurer) this.record('settle', { t: this.w.tick, k: Kind.Golem, ev: 'slamKnock', id: c.id, n: o.sp, x: Math.round(o.x), y: Math.round(o.y) } as never);
+    });
+  }
+  // 狙った冒険者に当たらなかった（予兆を見て避けた）
+  if (aim && !aim.dead && aim.k === Kind.Adventurer && aim.hitAt !== this.w.tick) this.record('settle', { t: this.w.tick, k: Kind.Golem, ev: 'golemDodge', id: c.id, n: aim.sp, x: Math.round(aim.x), y: Math.round(aim.y) } as never);
+  c.aim = 0;
+  return true;
+}
+
+/**
+ * 持ち場のゴーレムが、技を使うか（溜めはじめたら true）。foe は入口を通ろうとする者か宝を抱えた者（src/eco/monsters.ts の golem）。
+ * 3マスの内に相手がいれば振り下ろし。そうでなければ、入口から8マスの内で入口の方を向いて近づいてくる者か宝を抱えた者に、地割れ
+ */
+export function golemEngage(this: Ecology, c: Cr, foe: Cr | null): boolean {
+  if (foe && sq(foe.x - c.x) + sq(foe.y - c.y) <= 3 * TILE * 3 * TILE && this.skillCanStart(c, SKILL_GOLEM_SLAM)) {
+    this.skillStart(c, SKILL_GOLEM_SLAM);
+    c.run = 0;
+    c.aim = foe.id;
+    return true;
+  }
+  if (!this.skillCanStart(c, SKILL_GOLEM_QUAKE)) return false;
+  const m = this.w.map;
+  let best: Cr | null = null;
+  let bd = QUAKE_LEN * QUAKE_LEN;
+  this.nearby(c.tx, c.ty, 9, (o) => {
+    if (o.dead || o.away || o.caught || !golemFoe(o) || this.airborne(o)) return;
+    const d = sq(o.x - c.x) + sq(o.y - c.y);
+    if (d >= bd || d < 2 * TILE * 2 * TILE) return;
+    const k = this.tileOf(o.x, o.y);
+    const thief = o.gold > 0 && k >= 0 && m.vault[k];
+    if (!thief) {
+      // 冒険者とドワーフは8マスの内から、大物（強さ6以上）は5マスの内まで近づいたら（宝物庫のそばをうろつくトロールに、地割れを撃ち続けていた）
+      if (!(o.k === Kind.Adventurer || o.k === Kind.Dwarf || (this.str(o) >= 6 && d <= 5 * TILE * 5 * TILE))) return;
+      // 入口の方を向いている（向きはセーブに入っている値。前の位置との差で決めると、ロードし直したときにずれる）
+      const fx = o.dir === 2 ? 1 : o.dir === 3 ? -1 : 0;
+      const fy = o.dir === 0 ? 1 : o.dir === 1 ? -1 : 0;
+      if ((c.tx - o.x) * fx + (c.ty - o.y) * fy <= 0) return;
+    }
+    if (!lineOfSight(m, c.x, c.y, o.x, o.y)) return;
+    bd = d;
+    best = o;
+  });
+  if (!best) return false;
+  const b = best as Cr;
+  const L = Math.sqrt(bd) || 1;
+  this.skillStart(c, SKILL_GOLEM_QUAKE);
+  c.run = -2;
+  c.aim = b.id;
+  c.kbx = (b.x - c.x) / L;
+  c.kby = (b.y - c.y) / L;
+  this.setDir(c, c.kbx, c.kby);
+  return true;
+}
+
+/** 予兆を見て下がりはじめるまでの、溜めはじめからの生き物の更新の回数（盗賊と狩人はすぐ、竜殺しは2回、ほかは4回。位1つにつき1回早い） */
+function dodgeDelay(this: Ecology, c: Cr): number {
+  const rank = this.heroOf(c)?.rank ?? 0;
+  return Math.max(0, (c.sp === Job.Thief || c.sp === Job.Hunter ? 0 : c.sp === Job.Slayer ? 2 : 4) - rank);
+}
+
+/**
+ * 冒険者が、ゴーレムの溜めを見たときの動き。true なら今は下がっている。
+ * 地割れの溜め（地面に光る筋）：線の上にいる者は横へ下がる（戦士と僧侶も。地面の下を走るので受け止められない）。
+ * 振り下ろしの溜め（両腕を掲げて目が光る）：円の中（3.3マスの内）にいる者は外へ下がる（戦士と僧侶は下がらずに受ける）
+ */
+export function advDodgeGolem(this: Ecology, c: Cr, g: Cr): boolean {
+  if ((this.w.tick - g.cast) / CR_EVERY < dodgeDelay.call(this, c)) return false;
+  if (g.run === -2) {
+    const along = (c.x - g.x) * g.kbx + (c.y - g.y) * g.kby;
+    const side = (c.x - g.x) * g.kby - (c.y - g.y) * g.kbx;
+    if (along < -4 || along > QUAKE_LEN + 8 || Math.abs(side) > QUAKE_W + 10) return false;
+    const sg = Math.abs(side) > 1 ? Math.sign(side) : ih(c.id, g.id, 333) & 1 ? 1 : -1;
+    c.act = 1;
+    this.tryMove(c, g.kby * sg * 1.5, -g.kbx * sg * 1.5);
+    this.setDir(c, g.x - c.x, g.y - c.y);
+    return true;
+  }
+  if (blocker(c)) return false;
+  const dx = c.x - g.x;
+  const dy = c.y - g.y;
+  const d2 = dx * dx + dy * dy;
+  if (d2 > 3.3 * TILE * 3.3 * TILE) return false;
+  const L = Math.sqrt(d2) || 1;
+  c.act = 1;
+  this.tryMove(c, (dx / L) * 1.5, (dy / L) * 1.5);
+  this.setDir(c, g.x - c.x, g.y - c.y);
+  return true;
+}
+
 declare module '../ecology' {
   interface Ecology {
     breakWindup: typeof breakWindup;
@@ -300,7 +469,10 @@ declare module '../ecology' {
     minoRun: typeof minoRun;
     minoRunEnd: typeof minoRunEnd;
     advBrace: typeof advBrace;
+    golemSkill: typeof golemSkill;
+    golemEngage: typeof golemEngage;
+    advDodgeGolem: typeof advDodgeGolem;
   }
 }
 
-Object.assign(Ecology.prototype, { breakWindup, knock, knockTick, minoSkill, minoTarget, minoEngage, minoRun, minoRunEnd, advBrace });
+Object.assign(Ecology.prototype, { breakWindup, knock, knockTick, minoSkill, minoTarget, minoEngage, minoRun, minoRunEnd, advBrace, golemSkill, golemEngage, advDodgeGolem });

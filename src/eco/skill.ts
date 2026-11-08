@@ -30,6 +30,10 @@ export const SKILL_PRIEST_HAMMER: Skill = { windup: 4, cool: 20 };
 export const SKILL_MINO_SWEEP: Skill = { windup: 4, cool: 10 };
 /** ミノタウロスの突進：およそ1.6秒、頭を下げて地面をかき、使ったあと6秒は溜め直さない */
 export const SKILL_MINO_CHARGE: Skill = { windup: 8, cool: 30 };
+/** ゴーレムの両腕の振り下ろし：およそ1.2秒、両腕を掲げて溜め、使ったあと3秒は溜め直さない */
+export const SKILL_GOLEM_SLAM: Skill = { windup: 6, cool: 15 };
+/** ゴーレムの地割れ：およそ2秒、地面に光る筋を走らせて溜め、使ったあと7秒は溜め直さない */
+export const SKILL_GOLEM_QUAKE: Skill = { windup: 10, cool: 35 };
 /** 盗賊の短剣投げ：およそ0.4秒構え、投げたあと2秒は構え直さない */
 export const SKILL_THIEF_THROW: Skill = { windup: 2, cool: 10 };
 

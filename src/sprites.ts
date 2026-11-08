@@ -5057,6 +5057,66 @@ function fxStunStar(f){
  for(let t=1;t<=L;t++)for(const [ox,oy] of [[t,0],[-t,0],[0,t],[0,-t]])setPx(fr,S+ox,S+oy,Y[Math.min(3,t+(f>=2?1:0))],t===1);
  return {...fr,ax:S,ay:S};
 }
+/** 岩（ゴーレムの技）：明るい石 → 灰 → 暗い灰 → 縁取り */
+const ROCKL=[[222,216,206],[178,172,162],[134,128,120],[96,92,86],[64,60,56],[34,32,30]];
+/** ゴーレムの符文の光：白 → 淡い水色 → 水色 → 青 → 深い青 */
+const RUNEL=[[240,255,255],[170,240,255],[96,200,240],[52,140,210],[30,84,150],[14,40,80]];
+/**
+ * ゴーレムの地割れの一節：d は向き（16方向）、f 0 予兆（細く光る水色の筋）、1 走る（太く白く光る）、2 割れたあと（暗いひびと縁の石）、3 消えかけのひび。
+ * 向きをそろえて並べて、まっすぐな筋にする（向きが同じなので、つなぎ目は出ない）
+ */
+function fxQuakeCrack(d,f){
+ const S=7,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const a=d*Math.PI/8,ca=Math.cos(a),sa=Math.sin(a);
+ if(f<=1){
+  const hw=f===0?0.9:1.9;
+  aaDraw(fr,S,S,RUNEL,2,(x,y)=>{const s=x*ca+y*sa,t=Math.abs(-x*sa+y*ca);if(Math.abs(s)>5.6||t>hw)return -1;return f===0?(t<0.5?1:2):(t<0.7?0:t<1.3?1:2)},false);
+ } else {
+  const hw=f===2?1.6:1;
+  aaDraw(fr,S,S,ROCKL,-1,(x,y)=>{const s=x*ca+y*sa,t=-x*sa+y*ca;if(Math.abs(s)>5.6)return -1;const w=hw+(Math.sin(s*1.7+d)*0.5);if(Math.abs(t)>w)return -1;return Math.abs(t)<w*0.45?5:(t<0?(f===2?1:2):3)},false);
+ }
+ return {...fr,ax:S,ay:S};
+}
+/** 地割れで突き出す岩の棘：f 0〜5（0〜2 突き出す、3 いちばん高い、4・5 崩れる）。左から光の当たる尖った岩。根もとに砕けた石 */
+function fxRockSpike(f){
+ const W=15,H=22,fr=blank(W,H),cx=7,by=19;
+ const h=[5,11,15,16,10,5][f],w=[3,4,4.5,4.5,4,3.5][f];
+ aaDraw(fr,cx,by,ROCKL,-1,(x,y)=>{
+  // 棘：根もと（y=0）から上（−）へ、幅が細くなる
+  if(y<=0.5&&y>=-h){const ww=w*(1+y/h);if(Math.abs(x)<=ww){const lit=x<-ww*0.2?1:x<ww*0.4?2:3;return f>=4&&((Math.floor(-y/3)+(x>0?1:0))%2)?-1:lit}}
+  // 根もとの砕けた石
+  if(y>-1.5&&y<=1.5&&Math.abs(x)<=w+2.5&&Math.abs(x)>w*0.6)return 3;
+  return -1;
+ });
+ return {...fr,ax:cx,ay:by};
+}
+/** ゴーレムの振り下ろしの衝撃：f 0〜5。打った所から岩の破片と土の輪が広がる（半径はおよそ3マスまで。当たる範囲）。芯は白い閃光 */
+function fxGolemSlam(f){
+ const S=52,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const R=[10,22,34,44,48,49][f],th=[4,4,3.5,3,2,1.2][f],shade=[0,0,0,1,2,3][f];
+ aaDraw(fr,S,S,ROCKL,-1,(x,y)=>{
+  const r=Math.hypot(x,y);
+  if(Math.abs(r-R)<=th){const k=(r-R+th)/(2*th);return Math.min(4,(k<0.3?0:k<0.7?1:2)+shade)}
+  if(f<=1&&r<6-f*3)return 0;
+  return -1;
+ });
+ // 輪の上の岩のかけら
+ if(f>=1&&f<=4){
+  for(let i=0;i<14;i++){
+   const a=i*0.4488+(i%2)*0.2,rr=R+((i*7)%5)-2;
+   const x=Math.round(S+Math.cos(a)*rr),y=Math.round(S+Math.sin(a)*rr-f);
+   setPx(fr,x,y,ROCKL[1],false);setPx(fr,x+1,y,ROCKL[2],false);setPx(fr,x,y+1,ROCKL[3],false);setPx(fr,x+1,y+1,ROCKL[4],false);
+  }
+ }
+ return {...fr,ax:S,ay:S};
+}
+/** ゴーレムの溜めで光る符文：f 0〜3（形の違う小さな符文。水色に光る） */
+function fxRuneGlow(f){
+ const W=7,H=7,fr=blank(W,H);
+ const P=[["..#..",".###.","..#..","..#..",".#.#."],["#...#",".#.#.","..#..",".#.#.","#...#"],[".###.","#...#","#.#.#","#...#",".###."],["##.##","..#..","#####","..#..","##.##"]][f];
+ for(let y=0;y<5;y++)for(let x=0;x<5;x++)if(P[y][x]==='#')setPx(fr,x+1,y+1,RUNEL[(x+y)%3===0?0:1],true);
+ return {...fr,ax:3,ay:3};
+}
 /** 毒の者から立ちのぼる泡：f 0〜3（小さな泡 → ふくらむ → ふくらみきる → はじける） */
 function fxPoisonBubble(f){
  const S=4,W=S*2+1,H=S*2+1,fr=blank(W,H);
@@ -5494,4 +5554,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxQuakeCrack, fxRockSpike, fxGolemSlam, fxRuneGlow, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
