@@ -4,6 +4,7 @@ import { TROPHY } from './eco/loot';
 import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
 import { RANK_AT, packLook, unpackLook } from './eco/roster';
 import { SKILL_WIZARD_MISSILE } from './eco/skill';
+import { hopAt } from './eco/charge';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
 import { lineOfSight } from './mapgen';
@@ -716,8 +717,7 @@ export class CreatureView {
           for (let i = 1; i <= n; i++) {
             const g = age - i * 1.5;
             if (g < 0 || g >= 9) continue;
-            const hx = r.ax + ux * 1.6 * 16 * i;
-            const hy = r.ay + uy * 1.6 * 16 * i;
+            const [hx, hy] = hopAt(r.aid, r.rad ?? 0, r.ax, r.ay, ux, uy, i);
             push(hx, hy, 1, false, A.fx(`shock:${Math.min(5, Math.floor(g * 0.7))}`), 0, 4);
             if (g < 3) dyn.push({ x: hx, y: hy - 6, r: 30, i: 0.4 * damp * (1 - g / 3), c: 0 });
             if (g < 7)
@@ -1593,8 +1593,7 @@ export class CreatureView {
           const spent = eco.w.tick + alpha - c.cast;
           for (let i = 1; i <= 5; i++) {
             if (spent < i * 2.5) break;
-            const hx = c.x + c.kbx * 1.6 * 16 * i;
-            const hy = c.y + c.kby * 1.6 * 16 * i;
+            const [hx, hy] = hopAt(c.id, c.cast, c.x, c.y, c.kbx, c.kby, i);
             if (!lineOfSight(eco.w.map, c.x, c.y, hx, hy)) break;
             pushSprite(hx, hy + 0.02, 0, false, A.fx(`shockmark:${spent > 12 && Math.floor(t / 2) % 2 === 0 ? 1 : 0}`), 0, 2);
           }

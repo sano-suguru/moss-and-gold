@@ -13,7 +13,7 @@
  * ゴーレム（宝物庫の入口の番人）：入口から動かずに、2つの技を使う。
  *   両腕の振り下ろし（周りの円、3マス）：入口のそば（3マスの内）の相手に。当たった者はゴーレムを中心に外へはね飛ばされ、着地で怯む（入口から押し返す）。
  *   跳ねる衝撃波（直線8マス）：入口から8マスの内で、入口の方を向いて近づいてくる強さのある者（冒険者・ドワーフ・大物）か、宝を抱えた者に。
- *     丸い衝撃波が1.6マスおきに5回、少しずつ間を置いて跳ねていき、落ちたときに輪の中（半径およそ1マス）にいる者に当たって怯ませる（戦士や僧侶でも止められない）。
+ *     丸い衝撃波が1.6マスおきに5回、少しずつ間を置いて跳ねていき（落ちる所は少し散らばり、遠くほど外へ開く。hopAt）、落ちたときに輪の中（半径およそ1マス）にいる者に当たって怯ませる（戦士や僧侶でも止められない）。
  *     輪と輪のあいだにいれば当たらない。向きは溜めはじめに決まる（Cr.kbx・kby に持つ）。
  *   どちらも重いが、冒険者を一撃では倒さない（体力の半分〜7割ほど）。冒険者は両方の予兆を見て避ける（戦士と僧侶は、振り下ろしからは下がらずに受ける）。
  */
@@ -320,6 +320,22 @@ const QUAKE_LEN = HOP_N * HOP_GAP;
 /** 冒険者が下がる、衝撃波の通り道の半分の幅（px） */
 const QUAKE_W = HOP_R;
 
+/**
+ * 跳ねる衝撃波の i 番目（1〜HOP_N）が落ちる所。まっすぐの線から少し散らす：向きを左右へ最大およそ14度ずらし（遠くの輪ほど外へ開いて、気持ち放射状になる）、
+ * 間隔をおよそ±12%、横へ最大4ドットずらす。ずれ方はゴーレムの番号と溜めはじめた時刻だけで決まる（予兆の印・輪の絵・当たる所が同じになる。描画からも呼ぶ）
+ */
+export function hopAt(id: number, cast: number, gx: number, gy: number, ux: number, uy: number, i: number): [number, number] {
+  const h = (salt: number) => ih(id, cast * 7 + i, salt) / 4294967296;
+  const da = (h(341) - 0.5) * 0.48;
+  const ca = Math.cos(da);
+  const sa = Math.sin(da);
+  const vx = ux * ca - uy * sa;
+  const vy = ux * sa + uy * ca;
+  const d = HOP_GAP * i * (0.88 + h(342) * 0.24);
+  const side = (h(343) - 0.5) * 8;
+  return [gx + vx * d - vy * side, gy + vy * d + vx * side];
+}
+
 /** ゴーレムの技の相手になれる者（強さのある者。霊・ウィスプ・飛んでいる者・ゴーレム自身は除く） */
 function golemFoe(o: Cr): boolean {
   return o.k !== Kind.Golem && o.k !== Kind.Ghost && o.k !== Kind.Wisp && o.k !== Kind.Dragon && o.k !== Kind.Worm && o.k !== Kind.Mimic && o.k !== Kind.Gargoyle && o.k !== Kind.Armor;
@@ -351,18 +367,20 @@ export function golemSkill(this: Ecology, c: Cr): boolean {
     const m = this.w.map;
     let n = 0;
     for (let i = 1; i <= HOP_N; i++) {
-      const hx = c.x + c.kbx * HOP_GAP * i;
-      const hy = c.y + c.kby * HOP_GAP * i;
+      const [hx, hy] = hopAt(c.id, c.cast, c.x, c.y, c.kbx, c.kby, i);
       if (!lineOfSight(m, c.x, c.y, hx, hy)) break;
       this.queueVolley(c, { d: -1, x: hx, y: hy, r: HOP_R, mul: QUAKE_MUL, poison: 0, stun: STUN_N }, Math.round(i * HOP_DT));
       n = i;
     }
-    this.fxAttacks.push({ t: this.w.tick, style: 'gquake', col: 0, size: 2, ax: c.x, ay: c.y, dx: c.x + c.kbx * HOP_GAP * n, dy: c.y + c.kby * HOP_GAP * n, did: -1, aid: c.id, big: true, kill: false, n, fly: Math.round(n * HOP_DT) });
+    this.fxAttacks.push({ t: this.w.tick, style: 'gquake', col: 0, size: 2, ax: c.x, ay: c.y, dx: c.x + c.kbx * HOP_GAP * n, dy: c.y + c.kby * HOP_GAP * n, did: -1, aid: c.id, big: true, kill: false, n, fly: Math.round(n * HOP_DT), rad: c.cast });
     this.lastBigHit = this.w.tick;
     // 狙った冒険者が、どの輪にも入っていなければ（予兆を見て避けた）。輪は少し後で落ちるので、いまの位置で見る
     if (aim && !aim.dead && aim.k === Kind.Adventurer) {
       let inside = false;
-      for (let i = 1; i <= n; i++) if (sq(aim.x - (c.x + c.kbx * HOP_GAP * i)) + sq(aim.y - (c.y + c.kby * HOP_GAP * i)) <= HOP_R * HOP_R) inside = true;
+      for (let i = 1; i <= n; i++) {
+        const [hx, hy] = hopAt(c.id, c.cast, c.x, c.y, c.kbx, c.kby, i);
+        if (sq(aim.x - hx) + sq(aim.y - hy) <= HOP_R * HOP_R) inside = true;
+      }
       if (!inside) this.record('settle', { t: this.w.tick, k: Kind.Golem, ev: 'golemDodge', id: c.id, n: aim.sp, x: Math.round(aim.x), y: Math.round(aim.y) } as never);
     }
     c.aim = 0;
