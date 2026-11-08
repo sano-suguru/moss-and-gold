@@ -1660,7 +1660,7 @@ export class CreatureView {
         }
         dyn.push({ x, y: yy - bh * 0.6, r: 46, i: 0.5 + 0.2 * Math.sin(t * 0.5), c: 2 });
         if (c.run === -2) {
-          // 地割れの予兆：走る向きの地面に細いひびが少しずつ入り、その上で小石が小刻みに跳ね、土ぼこりが立つ（光る線は使わない）
+          // 地割れの予兆：走る向きの地面に細いひびが少しずつ入り、その上で小石が小刻みに跳ねる（光る線は使わない。土ぼこりの玉は、灰色の丸に見えたので出さない）
           const spent = eco.w.tick + alpha - c.cast;
           const grow = Math.min(1, spent / 16);
           let len = 0;
@@ -1678,7 +1678,6 @@ export class CreatureView {
             if (!pt) continue;
             const hop = Math.abs(Math.sin(t * 0.9 + i * 1.7)) * (2 + (i % 3));
             pushSprite(pt[0] + ((i % 2) ? 3 : -3), pt[1] + 0.03, hop, false, A.fx(`pebble:${i % 3}`), 0, 2);
-            if ((Math.floor(t / 3) + i) % 4 === 0) pushSprite(pt[0], pt[1] + 0.04, 1, false, A.fx(`dpuff:${Math.floor(t / 2 + i) % 4}`), 0, 2);
           }
         }
       }
