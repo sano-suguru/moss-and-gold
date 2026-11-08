@@ -138,16 +138,12 @@ export function hunt(this: Ecology, c: Cr, R: number, kinds: Kind[], speed: numb
   this.markNotice(c, p, '!');
   c.act = 1;
   const d2 = sq(p.x - c.x) + sq(p.y - c.y);
+  // ミノタウロスは、4マスの内なら斧の薙ぎ払い、4〜8マスなら突進を溜める（src/eco/charge.ts）
+  if (c.k === Kind.Minotaur && this.minoEngage(c, p, d2)) return true;
   if (d2 < 11 * 11) {
     // 狩りは、相手が小さくても一口では食べず、打ち合って仕留めてから食べる（攻撃のエフェクトを見せる）。
     // 一口で食べるのは、クモの巣・ワームの丸のみ・空中でさらう・ミミックの丸のみ・死骸を食べる、の場面だけ
     this.fight(c, p);
-  } else if (c.k === Kind.Minotaur && d2 > 2 * TILE * 2 * TILE) {
-    // 一直線に突進し、壁にぶつかると一瞬よろめく
-    const x0 = c.x;
-    const y0 = c.y;
-    this.moveToward(c, p.x, p.y, speed * 1.8);
-    if (Math.abs(c.x - x0) + Math.abs(c.y - y0) < speed * 0.5) c.gait = 14;
   } else if (TIER[c.k] === 2 && d2 > 2 * TILE * 2 * TILE) {
     // 狡猾な種は、仲間がいれば回り込んで別々の方向から近づく
     let allies = 0;
@@ -195,6 +191,8 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1, fx = true): boolean
   const sa = this.str(a);
   const dmg = sa * (1.2 + (ih(a.id, d.id ^ this.step, 161) % 1000) / 1000 * 1.2) * mul;
   d.hp -= dmg;
+  // 大物の溜め（突進など）は、体力の上限の2割を超える重い一撃を受けたときだけ止まる（src/eco/charge.ts の breakWindup）
+  if (d.k !== Kind.Adventurer && d.act === 2 && d.actT < 0 && d.hp > 0 && dmg > this.maxHp(d) * 0.2) this.breakWindup(d);
   // リビングアーマーは、倒れずに強い一打を受けると、手の武器を落とす（src/eco/armor.ts）
   if (d.k === Kind.Armor && d.hp > 0) this.armorShed(d, dmg, a);
   // やられそうになったヴァンパイアは、コウモリの群れにばらけて逃げる（1日に1回、光の中ではできない。src/eco/vampire.ts）

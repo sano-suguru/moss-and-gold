@@ -4954,8 +4954,8 @@ function fxMissileBurst(f){
  return {...fr,ax:S,ay:S};
 }
 
-/** 毒の煙の塊：f 0〜7。ふくらみ（0〜2）、渦を巻いて盛り上がり（3〜5）、ちぎれて散る（6・7）。左上から光の当たる丸い煙のかたまりを重ねて描く */
-function fxPoisonCloud(f){
+/** 煙の塊：f 0〜7。ふくらみ（0〜2）、渦を巻いて盛り上がり（3〜5）、ちぎれて散る（6・7）。左上から光の当たる丸い煙のかたまりを重ねて描く。pal は色（毒の緑、土ぼこりの茶、息の白） */
+function fxCloud(pal,f){
  const S=24,W=S*2+1,H=S*2+1,fr=blank(W,H);
  const g=[0.45,0.75,1,1.05,1.08,1.1,1.0,0.85][f];
  const spread=[0,0,0,1,2,3,6,9][f];
@@ -4963,7 +4963,7 @@ function fxPoisonCloud(f){
  // 煙のかたまり：[中心x, 中心y, 半径]
  const puffs=[[0,0,9],[-8,2,6.5],[8,1,6.5],[-4,-6,6],[5,-6,6.5],[0,5,6],[-11,-3,4],[11,-4,4.2]];
  const keep=f>=6?[0,1,2,4,5]:[0,1,2,3,4,5,6,7];
- aaDraw(fr,S,S,GRNL,-1,(x,y)=>{
+ aaDraw(fr,S,S,pal,-1,(x,y)=>{
   // いちばん深く重なっている塊（中心に近い塊）の陰を使う（塊ごとの陰の小さいほうを選ぶと、斜めの縞になった）
   let best=-1,bestDepth=-1;
   for(const k of keep){
@@ -4983,11 +4983,78 @@ function fxPoisonCloud(f){
  });
  return {...fr,ax:S,ay:S};
 }
-/** 矢の落ちた所の小さな毒の煙：f 0〜3 */
-function fxPoisonPuff(f){
+/** 小さな煙：f 0〜3（毒の煙、土ぼこり、鼻息）。pal は色 */
+function fxPuff(pal,f){
  const S=7,W=S*2+1,H=S*2+1,fr=blank(W,H);
  const R=[2.5,4.5,5.5,4.5][f],shade=[0,0,1,3][f];
- aaDraw(fr,S,S,GRNL,-1,(x,y)=>{const r=Math.hypot(x,y+f*0.6);if(r>R)return -1;const lit=(-x*0.6-y*0.8)/R;return Math.min(4,(lit>0.4?0:lit>-0.1?1:2)+shade)});
+ aaDraw(fr,S,S,pal,-1,(x,y)=>{const r=Math.hypot(x,y+f*0.6);if(r>R)return -1;const lit=(-x*0.6-y*0.8)/R;return Math.min(4,(lit>0.4?0:lit>-0.1?1:2)+shade)});
+ return {...fr,ax:S,ay:S};
+}
+const fxPoisonCloud=(f)=>fxCloud(GRNL,f);
+const fxPoisonPuff=(f)=>fxPuff(GRNL,f);
+/** 土ぼこり（ミノタウロスの突進）：明るい砂色 → 茶 → 暗い茶の縁取り */
+const DUSTL=[[214,190,152],[178,150,112],[140,112,82],[104,82,60],[72,56,42],[40,30,22]];
+/** 鼻息の白い息 */
+const BREATHL=[[255,255,255],[232,238,246],[198,208,222],[156,168,186],[112,122,140],[62,68,82]];
+/** 鉄の重い軌跡（ミノタウロスの斧）：白い刃の光 → 鉄の銀 → 暗い銀 → 暗い赤 → 深い赤 → 縁取り */
+const STEELL=[[255,255,255],[214,222,232],[150,160,176],[128,44,46],[86,22,28],[38,12,16]];
+const fxDustCloud=(f)=>fxCloud(DUSTL,f);
+const fxDustPuff=(f)=>fxPuff(DUSTL,f);
+const fxSnort=(f)=>fxPuff(BREATHL,f);
+/**
+ * ミノタウロスの斧の薙ぎ払いの軌跡の一片：d は軌跡の進む向き（接線、16方向）、f 0〜5（0・1 刃が通る（いちばん明るい）、2・3 重い残り、4・5 薄れる）。
+ * 扇の外の縁に沿って並べて、太い帯の弧にする。外の縁が白い刃の光、内へ向かって鉄の銀から暗い赤へ（獣の力の重さ）。薄れるときは細く暗く
+ */
+function fxMinoSweep(d,f){
+ const S=11,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const a=d*Math.PI/8,ca=Math.cos(a),sa=Math.sin(a);
+ const thick=[16,15,12,9,6,3][f],shade=[0,0,1,1,2,3][f];
+ aaDraw(fr,S,S,STEELL,f<=1?1:-1,(x,y)=>{
+  const s=x*ca+y*sa;                          // 接線の向き
+  const t=-x*sa+y*ca;                         // 外（−）から内（＋）へ
+  if(Math.abs(s)>6.5)return -1;
+  const tt=t+thick/2;                         // 外の縁からの深さ
+  if(tt<0||tt>thick)return -1;
+  const r=tt/thick;
+  return Math.min(4,(r<0.16?0:r<0.38?1:r<0.6?2:r<0.82?3:4)+shade);
+ },false);
+ return {...fr,ax:S,ay:S};
+}
+/**
+ * ミノタウロスの突進が当たった所の衝撃：f 0〜5。kind 0 はね飛ばし（白い閃光と砂色の輪）、1 受け止め（金の火花と白い輪）、2 壁にぶつかった（大きな茶の輪と岩のかけら）。
+ * 輪は上から見た楕円で広がって薄れ、閃光の筋が四方へ伸びる
+ */
+function fxMinoImpact(kind,f){
+ const S=16,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const pal=kind===1?GOLDL:kind===2?DUSTL:BREATHL;
+ const ringR=[4,8,11,13,14,15][f]*(kind===2?1.1:1),ringW=[2,1.8,1.5,1.2,0.9,0.6][f],shade=[0,0,1,2,3,3][f];
+ const ray=[7,12,10,7,0,0][f];
+ aaDraw(fr,S,S,pal,f<=1?1:-1,(x,y)=>{
+  const yy=y*1.6;                              // 上から見た楕円
+  const r=Math.hypot(x,yy);
+  if(Math.abs(r-ringR)<=ringW)return Math.min(4,1+shade);
+  if(f<=1&&r<4-f*1.5)return 0;
+  const ax=Math.abs(x),ay=Math.abs(y);
+  if(ray&&((ax<=ray&&ay<=0.8*(1-ax/ray)+0.2)||(ay<=ray*0.6&&ax<=0.8*(1-ay/(ray*0.6))+0.2)))return Math.min(4,(Math.max(ax,ay*1.6)<ray*0.4?0:1)+shade);
+  return -1;
+ });
+ // 壁：岩のかけら
+ if(kind===2&&f>=1&&f<=4){
+  for(let i=0;i<6;i++){
+   const a=i*1.05+0.3,rr=ringR*0.8;
+   const x=Math.round(S+Math.cos(a)*rr),y=Math.round(S+Math.sin(a)*rr/1.6-f);
+   setPx(fr,x,y,DUSTL[3],false);setPx(fr,x+1,y,DUSTL[2],false);setPx(fr,x,y+1,DUSTL[4],false);
+  }
+ }
+ return {...fr,ax:S,ay:S};
+}
+/** 怯みの星：f 0〜3（黄色い四つ角の星が、光って小さくなる。頭の上を回る） */
+function fxStunStar(f){
+ const S=3,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const Y=[[255,255,220],[255,236,120],[230,180,50],[150,100,30]];
+ setPx(fr,S,S,Y[0],true);
+ const L=[2,2,1,1][f];
+ for(let t=1;t<=L;t++)for(const [ox,oy] of [[t,0],[-t,0],[0,t],[0,-t]])setPx(fr,S+ox,S+oy,Y[Math.min(3,t+(f>=2?1:0))],t===1);
  return {...fr,ax:S,ay:S};
 }
 /** 毒の者から立ちのぼる泡：f 0〜3（小さな泡 → ふくらむ → ふくらみきる → はじける） */
@@ -5427,4 +5494,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

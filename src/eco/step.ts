@@ -66,6 +66,11 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
     }
     // 毒（src/eco/attack.ts）
     if (c.poison > 0 && !c.away && this.poisonTick(c)) continue;
+    // はね飛ばされている者と怯み（src/eco/charge.ts）
+    if ((c.kb > 0 || c.stun > 0) && !c.away && this.knockTick(c)) {
+      this.metabolism(c);
+      continue;
+    }
     if (STR[c.k] > 0 && this.woundsAndFlight(c)) {
       this.metabolism(c);
       continue;

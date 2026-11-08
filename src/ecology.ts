@@ -542,6 +542,16 @@ export interface Cr {
   /** 毒の残り（生き物の更新の回数）と、毒を与えた種（src/eco/attack.ts の poisonTick） */
   poison: number;
   poisonBy: number;
+  /** 怯みの残り（生き物の更新の回数。src/eco/charge.ts）：歩く速さが半分になり、技の溜めを始められない */
+  stun: number;
+  /** はね飛ばされている残り（生き物の更新の回数）と、1回の更新で飛ぶ量（px。src/eco/charge.ts） */
+  kb: number;
+  kbx: number;
+  kby: number;
+  /** ミノタウロスの突進：−1 突進の溜め中、1 以上 走っている残り（生き物の更新の回数）、0 突進していない（src/eco/charge.ts） */
+  run: number;
+  /** 突進で狙った相手（src/eco/charge.ts） */
+  aim: number;
   /** 死骸ができたときの養分（腐り具合の目安） */
   init: number;
 }

@@ -61,6 +61,8 @@ export const MINO_FAR = 30;
  */
 export function minotaur(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Minotaur];
+  // 斧の薙ぎ払いと突進（src/eco/charge.ts）
+  if (this.minoSkill(c)) return;
   if (c.act === 2 && c.actT < 5) return;
   const m = this.w.map;
   const home = this.inLair(c.x, c.y);

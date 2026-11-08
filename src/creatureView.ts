@@ -651,6 +651,52 @@ export class CreatureView {
           if (age >= fly && age < fly + 16) push(r.dx, r.dy, 4, false, A.fx(`pcloud:${Math.min(7, (age - fly) >> 1)}`), 0, 4);
           break;
         }
+        case 'minosweep': {
+          // ミノタウロスの斧の薙ぎ払い（src/eco/charge.ts）：鉄の銀から暗い赤へ移る重い軌跡の帯（src/sprites.ts の fxMinoSweep を扇の外の縁に沿って並べたもの）が、
+          // 扇の片側から反対側へ3 tick で走り、通ったあとは細く暗くなって消える（一本の太い帯。二重にすると虹の縞に見えた）。帯の外の縁までがおよそ当たる範囲
+          const R = r.rad ?? 64;
+          const H = r.half ?? 1.1;
+          const a0 = Math.atan2(uy, ux);
+          const n = Math.max(10, Math.round((2 * H * R) / 4));
+          for (const [k, rad, add] of [[0, 0.82, 0]] as [number, number, number][]) {
+            for (let i = 0; i <= n; i++) {
+              const q = i / n;
+              const pass = q * 3;
+              const fr = Math.floor(age - pass) + add;
+              if (age < pass || fr > 5) continue;
+              const a = a0 - H + 2 * H * q;
+              const d16 = (Math.round((a + Math.PI / 2) / (Math.PI / 8)) + 32) % 16;
+              push(r.ax + Math.cos(a) * R * rad, r.ay + Math.sin(a) * R * rad, lift - 2 - k, false, A.fx(`msweep:${d16}:${Math.max(0, fr)}`), 0, 4);
+            }
+          }
+          if (age < 6) dyn.push({ x: r.ax + ux * R * 0.6, y: r.ay + uy * R * 0.6 - 8, r: R * 0.8, i: 0.35 * damp * (1 - age / 6), c: 0 });
+          if (once) spray(1, 0, 6, 1.0, 0.8);
+          break;
+        }
+        case 'minocharge': {
+          // ミノタウロスの突進（src/eco/charge.ts）：走ったあとの道に、土ぼこりの雲が次々に立って散る
+          const m = eco.byId.get(r.aid);
+          const fly = r.fly ?? 20;
+          const L = dist;
+          const run = m && !m.dead && age <= fly ? Math.max(0, (m.x - r.ax) * ux + (m.y - r.ay) * uy) : L;
+          for (let d = 6, i = 0; d < Math.min(L, run); d += 12, i++) {
+            const born = (d / Math.max(1, L)) * fly;
+            const fa = Math.floor((age - born) / 2);
+            const side = (i % 2 ? 1 : -1) * 5;
+            // 大きな雲は3つに1つ（小さめのコマまで）、あいだは小さな土ぼこり
+            if (i % 3 === 0) {
+              if (fa >= 0 && fa <= 5) push(r.ax + ux * d - uy * side, r.ay + uy * d + ux * side, 2, false, A.fx(`dcloud:${Math.max(0, fa - 1)}`), 0, 4);
+            } else if (fa >= 0 && fa <= 3) push(r.ax + ux * d - uy * side, r.ay + uy * d + ux * side, 2, false, A.fx(`dpuff:${fa}`), 0, 4);
+          }
+          break;
+        }
+        case 'minoimpact': {
+          // 突進が当たった所の衝撃（src/sprites.ts の fxMinoImpact）：はね飛ばしは白い閃光と砂色の輪、戦士か僧侶が受け止めたら金の火花、壁なら大きな茶の輪と岩のかけら
+          if (age < 9) push(r.dx, r.dy, 4, false, A.fx(`mimpact:${r.col}:${Math.min(5, Math.floor(age * 0.7))}`), 0, 4);
+          if (age < 5) dyn.push({ x: r.dx, y: r.dy - 8, r: 40, i: 0.45 * damp * (1 - age / 5), c: r.col === 1 ? 1 : 0 });
+          if (once) spray(r.col === 2 ? 0 : 1, r.col === 1 ? 1 : 6, 6, 1.3, 1.4);
+          break;
+        }
         case 'breath':
           break;
         case 'puff':
@@ -1490,6 +1536,24 @@ export class CreatureView {
             const ph = (t * 0.045 + i * 0.37) % 1;
             pushSprite(x + Math.sin(t * 0.2 + i * 2.1) * (4 + (i % 3) * 2), yy + 0.06, lift + 2 + ph * bh, false, A.speck(1, Math.min(3, Math.floor(ph * 4))), 0, 2);
           }
+        }
+      }
+      // ミノタウロスの突進の溜め（src/eco/charge.ts）：頭を下げて、鼻先から白い息を吹き、足もとで地面をかいて土ぼこりを立てる（描画専用）
+      if (sp === Kind.Minotaur && !c.dead && c.run === -1 && c.act === 2 && c.actT < 0) {
+        const t = eco.w.tick + alpha;
+        const fx = dir === 2 ? 1 : dir === 3 ? -1 : 0;
+        const fy = dir === 0 ? 1 : dir === 1 ? -1 : 0;
+        const ph = Math.floor(t / 2) % 4;
+        pushSprite(x + fx * 11, yy + fy * 4 + 0.05, lift + 14, false, A.fx(`snort:${ph}`), 0, 2);
+        pushSprite(x - fx * 6 + ((Math.floor(t / 3) & 1) ? 3 : -3), yy - fy * 3 + 0.05, lift + 1, false, A.fx(`dpuff:${Math.floor(t / 1.5) % 4}`), 0, 2);
+      }
+      // 怯んだ者（src/eco/charge.ts）：頭の上で小さな星が三つ回る（描画専用）
+      if (!c.dead && c.stun > 0) {
+        const t = eco.w.tick + alpha;
+        const bh = Ecology.bodySize(sp) * 0.9 + 6;
+        for (let i = 0; i < 3; i++) {
+          const a = t * 0.35 + (i * Math.PI * 2) / 3;
+          pushSprite(x + Math.cos(a) * 6, yy + Math.sin(a) * 2 + 0.07, lift + bh + Math.sin(a) * 1.5, false, A.fx(`stunstar:${Math.floor(t / 2 + i) % 4}`), 0, 2);
         }
       }
       // 毒の者（src/eco/attack.ts の poisonTick）：体のまわりから緑の泡が立ちのぼる（描画専用）

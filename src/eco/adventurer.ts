@@ -374,6 +374,8 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   const skill = JOB_SKILL[c.sp] ?? null;
   const sk = skill ? this.skillStep(c, skill) : '';
   if (sk === 'charging') return;
+  // 近くのミノタウロスの突進の溜めを見たら、通り道から下がる（戦士と僧侶は受け止めに入る。src/eco/charge.ts）
+  if (sk !== 'ready' && this.advBrace(c)) return;
   if (sk === 'broken') {
     if (c.sp === Job.Wizard) this.fxAttacks.push({ t: this.w.tick, style: 'puff', col: 2, size: 0, ax: c.x, ay: c.y, dx: c.x, dy: c.y - 14, did: -1, aid: c.id, big: false, kill: false });
     return;

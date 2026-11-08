@@ -26,6 +26,9 @@ export const MOMENTS: Moment[] = [
   { key: 'vampLightKill', label: 'ヴァンパイア：光の中で追い詰められ、ばらけられずに倒された' },
   { key: 'thrallRise', label: 'ヴァンパイア：倒された者が眷属として起き上がった' },
   { key: 'thrallAdv', label: 'ヴァンパイア：倒れた冒険者が眷属として起き上がった' },
+  { key: 'chargeKnock2', label: 'ミノタウロス：一度の突進で冒険者を2人以上はね飛ばした' },
+  { key: 'chargeBlock', label: 'ミノタウロス：突進を戦士か僧侶が受け止めた' },
+  { key: 'chargeDodge', label: 'ミノタウロス：突進の溜めを見た冒険者が避け、空振りさせた' },
   { key: 'webEat', label: '狩り：クモが巣にかかった獲物を食べた' },
   { key: 'webCatch', label: 'クモの巣：大ネズミかアリが捕まった' },
   { key: 'webTear', label: 'クモの巣：大きな者が引き裂いた' },
@@ -200,6 +203,13 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     campDeath: d.filter((x) => x.k === K.Adventurer && x.camp === 1).length,
     huntArrive: new Set(ev(K.Adventurer, 'arrive').filter((x) => x.how === 5).map((x) => x.id)).size,
     reveal: ev(K.Adventurer, 'reveal').length,
+    chargeKnock2: (() => {
+      const g = new Map<string, number>();
+      for (const x of s) if (x.k === K.Minotaur && x.ev === 'chargeKnock' && x.n === K.Adventurer) g.set(`${x.id}:${x.at}`, (g.get(`${x.id}:${x.at}`) ?? 0) + 1);
+      return [...g.values()].filter((n) => n >= 2).length;
+    })(),
+    chargeBlock: s.filter((x) => x.k === K.Minotaur && x.ev === 'chargeBlock').length,
+    chargeDodge: s.filter((x) => x.k === K.Minotaur && x.ev === 'chargeDodge').length,
     lairFound: s.filter((x) => x.k === K.Adventurer && x.ev === 'aim' && x.how === 6 && x.reason === 1).length,
     wayHome: ev(K.Adventurer, 'way').length,
     lairArrive: new Set(ev(K.Adventurer, 'arrive').filter((x) => x.how === 2).map((x) => x.id)).size,
