@@ -5062,53 +5062,27 @@ const ROCKL=[[222,216,206],[178,172,162],[134,128,120],[96,92,86],[64,60,56],[34
 /** ゴーレムの符文の光：白 → 淡い水色 → 水色 → 青 → 深い青 */
 const RUNEL=[[240,255,255],[170,240,255],[96,200,240],[52,140,210],[30,84,150],[14,40,80]];
 /**
- * ゴーレムの地割れの割れ目の一節（ジグザグの線をつくる短い一節）：d は向き（16方向）、f 0 予兆（暗い割れ目の奥に、細く水色の光がにじむ）、1 予兆の光が強まる、
- * 2 口を開けた割れ目（暗く広い溝と、縁の明るい石）、3 閉じかけ（細く暗い）。一節の長さは10ドットで、両端を少し重ねて並べる
+ * ゴーレムの地割れの割れ目をつくる丸：kind 0 溝の暗い奥、1 光の当たった縁（明るい土）、2 影の縁（暗い土）、3 閉じたあとのひびの跡（薄い）。
+ * k 0〜6 は大きさ（0 がいちばん大きい）。縁取りを置かずに、割れ目の線に沿って密に重ねて、なめらかな帯にする（点や段のつなぎ目が出ないように）
  */
-function fxFissure(d,f){
- const S=8,W=S*2+1,H=S*2+1,fr=blank(W,H);
- const a=d*Math.PI/8,ca=Math.cos(a),sa=Math.sin(a);
- const hw=[1.3,1.5,2.6,1.1][f];
- // 割れ目は岩の暗い色、奥の光は符文の水色
- const pal=[ROCKL[0],ROCKL[1],ROCKL[2],ROCKL[4],[20,18,22],RUNEL[1],RUNEL[2],[40,36,40]];
- aaDraw(fr,S,S,pal,-1,(x,y)=>{
-  const s=x*ca+y*sa,t=-x*sa+y*ca,at=Math.abs(t);
-  if(Math.abs(s)>5.8)return -1;
-  const w=hw*(1-0.25*Math.abs(s)/5.8);
-  if(at<=w){
-   if(f<=1&&at<(f===0?0.45:0.7))return f===0?6:5;   // 奥の光
-   return 4;                                           // 暗い溝
-  }
-  // 縁の石：片側は光が当たって明るく、片側は暗い
-  if(at<=w+(f===2?1.4:0.8))return t<0?(f===2?1:2):3;
-  return -1;
- },false);
+function fxCrackDisc(kind,k){
+ const R=[5.2,4.4,3.6,2.9,2.2,1.5,1.0][k];
+ const S=6,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const pal=[[[14,11,12],[30,24,24]],[[196,182,158],[176,162,140]],[[58,50,46],[72,62,56]],[[24,20,22],[40,34,32]]][kind];
+ aaDraw(fr,S,S,[pal[0],pal[1]],-1,(x,y)=>{const r=Math.hypot(x,y);if(r>R)return -1;return r<R*0.55?0:1},false);
  return {...fr,ax:S,ay:S};
 }
-/**
- * 地割れで噴き上がる岩の柱：v 形の違い（0 尖った柱、1 二つに割れた柱、2 ずんぐりした塊）、f 0〜6（0〜2 噴き上がる、3 いちばん高い、4 ひびが入る、5・6 崩れて瓦礫になる）。
- * 左から光の当たる面と、影になる面。根もとに砕けた石
- */
-function fxRockPillar(v,f){
- const W=21,H=34,fr=blank(W,H),cx=10,by=30;
- const top=[24,26,16][v]*[0.35,0.75,1,1,0.95,0.55,0.25][f];
- const w0=[5.5,6.5,7.5][v];
- const shade=[0,0,0,0,1,1,2][f];
- aaDraw(fr,cx,by,ROCKL,-1,(x,y)=>{
-  const h=-y;
-  // 根もとの瓦礫
-  if(h>-2&&h<2.5&&Math.abs(x)<w0+3&&(Math.abs(x)>w0*0.5||f>=5))return Math.min(4,3+(shade>1?1:0));
-  if(h<0||h>top)return -1;
-  const ww=w0*Math.pow(1-h/(top+0.01),v===2?0.4:0.8);
-  // 二つに割れた柱：真ん中に溝
-  if(v===1&&Math.abs(x)<0.9&&h>top*0.35)return -1;
-  if(Math.abs(x)>ww)return -1;
-  // ひびと崩れ：段ごとに欠ける
-  if(f>=4&&((Math.floor(h/4)+(x>0?1:0)+v)%3===0)&&h>2)return f>=5?-1:4;
-  const face=x<-ww*0.15?0:x<ww*0.45?1:2;
-  return Math.min(4,face+shade+(h<3?1:0));
+/** 地割れで跳ねる岩のかけら：v 0〜2（形と大きさの違う小さな石。左上から光が当たる） */
+function fxPebble(v){
+ const S=3,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const R=[1.6,2.1,2.6][v];
+ aaDraw(fr,S,S,ROCKL,-1,(x,y)=>{
+  const xx=x*(v===1?0.8:1),yy=y*(v===2?1.25:1);
+  if(Math.hypot(xx,yy)>R)return -1;
+  const lit=(-x-y)/R;
+  return lit>0.5?0:lit>-0.1?1:lit>-0.6?2:3;
  });
- return {...fr,ax:cx,ay:by};
+ return {...fr,ax:S,ay:S};
 }
 /** ゴーレムの振り下ろしの衝撃：f 0〜5。打った所から岩の破片と土の輪が広がる（半径はおよそ3マスまで。当たる範囲）。芯は白い閃光 */
 function fxGolemSlam(f){
@@ -5574,4 +5548,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxGolemSlam, fxRuneGlow, fxFissure, fxRockPillar, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxGolemSlam, fxRuneGlow, fxCrackDisc, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

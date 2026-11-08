@@ -1,4 +1,4 @@
-import { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxGolemSlam, fxRuneGlow, fxFissure, fxRockPillar, vampMist, livingArmor, heroSprite, heroBed, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
+import { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxGolemSlam, fxRuneGlow, fxCrackDisc, fxPebble, vampMist, livingArmor, heroSprite, heroBed, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -633,9 +633,9 @@ export function buildAtlas(): Atlas {
   // ゴーレム：振り下ろしの衝撃（6コマ）、符文（4種）
   for (let f = 0; f < 6; f++) addFx(`gslam:${f}`, fxGolemSlam(f) as RawFrame);
   for (let f = 0; f < 4; f++) addFx(`rune:${f}`, fxRuneGlow(f) as RawFrame);
-  // 地割れの割れ目（16方向×4コマ）と、噴き上がる岩の柱（3種×7コマ）
-  for (let d = 0; d < 16; d++) for (let f = 0; f < 4; f++) addFx(`fiss:${d}:${f}`, fxFissure(d, f) as RawFrame);
-  for (let v = 0; v < 3; v++) for (let f = 0; f < 7; f++) addFx(`pillar:${v}:${f}`, fxRockPillar(v, f) as RawFrame);
+  // 地割れの割れ目をつくる丸（4種×7段）と、跳ねる岩のかけら（3種）
+  for (let kind = 0; kind < 4; kind++) for (let k = 0; k < 7; k++) addFx(`gcrack:${kind}:${k}`, fxCrackDisc(kind, k) as RawFrame);
+  for (let v = 0; v < 3; v++) addFx(`pebble:${v}`, fxPebble(v) as RawFrame);
   for (let kind = 0; kind < 5; kind++) for (let col = 0; col < 8; col++) for (let f = 0; f < 4; f++) addFx(`bit:${kind}:${col}:${f}`, fxBit(kind, col, f) as RawFrame);
   for (let v = 0; v < 3; v++) addFx(`crack:${v}`, fxCrack(v) as RawFrame);
   // クモの糸の繭（クモの巣にかかった獲物を巻いたもの）：0 大、1 中、2 小（食べられて細っていく）

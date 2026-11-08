@@ -12,23 +12,46 @@ import { heroOrbAt } from './sprites';
 /** 冒険者の攻撃で、技の演出を振り下ろしのコマまで遅らせる tick 数（攻撃のコマ 0 構え・1 振り上げのあと） */
 const ADV_STRIKE_LAG = 4;
 /** その攻撃の記録が、冒険者の振る技か（演出を振り下ろしのコマに合わせるもの） */
-/**
- * ゴーレムの地割れのジグザグの割れ目の点（9ドットおき、横へ ±3ドットずれる）。形は、ゴーレムの番号と向きだけで決まる（予兆と放ったあとで同じ形になる）
- */
-function fissurePts(id: number, ax: number, ay: number, ux: number, uy: number, len: number): [number, number][] {
-  const a32 = Math.round(Math.atan2(uy, ux) / (Math.PI / 16));
-  const pts: [number, number][] = [];
-  for (let i = 0, d = 0; d <= len; i++, d += 9) {
-    const h = ((id * 73856093) ^ (a32 * 19349663) ^ (i * 83492791)) >>> 0;
-    const off = i === 0 ? 0 : ((h % 7) - 3) * 1.1;
-    pts.push([ax + ux * d - uy * off, ay + uy * d + ux * off]);
-  }
-  return pts;
+/** ゴーレムの地割れの形の乱数（ゴーレムの番号と向きだけで決まる。予兆と放ったあとで同じ形になる） */
+function crackRand(id: number, a32: number, i: number): number {
+  return (((id * 73856093) ^ (a32 * 19349663) ^ (i * 83492791)) >>> 0) / 4294967296;
 }
-/** 割れ目の一節を描く（点から点へ、向きをそろえた絵を中点に置く） */
-function fissureSeg(p: [number, number], q: [number, number]): [number, number, number] {
-  const d16 = (Math.round(Math.atan2(q[1] - p[1], q[0] - p[0]) / (Math.PI / 8)) + 16) % 16;
-  return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, d16];
+/**
+ * ゴーレムの地割れの割れ目の線：太い一本（d 0〜len を3ドットおき）と、左右への枝分かれのひび。各点は [x, y, 太さ（0〜1）, 根もとからの距離]。
+ * 線は二つの波を重ねてなめらかにうねり、太さも途中で太くなったり細くなったりして、先へ行くほど細い
+ */
+function crackLines(id: number, ax: number, ay: number, ux: number, uy: number, len: number): { main: number[][]; branches: number[][][] } {
+  const a32 = Math.round(Math.atan2(uy, ux) / (Math.PI / 16));
+  const p1 = crackRand(id, a32, 1) * 6.28;
+  const p2 = crackRand(id, a32, 2) * 6.28;
+  const p3 = crackRand(id, a32, 3) * 6.28;
+  const main: number[][] = [];
+  for (let d = 0; d <= len; d += 3) {
+    const off = (Math.sin(d * 0.085 + p1) * 3 + Math.sin(d * 0.21 + p2) * 1.2) * Math.min(1, d / 12);
+    const w = (0.78 + 0.22 * Math.sin(d * 0.07 + p3)) * (1 - 0.45 * (d / Math.max(1, len)));
+    main.push([ax + ux * d - uy * off, ay + uy * d + ux * off, w, d]);
+  }
+  const branches: number[][][] = [];
+  for (let i = 0, d = 14 + crackRand(id, a32, 9) * 10; d < len - 6; i++, d += 18 + crackRand(id, a32, 10 + i) * 16) {
+    const base = main[Math.min(main.length - 1, Math.round(d / 3))];
+    const sg = crackRand(id, a32, 30 + i) < 0.5 ? -1 : 1;
+    const ang = Math.atan2(uy, ux) + sg * (0.6 + crackRand(id, a32, 50 + i) * 0.5);
+    const bl = 8 + crackRand(id, a32, 70 + i) * 12;
+    const bx = Math.cos(ang);
+    const by = Math.sin(ang);
+    const br: number[][] = [];
+    for (let t = 0; t <= bl; t += 2.5) {
+      const off = Math.sin(t * 0.3 + i) * 1.2;
+      br.push([base[0] + bx * t - by * off, base[1] + by * t + bx * off, 0.45 * (1 - t / (bl + 1)), d]);
+    }
+    branches.push(br);
+  }
+  return { main, branches };
+}
+/** 割れ目の帯の太さ（0〜1）から、溝の丸の大きさの段（0 がいちばん大きい。−1 なら描かない） */
+function crackK(w: number): number {
+  if (w < 0.08) return -1;
+  return Math.max(0, Math.min(6, Math.round((1 - w) * 6.4)));
 }
 
 /** 冒険者の職業の技のエフェクト（技は溜めてから放つので、打ち合いの一打ちのように遅らせない。src/eco/adventurer.ts） */
@@ -729,32 +752,52 @@ export class CreatureView {
           break;
         }
         case 'gquake': {
-          // ゴーレムの地割れ（src/eco/charge.ts）：予兆のジグザグの割れ目に沿って、光の先が4 tick で端まで走り、通ったあとから大きな岩の柱が左右交互に噴き上がって
-          // 土ぼこりが立ち、柱は崩れて瓦礫になる。割れ目は口を開けてから閉じていく
+          // ゴーレムの地割れ（src/eco/charge.ts）：ゴーレムの足もとから、幅のある割れ目が約0.4秒で端まで裂けながら伸び、伸びた所から口が開く。
+          // 細いひびが左右へ枝分かれし、縁の土が砕けて岩のかけらが跳ね、土ぼこりが割れ目に沿って立ちこめる。割れ目は2〜3秒で閉じ、薄いひびの跡が残って消える。
+          // 光らせない（土と岩だけ）。帯は縁取りのない丸を密に重ねて描く（src/sprites.ts の fxCrackDisc）
           const len = r.rad ?? dist;
-          const pts = fissurePts(r.aid, r.ax, r.ay, ux, uy, len);
-          for (let i = 0; i + 1 < pts.length; i++) {
-            const pass = ((i * 9) / Math.max(1, len)) * 4;
-            const g = age - pass;
+          const { main, branches } = crackLines(r.aid, r.ax, r.ay, ux, uy, len);
+          const passAt = (d: number) => (d / Math.max(1, len)) * 4;
+          // 口の開き（0〜1）：裂けて2 tick で開ききり、10 tick から26 tick までに閉じる
+          const openAt = (g: number) => (g < 0 ? -1 : g < 2 ? (g + 0.5) / 2.5 : g < 10 ? 1 : g < 26 ? 1 - (g - 10) / 16 : 0);
+          const drawLine = (pts: number[][], scale: number) => {
+            for (const [x, y, w, d] of pts) {
+              const g = age - passAt(d);
+              const o = openAt(g);
+              if (o < 0) continue;
+              if (o > 0) {
+                const ww = w * o * scale;
+                const k = crackK(ww);
+                if (k < 0) continue;
+                // 光の当たった縁（明るい土）を左上へ、影の縁を右下へ1ドットほどずらして重ね、その上に暗い溝（縁は細い筋だけのぞく）
+                push(x - 1.1, y - 1.1, 0, false, A.fx(`gcrack:1:${k}`), 0, 4);
+                push(x + 1.1, y + 1.2, 0, false, A.fx(`gcrack:2:${k}`), 0, 4);
+                push(x, y, 0, false, A.fx(`gcrack:0:${k}`), 0, 4);
+              } else if (g < 60 && w * scale > 0.2) {
+                // 閉じたあとのひびの跡：細い暗い線と、明るい縁（だんだん細く）
+                const kk = g < 44 ? 5 : 6;
+                push(x - 0.9, y - 0.9, 0, false, A.fx(`gcrack:1:6`), 0, 4);
+                push(x, y, 0, false, A.fx(`gcrack:3:${kk}`), 0, 4);
+              }
+            }
+          };
+          for (const br of branches) drawLine(br, 1);
+          drawLine(main, 1);
+          // 縁の土が砕けて、岩のかけらが跳ねる（割れ目が通った所から、放物線で跳ね上がって落ちる）と、土ぼこり
+          for (let i = 0, d = 4; d < len; i++, d += 7) {
+            const g = age - passAt(d);
             if (g < 0) continue;
-            const f = g < 10 ? 2 : g < 20 ? 3 : -1;
-            if (f < 0) continue;
-            const [mx, my, d16] = fissureSeg(pts[i], pts[i + 1]);
-            push(mx, my, 0, false, A.fx(`fiss:${d16}:${f}`), 0, 4);
+            const pt = main[Math.min(main.length - 1, Math.round(d / 3))];
+            const sg = i % 2 ? 1 : -1;
+            const dr = 2 + ((i * 37) % 5);
+            if (g < 9) {
+              const q = g / 9;
+              const z = Math.sin(q * Math.PI) * (6 + (i % 4) * 2);
+              push(pt[0] - uy * sg * (3 + dr * q), pt[1] + ux * sg * (3 + dr * q), z, false, A.fx(`pebble:${i % 3}`), 0, 4);
+            }
+            if (i % 3 === 0 && g >= 1 && g < 13) push(pt[0] + uy * sg * 7, pt[1] - ux * sg * 7 + 1, 1, false, A.fx(`dpuff:${Math.min(3, Math.floor((g - 1) / 3))}`), 0, 4);
           }
-          for (let d = 8, i = 0; d < len; d += 10, i++) {
-            const pass = (d / Math.max(1, len)) * 4 + 0.5;
-            const g = Math.floor((age - pass) * 0.8);
-            if (g < 0 || g > 6) continue;
-            const side = (i % 2 ? 1 : -1) * (6 + (i % 3));
-            const px = r.ax + ux * d - uy * side;
-            const py = r.ay + uy * d + ux * side;
-            push(px, py, 0, false, A.fx(`pillar:${(i * 7 + r.aid) % 3}:${g}`), 0, 4);
-            if (g <= 3) push(px - uy * side * 0.4, py + ux * side * 0.4 + 2, 1, false, A.fx(`dpuff:${g}`), 0, 4);
-          }
-          const front = Math.min(len, ((age + 1) / 4) * len);
-          if (age < 8) dyn.push({ x: r.ax + ux * front, y: r.ay + uy * front - 6, r: 40, i: 0.5 * damp * (1 - age / 8), c: 2 });
-          if (once) spray(0, 6, 10, 1.4, 2.4);
+          if (once) spray(0, 6, 6, 1.2, 2.0);
           break;
         }
         case 'breath':
@@ -1617,17 +1660,25 @@ export class CreatureView {
         }
         dyn.push({ x, y: yy - bh * 0.6, r: 46, i: 0.5 + 0.2 * Math.sin(t * 0.5), c: 2 });
         if (c.run === -2) {
-          // 地割れの予兆：ゴーレムの足もとから、走る向きへジグザグの暗い割れ目が少しずつ伸び、奥から水色の光がにじむ（溜めの後半は光が強まって脈打つ）
+          // 地割れの予兆：走る向きの地面に細いひびが少しずつ入り、その上で小石が小刻みに跳ね、土ぼこりが立つ（光る線は使わない）
           const spent = eco.w.tick + alpha - c.cast;
-          const grow = Math.min(1, spent / 14);
-          // 長さは地割れそのもの（src/eco/charge.ts の golemSkill）と同じく、見通しの利く所まで
+          const grow = Math.min(1, spent / 16);
           let len = 0;
           while (len < 8 * 16 && lineOfSight(eco.w.map, c.x, c.y, c.x + c.kbx * (len + 8), c.y + c.kby * (len + 8))) len += 8;
-          const pts = fissurePts(c.id, c.x, c.y, c.kbx, c.kby, len * grow);
-          const strong = spent > 12 && Math.floor(t / 2) % 2 === 0;
-          for (let i = 0; i + 1 < pts.length; i++) {
-            const [mx, my, d16] = fissureSeg(pts[i], pts[i + 1]);
-            pushSprite(mx, my + 0.02, 0, false, A.fx(`fiss:${d16}:${strong ? 1 : 0}`), 0, 2);
+          const { main } = crackLines(c.id, c.x, c.y, c.kbx, c.kby, len);
+          for (const [px, py, , d] of main) {
+            if (d > len * grow) break;
+            // 細いひび：明るい縁と暗い線
+            pushSprite(px - 0.9, py - 0.9 + 0.02, 0, false, A.fx(`gcrack:1:6`), 0, 2);
+            pushSprite(px, py + 0.025, 0, false, A.fx(`gcrack:0:${d < len * grow - 12 ? 5 : 6}`), 0, 2);
+          }
+          for (let i = 0; i < 6; i++) {
+            const d = ((i + 0.5) / 6) * len * grow;
+            const pt = main[Math.min(main.length - 1, Math.round(d / 3))];
+            if (!pt) continue;
+            const hop = Math.abs(Math.sin(t * 0.9 + i * 1.7)) * (2 + (i % 3));
+            pushSprite(pt[0] + ((i % 2) ? 3 : -3), pt[1] + 0.03, hop, false, A.fx(`pebble:${i % 3}`), 0, 2);
+            if ((Math.floor(t / 3) + i) % 4 === 0) pushSprite(pt[0], pt[1] + 0.04, 1, false, A.fx(`dpuff:${Math.floor(t / 2 + i) % 4}`), 0, 2);
           }
         }
       }

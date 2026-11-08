@@ -357,7 +357,7 @@ export function golemSkill(this: Ecology, c: Cr): boolean {
     // 壁で止まる長さ（エフェクトの長さ）：線の上を少しずつ進み、岩に当たった所まで
     let len = 0;
     while (len < QUAKE_LEN && lineOfSight(m, c.x, c.y, c.x + ux * (len + 8), c.y + uy * (len + 8))) len += 8;
-    this.fxAttacks.push({ t: this.w.tick, style: 'gquake', col: 0, size: 2, ax: c.x, ay: c.y, dx: c.x + ux * len, dy: c.y + uy * len, did: -1, aid: c.id, big: true, kill: false, rad: len });
+    this.fxAttacks.push({ t: this.w.tick, style: 'gquake', col: 0, size: 2, ax: c.x, ay: c.y, dx: c.x + ux * len, dy: c.y + uy * len, did: -1, aid: c.id, big: true, kill: false, rad: len, fly: 40 });
     this.lastBigHit = this.w.tick;
     let advHit = 0;
     for (const o of hits) {
