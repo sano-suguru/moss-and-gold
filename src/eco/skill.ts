@@ -34,6 +34,10 @@ export const SKILL_MINO_CHARGE: Skill = { windup: 8, cool: 30 };
 export const SKILL_GOLEM_SLAM: Skill = { windup: 6, cool: 15 };
 /** ゴーレムの跳ねる衝撃波：およそ2秒、両腕を振り上げて溜め（体の符文が光る）、使ったあと7秒は溜め直さない */
 export const SKILL_GOLEM_QUAKE: Skill = { windup: 10, cool: 35 };
+/** リビングアーマーの武器の大振り：およそ0.8秒振りかぶり、使ったあと2.4秒は溜め直さない */
+export const SKILL_ARMOR_SWEEP: Skill = { windup: 4, cool: 12 };
+/** リビングアーマーの盾の体当たり：およそ1.4秒、武具を震わせて溜め、使ったあと6秒は溜め直さない */
+export const SKILL_ARMOR_BASH: Skill = { windup: 7, cool: 30 };
 /** 盗賊の短剣投げ：およそ0.4秒構え、投げたあと2秒は構え直さない */
 export const SKILL_THIEF_THROW: Skill = { windup: 2, cool: 10 };
 

@@ -5005,11 +5005,11 @@ const fxSnort=(f)=>fxPuff(BREATHL,f);
  * ミノタウロスの斧の薙ぎ払いの軌跡の一片：d は軌跡の進む向き（接線、16方向）、f 0〜5（0・1 刃が通る（いちばん明るい）、2・3 重い残り、4・5 薄れる）。
  * 扇の外の縁に沿って並べて、太い帯の弧にする。外の縁が白い刃の光、内へ向かって鉄の銀から暗い赤へ（獣の力の重さ）。薄れるときは細く暗く
  */
-function fxMinoSweep(d,f){
+function fxMinoSweep(d,f,pal=STEELL){
  const S=11,W=S*2+1,H=S*2+1,fr=blank(W,H);
  const a=d*Math.PI/8,ca=Math.cos(a),sa=Math.sin(a);
  const thick=[16,15,12,9,6,3][f],shade=[0,0,1,1,2,3][f];
- aaDraw(fr,S,S,STEELL,f<=1?1:-1,(x,y)=>{
+ aaDraw(fr,S,S,pal,f<=1?1:-1,(x,y)=>{
   const s=x*ca+y*sa;                          // 接線の向き
   const t=-x*sa+y*ca;                         // 外（−）から内（＋）へ
   if(Math.abs(s)>6.5)return -1;
@@ -5114,6 +5114,29 @@ function fxRuneGlow(f){
  const P=[["..#..",".###.","..#..","..#..",".#.#."],["#...#",".#.#.","..#..",".#.#.","#...#"],[".###.","#...#","#.#.#","#...#",".###."],["##.##","..#..","#####","..#..","##.##"]][f];
  for(let y=0;y<5;y++)for(let x=0;x<5;x++)if(P[y][x]==='#')setPx(fr,x+1,y+1,RUNEL[(x+y)%3===0?0:1],true);
  return {...fr,ax:3,ay:3};
+}
+/** 未練の青白い光（リビングアーマーの技）：白 → 淡い青白 → 青白 → くすんだ青 → 深い藍 → 縁取り */
+const GHOSTL=[[244,250,255],[196,226,250],[140,184,230],[92,128,186],[56,74,130],[26,32,64]];
+/** リビングアーマーの武器の大振りの軌跡の一片（ミノタウロスの斧と同じ形を、未練の青白い光で） */
+const fxArmorSweep=(d,f)=>fxMinoSweep(d,f,GHOSTL);
+/**
+ * リビングアーマーの盾の体当たりの光の壁：d は進む向き（16方向）、f 0〜3（0・1 濃い、2・3 薄れる）。
+ * 進む向きに直角な、前へ少しふくらんだ弓形の光の板（幅およそ22ドット）
+ */
+function fxShieldWall(d,f){
+ const S=13,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const a=d*Math.PI/8,ca=Math.cos(a),sa=Math.sin(a);
+ const thick=[4,4.5,3,1.8][f],shade=[0,0,1,2][f];
+ aaDraw(fr,S,S,GHOSTL,f<=1?1:-1,(x,y)=>{
+  const u=x*ca+y*sa,v=-x*sa+y*ca;
+  if(Math.abs(v)>11)return -1;
+  const bow=3*(1-(v/11)*(v/11));             // 前へふくらむ
+  const t=u-bow+thick/2;
+  if(t<0||t>thick)return -1;
+  const r=t/thick;
+  return Math.min(4,(r>0.7?0:r>0.4?1:2)+shade+(Math.abs(v)>9?1:0));
+ },false);
+ return {...fr,ax:S,ay:S};
 }
 /** 毒の者から立ちのぼる泡：f 0〜3（小さな泡 → ふくらむ → ふくらみきる → はじける） */
 function fxPoisonBubble(f){
@@ -5552,4 +5575,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

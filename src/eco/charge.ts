@@ -10,6 +10,9 @@
  * 戦士と僧侶は下がらず、ミノタウロスと狙われた仲間のあいだへ移って構え、突進を受け止める（advBrace）。
  * 怯み（Cr.stun）：およそ2秒、その場でふらついて立ち止まり、何もできない（技の溜めも始められない）。頭の上で小さな星が回る。
  *
+ * リビングアーマー：武器の大振り（前方の扇。広さは手に取り込んだ武器の数で、2.5〜4.5マス）と、盾の体当たり（直線5マス。盾を持っているときだけ。
+ *   当たり方はミノタウロスの突進と同じで、冒険者は予兆を見て避け、前衛は受け止めに入る）。armorSkill・armorEngage。
+ *
  * ゴーレム（宝物庫の入口の番人）：入口から動かずに、2つの技を使う。
  *   両腕の振り下ろし（周りの円、3マス）：入口のそば（3マスの内）の相手に。当たった者はゴーレムを中心に外へはね飛ばされ、着地で怯む（入口から押し返す）。
  *   跳ねる衝撃波（直線8マス）：入口から8マスの内で、入口の方を向いて近づいてくる強さのある者（冒険者・ドワーフ・大物）か、宝を抱えた者に。
@@ -19,11 +22,17 @@
  */
 import { CR_EVERY, Cr, Ecology, HUNT3, Job, Kind, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
-import { SKILL_GOLEM_QUAKE, SKILL_GOLEM_SLAM, SKILL_MINO_CHARGE, SKILL_MINO_SWEEP } from './skill';
+import { SKILL_ARMOR_BASH, SKILL_ARMOR_SWEEP, SKILL_GOLEM_QUAKE, SKILL_GOLEM_SLAM, SKILL_MINO_CHARGE, SKILL_MINO_SWEEP } from './skill';
+import { ItemKind } from '../ecology';
 
-/** 突進の長さ（px）と、走る生き物の更新の回数 */
+/** 突進の長さ（px）と、走る生き物の更新の回数（ミノタウロス。リビングアーマーの盾の体当たりは runLen・runN） */
 const RUN_LEN = 8 * TILE;
 const RUN_N = 10;
+/** 盾の体当たり（リビングアーマー）の長さと回数 */
+const BASH_LEN = 5 * TILE;
+const BASH_N = 7;
+const runLen = (c: Cr) => (c.k === Kind.Armor ? BASH_LEN : RUN_LEN);
+const runN = (c: Cr) => (c.k === Kind.Armor ? BASH_N : RUN_N);
 /** はね飛ばされる量（px）と、飛んでいる更新の回数 */
 const KB_LEN = 3 * TILE;
 const KB_N = 4;
@@ -187,7 +196,7 @@ export function minoRun(this: Ecology, c: Cr): void {
   const L = Math.sqrt(dx * dx + dy * dy) || 1;
   const ux = dx / L;
   const uy = dy / L;
-  const step = Math.min(L, RUN_LEN / RUN_N);
+  const step = Math.min(L, runLen(c) / runN(c));
   const x0 = c.x;
   const y0 = c.y;
   this.tryMove(c, ux * step, uy * step);
@@ -197,9 +206,9 @@ export function minoRun(this: Ecology, c: Cr): void {
   let stop = false;
   const hit: Cr[] = [];
   this.nearby(c.x, c.y, 2, (o) => {
-    if (o === c || o.dead || o.away || o.caught || o.k === Kind.Minotaur || o.k === Kind.Ghost || o.k === Kind.Wisp || this.airborne(o)) return;
+    if (o === c || o.dead || o.away || o.caught || o.k === c.k || o.k === Kind.Ghost || o.k === Kind.Wisp || this.airborne(o)) return;
     // 同じ突進ですでに打った者（はね飛ばされている者と、この突進で打たれたばかりの者）は打たない
-    if (o.kb > 0 || (o.foe === c.id && this.w.tick - o.hitAt <= RUN_N * CR_EVERY)) return;
+    if (o.kb > 0 || (o.foe === c.id && this.w.tick - o.hitAt <= runN(c) * CR_EVERY)) return;
     const px = o.x - x0;
     const py = o.y - y0;
     const along = px * ux + py * uy;
@@ -208,7 +217,8 @@ export function minoRun(this: Ecology, c: Cr): void {
   });
   hit.sort((p, q) => (p.x - x0) * ux + (p.y - y0) * uy - ((q.x - x0) * ux + (q.y - y0) * uy) || p.id - q.id);
   // 突進で倒した獲物のうち、まだ食べていなければ最初の1体を食べる（寝床まで引きずる。src/eco/monsters.ts の dragToLair）
-  let ate = c.feed > 0;
+  // リビングアーマーは食べない（倒すだけ。slay が決める）
+  let ate = c.feed > 0 || c.k === Kind.Armor;
   const fed0 = c.feed;
   for (const o of hit) {
     if (blocker(o)) {
@@ -220,7 +230,7 @@ export function minoRun(this: Ecology, c: Cr): void {
         o.kbx = ux * 5;
         o.kby = uy * 5;
       }
-      this.record('settle', { t: this.w.tick, k: Kind.Minotaur, ev: 'chargeBlock', id: c.id, n: o.sp, x: Math.round(o.x), y: Math.round(o.y) } as never);
+      this.record('settle', { t: this.w.tick, k: c.k, ev: 'chargeBlock', id: c.id, n: o.sp, x: Math.round(o.x), y: Math.round(o.y) } as never);
       stop = true;
       break;
     }
@@ -232,7 +242,7 @@ export function minoRun(this: Ecology, c: Cr): void {
     this.fxAttacks.push({ t: this.w.tick, style: 'minoimpact', col: 0, size: 1, ax: c.x, ay: c.y, dx: o.x, dy: o.y, did: o.id, aid: c.id, big: true, kill: false });
     if (this.strike(c, o, RUN_MUL, false)) ate = this.slay(c, o, !ate) || ate;
     else this.knock(o, kx, ky);
-    this.record('settle', { t: this.w.tick, k: Kind.Minotaur, ev: 'chargeKnock', id: c.id, at: c.cast, n: o.k, x: Math.round(o.x), y: Math.round(o.y) } as never);
+    this.record('settle', { t: this.w.tick, k: c.k, ev: 'chargeKnock', id: c.id, at: c.cast, n: o.k, x: Math.round(o.x), y: Math.round(o.y) } as never);
   }
   if (!stop && moved < step * 0.4) {
     // 壁にぶつかった：よろめく
@@ -251,7 +261,7 @@ export function minoRunEnd(this: Ecology, c: Cr): void {
   c.act = 0;
   c.actT = 6;
   const a = this.byId.get(c.aim);
-  if (a && !a.dead && a.k === Kind.Adventurer && !(a.foe === c.id && this.w.tick - a.hitAt <= (RUN_N + 2) * CR_EVERY)) this.record('settle', { t: this.w.tick, k: Kind.Minotaur, ev: 'chargeDodge', id: c.id, n: a.sp, x: Math.round(a.x), y: Math.round(a.y) } as never);
+  if (a && !a.dead && a.k === Kind.Adventurer && !(a.foe === c.id && this.w.tick - a.hitAt <= (runN(c) + 2) * CR_EVERY)) this.record('settle', { t: this.w.tick, k: c.k, ev: 'chargeDodge', id: c.id, n: a.sp, x: Math.round(a.x), y: Math.round(a.y) } as never);
   c.aim = 0;
   c.tx = 0;
   c.ty = 0;
@@ -268,7 +278,7 @@ export function advBrace(this: Ecology, c: Cr): boolean {
   let g: Cr | null = null;
   this.nearby(c.x, c.y, 10, (o) => {
     if (o.dead || o.act !== 2 || o.actT >= 0) return;
-    if (!m && o.k === Kind.Minotaur && o.run === -1) m = o;
+    if (!m && (o.k === Kind.Minotaur || o.k === Kind.Armor) && o.run === -1) m = o;
     if (!g && o.k === Kind.Golem) g = o;
   });
   if (g && this.advDodgeGolem(c, g)) return true;
@@ -297,7 +307,7 @@ export function advBrace(this: Ecology, c: Cr): boolean {
     this.setDir(c, mm.x - c.x, mm.y - c.y);
     return true;
   }
-  if (along < -8 || along > RUN_LEN + 12 || Math.abs(side) > 22) return false;
+  if (along < -8 || along > runLen(mm) + 12 || Math.abs(side) > 22) return false;
   const rank = this.heroOf(c)?.rank ?? 0;
   const delay = Math.max(0, (c.sp === Job.Thief || c.sp === Job.Hunter ? 0 : c.sp === Job.Slayer ? 2 : 4) - rank);
   if ((this.w.tick - mm.cast) / CR_EVERY < delay) return false;
@@ -493,6 +503,82 @@ export function advDodgeGolem(this: Ecology, c: Cr, g: Cr): boolean {
   return true;
 }
 
+/** リビングアーマーの手の武器の数と、盾を持っているか */
+function armorArms(this: Ecology, c: Cr): { weapons: number; shield: boolean } {
+  const hand = this.armorHand(c);
+  return { weapons: hand.filter((k) => k !== ItemKind.Shield).length, shield: hand.includes(ItemKind.Shield) };
+}
+/** 武器の大振りの広さ（px）：武器が無ければ2.5マス、1つごとに0.5マス広く、最大4.5マス */
+function armorSweepR(weapons: number): number {
+  return Math.min(4.5, 2.5 + 0.5 * weapons) * TILE;
+}
+
+/**
+ * リビングアーマーの技の進み（生き物の更新ごと、ほかの行いより先に）。true なら今は技の最中。
+ * 武器の大振り（前方の扇。広さは手の武器の数で決まる）と、盾の体当たり（直線5マス。盾を持っているときだけ。ミノタウロスの突進と同じ当たり方）
+ */
+export function armorSkill(this: Ecology, c: Cr): boolean {
+  if (c.run > 0) {
+    this.minoRun(c);
+    return true;
+  }
+  const spec = c.run === -1 ? SKILL_ARMOR_BASH : SKILL_ARMOR_SWEEP;
+  const sk = this.skillStep(c, spec, false);
+  if (sk === 'charging') {
+    if (c.run === -1) this.setDir(c, c.tx - c.x, c.ty - c.y);
+    return true;
+  }
+  if (sk !== 'ready') {
+    if (c.run === -1 && !(c.act === 2 && c.actT <= 0)) c.run = 0;
+    return false;
+  }
+  c.act = 2;
+  c.actT = 0;
+  if (c.run === -1) {
+    const dx = c.tx - c.x;
+    const dy = c.ty - c.y;
+    const L = Math.sqrt(dx * dx + dy * dy) || 1;
+    c.tx = c.x + (dx / L) * BASH_LEN;
+    c.ty = c.y + (dy / L) * BASH_LEN;
+    c.run = BASH_N;
+    this.fxAttacks.push({ t: this.w.tick, style: 'armorbash', col: 0, size: 2, ax: c.x, ay: c.y, dx: c.tx, dy: c.ty, did: -1, aid: c.id, big: true, kill: false, fly: BASH_N * CR_EVERY });
+    return true;
+  }
+  const { weapons } = armorArms.call(this, c);
+  const f = this.byId.get(c.aim);
+  const fx = f && !f.dead ? f.x - c.x : c.dir === 2 ? 1 : c.dir === 3 ? -1 : 0;
+  const fy = f && !f.dead ? f.y - c.y : c.dir === 0 ? 1 : c.dir === 1 ? -1 : 0;
+  const L = Math.sqrt(fx * fx + fy * fy) || 1;
+  const n = this.areaStrike(c, c.x, c.y, fx / L, fy / L, { kind: 'fan', r: armorSweepR(weapons), half: 1.05 }, 1, { style: 'armorsweep', col: 0 }, (o) => o.k !== Kind.Armor && o.k !== Kind.Ghost && o.k !== Kind.Wisp && !this.airborne(o));
+  if (n >= 2) this.record('settle', { t: this.w.tick, k: Kind.Armor, ev: 'armorSweep2', id: c.id, n, x: Math.round(c.x), y: Math.round(c.y) } as never);
+  c.aim = 0;
+  return true;
+}
+
+/** 襲う相手 f（d2 は距離の二乗）に、リビングアーマーが技を使うか（溜めはじめたら true） */
+export function armorEngage(this: Ecology, c: Cr, f: Cr, d2: number): boolean {
+  const { weapons, shield } = armorArms.call(this, c);
+  const R = armorSweepR(weapons);
+  if (d2 <= R * R * 0.8) {
+    if (!this.skillCanStart(c, SKILL_ARMOR_SWEEP)) return false;
+    this.skillStart(c, SKILL_ARMOR_SWEEP);
+    c.run = 0;
+    c.aim = f.id;
+    this.setDir(c, f.x - c.x, f.y - c.y);
+    return true;
+  }
+  if (shield && d2 <= BASH_LEN * BASH_LEN && this.skillCanStart(c, SKILL_ARMOR_BASH) && lineOfSight(this.w.map, c.x, c.y, f.x, f.y)) {
+    this.skillStart(c, SKILL_ARMOR_BASH);
+    c.run = -1;
+    c.aim = f.id;
+    c.tx = f.x;
+    c.ty = f.y;
+    this.setDir(c, f.x - c.x, f.y - c.y);
+    return true;
+  }
+  return false;
+}
+
 declare module '../ecology' {
   interface Ecology {
     breakWindup: typeof breakWindup;
@@ -507,7 +593,9 @@ declare module '../ecology' {
     golemSkill: typeof golemSkill;
     golemEngage: typeof golemEngage;
     advDodgeGolem: typeof advDodgeGolem;
+    armorSkill: typeof armorSkill;
+    armorEngage: typeof armorEngage;
   }
 }
 
-Object.assign(Ecology.prototype, { breakWindup, knock, knockTick, minoSkill, minoTarget, minoEngage, minoRun, minoRunEnd, advBrace, golemSkill, golemEngage, advDodgeGolem });
+Object.assign(Ecology.prototype, { breakWindup, knock, knockTick, minoSkill, minoTarget, minoEngage, minoRun, minoRunEnd, advBrace, golemSkill, golemEngage, advDodgeGolem, armorSkill, armorEngage });

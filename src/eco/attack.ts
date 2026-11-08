@@ -53,7 +53,7 @@ function inside(A: Area, dx: number, dy: number, ux: number, uy: number): boolea
 
 /**
  * 形の中の相手に一打ちずつ当てる。中心は (cx, cy)、扇の向きは (ux, uy)（長さ1）。
- * who は当ててよい相手か（打つ者自身はもとから除く）。倒した数を返す。
+ * who は当ててよい相手か（打つ者自身はもとから除く）。当てた数を返す。
  */
 export function areaStrike(this: Ecology, a: Cr, cx: number, cy: number, ux: number, uy: number, A: Area, mul: number, look: AreaLook, who: (o: Cr) => boolean): number {
   const m = this.w.map;
@@ -74,15 +74,13 @@ export function areaStrike(this: Ecology, a: Cr, cx: number, cy: number, ux: num
     if (this.fxAttacks.length > 160) this.fxAttacks.splice(0, 60);
   }
   this.lastBigHit = this.w.tick;
-  let kills = 0;
   let ate = false;
   for (const o of hits) {
     if (o.dead) continue;
     if (!this.strike(a, o, mul, false)) continue;
-    kills++;
     ate = this.slay(a, o, !ate) || ate;
   }
-  return kills;
+  return hits.length;
 }
 
 /**
@@ -95,6 +93,11 @@ export function slay(this: Ecology, a: Cr, d: Cr, canEat = true): boolean {
   else {
     this.eat(a, d, true);
     ate = true;
+  }
+  // リビングアーマーは、技で倒した相手も覚える（その落とし物を「奪って」取り込む。src/eco/armor.ts）
+  if (a.k === Kind.Armor) {
+    a.ref = d.id;
+    a.ref2 = this.step;
   }
   // ヴァンパイアと、その眷属が倒した者は、眷属として起き上がることがある（src/eco/thrall.ts）
   if (a.k === Kind.Vampire) this.vampClaim(a, d);

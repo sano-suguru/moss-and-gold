@@ -397,6 +397,8 @@ export function armor(this: Ecology, c: Cr): void {
     }
     return;
   }
+  // 武器の大振りと盾の体当たり（src/eco/charge.ts）
+  if (this.armorSkill(c)) return;
   if (c.act === 2 && c.actT < 5) return;
   const sp = s.speed * (c.mana < ARMOR_LOW ? 0.6 : 1) * this.limp(c);
   // 武具を持つ侵入者を襲う
@@ -414,6 +416,7 @@ export function armor(this: Ecology, c: Cr): void {
     const f = foe as Cr;
     this.markNotice(c, f, '!');
     c.dir = Math.abs(f.x - c.x) > Math.abs(f.y - c.y) ? (f.x > c.x ? 2 : 3) : f.y > c.y ? 0 : 1;
+    if (this.armorEngage(c, f, bd)) return;
     if (bd < 13 * 13) {
       if (this.fight(c, f)) {
         c.ref = f.id;

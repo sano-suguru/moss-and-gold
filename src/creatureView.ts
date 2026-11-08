@@ -653,8 +653,9 @@ export class CreatureView {
           if (age >= fly && age < fly + 16) push(r.dx, r.dy, 4, false, A.fx(`pcloud:${Math.min(7, (age - fly) >> 1)}`), 0, 4);
           break;
         }
+        case 'armorsweep':
         case 'minosweep': {
-          // ミノタウロスの斧の薙ぎ払い（src/eco/charge.ts）：鉄の銀から暗い赤へ移る重い軌跡の帯（src/sprites.ts の fxMinoSweep を扇の外の縁に沿って並べたもの）が、
+          // ミノタウロスの斧の薙ぎ払い（src/eco/charge.ts。リビングアーマーの武器の大振りは同じ形を未練の青白い光で）：鉄の銀から暗い赤へ移る重い軌跡の帯（src/sprites.ts の fxMinoSweep を扇の外の縁に沿って並べたもの）が、
           // 扇の片側から反対側へ3 tick で走り、通ったあとは細く暗くなって消える（一本の太い帯。二重にすると虹の縞に見えた）。帯の外の縁までがおよそ当たる範囲
           const R = r.rad ?? 64;
           const H = r.half ?? 1.1;
@@ -666,9 +667,12 @@ export class CreatureView {
               const pass = q * 3;
               const fr = Math.floor(age - pass) + add;
               if (age < pass || fr > 5) continue;
+              // 軌跡の先頭（通ったばかりの一片）と、弧の両端の一片は細く描く（太い一片だけが先に出たり端に残ったりすると、四角い塊に見えた）
+              const lead = (age - pass < 1 && age > 0.5) || i === 0 || i === n;
+              const edge = i === 1 || i === n - 1;
               const a = a0 - H + 2 * H * q;
               const d16 = (Math.round((a + Math.PI / 2) / (Math.PI / 8)) + 32) % 16;
-              push(r.ax + Math.cos(a) * R * rad, r.ay + Math.sin(a) * R * rad, lift - 2 - k, false, A.fx(`msweep:${d16}:${Math.max(0, fr)}`), 0, 4);
+              push(r.ax + Math.cos(a) * R * rad, r.ay + Math.sin(a) * R * rad, lift - 2 - k, false, A.fx(`${r.style === 'armorsweep' ? 'asweep' : 'msweep'}:${d16}:${lead ? Math.max(4, fr) : edge ? Math.max(3, fr) : Math.max(0, fr)}`), 0, 4);
             }
           }
           if (age < 6) dyn.push({ x: r.ax + ux * R * 0.6, y: r.ay + uy * R * 0.6 - 8, r: R * 0.8, i: 0.35 * damp * (1 - age / 6), c: 0 });
@@ -726,6 +730,20 @@ export class CreatureView {
                 const q = g / 6;
                 push(hx + Math.cos(a) * (4 + 8 * q), hy + Math.sin(a) * (4 + 8 * q) * 0.8, Math.sin(q * Math.PI) * 4, false, A.fx(`pebble:${(i + j) % 2}`), 0, 4);
               }
+          }
+          break;
+        }
+        case 'armorbash': {
+          // リビングアーマーの盾の体当たり（src/eco/charge.ts）：走るあいだ、鎧の前に未練の青白い光の壁（src/sprites.ts の fxShieldWall）が立つ
+          const m = eco.byId.get(r.aid);
+          const fly = r.fly ?? 14;
+          if (m && !m.dead && age <= fly + 2) {
+            const d16 = (Math.round(Math.atan2(uy, ux) / (Math.PI / 8)) + 16) % 16;
+            const mx = m.x;
+            const my = m.y;
+            const f = age > fly ? 3 : age < 2 ? 0 : 1;
+            push(mx + ux * 9, my + uy * 9, lift, false, A.fx(`swall:${d16}:${f}`), 0, 4);
+            dyn.push({ x: mx + ux * 9, y: my + uy * 9 - lift, r: 34, i: 0.45 * damp, c: 2 });
           }
           break;
         }
@@ -1588,6 +1606,16 @@ export class CreatureView {
           pushSprite(x + Math.cos(a) * 10, yy + Math.sin(a) * 3 + 0.06, lift + bh * 0.6 + Math.sin(t * 0.3 + i) * 2, false, A.fx(`rune:${(i + Math.floor(t / 6)) % 4}`), 0, 2);
         }
         dyn.push({ x, y: yy - bh * 0.6, r: 46, i: 0.5 + 0.2 * Math.sin(t * 0.5), c: 2 });
+      }
+      // リビングアーマーの溜め（src/eco/charge.ts）：鎧の隙間から未練の青白い光が漏れ、光の粒が立ちのぼる（描画専用。体は src/creatureView.ts の震えで描く）
+      if (sp === Kind.Armor && !c.dead && c.act === 2 && c.actT < 0) {
+        const t = eco.w.tick + alpha;
+        const bh = Ecology.bodySize(sp);
+        dyn.push({ x, y: yy - bh * 0.5, r: 30 + (c.run === -1 ? 10 : 0), i: 0.45 + 0.2 * Math.sin(t * 1.3), c: 2 });
+        for (let i = 0; i < 3; i++) {
+          const ph = (t * 0.06 + i * 0.33 + c.id * 0.1) % 1;
+          pushSprite(x + Math.sin(i * 2.1 + t * 0.4) * 5, yy + 0.06, lift + bh * 0.3 + ph * bh * 0.8, false, A.fx(`bit:4:7:${Math.min(3, Math.floor(ph * 4))}`), 0, 2);
+        }
       }
       // 怯んだ者（src/eco/charge.ts）：頭の上で小さな星が三つ回る（描画専用）
       if (!c.dead && c.stun > 0) {
