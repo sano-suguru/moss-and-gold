@@ -542,7 +542,7 @@ export interface Cr {
   /** 毒の残り（生き物の更新の回数）と、毒を与えた種（src/eco/attack.ts の poisonTick） */
   poison: number;
   poisonBy: number;
-  /** 怯みの残り（生き物の更新の回数。src/eco/charge.ts）：歩く速さが半分になり、技の溜めを始められない */
+  /** 怯みの残り（生き物の更新の回数。src/eco/charge.ts）：その場でふらついて立ち止まり、何もできない */
   stun: number;
   /** はね飛ばされている残り（生き物の更新の回数）と、1回の更新で飛ぶ量（px。src/eco/charge.ts） */
   kb: number;

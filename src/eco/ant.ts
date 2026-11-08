@@ -99,10 +99,14 @@ export function ant(this: Ecology, c: Cr): void {
   // （以前は番号が残ったまま探し直さず、何もしないまま歩く姿でその場に立ち続けていた）
   if (!target && c.ref2 > 0) c.ref2 = 0;
   if (!target && c.ref2 === 0) {
+    // 巣から歩いて行ける物（巣と同じ、つながった洞窟の領域にある物）だけを選ぶ
+    // （以前はまっすぐの距離だけで選んだので、岩に囲まれた隅の巣のアリが、壁の向こうの苔へ道が見つからないまま歩き続けた。abc の10〜18日目で40回）
+    const home = this.regionOf(this.tileOf(col.x, col.y));
+    const reach = (x: number, y: number) => home < 0 || this.regionOf(this.tileOf(x, y)) === home;
     let bd = 14 * TILE * 14 * TILE;
     for (const o of this.corpses) {
       const d = sq(o.x - col.x) + sq(o.y - col.y);
-      if (d < bd) {
+      if (d < bd && reach(o.x, o.y)) {
         bd = d;
         target = o;
       }
@@ -110,7 +114,9 @@ export function ant(this: Ecology, c: Cr): void {
     if (target) c.ref2 = target.id;
     else {
       const k = this.findMoss(c, col.x, col.y, 8, 65);
-      const kk = k >= 0 ? k : this.findFungus(col.x, col.y, 8, c.id);
+      const k1 = k >= 0 && reach((k % this.w.map.w) * TILE + 8, Math.floor(k / this.w.map.w) * TILE + 8) ? k : -1;
+      const f = k1 >= 0 ? -1 : this.findFungus(col.x, col.y, 8, c.id);
+      const kk = k1 >= 0 ? k1 : f >= 0 && reach((f % this.w.map.w) * TILE + 8, Math.floor(f / this.w.map.w) * TILE + 8) ? f : -1;
       if (kk >= 0) {
         c.ref2 = -1 - kk;
       } else {

@@ -511,11 +511,6 @@ export function stroll(this: Ecology, c: Cr, shift: number, salt: number, mul: n
 }
 
 export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
-  // 怯んでいる者は半分の速さ（はね飛ばされて飛んでいるあいだは除く。src/eco/charge.ts）
-  if (c.stun > 0 && c.kb <= 0) {
-    mx *= 0.5;
-    my *= 0.5;
-  }
   if (c.hp > 0 && c.hp < this.maxHp(c) * 0.35) {
     mx *= 0.6;
     my *= 0.6;
