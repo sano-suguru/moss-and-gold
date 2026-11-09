@@ -2,10 +2,11 @@
  * Ecology のメソッド：ヴァンパイアの技（src/eco/vampire.ts から呼ぶ）。
  *
  * 三つの技を持つ。どれも溜め（src/eco/skill.ts）のあいだに打たれると止まる（ヴァンパイアは大物ではないので、軽い一撃でも止まる）。
- *   血吸い：手をかざして構え、3.5マス先までの相手から、血の玉を自分へ吸い寄せる。吸うあいだ（生き物の更新10回）は動かず、
- *           相手は少しずつ弱り、ヴァンパイアは吸った分だけ傷が癒える。相手が4.5マスより離れるか、壁の陰に入るか、ヴァンパイアが打たれると切れる。
+ *   血吸い：手をかざして構え、5.5マス先までの相手から、血の玉を自分へ吸い寄せる。吸うあいだ（生き物の更新10回）は動かず、
+ *           相手は少しずつ弱り、ヴァンパイアは吸った分だけ傷が癒える。相手が6.5マスより離れるか、壁の陰に入るか、ヴァンパイアが打たれると切れる。
  *   コウモリの群れ：従えるコウモリが2匹以上いれば、両腕を広げて構え、相手の方へ黒いコウモリの群れを6マスまで突っ込ませる。
  *           群れの通り道（1マスおきの丸い範囲）に、群れが届いた時にいる者を少し打って、怯ませる（動いていれば避けられる）。
+ *           噛みついたコウモリは、吸った血をくわえてヴァンパイアのもとへ戻り、その分（打った分の6割）だけヴァンパイアの傷が癒える（src/eco/attack.ts の resolveVolleys）。
  *   霧の歩み：黒い霧になって消え、一行の後ろにいる後衛（魔法使い・狩人・僧侶・吟遊詩人）の背後に現れて、重い一撃を打つ。
  *           大きな火（焚き火、かがり火、炉、入口の灯り）の明かりの中へは出ない。松明の明かりの中へは出るが、すぐに暗がりへ退く（打って逃げる）。
  *
@@ -24,9 +25,12 @@ export const SKILL_VAMP_SWARM: Skill = { windup: 5, cool: 30 };
 /** 霧の歩み：およそ0.6秒、体が黒い霧に崩れていき、使ったあと8秒は使わない */
 export const SKILL_VAMP_MIST: Skill = { windup: 3, cool: 40 };
 
-/** 血吸いを始められる遠さ、続けられる遠さ（px） */
-const DRAIN_R = 3.5 * TILE;
-const DRAIN_KEEP = 4.5 * TILE;
+/**
+ * 血吸いを始められる遠さ、続けられる遠さ（px）。松明を持つ冒険者の明かりの輪の2マス外（4.5マス）より遠くから届くようにする
+ * （3.5マスでは、一行の松明の明かりの手前までしか近づけないヴァンパイアは、冒険者にほとんど使えなかった）
+ */
+const DRAIN_R = 5.5 * TILE;
+const DRAIN_KEEP = 6.5 * TILE;
 /** 血を吸う長さ（生き物の更新の回数）と、1回ごとの打ちの強さ（ふつうの一打ちに対する倍率） */
 export const DRAIN_N = 10;
 const DRAIN_MUL = 0.12;
@@ -244,12 +248,15 @@ export function vampEngage(this: Ecology, c: Cr, foes: Cr[], prey: Cr | null): b
     near = o;
   }
   if (!near) return false;
-  if ((foes.length || near.k === Kind.Adventurer) && nd <= SWARM_LEN * SWARM_LEN && nd > sq(1.5 * TILE) && this.skillCanStart(c, SKILL_VAMP_SWARM) && retinueNear.call(this, c) >= 2) return start(SKILL_VAMP_SWARM, -2, near);
+  const bats = retinueNear.call(this, c);
+  const canSwarm = (foes.length || near.k === Kind.Adventurer) && nd <= SWARM_LEN * SWARM_LEN && nd > sq(1.5 * TILE) && bats >= 2 && this.skillCanStart(c, SKILL_VAMP_SWARM);
   // 血吸いは、冒険者（近づけば打ち返されて危ない相手）と、足止めしてくれるコウモリ（2匹以上）を連れていないときの獲物に使う。
   // コウモリを連れていれば、大ネズミやゴブリンのような獲物には、これまでどおり近づいて、コウモリに群がらせて足止めしてから打ちかかる
-  // （血吸いをどの獲物にも使うと、離れたまま仕留めてしまい、足止めの場面が8シードで18回から3回に減った。冒険者にだけ使うと、
-  //  一行の松明の明かりの手前までしか近づけないので、一度も使わなかった）
-  if ((near.k === Kind.Adventurer || retinueNear.call(this, c) < 2) && nd <= DRAIN_R * DRAIN_R && nd > sq(1.2 * TILE) && this.skillCanStart(c, SKILL_VAMP_DRAIN)) return start(SKILL_VAMP_DRAIN, -1, near);
+  // （血吸いをどの獲物にも使うと、離れたまま仕留めてしまい、足止めの場面が8シードで18回から3回に減った）
+  const canDrain = (near.k === Kind.Adventurer || bats < 2) && nd <= DRAIN_R * DRAIN_R && nd > sq(1.2 * TILE) && this.skillCanStart(c, SKILL_VAMP_DRAIN);
+  // 傷を負っていれば（体力が85％を切っていれば）血吸いを先に、そうでなければコウモリの群れを先に使う
+  if (canDrain && (c.hp < this.maxHp(c) * 0.85 || !canSwarm)) return start(SKILL_VAMP_DRAIN, -1, near);
+  if (canSwarm) return start(SKILL_VAMP_SWARM, -2, near);
   return false;
 }
 

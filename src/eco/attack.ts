@@ -174,7 +174,17 @@ export function resolveVolleys(this: Ecology): void {
     this.nearby(v.x, v.y, Math.ceil(v.r / TILE) + 1, (o) => {
       if (o.dead || o.away || o.caught || !who(o) || sq(o.x - v.x) + sq(o.y - v.y) > v.r * v.r) return;
       if (v.poison > 0) this.poisonOn(o, a.k, v.poison);
-      if (this.strike(a, o, v.mul, false)) {
+      const hp0 = o.hp > 0 ? o.hp : this.maxHp(o);
+      const killed = this.strike(a, o, v.mul, false);
+      // ヴァンパイアのコウモリの群れ（src/eco/vampskill.ts）：噛みついたコウモリが血をくわえて戻り、打った分の6割だけヴァンパイアの傷が癒える。
+      // 画面には、打たれた者からヴァンパイアへ、血の玉をくわえたコウモリが飛んで戻る（batreturn）
+      if (a.k === Kind.Vampire && !a.dead && !a.away) {
+        const got = Math.max(0, hp0 - Math.max(0, o.hp));
+        a.hp = Math.min(this.maxHp(a), a.hp + got * 0.6);
+        this.fxAttacks.push({ t: this.w.tick, style: 'batreturn', col: 0, size: 1, ax: o.x, ay: o.y, dx: a.x, dy: a.y, did: o.id, aid: a.id, big: false, kill: false, fly: Math.max(6, Math.min(16, Math.round(Math.hypot(a.x - o.x, a.y - o.y) / 7))) });
+        this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'swarmBlood', id: a.id, n: o.k, x: Math.round(o.x), y: Math.round(o.y) } as never);
+      }
+      if (killed) {
         this.slay(a, o, first);
         first = false;
       } else if (v.stun) o.stun = Math.max(o.stun, v.stun);

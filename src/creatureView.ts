@@ -4,6 +4,7 @@ import { TROPHY } from './eco/loot';
 import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
 import { RANK_AT, packLook, unpackLook } from './eco/roster';
 import { SKILL_WIZARD_MISSILE } from './eco/skill';
+import { SKILL_VAMP_MIST } from './eco/vampskill';
 import { HOP_DT, HOP_N, hopAt } from './eco/charge';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
@@ -807,6 +808,30 @@ export class CreatureView {
             }
             push(bx, by, z, vx < 0, A.index(1, 2, 1, (age + i) & 3), 0, 4);
           }
+          break;
+        }
+        case 'batreturn': {
+          // コウモリの群れの戻り（src/eco/attack.ts の resolveVolleys）：噛みついたコウモリが、足に赤い血の玉をつかんで、
+          // 打たれた者からヴァンパイアのもとへ、ゆるい弧を描いて飛んで戻る。着くと、ヴァンパイアのまわりが赤く光る
+          const fly = r.fly ?? 10;
+          const v = eco.byId.get(r.aid);
+          const ex = v && !v.dead ? v.x : r.dx;
+          const ey = v && !v.dead ? v.y : r.dy;
+          const L = Math.hypot(ex - r.ax, ey - r.ay) || 1;
+          const px = -(ey - r.ay) / L;
+          const py = (ex - r.ax) / L;
+          for (let i = 0; i < 2; i++) {
+            const p = (age - i * 1.5) / fly;
+            if (p < 0 || p > 1) continue;
+            const bend = Math.sin(p * Math.PI) * 10 * (i ? -1 : 1);
+            const bx = r.ax + (ex - r.ax) * p + px * bend;
+            const by = r.ay + (ey - r.ay) * p + py * bend;
+            const z = lift + 6 + Math.sin(p * Math.PI) * 8;
+            push(bx, by, z, ex < r.ax, A.index(1, 2, 1, (age + i) & 3), 0, 4);
+            push(bx, by + 0.05, z - 4, false, A.fx(`borb:${(Math.floor(age / 2) + i) & 3}`), 0, 4);
+          }
+          const g = age - fly;
+          if (g >= 0 && g < 6) dyn.push({ x: ex, y: ey - 10, r: 30, i: 0.5 * damp * (1 - g / 6), c: 6 });
           break;
         }
         case 'miststep': {
@@ -1713,10 +1738,20 @@ export class CreatureView {
             pushSprite(x + Math.cos(a) * rr, yy + Math.sin(a) * rr * 0.5 + 0.06, lift + bh * 0.8 + (i % 3) * 3, Math.sin(a) > 0, A.index(1, 2, 1, (Math.floor(t) + i) & 3), 0, 2);
           }
         } else {
-          for (let i = 0; i < 4; i++) {
-            const ph = (t * 0.08 + i * 0.25) % 1;
-            pushSprite(x + Math.sin(i * 2.1 + t * 0.3) * 5, yy + 0.08, lift + ph * bh, i % 2 === 1, A.mist(Math.min(3, Math.floor(ph * 4))), 0, 0);
+          // 霧の歩みの溜め：溜めが進むほど、足もとから濃い黒い霧が湧いて体を包み、小さなコウモリが体からはがれて舞い上がる
+          const p = Math.max(0, Math.min(1, (SKILL_VAMP_MIST.windup + c.actT + alpha) / SKILL_VAMP_MIST.windup));
+          const n = 4 + Math.round(p * 6);
+          for (let i = 0; i < n; i++) {
+            const ph = (t * 0.1 + i / n) % 1;
+            const sw = 4 + p * 6;
+            pushSprite(x + Math.sin(i * 2.4 + t * 0.35) * sw, yy + Math.cos(i * 1.7) * 2 + 0.08, lift + ph * bh * (0.6 + p * 0.6), i % 2 === 1, A.mist(Math.min(3, Math.floor(ph * 3 + (1 - p)))), 0, 0);
           }
+          for (let i = 0; i < 2; i++) {
+            const ph = (t * 0.07 + i * 0.5) % 1;
+            if (p < 0.3) continue;
+            pushSprite(x + (i ? 1 : -1) * (3 + ph * 12), yy + 0.09, lift + bh * 0.6 + ph * 14, i === 0, A.index(1, 2, 1, (Math.floor(t) + i) & 3), 0, 0);
+          }
+          dyn.push({ x, y: yy - bh * 0.5, r: 26, i: 0.3 * p, c: 2 });
         }
       }
       // 怯んだ者（src/eco/charge.ts）：頭の上で小さな星が三つ回る（描画専用）
