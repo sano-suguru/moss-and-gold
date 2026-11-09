@@ -30,8 +30,18 @@ export const SKILL_ORC_THROW: Skill = { windup: 4, cool: 25 };
 export const ROAR_R = 5 * TILE;
 const ROAR_STUN = 6;
 const ROAR_FLEE = 50;
-/** 雄叫びで加勢するゴブリンの届く所（オークから。群れの警戒は、警戒の出た所から10マスの内の仲間が応じる） */
-const RALLY_R = 10 * TILE;
+/**
+ * 雄叫びで加勢させる集落の遠さ（オークから集落のまん中まで）と、相手を選ぶ遠さ（px）。
+ * オークの寝床は従える集落から12マス以上離れて作られる（src/eco/orc.ts の pickLair）ので、警戒はオークと集落のまん中に出す
+ * （群れの警戒は、警戒の出た所から10マスの内の仲間が応じる。src/eco/groups.ts の heedAlarm）
+ */
+const RALLY_CAMP = 20 * TILE;
+const RALLY_FOE = 12 * TILE;
+/**
+ * 雄叫びの警戒が続く長さを、群れの警戒のふつうの長さ（生き物の更新80回）より延ばす分。警戒は出た時刻から80回たつと消えるので、時刻を先にずらして出す
+ * （ゴブリンの歩く速さでは、80回のあいだに5マスほどしか進めず、駆けつける前に警戒が消えていた）
+ */
+const RALLY_EXTRA = 60;
 /** 投げ斧の届く遠さ（px）、飛ぶ速さと戻る速さ（生き物の更新1回あたりの px）、当たる丸の半径、打ちの強さ */
 const THROW_MIN = 3 * TILE;
 const THROW_MAX = 7 * TILE;
@@ -135,18 +145,26 @@ export function orcRoar(this: Ecology, c: Cr): void {
   // 加勢させる相手：にらみ合いのあとなら一行のいちばん近い者、そうでなければ打ってきた相手（小物は逃げるので、加勢の相手にしない）
   let foe: Cr | null = null;
   const f0 = this.byId.get(c.foe);
-  if (f0 && !f0.dead && !f0.away && f0.k !== Kind.Orc && f0.k !== Kind.Goblin && this.w.tick - c.hitAt < 200 && sq(f0.x - c.x) + sq(f0.y - c.y) < RALLY_R * RALLY_R) foe = f0;
+  if (f0 && !f0.dead && !f0.away && f0.k !== Kind.Orc && f0.k !== Kind.Goblin && !SCARED.has(f0.k) && this.w.tick - c.hitAt < 200 && sq(f0.x - c.x) + sq(f0.y - c.y) < RALLY_FOE * RALLY_FOE) foe = f0;
+  const party = c.ref ? this.parties.find((p) => p.id === c.ref) : undefined;
+  if (party) {
+    let bd = RALLY_FOE * RALLY_FOE;
+    for (const id of party.members) {
+      const o = this.byId.get(id);
+      if (!o || o.dead || o.away) continue;
+      const d = sq(o.x - c.x) + sq(o.y - c.y);
+      if (d < bd) {
+        bd = d;
+        foe = o;
+      }
+    }
+  }
   let scared = 0;
   let stunned = 0;
-  let bd = 1e18;
   this.nearby(c.x, c.y, Math.ceil(ROAR_R / TILE) + 1, (o) => {
     if (o === c || o.dead || o.away || o.caught) return;
     const d = sq(o.x - c.x) + sq(o.y - c.y);
     if (d > ROAR_R * ROAR_R || !lineOfSight(m, c.x, c.y, o.x, o.y)) return;
-    if (c.ref && o.k === Kind.Adventurer && o.party === c.ref && d < bd) {
-      bd = d;
-      foe = o;
-    }
     if (SCARED.has(o.k) || (o.k === Kind.Goblin && !o.party && !vassalGoblin.call(this, c, o))) {
       o.sleep = 0;
       o.flee = Math.max(o.flee, ROAR_FLEE + (o.id % 20));
@@ -161,20 +179,23 @@ export function orcRoar(this: Ecology, c: Cr): void {
       stunned++;
     }
   });
-  // 加勢：従う集落のゴブリンに、相手への警戒を出す（10マスの内の者が駆けつける）。眠っている者も起きる
+  // 加勢：従う集落のゴブリンに、相手への警戒を出す（オークと集落のまん中から10マスの内の者が駆けつける）。眠っている者も起きる
   let rallied = 0;
   const target = foe as Cr | null;
-  if (target && !SCARED.has(target.k)) {
+  if (target) {
     for (const cp of this.vassalsOf(c)) {
+      if (sq(cp.x - c.x) + sq(cp.y - c.y) > RALLY_CAMP * RALLY_CAMP) continue;
+      const mx = (c.x + cp.x) / 2;
+      const my = (c.y + cp.y) / 2;
       let near = 0;
-      this.nearby(c.x, c.y, Math.ceil(RALLY_R / TILE) + 1, (o) => {
-        if (o.dead || o.away || o.k !== Kind.Goblin || o.party || o.ref !== cp.id || sq(o.x - c.x) + sq(o.y - c.y) > RALLY_R * RALLY_R) return;
+      this.nearby(mx, my, 11, (o) => {
+        if (o.dead || o.away || o.k !== Kind.Goblin || o.party || o.ref !== cp.id || o.flee > 0 || sq(o.x - mx) + sq(o.y - my) > 10 * TILE * 10 * TILE) return;
         near++;
         o.sleep = 0;
         this.markNotice(o, target, '!');
       });
       if (!near) continue;
-      this.alarms.set(`${Kind.Goblin}:${cp.id}`, { t: this.step, foe: target.id, x: Math.round(c.x), y: Math.round(c.y) });
+      this.alarms.set(`${Kind.Goblin}:${cp.id}`, { t: this.step + RALLY_EXTRA, foe: target.id, x: Math.round(mx), y: Math.round(my) });
       rallied += near;
     }
   }
