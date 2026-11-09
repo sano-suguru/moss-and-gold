@@ -89,12 +89,16 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       return;
     }
   }
-  if (day > 0.05) {
-    // 住処が遠いまま眠気が出てきたら（眠りの目安の3割を超えたら）、近くの物陰（行き止まりや、人の気配の薄い暗い所）へ寄って、
+  // 夜明け前（1日の 0.1〜0.2）に住処が20マスより遠ければ、昼を待たずに物陰を探しはじめる（昼の眠気は夜明け前から来るので、
+  // 昼になってから探すと、住処へ帰る途中の通路で眠り込んでいた）
+  const farDawn = this.phaseNow >= 0.1 && this.phaseNow < 0.2 && sq(c.hx - c.x) + sq(c.hy - c.y) > sq(20 * TILE);
+  if (day > 0.05 || farDawn) {
+    // 昼になって住処が20マスより遠いか、住処が遠いまま眠気が出てきたら（眠りの目安の3割を超えたら）、近くの物陰（行き止まりや、人の気配の薄い暗い所）へ寄って、
+    // （眠気が出てから探しはじめると、住処から遠い所では物陰に着く前に通路で眠り込み、そこに棺を出していた）
     // そこで眠り込んで棺を呼び出す（vampCoffin）。物陰は生き物の更新20回ごとに選び直し、tx, ty に持つ
     // （以前はどこで眠り込んでもその場に棺を出したので、通路の真ん中の棺が僧侶や竜殺しに暴かれていた。16シード×25日で4回 → 17回）
     const th = Ecology.SLEEP[Kind.Vampire]?.th ?? 1500;
-    if (sq(c.hx - c.x) + sq(c.hy - c.y) > 12 * 12 && c.drowsy > th * 0.3) {
+    if (sq(c.hx - c.x) + sq(c.hy - c.y) > 12 * 12 && (c.drowsy > th * 0.3 || sq(c.hx - c.x) + sq(c.hy - c.y) > sq(20 * TILE))) {
       if (!c.tx || this.step % 20 === c.id % 20) {
         const spot = this.vampHideSpot(c);
         c.tx = spot ? spot[0] : 0;
