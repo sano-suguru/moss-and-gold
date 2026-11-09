@@ -184,6 +184,8 @@ export function warrenOf(this: Ecology, c: Cr): Warren | undefined {
 
 export function kobold(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Kobold];
+  // 住処のそばを通る冒険者の一行に立ちふさがる（src/eco/standoff.ts）
+  if (this.residentStand(c)) return;
   // 住処へ向かう道中：冒険者が近くにいる間は身をひそめて待ち、離れてから進む
   if ((c.st === 11 || c.st === 12) && this.koboldTransit(c)) return;
   // 冒険者に気づいたら、一行がずっと強ければ戦わずに逃げる（追いかけてはこない）

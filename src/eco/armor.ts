@@ -70,7 +70,7 @@ export const ARMOR_LOW = 30;
 /** 手に取り込める武器と盾の数と、取り込んでから次を取り込めるまでの生き物の更新の回数（通常速度で約1分。少しずつ強くなるのが見えるように） */
 export const ARMOR_HAND_MAX = 5;
 /** 倒した相手から奪う物は、強さの上限（ARMOR_HAND_MAX）を超えても、この数まで取り込む（強さは上がらず、巡る武具が増えるだけ） */
-export const ARMOR_ROB_MAX = 8;
+export const ARMOR_ROB_MAX = 5;
 export const ARMOR_ABSORB_GAP = 300;
 /** 未練の宿った武具（倒れた者の物）を拾い集めるときの間隔（生き物の更新の回数。一つずつ歩み寄って取り込むのが見えるように） */
 export const ARMOR_GATHER_GAP = 30;

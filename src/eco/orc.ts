@@ -73,16 +73,46 @@ export function orc(this: Ecology, c: Cr): void {
 }
 
 /**
- * オークの見極め（威嚇して退く）：冒険者の一行に気づき（7マス、見通しが利く）、一行の強さ（英雄のいる一行はそれだけ強く見積もる）が
- * 自分たち（6マスの内のオーク）よりはっきり上（1.5倍）なら、襲わずにその場で唸って武器を打ち鳴らし（st 20：一行の方を向いて
- * 武器を振る動きを3回、ORC_BLUFF 回の更新）、縄張りの奥へ退く（st 21：住みかの印 hx, hy へ。住みかがなければ一行から離れる方へ）。
- * 勝ち目があれば今までどおり。退いているオークを、目標でない一行は追わない（orcYields）。
+ * オークの見極め（にらみ合い）：冒険者の一行に気づき（7マス、見通しが利く）、一行の強さ（英雄のいる一行はそれだけ強く見積もる）が
+ * 自分たち（6マスの内のオーク）よりはっきり上（1.5倍）なら、すぐには襲わずにその場で唸って武器を打ち鳴らす（st 20：一行の方を向いて
+ * 武器を振る動きを3回、ORC_BLUFF 回の更新）。そのあと、一行が前に出れば一行が打ちかかり、一行がひるめばオークが襲いかかる（st 22）。
+ * どちらになるかは強さの差と乱数で決まる。勝ち目があれば今までどおり。
+ * （st 21 の縄張りの奥へ退く動きは、以前のセーブから続く分だけ残している。威嚇しているオークを、目標でない一行は追わない（orcYields））。
  * 状態は st と ref（一行）と lureAt（始めた step 番号）。step.ts の判断のはじめ（潜む・縄張り・狩りより先）に呼ぶ
  */
 export const ORC_BLUFF = 24;
 const ORC_WITHDRAW = 600;
 export function orcWary(this: Ecology, c: Cr): boolean {
   const s = SPEC[Kind.Orc];
+  // にらみ合いのあと、ひるんだ一行へ襲いかかる（st 22）：いちばん近い者へ向かって打ちかかる。一行がいなくなるか、生き物の更新400回たったら、ふだんに戻る
+  if (c.st === 22) {
+    const p = this.parties.find((q) => q.id === c.ref);
+    let near: Cr | null = null;
+    let bd = 1e18;
+    if (p)
+      for (const id of p.members) {
+        const o = this.byId.get(id);
+        if (!o || o.dead || o.away) continue;
+        const d = sq(o.x - c.x) + sq(o.y - c.y);
+        if (d < bd) {
+          bd = d;
+          near = o;
+        }
+      }
+    if (!near || bd > 12 * TILE * 12 * TILE || this.step - c.lureAt > 400 || c.flee > 0) {
+      c.st = 0;
+      c.ref = 0;
+      return false;
+    }
+    const n = near as Cr;
+    this.setDir(c, n.x - c.x, n.y - c.y);
+    if (bd < 12 * 12) this.fight(c, n);
+    else {
+      c.act = 1;
+      this.goTo(c, n.x, n.y, s.speed * 1.2);
+    }
+    return true;
+  }
   if (c.st === 20 || c.st === 21) {
     const p = this.parties.find((q) => q.id === c.ref);
     // 一行に打たれたら、打ち返す（今までどおり）
@@ -114,31 +144,19 @@ export function orcWary(this: Ecology, c: Cr): boolean {
         this.noise(c.x, c.y, 7);
       }
       if (el >= ORC_BLUFF) {
-        c.st = 21;
+        // にらみ合いの決着：一行が前に出れば一行が打ちかかり、一行がひるめばオークが襲いかかる。どちらになるかは強さの差と乱数で決まる
+        // （以前は威嚇したあと縄張りの奥へ退き、一行も追わなかったので、出会っても戦わずに別れていた）
+        const might = this.partyMight(p);
+        const mine = Math.max(1, this.str(c));
+        const advance = (ih(c.id, p.id ^ this.step, 402) % 100) < Math.max(20, Math.min(80, 50 + ((might - mine) / mine) * 25));
+        c.st = advance ? 0 : 22;
         c.lureAt = this.step;
-        // 退く先：見通しの利く6マス先（16方向）のうち、一行からいちばん遠い所（tx, ty）。まずそこまで下がる
-        c.tx = c.x;
-        c.ty = c.y;
-        let best = -1;
-        for (const [ux, uy] of DIR16) {
-          for (const r of [6, 4, 2.5]) {
-            const x = c.x + ux * r * TILE;
-            const y = c.y + uy * r * TILE;
-            const k = this.tileOf(x, y);
-            if (k < 0 || this.w.map.solid[k] || this.w.map.lava[k] || this.w.water[k] > 20 || !lineOfSight(this.w.map, c.x, c.y, x, y)) continue;
-            let dmin = 1e18;
-            for (const id of p.members) {
-              const o = this.byId.get(id);
-              if (o && !o.dead) dmin = Math.min(dmin, sq(o.x - x) + sq(o.y - y));
-            }
-            if (dmin > best) {
-              best = dmin;
-              c.tx = x;
-              c.ty = y;
-            }
-            break;
-          }
+        if (advance) {
+          p.engage = c.id;
+          p.engageN = p.members.filter((id) => !this.byId.get(id)?.dead).length;
         }
+        this.record('settle', { t: this.w.tick, k: Kind.Orc, ev: 'orcClash', id: c.id, how: advance ? 1 : 2, n: p.id, x: Math.round(c.x), y: Math.round(c.y) } as never);
+        return advance ? false : true;
       }
       return true;
     }
@@ -203,7 +221,7 @@ export function orcWary(this: Ecology, c: Cr): boolean {
   this.record('settle', { t: this.w.tick, k: Kind.Orc, id: p.id, ev: 'bluff', n: c.id, how: Math.round((theirs / Math.max(1, ours)) * 10), x: Math.round(c.x), y: Math.round(c.y) } as never);
   if (this.step - (this.lastLogged[997] ?? -99999) > 1500) {
     this.lastLogged[997] = this.step;
-    this.log(c.x, c.y, `{k:${Kind.Orc}}が${this.partyTitle(p)}の一行に唸って武器を打ち鳴らし、縄張りの奥へ退いた`);
+    this.log(c.x, c.y, `{k:${Kind.Orc}}が${this.partyTitle(p)}の一行に唸って武器を打ち鳴らし、にらみ合った`);
   }
   return true;
 }

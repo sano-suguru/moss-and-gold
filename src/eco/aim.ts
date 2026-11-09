@@ -253,6 +253,8 @@ export function spareResident(this: Ecology, p: Party, c: Cr, o: Cr): boolean {
   const key = leaving ? 0 : this.homeKey(o);
   if (key === null) return false;
   if (p.aim === 5 && !p.aimEnd && key === p.aimId) return false;
+  // 立ちふさがって威嚇してくる住民とは戦う（src/eco/standoff.ts）
+  if ((o.k === Kind.Kobold || o.k === Kind.Goblin) && o.st === 40) return false;
   if (o.act === 2 && o.foe && p.members.includes(o.foe) && this.w.tick - o.hitAt < 150) return false;
   // 行く手をふさがれた：すぐそばにいて、こちらが進めずにいる
   if (sq(o.x - c.x) + sq(o.y - c.y) < 12 * 12 && (this.paths.get(c.id)?.stall ?? 0) > 20) return false;

@@ -52,4 +52,5 @@ import './armor';
 import './skill';
 import './attack';
 import './charge';
+import './standoff';
 import './save';

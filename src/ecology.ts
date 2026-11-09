@@ -92,6 +92,12 @@ export const enum Job {
 export interface Party {
   id: number;
   members: number[];
+  /** 皆で向かう相手に向かいはじめたときの、生きている仲間の数（src/eco/adventurer.ts の撤退） */
+  engageN?: number;
+  /** 撤退：下がり終える step 番号と、退く相手のいた所 */
+  retreatUntil?: number;
+  retreatX?: number;
+  retreatY?: number;
   /** 0 = 奥へ進む、1 = 引き返す */
   goal: number;
   tx: number;

@@ -549,7 +549,7 @@ export function armorSkill(this: Ecology, c: Cr): boolean {
   const fx = f && !f.dead ? f.x - c.x : c.dir === 2 ? 1 : c.dir === 3 ? -1 : 0;
   const fy = f && !f.dead ? f.y - c.y : c.dir === 0 ? 1 : c.dir === 1 ? -1 : 0;
   const L = Math.sqrt(fx * fx + fy * fy) || 1;
-  const n = this.areaStrike(c, c.x, c.y, fx / L, fy / L, { kind: 'fan', r: armorSweepR(weapons), half: 1.05 }, 1, { style: 'armorsweep', col: 0 }, (o) => o.k !== Kind.Armor && o.k !== Kind.Ghost && o.k !== Kind.Wisp && !this.airborne(o));
+  const n = this.areaStrike(c, c.x, c.y, fx / L, fy / L, { kind: 'fan', r: armorSweepR(weapons), half: 1.05 }, 0.6, { style: 'armorsweep', col: 0 }, (o) => o.k !== Kind.Armor && o.k !== Kind.Ghost && o.k !== Kind.Wisp && !this.airborne(o));
   if (n >= 2) this.record('settle', { t: this.w.tick, k: Kind.Armor, ev: 'armorSweep2', id: c.id, n, x: Math.round(c.x), y: Math.round(c.y) } as never);
   c.aim = 0;
   return true;

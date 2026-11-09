@@ -405,6 +405,8 @@ export function campOf(this: Ecology, c: Cr): Camp | undefined {
 
 export function goblin(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Goblin];
+  // 集落のそばを通る冒険者の一行に立ちふさがる（src/eco/standoff.ts）
+  if (this.residentStand(c)) return;
   if (c.st === 10) {
     this.leaveWithGroup(c);
     return;

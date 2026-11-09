@@ -122,10 +122,9 @@ export function hunt(this: Ecology, c: Cr, R: number, kinds: Kind[], speed: numb
     if (c.k === Kind.Goblin && this.inKoboldLand(o.x, o.y)) return;
     // （夜襲に出る大物は、3割ほど飢えていれば、細った焚き火のそばの獲物も狙う。src/eco/night.ts）
     if (Ecology.FEARS_FIRE.has(c.k) && c.sinceMeal < SPEC[c.k].starve * 0.85 && this.fireDaunts(c, o.x, o.y)) return;
-    // 知性ある者は勝てない相手を避け、狡猾な者は自分より強い相手には挑まない
+    // 知性ある者と狡猾な者は、自分の2倍より強い相手には挑まない（以前は1.1倍・1.6倍で、大物どうしがほとんどぶつからなかった）
     const ts = this.str(o) * (o.hp > 0 ? o.hp / this.maxHp(o) : 1);
-    if (tier >= 3 && ts > me * 1.1) return;
-    if (tier === 2 && ts > me * 1.6) return;
+    if (tier >= 2 && ts > me * 2) return;
     // 焚き火で眠っている冒険者は、近くにいるものとして好んで狙う（寝込みを襲う）
     const d = (sq(o.x - c.x) + sq(o.y - c.y)) * (this.campSleeper(o) ? 0.25 : 1);
     if (d < bd) {
