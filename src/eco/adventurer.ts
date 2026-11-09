@@ -565,7 +565,9 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       const d = sq(o.x - c.x) + sq(o.y - c.y);
       const near = c.sp === Job.Thief ? 3 * TILE : NOTICE_DARK;
       // （暗がりの気配で気づくのは敵だけ。大ネズミなどの雑魚にまで気づくと、暗がりの雑魚を払う数が増え、大ネズミがはっきり減った）
-      const reach = attacked ? NOTICE_HIT : this.seenBy(c, lights, o) ? NOTICE_LIT : enemy && d < near * near && !this.isHidden(o) ? near : 0;
+      // （盗みに忍び寄るゴブリンも、暗がりの気配では気づかれない。見張りが気配で盗人に気づくと、夜の盗みがはっきり減った）
+      const sneaking = o.k === Kind.Goblin && o.st >= 15 && o.st <= 18;
+      const reach = attacked ? NOTICE_HIT : this.seenBy(c, lights, o) ? NOTICE_LIT : enemy && !sneaking && d < near * near && !this.isHidden(o) ? near : 0;
       if (d >= reach * reach || (d > 2 * TILE * 2 * TILE && !lineOfSight(this.w.map, c.x, c.y, o.x, o.y))) return;
       // 雑魚は、近く（2マス）に来たときか、自分に害をなしたときだけ払う
       if (minor && !enemy && !attacked && o.foe !== c.id && d > 2 * TILE * 2 * TILE) return;
@@ -578,7 +580,11 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     });
   // 手強い敵に気づいたら、一行に知らせる（かなわない相手は、見張りの判断で引き返す）
   // （以前は一行の1.2倍より強い相手には知らせず、皆で向かわなかった。いまは強さに関わらず皆で向かい、負けそうなら退く）
-  if (foe && !MINOR.includes((foe as Cr).k) && !p.engage && (p.retreatUntil ?? 0) <= this.step) {
+  // 暗がりから血を吸うヴァンパイア（灯りの中に見えていない）には、打たれて気づいても、一行で暗がりへ踏み込まない。
+  // 吸われた者はヴァンパイアの方を向いて構え、届く技のある者は撃ち返す（src/eco/vampskill.ts の血吸い。
+  // 打たれたら気づくようにしたとき、一行が暗がりへ詰め寄ってヴァンパイアを追い払い、血吸いが16シード×25日で62→13回に減った）
+  const darkVamp = !!foe && (foe as Cr).k === Kind.Vampire && !this.seenBy(c, lights, foe as Cr);
+  if (foe && !darkVamp && !MINOR.includes((foe as Cr).k) && !p.engage && (p.retreatUntil ?? 0) <= this.step) {
     p.engage = (foe as Cr).id;
     p.engageN = p.members.filter((id) => !this.byId.get(id)?.dead).length;
   }
@@ -663,6 +669,10 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     }
     if (sq(f.x - c.x) + sq(f.y - c.y) < 14 * 14) {
       this.fight(c, f);
+      return;
+    }
+    if (darkVamp) {
+      c.act = 0;
       return;
     }
     c.act = 1;
