@@ -1738,13 +1738,15 @@ export class CreatureView {
             pushSprite(x + Math.cos(a) * rr, yy + Math.sin(a) * rr * 0.5 + 0.06, lift + bh * 0.8 + (i % 3) * 3, Math.sin(a) > 0, A.index(1, 2, 1, (Math.floor(t) + i) & 3), 0, 2);
           }
         } else {
-          // 霧の歩みの溜め：溜めが進むほど、足もとから濃い黒い霧が湧いて体を包み、小さなコウモリが体からはがれて舞い上がる
+          // 霧の歩みの溜め：溜めが進むほど、足もとから灰紫の影の霧（src/sprites.ts の fxShadowPuff）が湧いて体を包み、小さなコウモリが体からはがれて舞い上がる
           const p = Math.max(0, Math.min(1, (SKILL_VAMP_MIST.windup + c.actT + alpha) / SKILL_VAMP_MIST.windup));
-          const n = 4 + Math.round(p * 6);
+          // 足もとに広がる影の霧の塊（溜めが進むほど大きく）と、体の手前と左右を立ちのぼる霧の玉
+          pushSprite(x, yy + 3, 1, false, A.fx(`scloud:${Math.min(2, Math.floor(p * 3))}`), 0, 2);
+          const n = 5 + Math.round(p * 7);
           for (let i = 0; i < n; i++) {
             const ph = (t * 0.1 + i / n) % 1;
-            const sw = 4 + p * 6;
-            pushSprite(x + Math.sin(i * 2.4 + t * 0.35) * sw, yy + Math.cos(i * 1.7) * 2 + 0.08, lift + ph * bh * (0.6 + p * 0.6), i % 2 === 1, A.mist(Math.min(3, Math.floor(ph * 3 + (1 - p)))), 0, 0);
+            const sw = 5 + p * 7;
+            pushSprite(x + Math.sin(i * 2.4 + t * 0.35) * sw, yy + 2 + (i % 3) + 0.08, lift + ph * bh * (0.5 + p * 0.7), i % 2 === 1, A.fx(`spuff:${Math.min(3, Math.floor(ph * 4))}`), 0, 2);
           }
           for (let i = 0; i < 2; i++) {
             const ph = (t * 0.07 + i * 0.5) % 1;
