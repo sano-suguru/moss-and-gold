@@ -134,6 +134,8 @@ export function rat(this: Ecology, c: Cr, day: number): void {
         if (t2 >= 0 && t2 !== goal && d2 + 2 < left) c.ref = t2 + 1;
       }
     }
+    // 食べ物が見つからずにうずくまって休んでいる者は、生き物の更新20回に1回だけ探し直す
+    if (c.ref === 0 && c.act === 0 && this.step % 20 !== c.id % 20) return;
     if (c.ref === 0 || (ih(c.id, this.step, 13) % 50 === 0 && !(c.hungry > 0 && cur >= 0 && Math.max(this.w.moss[cur], this.w.fungus[cur]) >= 20))) {
       // 腹を空かせていれば、歩いて12マス以内でいちばん近い食べられる苔かキノコを目当てにする
       // （いくつかの点を選んで調べるやり方では、まばらな苔を見落として、ずっと遠くの群落を目指して途中で飢えていた）
@@ -146,11 +148,14 @@ export function rat(this: Ecology, c: Cr, day: number): void {
         const sh = this.w.map.shafts[ih(c.id, this.step, 15) % this.w.map.shafts.length];
         t = this.findMoss(c, sh.x * TILE + 8, sh.y * TILE + 8, 6, 260);
       }
+      // それでも見つからなければ、腹の具合に関わらず、歩いて24マス以内のいちばん近い食べ物、次に地図全体の土地勘から歩いて行ける豊かな群落を目指す。
+      // どこにも無ければ、その場でうずくまって休む（しばらくして探し直す）
+      // （以前は、その場で一歩ずつでたらめな向きへ歩き続け、苔の尽きた巣穴のそばで大ネズミが固まって足踏みしていた）
+      if (t < 0) t = this.nearestEdible(c, 24);
+      if (t < 0) t = this.nearestForage(c.x, c.y, 200, c.gait - 1);
       c.ref = t >= 0 ? t + 1 : 0;
       if (t < 0) {
-        const j = DIR16[ih(c.id, this.step, 14) & 15];
-        this.tryMove(c, j[0] * s.speed, j[1] * s.speed);
-        c.act = 1;
+        c.act = 0;
         return;
       }
     }
