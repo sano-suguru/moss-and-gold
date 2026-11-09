@@ -607,7 +607,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
           const hd = Math.min(fl, reach);
           const hx = c.x + ux * hd;
           const hy = c.y + uy * hd;
-          const holy = (o: Cr) => o.k === Kind.Zombie || o.k === Kind.Skeleton || o.k === Kind.Lich || o.k === Kind.Thrall || o.k === Kind.Vampire;
+          const holy = (o: Cr) => o.k === Kind.Zombie || o.k === Kind.Skeleton || o.k === Kind.Lich || o.k === Kind.Thrall || o.k === Kind.Vampire || o.k === Kind.Armor;
           const cross = { kind: 'cross' as const, r: 3 * TILE, w: 9 };
           this.fxAttacks.push({ t: this.w.tick, style: 'cross', col: 1, size: 2, ax: c.x, ay: c.y, dx: hx, dy: hy, did: f.id, aid: c.id, big: true, kill: false, rad: cross.r });
           this.areaStrike(c, hx, hy, ux, uy, cross, 1.2, { style: '', col: 1 }, (o) => who(o) && !holy(o));
