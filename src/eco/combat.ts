@@ -311,6 +311,11 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
       return true;
     }
     this.fleeFrom(c, f, sp);
+  } else if ((c.hx || c.hy) && c.hungry < SPEC[c.k].starve * 0.5) {
+    // 物音におびえて（相手のいないまま）巣へ逃げ帰った者は、逃げる時間が切れるまで巣のそばで身をひそめる。
+    // （以前は巣の20px の内に着いたとたんに逃げるのをやめて餌探しへ戻り、次の物音でまた逃げ帰るのを、更新ごとに繰り返していた。
+    //  seed35 では、リザードマンが大ネズミを狩り続ける巣穴のそばで、大ネズミが何匹も巣の縁で行ったり来たりしていた）
+    c.act = 0;
   } else c.flee = 0;
   return true;
 }
