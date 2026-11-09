@@ -90,11 +90,11 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
     }
   }
   if (day > 0.05) {
-    // 住処が遠いまま眠気が強くなったら（眠りの目安の6割を超えたら）、近くの物陰（行き止まりや、人の気配の薄い暗い所）へ寄って、
+    // 住処が遠いまま眠気が出てきたら（眠りの目安の3割を超えたら）、近くの物陰（行き止まりや、人の気配の薄い暗い所）へ寄って、
     // そこで眠り込んで棺を呼び出す（vampCoffin）。物陰は生き物の更新20回ごとに選び直し、tx, ty に持つ
     // （以前はどこで眠り込んでもその場に棺を出したので、通路の真ん中の棺が僧侶や竜殺しに暴かれていた。16シード×25日で4回 → 17回）
     const th = Ecology.SLEEP[Kind.Vampire]?.th ?? 1500;
-    if (sq(c.hx - c.x) + sq(c.hy - c.y) > 12 * 12 && c.drowsy > th * 0.6) {
+    if (sq(c.hx - c.x) + sq(c.hy - c.y) > 12 * 12 && c.drowsy > th * 0.3) {
       if (!c.tx || this.step % 20 === c.id % 20) {
         const spot = this.vampHideSpot(c);
         c.tx = spot ? spot[0] : 0;
@@ -339,8 +339,8 @@ export function vampMistFx(this: Ecology, x: number, y: number, how: number): vo
 }
 
 /**
- * 住処へ帰れないまま眠気の強くなったヴァンパイアが、棺を呼び出す物陰：いまいる所から6マス以内の、同じ洞窟の続きの床で、
- * 日の光も大きな火の明かりも届かない所のうち、まわり8マスに壁の多い所（行き止まりや壁ぎわ）、人の気配の薄い所、近い所ほど選ぶ。
+ * 住処へ帰れないまま眠気の出てきたヴァンパイアが、棺を呼び出す物陰：いまいる所から10マス以内の、同じ洞窟の続きの床で、
+ * 日の光も大きな火の明かりも届かない所のうち、人の気配の薄い所（冒険者の通り道から外れた所）、まわり8マスに壁の多い所（行き止まりや壁ぎわ）、近い所ほど選ぶ。
  * 見つからなければ null（その場で眠り込めば、その場に棺を出す）
  */
 export function vampHideSpot(this: Ecology, c: Cr): [number, number] | null {
@@ -353,8 +353,8 @@ export function vampHideSpot(this: Ecology, c: Cr): [number, number] | null {
   const fires = this.fires();
   let best: [number, number] | null = null;
   let bs = -1e9;
-  for (let y = Math.max(1, ty - 6); y <= Math.min(m.h - 2, ty + 6); y++)
-    for (let x = Math.max(1, tx - 6); x <= Math.min(m.w - 2, tx + 6); x++) {
+  for (let y = Math.max(1, ty - 10); y <= Math.min(m.h - 2, ty + 10); y++)
+    for (let x = Math.max(1, tx - 10); x <= Math.min(m.w - 2, tx + 10); x++) {
       const k = y * m.w + x;
       if (m.solid[k] || this.regionOf(k) !== reg || this.w.lightBase[k] * this.dayNow > 60) continue;
       const px = x * TILE + 8;
@@ -365,7 +365,7 @@ export function vampHideSpot(this: Ecology, c: Cr): [number, number] | null {
       if (lit) continue;
       let walls = 0;
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) if (m.solid[k + dy * m.w + dx]) walls++;
-      const sc = walls * 3 - this.presenceAt(px, py) * 20 - Math.hypot(x - tx, y - ty) * 0.4;
+      const sc = walls * 3 - this.presenceAt(px, py) * 60 - Math.hypot(x - tx, y - ty) * 0.4;
       if (sc > bs) {
         bs = sc;
         best = [px, py];

@@ -8,9 +8,10 @@
  *           群れの通り道（1マスおきの丸い範囲）に、群れが届いた時にいる者を少し打って、怯ませる（動いていれば避けられる）。
  *           噛みついたコウモリは、吸った血をくわえてヴァンパイアのもとへ戻り、その分（打った分の6割）だけヴァンパイアの傷が癒える（src/eco/attack.ts の resolveVolleys）。
  *   霧の歩み：黒い霧になって消え、一行の後ろにいる後衛（魔法使い・狩人・僧侶・吟遊詩人）の背後に現れて、重い一撃を打つ。
- *           大きな火（焚き火、かがり火、炉、入口の灯り）の明かりの中へは出ない。松明の明かりの中へは出るが、すぐに暗がりへ退く（打って逃げる）。
+ *           打ったら、また霧になって消え、元いた暗がりへ戻る（打って消える）。大きな火（焚き火、かがり火、炉、入口の灯り）の明かりの中へは出ない。
+ *           （以前は打ったあとも一行の真ん中に残り、14〜40 tick で倒されていた）
  *
- * 状態：溜めているあいだは run に技の番号（−1 血吸い、−2 コウモリの群れ、−3 霧の歩み）、血を吸っているあいだは run に残りの回数（正の数）、
+ * 状態：溜めているあいだは run に技の番号（−1 血吸い、−2 コウモリの群れ、−3 霧の歩み。−4 は霧の歩みの一撃のあと、元いた所（tx, ty）へ戻るのを待っている）、血を吸っているあいだは run に残りの回数（正の数）、
  * 狙う相手の番号は aim に持つ（どちらもセーブに入る）。技を溜めはじめた時刻は cast（使ったあとの間に使う。三つの技で共通）。
  */
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -46,6 +47,8 @@ export const SWARM_DT = 2;
 const MIST_R = 8 * TILE;
 const MIST_BACK = 14;
 const MIST_MUL = 1.3;
+/** 霧の歩みの一撃のあと、元の暗がりへ戻るのを待っているときの run の値 */
+const MIST_BACK_RUN = -4;
 
 /** 霧の歩みで狙う後衛の職業 */
 const REAR = new Set<number>([Job.Wizard, Job.Hunter, Job.Priest, Job.Bard]);
@@ -71,6 +74,30 @@ function darkFor(this: Ecology, x: number, y: number): boolean {
 export function vampSkill(this: Ecology, c: Cr): boolean {
   if (c.run > 0) {
     drainTick.call(this, c);
+    return true;
+  }
+  // 霧の歩みの一撃のあと：生き物の更新2回のあいだ構えを解かずにいてから、また霧になって消え、元いた暗がり（tx, ty）に戻る
+  if (c.run === MIST_BACK_RUN) {
+    if (this.w.tick - c.cast < (SKILL_VAMP_MIST.windup + 2) * CR_EVERY) {
+      c.act = 2;
+      c.actT = 0;
+      return true;
+    }
+    c.run = 0;
+    if (c.tx || c.ty) {
+      this.vampMistFx(c.x, c.y, 2);
+      this.fxAttacks.push({ t: this.w.tick, style: 'miststep', col: 0, size: 1, ax: c.x, ay: c.y, dx: c.tx, dy: c.ty, did: -1, aid: c.id, big: false, kill: false });
+      c.x = c.tx;
+      c.y = c.ty;
+      c.px = c.x;
+      c.py = c.y;
+      this.paths.delete(c.id);
+      this.vampMistFx(c.x, c.y, 3);
+      c.tx = 0;
+      c.ty = 0;
+    }
+    c.act = 0;
+    c.actT = 0;
     return true;
   }
   if (c.run >= 0) return false;
@@ -112,8 +139,13 @@ export function vampSkill(this: Ecology, c: Cr): boolean {
 /** 血を吸う1回分。切れたら run を 0 に戻す */
 function drainTick(this: Ecology, c: Cr): void {
   const t = this.byId.get(c.aim);
+  // 起きている冒険者が2.5マスまで詰め寄ってきたら、吸うのをやめて退く（吸っているあいだは動けないので、そのまま囲まれて倒されていた）
+  let close = false;
+  this.nearby(c.x, c.y, 3, (o) => {
+    if (!close && o.k === Kind.Adventurer && !o.dead && !o.away && o.sleep === 0 && sq(o.x - c.x) + sq(o.y - c.y) < sq(2.5 * TILE)) close = true;
+  });
   const ok =
-    !!t && !t.dead && !t.away && c.stun <= 0 && this.w.tick - c.hitAt >= CR_EVERY && sq(t.x - c.x) + sq(t.y - c.y) <= DRAIN_KEEP * DRAIN_KEEP && lineOfSight(this.w.map, c.x, c.y, t.x, t.y);
+    !close && !!t && !t.dead && !t.away && c.stun <= 0 && this.w.tick - c.hitAt >= CR_EVERY && sq(t.x - c.x) + sq(t.y - c.y) <= DRAIN_KEEP * DRAIN_KEEP && lineOfSight(this.w.map, c.x, c.y, t.x, t.y);
   if (!ok) {
     c.run = 0;
     c.aim = 0;
@@ -200,6 +232,9 @@ function mistRelease(this: Ecology, c: Cr, t: Cr): void {
     }
   }
   if (!at) return;
+  // 元いた所（一撃のあと、霧になって戻る先）
+  c.tx = c.x;
+  c.ty = c.y;
   this.vampMistFx(c.x, c.y, 2);
   this.fxAttacks.push({ t: this.w.tick, style: 'miststep', col: 0, size: 1, ax: c.x, ay: c.y, dx: at[0], dy: at[1], did: t.id, aid: c.id, big: false, kill: false });
   c.x = at[0];
@@ -211,6 +246,7 @@ function mistRelease(this: Ecology, c: Cr, t: Cr): void {
   this.setDir(c, t.x - c.x, t.y - c.y);
   this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'mistStep', id: c.id, n: t.sp, x: Math.round(t.x), y: Math.round(t.y) } as never);
   if (this.strike(c, t, MIST_MUL)) this.slay(c, t);
+  c.run = MIST_BACK_RUN;
 }
 
 /**
