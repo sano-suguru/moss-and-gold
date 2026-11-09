@@ -33,6 +33,8 @@ const BASH_LEN = 5 * TILE;
 const BASH_N = 7;
 const runLen = (c: Cr) => (c.k === Kind.Armor ? BASH_LEN : RUN_LEN);
 const runN = (c: Cr) => (c.k === Kind.Armor ? BASH_N : RUN_N);
+/** 突進の重さ：ミノタウロスは打ち合いの一打ちの1.5倍、リビングアーマーの盾の体当たりは0.8倍（武具を取り込むと強さが大きく上がるので、1.5倍では冒険者を一撃で倒していた） */
+const runMul = (c: Cr) => (c.k === Kind.Armor ? 0.8 : RUN_MUL);
 /** はね飛ばされる量（px）と、飛んでいる更新の回数 */
 const KB_LEN = 3 * TILE;
 const KB_N = 4;
@@ -224,7 +226,7 @@ export function minoRun(this: Ecology, c: Cr): void {
     if (blocker(o)) {
       // 戦士と僧侶が受け止める：突進はここで止まり、受けた者の傷は半分。受けた者は少し押し戻される
       this.fxAttacks.push({ t: this.w.tick, style: 'minoimpact', col: 1, size: 2, ax: c.x, ay: c.y, dx: o.x, dy: o.y, did: o.id, aid: c.id, big: true, kill: false });
-      if (this.strike(c, o, RUN_MUL * 0.5, false)) ate = this.slay(c, o, !ate) || ate;
+      if (this.strike(c, o, runMul(c) * 0.5, false)) ate = this.slay(c, o, !ate) || ate;
       else {
         o.kb = 2;
         o.kbx = ux * 5;
@@ -240,7 +242,7 @@ export function minoRun(this: Ecology, c: Cr): void {
     const kx = uy * sg * 0.85 + ux * 0.5;
     const ky = -ux * sg * 0.85 + uy * 0.5;
     this.fxAttacks.push({ t: this.w.tick, style: 'minoimpact', col: 0, size: 1, ax: c.x, ay: c.y, dx: o.x, dy: o.y, did: o.id, aid: c.id, big: true, kill: false });
-    if (this.strike(c, o, RUN_MUL, false)) ate = this.slay(c, o, !ate) || ate;
+    if (this.strike(c, o, runMul(c), false)) ate = this.slay(c, o, !ate) || ate;
     else this.knock(o, kx, ky);
     this.record('settle', { t: this.w.tick, k: c.k, ev: 'chargeKnock', id: c.id, at: c.cast, n: o.k, x: Math.round(o.x), y: Math.round(o.y) } as never);
   }
