@@ -39,7 +39,7 @@ export const MOMENTS: Moment[] = [
   { key: 'standoff', label: 'コボルトかゴブリンが、住処のそばを通る一行に立ちふさがって威嚇した' },
   { key: 'orcClash', label: 'オークとのにらみ合いから戦いになった' },
   { key: 'orcRoar', label: 'オーク：雄叫びで小物を逃がすか、冒険者の後衛を怖ませた' },
-  { key: 'orcMeet', label: 'オーク：従う集落に近づいた一行を、集落の前で迎え撃った' },
+  { key: 'orcMeet', label: 'オーク：縄張りに入った一行のもとへ駆けつけて迎え撃った' },
   { key: 'orcRally', label: 'オーク：雄叫びで従う集落のゴブリンを駆けつけさせた' },
   { key: 'orcAxe', label: 'オーク：鎖のついた投げ斧を相手に当てた' },
   { key: 'orcAxeAdv', label: 'オーク：投げ斧を冒険者に当てた' },
