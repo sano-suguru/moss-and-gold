@@ -71,6 +71,12 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       this.metabolism(c);
       continue;
     }
+    // ヴァンパイアの霧の歩みの一撃のあとは、深手で逃げる処理より先に、霧になって元の暗がりへ戻る（src/eco/vampskill.ts）
+    // （逃げる処理が先だと、背後に現れた直後に一行に打ち返されて逃げに切り替わり、戻れずに倒されていた）
+    if (c.k === Kind.Vampire && c.run === -4 && this.vampSkill(c)) {
+      this.metabolism(c);
+      continue;
+    }
     if (STR[c.k] > 0 && this.woundsAndFlight(c)) {
       this.metabolism(c);
       continue;

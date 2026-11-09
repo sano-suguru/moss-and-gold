@@ -340,7 +340,8 @@ export function vampMistFx(this: Ecology, x: number, y: number, how: number): vo
 
 /**
  * 住処へ帰れないまま眠気の出てきたヴァンパイアが、棺を呼び出す物陰：いまいる所から10マス以内の、同じ洞窟の続きの床で、
- * 日の光も大きな火の明かりも届かない所のうち、人の気配の薄い所（冒険者の通り道から外れた所）、まわり8マスに壁の多い所（行き止まりや壁ぎわ）、近い所ほど選ぶ。
+ * 日の光も大きな火の明かりも届かない所のうち、行き止まり（上下左右で開いているのが1つだけ）、人の気配の薄い所（冒険者の通り道から外れた所）、
+ * 壁ぎわ、近い所ほど選び、両側の開いた狭い通路は避ける（壁の多さだけで選ぶと、壁に挟まれた通路を選んで、通りかかった一行に棺を暴かれていた）。
  * 見つからなければ null（その場で眠り込めば、その場に棺を出す）
  */
 export function vampHideSpot(this: Ecology, c: Cr): [number, number] | null {
@@ -365,7 +366,14 @@ export function vampHideSpot(this: Ecology, c: Cr): [number, number] | null {
       if (lit) continue;
       let walls = 0;
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) if (m.solid[k + dy * m.w + dx]) walls++;
-      const sc = walls * 3 - this.presenceAt(px, py) * 60 - Math.hypot(x - tx, y - ty) * 0.4;
+      // 上下左右のうち開いている向き。1つだけなら行き止まり（通り抜ける者がいない）、向かい合う2つだけなら通路（通り道になる）
+      const oe = !m.solid[k + 1];
+      const ow = !m.solid[k - 1];
+      const os = !m.solid[k + m.w];
+      const on = !m.solid[k - m.w];
+      const open4 = +oe + +ow + +os + +on;
+      const corridor = open4 === 2 && ((oe && ow) || (os && on));
+      const sc = walls * 2 + (open4 === 1 ? 14 : 0) - (corridor ? 12 : 0) - this.presenceAt(px, py) * 60 - Math.hypot(x - tx, y - ty) * 0.4;
       if (sc > bs) {
         bs = sc;
         best = [px, py];

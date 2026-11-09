@@ -98,9 +98,9 @@ export function vampSkill(this: Ecology, c: Cr): boolean {
     drainTick.call(this, c);
     return true;
   }
-  // 霧の歩みの一撃のあと：生き物の更新2回のあいだ構えを解かずにいてから、また霧になって消え、元いた暗がり（tx, ty）に戻る
+  // 霧の歩みの一撃のあと：次の生き物の更新で、また霧になって消え、元いた暗がり（tx, ty）に戻る
   if (c.run === MIST_BACK_RUN) {
-    if (this.w.tick - c.cast < (SKILL_VAMP_MIST.windup + 2) * CR_EVERY) {
+    if (this.w.tick - c.cast < (SKILL_VAMP_MIST.windup + 1) * CR_EVERY) {
       c.act = 2;
       c.actT = 0;
       return true;
