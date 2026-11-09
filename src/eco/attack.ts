@@ -161,8 +161,10 @@ export function resolveVolleys(this: Ecology): void {
   if (!due.length) return;
   this.volleys = this.volleys.filter((v) => v.t > now);
   for (const v of due) {
+    // 打った者が倒れていれば当たらない（倒れた冒険者は強さが数でなくなり、打たれた側の体力が NaN になって二度と倒れなくなっていた。
+    // マジックミサイルが届く前に、撃った魔法使いが倒れたとき。seed41 では5日目に体力が NaN になったゴーレムが、25日目までに冒険者を8人倒していた）
     const a = this.byId.get(v.a);
-    if (!a || a.dead === 2) continue;
+    if (!a || a.dead) continue;
     if (v.d >= 0) {
       const d = this.byId.get(v.d);
       if (!d || d.dead || d.away) continue;
