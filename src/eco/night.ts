@@ -118,7 +118,6 @@ export function campWatch(this: Ecology, p: Party, alive: Cr[]): void {
     if (lost || hp < 0.5) {
       const lead = alive[0];
       this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'campBreak', how: lost ? 'lost' : 'hurt', x: Math.round(lead.x), y: Math.round(lead.y) } as never);
-      this.log(lead.x, lead.y, `夜襲を受けた冒険者の一行が、焚き火を消して発った`);
       this.endCamp(p);
       return;
     }

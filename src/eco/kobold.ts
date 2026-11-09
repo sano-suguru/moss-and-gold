@@ -823,10 +823,6 @@ export function checkTraps(this: Ecology): void {
     this.bleed(c, 2);
     this.noise(x, y, 7);
     this.markNotice(c, c, '!');
-    if (this.step - (this.lastLogged[996] ?? -99999) > 1500) {
-      this.lastLogged[996] = this.step;
-      this.log(x, y, `冒険者が{k:${Kind.Kobold}}の罠を踏んで傷を負った`);
-    }
     t.id = -1;
   }
   this.traps = this.traps.filter((t) => t.id >= 0);
@@ -871,10 +867,6 @@ export function watchWarrens(this: Ecology): void {
     const mine = members.reduce((a, c) => a + this.str(c), 0);
     if (wr.hide !== 1 && nd < 12 * TILE * 12 * TILE && threat > mine * 1.5) {
       wr.hide = 1;
-      if (this.step - (this.lastLogged[995] ?? -99999) > 3000) {
-        this.lastLogged[995] = this.step;
-        this.log(wr.x, wr.y, (near as Cr).k === Kind.Adventurer ? `{k:${Kind.Kobold}}たちが冒険者の気配に、住処の奥へ身をひそめた` : `{k:${Kind.Kobold}}たちが{k:${(near as Cr).k}}の気配に、住処の奥へ身をひそめた`);
-      }
       continue;
     }
     if (wr.hide === 1) {
@@ -891,7 +883,6 @@ export function watchWarrens(this: Ecology): void {
           c.hx = 0;
           c.hy = 0;
         }
-        this.log(wr.x, wr.y, `隠れていた{k:${Kind.Kobold}}たちが見つかり、奥へ逃げ散った`);
       }
     }
   }

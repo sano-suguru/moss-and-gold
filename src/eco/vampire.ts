@@ -409,7 +409,6 @@ export function vampRaiseFallen(this: Ecology, c: Cr, day: number): boolean {
       c.actT = 0;
       c.dir = Math.abs(d.x - c.x) > Math.abs(d.y - c.y) ? (d.x > c.x ? 2 : 3) : d.y > c.y ? 0 : 1;
       this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'raiseFallen', id: c.id, n: d.sp, x: Math.round(d.x), y: Math.round(d.y) } as never);
-      this.log(d.x, d.y, `{k:${Kind.Vampire}}が、倒れた冒険者の亡骸にかがみ込んだ`);
     }
     return true;
   }

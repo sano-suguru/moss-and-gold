@@ -93,7 +93,6 @@ export function thrallRoomForAdv(this: Ecology, v: Cr, d: Cr): boolean {
 
 /** 眷属が崩れ落ちて、元の種の亡骸に戻る（ふつうの亡骸として朽ち、食べられる） */
 export function crumbleThrall(this: Ecology, c: Cr): void {
-  this.log(c.x, c.y, `{k:${Kind.Thrall}}が崩れ落ちた`);
   this.die(c, 'crumble', Kind.Vampire);
   const orig = c.sp;
   c.sp = orig === Kind.Adventurer ? Math.max(0, c.lure - 1) : orig;

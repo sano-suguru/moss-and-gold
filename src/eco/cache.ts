@@ -127,10 +127,6 @@ export function cacheStep(this: Ecology, p: Party, alive: Cr[]): void {
       }
       if (got > 0) {
         this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'supply', n: got, to: o.id, how: o.d, left: o.food, back: p.goal, x: Math.round(o.x), y: Math.round(o.y) } as never);
-        if (this.step - (this.lastLogged[984] ?? -99999) > 1500) {
-          this.lastLogged[984] = this.step;
-          this.log(o.x, o.y, o.food > 0 ? `${p.name ?? ''}の一行が物資の置き場で食料を補った` : `${p.name ?? ''}の一行が物資の置き場の食料を食べ尽くした。木箱は空になった`);
-        }
       }
     }
     // 先頭が着いたら（あるいは歩いて行けなければ）、たどり終えて次へ
@@ -219,7 +215,6 @@ export function dropCache(this: Ecology, p: Party, alive: Cr[]): void {
   if (!(p.cacheKnown ??= []).includes(o.id)) p.cacheKnown.push(o.id);
   if (!(p.cacheVis ??= []).includes(o.id)) p.cacheVis.push(o.id);
   this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'cache', n: food, to: o.id, how: o.d, merged: merged ? 1 : 0, x: Math.round(o.x), y: Math.round(o.y) } as never);
-  this.log(o.x, o.y, `${p.name ?? ''}の一行が、行けた一番奥に物資の置き場（木箱と寝具）を残して引き返した`);
 }
 
 /** 生きて帰った一行が、残した置き場を町に伝える（leaveDungeon から） */
@@ -264,10 +259,6 @@ export function ratRaidCache(this: Ecology, c: Cr): boolean {
   c.actT = 0;
   c.dir = o.x > c.x ? 2 : 3;
   if (this.w.tick - o.rt > 600) this.record('settle', { t: this.w.tick, k: Kind.Rat, id: c.id, ev: 'cache', n: o.food, to: o.id, x: Math.round(o.x), y: Math.round(o.y) } as never);
-  if (this.w.tick - o.rt > 3000 && this.step - (this.lastLogged[983] ?? -99999) > 1500) {
-    this.lastLogged[983] = this.step;
-    this.log(o.x, o.y, `{k:${Kind.Rat}}が冒険者の物資の置き場をあさっている`);
-  }
   o.rt = this.w.tick;
   return true;
 }
@@ -323,10 +314,6 @@ export function planCacheRaids(this: Ecology): void {
     }
     cp.cacheT = this.w.tick + DAY_TICKS_ECO / 3;
     this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'cacheGo', n, to: tgt.id, how: bd, x: Math.round(tgt.x), y: Math.round(tgt.y) } as never);
-    if (this.step - (this.lastLogged[979] ?? -99999) > 1500) {
-      this.lastLogged[979] = this.step;
-      this.log(cp.x, cp.y, `蓄えの乏しい集落の{k:${Kind.Goblin}}が、冒険者の残した物資の置き場へ、食料を取りに暗がりを出ていった`);
-    }
   }
 }
 
@@ -347,10 +334,6 @@ export function goblinCacheRaid(this: Ecology, c: Cr): boolean {
   const back = () => {
     if (o && c.ref2 > 0) {
       this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'cacheLoot', n: c.ref2, to: o.id, how: o.food, x: Math.round(o.x), y: Math.round(o.y) } as never);
-      if (this.step - (this.lastLogged[978] ?? -99999) > 1500) {
-        this.lastLogged[978] = this.step;
-        this.log(o.x, o.y, o.food > 0 ? `{k:${Kind.Goblin}}が冒険者の物資の置き場の木箱をあさり、食料を袋に詰めて集落へ持ち帰った` : `{k:${Kind.Goblin}}が冒険者の物資の置き場の食料を持ち去った。木箱は空になった`);
-      }
     }
     c.st = 16;
     c.lure = 0;

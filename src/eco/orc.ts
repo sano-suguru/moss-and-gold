@@ -219,10 +219,6 @@ export function orcWary(this: Ecology, c: Cr): boolean {
   this.markNotice(c, seen as Cr, '!');
   this.noise(c.x, c.y, 7);
   this.record('settle', { t: this.w.tick, k: Kind.Orc, id: p.id, ev: 'bluff', n: c.id, how: Math.round((theirs / Math.max(1, ours)) * 10), x: Math.round(c.x), y: Math.round(c.y) } as never);
-  if (this.step - (this.lastLogged[997] ?? -99999) > 1500) {
-    this.lastLogged[997] = this.step;
-    this.log(c.x, c.y, `{k:${Kind.Orc}}が${this.partyTitle(p)}の一行に唸って武器を打ち鳴らし、にらみ合った`);
-  }
   return true;
 }
 
@@ -305,7 +301,6 @@ export function collectTribute(this: Ecology, c: Cr): void {
       c.act = 2;
       c.actT = 0;
       this.record('settle', { t: this.w.tick, k: Kind.Orc, id: cp.id, ev: 'tribute', n: amt, x: Math.round(cp.x), y: Math.round(cp.y) } as never);
-      this.log(cp.x, cp.y, `{k:${Kind.Orc}}が{k:${Kind.Goblin}}の集落から貢ぎ物を取り立てた`);
     }
     return;
   }

@@ -126,10 +126,8 @@ export function updateDigging(this: Ecology): void {
     this.noise((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8, 7);
   }
   this.lastDigCount = this.w.digs.length;
-  while (this.w.openedQueue.length) {
-    const o = this.w.openedQueue.shift() as { k: number; n: number };
-    this.log((o.k % m.w) * TILE + 8, Math.floor(o.k / m.w) * TILE + 8, `岩の向こうの空洞を掘り当てた（${o.n}マス）`);
-  }
+  // 岩の向こうの空洞を掘り当てた記録は、ログには出さない（物語の節目ではない）
+  this.w.openedQueue.length = 0;
   while (this.w.collapseQueue.length) {
     const o = this.w.collapseQueue.shift() as { k: number; n: number };
     const x = (o.k % m.w) * TILE + 8;

@@ -96,7 +96,6 @@ export function leaveIfStarving(this: Ecology, c: Cr): boolean {
     if (c.k === Kind.Dwarf) {
       // 生きて外へ出たドワーフが、ゴーレムの話を伝える
       if (this.hold?.golem) this.dwarfLore |= 1;
-      this.log(c.x, c.y, `{k:${Kind.Dwarf}}が住みかを捨てて外へ出ていった`);
     }
     c.body = 0;
     c.food = 0;

@@ -24,10 +24,7 @@ export function pick(this: Ecology, wx: number, wy: number): Cr | null {
   return best;
 }
 
-/** 群れを作る種の住処の呼び方（群れに一匹だけのときの文に使う） */
-const HOME_NAME: Record<number, string> = { [Kind.Rat]: '巣穴', [Kind.Bat]: 'ねぐら', [Kind.Ant]: '巣', [Kind.Kobold]: '住処', [Kind.Goblin]: '集落', [Kind.Lizardman]: '住処', [Kind.Orc]: '縄張り' };
-
-/** 生き物の名前と、いまの様子と、属する群れを、短い言葉で */
+/** 生き物の名前と、画面を見ても分からない今の狙いや事情を、短い言葉で */
 export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]): { title: string; lines: string[] } {
   // ヴァンパイアの眷属：見出しは主の名、本文は元の姿の1行（src/eco/thrall.ts）
   if (c.k === Kind.Thrall) return { title: `${this.discovered[Kind.Vampire] ? names[Kind.Vampire] : '見知らぬ影'}の眷属`, lines: [`元は${this.thrallOrigin(c)}`] };
@@ -45,58 +42,38 @@ export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]):
   const lines: string[] = [];
   const key = this.groupKey(c);
   const party = c.k === Kind.Adventurer ? this.parties.find((p) => p.id === c.party) : undefined;
+  // パネルには、画面を見ても分からない今の狙いや事情だけを出す。歩いている、戦っている、眠っている、逃げている、群れでいる、のように
+  // 動きや姿で見て分かることは書かない（何も書くことがなければ、見出しだけになる）
   let state = '';
-  if (c.sleep === 2) state = 'ぐっすり眠っている';
-  else if (c.sleep === 1) state = Ecology.SLEEP[c.k]?.kind === 'drift' ? '眠りながらゆっくり動いている' : 'うとうと眠っている';
-  else if (c.sleep === 3) state = '半分だけ眠っている（片目を開けたまま）';
-  else if (c.flee > 0) state = this.denHidden(c) ? '巣に逃げ込んで、身を隠している' : c.act === 2 ? '追い詰められて、噛みつき返している' : c.act === 0 ? '逃げ場がなく、相手に向き直って身構えている' : '逃げている';
-  else if (c.act === 2 && this.w.tick - c.hitAt < 120) state = '戦っている';
-  else if (c.k === Kind.Rat && c.st === 11) state = c.ref2 ? '仲間のあとについて、新しい巣穴へ引っ越している' : '群れの先頭に立って、新しい巣穴へ引っ越している';
-  else if (c.k === Kind.Goblin && c.st === 15) state = c.gait > 0 ? '光の縁に身をひそめて、焚き火をうかがっている' : c.gait < 0 ? '眠っている冒険者に忍び寄っている' : '暗がりを選んで、焚き火へ忍び寄っている';
-  else if (c.k === Kind.Goblin && c.st === 17) state = c.gait < 0 ? '一行の最後尾へ駆け寄って、荷を掠め取ろうとしている' : '通路を行く冒険者の一行の後ろを、暗がりからつけている';
-  else if (c.k === Kind.Goblin && c.st === 18) state = c.units > 0 && c.ref2 > 0 ? '冒険者の物資の置き場の木箱をあさって、食料を袋に詰めている' : '冒険者の物資の置き場へ、暗がりを選んで食料を取りに向かっている';
-  else if (c.k === Kind.Goblin && c.st === 16) state = c.units > 0 ? '盗んだ荷物を抱えて、集落へ逃げ帰っている' : '手ぶらで集落へ逃げ帰っている';
-  else if (c.k === Kind.Golem) state = '宝物庫の入口を見張っている';
-  else if (c.k === Kind.Armor) state = c.st === 10 ? '散らばった武具が寄り集まり、組み上がろうとしている' : c.mana < ARMOR_LOW ? 'マナが尽きかけ、継ぎ目を軋ませてマナの濃い所へ向かっている' : c.st === 1 ? '立ち番をしている' : '巡回している';
-  else if (c.k === Kind.Dragon) state = c.st === 2 ? '飛んでいる' : c.foe ? '宝を盗った者を追っている' : '目を覚まして獲物を探している';
-  else if (party && (party.camp ?? -1) >= 0) state = party.members[0] === c.id ? '焚き火のそばで見張りをしている' : '焚き火で休んでいる';
-  else if (party && (party.braceT ?? 0) > this.step) state = party.braceK === 1 ? '目標に着いて、武器を構えている' : party.braceK === 3 ? '荷を掠め取られて、振り返っている' : party.braceK === 4 ? (c.sp === Job.Priest ? '墓標の前で祈りを捧げている' : '墓標の前で立ち止まっている') : party.braceK === 5 ? (c.sp === Job.Priest ? '亡骸の前で祈りを捧げている' : '亡骸の前で立ち止まっている') : '住みかの気配に身構えている';
-  else if (party && (party.listenT ?? 0) > this.step) state = party.listenBy === c.id ? '暗がりの物音の方へ一歩出て、構えている' : '暗がりの物音に、立ち止まって耳を澄ませている';
+  if (c.sleep === 3) state = '片目を開けたまま眠っている';
+  else if (c.flee > 0) state = this.denHidden(c) ? '巣に身を隠している' : '';
+  else if (c.k === Kind.Rat && c.st === 11) state = '新しい巣穴へ引っ越している';
+  else if (c.k === Kind.Goblin && c.st === 15) state = c.gait < 0 ? '眠っている冒険者に忍び寄っている' : '焚き火をうかがっている';
+  else if (c.k === Kind.Goblin && c.st === 17) state = '冒険者の荷を狙ってつけている';
+  else if (c.k === Kind.Goblin && c.st === 18) state = '冒険者の物資の置き場の食料を狙っている';
+  else if (c.k === Kind.Goblin && c.st === 16) state = c.units > 0 ? '盗んだ荷物を集落へ運んでいる' : '';
+  else if (c.k === Kind.Golem) state = '宝物庫の番をしている';
+  else if (c.k === Kind.Armor) state = c.st === 10 ? '' : c.mana < ARMOR_LOW ? 'マナが尽きかけている' : '';
+  else if (c.k === Kind.Dragon) state = c.foe ? '宝を盗った者を追っている' : '';
+  else if (party && (party.camp ?? -1) >= 0) state = party.members[0] === c.id ? '見張りをしている' : '';
   else if (party && party.goal === 1) state = '引き返している';
   else if (key && this.isSentry(c, key) && this.groups.get(key)!.members.some((o) => o.sleep > 0)) state = '群れの見張りをしている';
-  else if (c.act === 2) state = '何かをしている';
-  else if (c.k === Kind.Skeleton) state = c.act === 1 ? '暗がりをさまよっている' : '暗がりにたたずんでいる';
-  else if (c.k === Kind.Lich) state = c.act === 1 ? '住みかを漂っている' : '住みかで動かずにいる';
   // 食べない種（腹に入る量が0：ゾンビ、ゴースト、マイコニド、ゴーレム、スケルトン、リッチ、リビングアーマー、眷属）は、
-  // 代謝の処理で空腹のカウンタが増えても飢えないので、空腹の文を出さない
-  else if (c.hungry && SPEC[c.k].cap > 0) state = '腹をすかせて餌を探している';
-  else if (c.act === 1) state = '歩き回っている';
-  else state = 'じっとしている';
-  lines.push(state);
-  if (c.hp > 0) {
-    const r = c.hp / this.maxHp(c);
-    if (r < 0.35) lines.push('深手を負っている');
-    else if (r < 0.7) lines.push('傷ついている');
-  }
-  const sp = Ecology.SLEEP[c.k];
-  if (sp && c.sleep === 0 && c.drowsy > sp.th) lines.push('眠そうにしている');
+  // 代謝の処理で空腹のカウンタが増えても飢えないので、空腹の文を出さない。飢えが進んでいるときだけ出す
+  else if (c.hungry > SPEC[c.k].starve * 0.3 && SPEC[c.k].cap > 0) state = '飢えている';
+  if (state) lines.push(state);
+  if (c.hp > 0 && c.hp / this.maxHp(c) < 0.35) lines.push('深手を負っている');
   if (key) {
     const g = this.groups.get(key);
     const n = g ? g.members.length : 1;
-    if (c.k === Kind.Adventurer) lines.push(party?.name ? `${this.partyTitle(party)}の一行（${n}人）` : `冒険者の一行（${n}人）`);
-    else if (c.k === Kind.Dwarf) lines.push(`ドワーフの一団（${n}人）`);
-    else if (n > 1) lines.push(`${known ? names[c.k] : '見知らぬ影'}の群れ（${n}匹）`);
-    // 群れに自分しかいないとき：ヴァンパイア（群れの中心）とその従者は何も出さない。住処のある者は、そこに一匹で暮らしている
-    else if (key[0] !== 'v' && HOME_NAME[c.k]) lines.push(`${HOME_NAME[c.k]}に一匹だけで暮らしている`);
-  } else if (GROUPED[c.k] && c.k !== Kind.Adventurer && c.k !== Kind.Dwarf) lines.push('群れからはぐれている');
-  else if (Ecology.TERRITORY[c.k]) lines.push('一匹で縄張りを持って暮らしている');
+    if (c.k === Kind.Adventurer && party?.name) lines.push(`${this.partyTitle(party)}の一行（${n}人）`);
+  }
   if (party) lines.push(this.aimLine(party));
   if (c.k === Kind.Armor) {
     const kit = this.armorKit.get(c.id) ?? [0];
     const nm = (ks: number[]) => ks.map((k) => ITEM_NAMES[k] ?? '武具').join('・');
-    lines.push(`体：${nm(kit.slice(1, 1 + kit[0])) || 'なし'}`);
     const hand = kit.slice(1 + kit[0]);
-    lines.push(hand.length ? `取り込んだ武具：${nm(hand)}` : 'まだ何も取り込んでいない');
+    if (hand.length) lines.push(`取り込んだ武具：${nm(hand)}`);
   }
   return { title, lines };
 }
@@ -289,10 +266,6 @@ export function advInteract(this: Ecology, c: Cr, p: Party, lights: Cr[]): boole
       o.flee = Math.max(o.flee, 60);
       o.foe = c.id;
     });
-    if (this.step - (this.lastLogged[995] ?? -99999) > 3000) {
-      this.lastLogged[995] = this.step;
-      this.log(c.x, c.y, '冒険者（吟遊詩人）が歌で獣をなだめ、道を開けさせた');
-    }
     return true;
   }
   if (!close) {
@@ -313,16 +286,8 @@ export function advInteract(this: Ecology, c: Cr, p: Party, lights: Cr[]): boole
     t.mana = 0;
     t.dead = 2;
     c.glow = 255;
-    if (this.step - (this.lastLogged[994] ?? -99999) > 3000) {
-      this.lastLogged[994] = this.step;
-      this.log(c.x, c.y, '冒険者（魔法使い）がウィスプを瓶に捕まえた');
-    }
   } else if (c.sp === Job.Priest) {
     this.die(t, 'fight', c.k);
-    if (this.step - (this.lastLogged[993] ?? -99999) > 3000) {
-      this.lastLogged[993] = this.step;
-      this.log(c.x, c.y, '冒険者（僧侶）がゴーストを祓った');
-    }
   } else if (c.sp === Job.Hunter) {
     // 大ネズミとは打ち合って仕留める（ほかの狩りと同じ）。止まり木で眠るコウモリは打ち返さないので、射落として拾う
     if (t.k === Kind.Rat) this.fight(c, t);

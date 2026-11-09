@@ -183,7 +183,6 @@ export function updateParties(this: Ecology): void {
         p.goal = 1;
         p.camp = -1;
         this.setExit(p);
-        this.log(alive[0].x, alive[0].y, `冒険者の一行が食料が乏しくなり、引き返した`);
         continue;
       }
       // 一行の撤退：皆で向かっている相手との戦いで、仲間が倒れたか、一行の体力が半分を切ったら、一行ごと退く。
@@ -215,7 +214,6 @@ export function updateParties(this: Ecology): void {
         p.goal = 1;
         p.camp = -1;
         this.setExit(p);
-        this.log(alive[0].x, alive[0].y, `冒険者の一行が深手を負って引き返した`);
         continue;
       }
       // 地上が夜なら、早めに休む（夜は焚き火を囲む）
@@ -871,7 +869,6 @@ export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: numbe
   p.campUntil = this.step + (this.isNight() ? 2400 : 1500);
   p.dozeT = 0;
   p.dozeNext = 0;
-  this.log((best % m.w) * TILE + 8, Math.floor(best / m.w) * TILE + 8, `冒険者の一行が焚き火を囲んで休みはじめた`);
 }
 
 /** 焚き火を囲む一行に、焚き火のそば（僧侶が癒やせる所）で傷ついている者がいるか（僧侶が起きて手当てを続けるか） */
@@ -947,8 +944,6 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
   }
   lo.danger = lo.danger.filter((d) => this.w.tick - d[2] < DAY_TICKS_ECO * 3).slice(-60);
   p.saw |= 16;
-  if (c.gold > 0) this.log(c.x, c.y, `冒険者（${JOB_NAMES[c.sp]}）が金貨${c.gold}枚を持って生きて帰った`);
-  else if (p.members[0] === c.id) this.log(c.x, c.y, `冒険者の一行が引き返して外へ出た`);
   // 背負ってきた置き場の荷が残っていれば、それも持ち帰る
   this.exported += c.body + c.food + c.units;
   c.units = 0;
@@ -1039,7 +1034,6 @@ export function dropBelongings(this: Ecology, c: Cr): void {
   }
   if (c.k !== Kind.Adventurer) return;
   this.fallen++;
-  this.log(c.x, c.y, `冒険者（${JOB_NAMES[c.sp]}）が倒れた`);
   const x = c.x;
   const y = c.y;
   if (c.torch > 0) this.dropItem(x + 4, y + 2, ItemKind.Torch, c.torch, n);

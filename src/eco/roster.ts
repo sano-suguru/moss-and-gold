@@ -303,7 +303,6 @@ export function raiseGrave(this: Ecology, h: Hero, x: number, y: number): void {
   while (this.graves.length > GRAVE_MAX) {
     const old = this.graves.shift() as Grave;
     this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: 0, ev: 'gravegone', n: old.id, x: old.x, y: old.y } as never);
-    this.log(old.x, old.y, `${heroTitle(old)}の古い墓標が崩れて消えた`);
   }
 }
 
@@ -322,7 +321,6 @@ export function graveBrace(this: Ecology, p: Party, lead: Cr): void {
       return !!o && !o.dead && o.sp === Job.Priest;
     });
     this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'mourn', n: g.id, how: priest ? 1 : 0, x: Math.round(lead.x), y: Math.round(lead.y) } as never);
-    this.log(g.x, g.y, `${this.partyTitle(p)}の一行が、${heroTitle(g)}の墓標の前で立ち止まった${priest ? '（僧侶が祈りを捧げた）' : ''}`);
     return;
   }
 }
@@ -357,7 +355,6 @@ export function blessBrace(this: Ecology, p: Party, lead: Cr): void {
     this.brace(p, o.x, o.y, 5, GRAVE_STOP);
     const own = o.party === p.id ? 1 : 0;
     this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'bless', n: o.id, how: o.sp, own, x: Math.round(o.x), y: Math.round(o.y) } as never);
-    this.log(o.x, o.y, `${this.partyTitle(p)}の一行の僧侶が、倒れた${own ? '仲間' : '冒険者'}（${JOB_NAMES[o.sp]}）の亡骸を清めた`);
     return;
   }
 }

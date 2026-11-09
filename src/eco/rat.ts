@@ -422,10 +422,6 @@ export function ratDisperse(this: Ecology, c: Cr): boolean {
     o.ty = ey;
     o.ref = 0;
   }
-  if (this.step - (this.lastLogged[994] ?? -99999) > 1500) {
-    this.lastLogged[994] = this.step;
-    this.log(c.x, c.y, group.length > 1 ? `腹を空かせた{k:${Kind.Rat}}の群れ（${group.length}匹）が、地表の横穴から外へ出ていった` : `腹を空かせた{k:${Kind.Rat}}が、地表の横穴から外へ出ていった`);
-  }
   return true;
 }
 

@@ -355,10 +355,6 @@ export function lurk(this: Ecology, c: Cr): boolean {
     }
     c.lure = (best as Cr).id;
     c.lureAt = this.step;
-    if (this.step - (this.lastLogged[998] ?? -99999) > 3000) {
-      this.lastLogged[998] = this.step;
-      this.log(c.x, c.y, `{k:${c.k}}が冒険者の灯りを見つけ、暗がりに潜んだ`);
-    }
   }
   const t = this.byId.get(c.lure);
   if (!t || t.dead || t.away || this.step - c.lureAt > 2400) {
@@ -466,10 +462,6 @@ export function pester(this: Ecology, c: Cr): boolean {
         const L = Math.hypot(dx, dy) || 1;
         c.act = 1;
         this.tryMove(c, (dx / L) * SPEC[c.k].speed * 2, (dy / L) * SPEC[c.k].speed * 2);
-        if (this.step - (this.lastLogged[992] ?? -99999) > 4000) {
-          this.lastLogged[992] = this.step;
-          this.log(c.x, c.y, `冒険者の一行が{k:${Kind.Wisp}}の光に誘われた`);
-        }
       }
       return true;
     case Kind.Myconid:

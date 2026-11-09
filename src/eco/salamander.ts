@@ -422,7 +422,6 @@ export function manaBirths(this: Ecology, day: number): void {
       c.hy = m.lair.y * TILE + 8;
       this.lastArrival[Kind.Minotaur] = this.step;
     }
-    this.log(x, y, `濃いマナから{k:${kind}}が生まれた`);
     return;
   }
 }

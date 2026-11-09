@@ -76,10 +76,6 @@ export function planRaids(this: Ecology): void {
     }
     cp.raidT = this.w.tick + DAY_TICKS_ECO / 3;
     this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'raid', n, to: best.p.id, x: Math.round(best.fx), y: Math.round(best.fy) } as never);
-    if (this.step - (this.lastLogged[986] ?? -99999) > 1500) {
-      this.lastLogged[986] = this.step;
-      this.log(cp.x, cp.y, `蓄えの乏しい集落の{k:${Kind.Goblin}}${n}匹が、焚き火を囲む冒険者の荷物を狙って、暗がりへ忍び出た`);
-    }
   }
 }
 
@@ -145,10 +141,6 @@ export function planSnatch(this: Ecology): void {
     }
     cp.snatchT = this.w.tick + DAY_TICKS_ECO / 8;
     this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'stalk', n, to: p.id, x: Math.round(t.x), y: Math.round(t.y) } as never);
-    if (this.step - (this.lastLogged[980] ?? -99999) > 1500) {
-      this.lastLogged[980] = this.step;
-      this.log(cp.x, cp.y, `{k:${Kind.Goblin}}が、通路を行く冒険者の一行の後ろを、暗がりからつけはじめた`);
-    }
   }
 }
 
@@ -237,10 +229,6 @@ export function goblinSnatch(this: Ecology, c: Cr): boolean {
         c.lureAt = this.step;
         c.gait = 0;
         this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'stalk', n: 1, to: q.id, how: 'ambush', x: Math.round(tl.x), y: Math.round(tl.y) } as never);
-        if (this.step - (this.lastLogged[980] ?? -99999) > 1500) {
-          this.lastLogged[980] = this.step;
-          this.log(c.x, c.y, `暗がりで待ち伏せていた{k:${Kind.Goblin}}が、通り過ぎる冒険者の一行の後ろをつけはじめた`);
-        }
         return true;
       }
     }
@@ -407,10 +395,6 @@ export function goblinRaid(this: Ecology, c: Cr): boolean {
       c.lure = 0;
       c.gait = 0;
       this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: cp.id, ev: 'spotted', n: a.sp, how: a.id === p.members[0] ? 'watch' : 'other', x: Math.round(c.x), y: Math.round(c.y) } as never);
-      if (this.step - (this.lastLogged[985] ?? -99999) > 1500) {
-        this.lastLogged[985] = this.step;
-        this.log(c.x, c.y, `焚き火の見張りが、忍び寄る{k:${Kind.Goblin}}に気づいた。{k:${Kind.Goblin}}は暗がりへ逃げ帰った`);
-      }
       return this.goblinRaid(c);
     }
   }
@@ -487,10 +471,6 @@ export function goblinSteal(this: Ecology, c: Cr, t: Cr, camp: Camp | undefined,
       tp.robCY = Math.round(camp.y);
     }
     this.record('settle', { t: this.w.tick, k: Kind.Goblin, id: camp?.id ?? -1, ev: 'rob', n: take, how: how ?? (bag ? 'raid' : 'lurk'), to: torch, doze: this.watchDozing(tp) ? 1 : 0, x: Math.round(t.x), y: Math.round(t.y) } as never);
-  }
-  if (this.step - (this.lastLogged[997] ?? -99999) > 3000) {
-    this.lastLogged[997] = this.step;
-    this.log(c.x, c.y, how === 'snatch' ? `{k:${Kind.Goblin}}が暗がりから駆け寄り、一行の最後尾の冒険者の荷から食べ物を掠め取って逃げた` : torch ? `{k:${Kind.Goblin}}が冒険者の松明と荷物を盗んで、暗がりへ逃げた` : `{k:${Kind.Goblin}}が冒険者の荷物を盗んで、暗がりへ逃げた`);
   }
   return take;
 }

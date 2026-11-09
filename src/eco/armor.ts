@@ -337,7 +337,6 @@ export function absorbItem(this: Ecology, c: Cr, it: Item): void {
   this.noise(c.x, c.y, 5);
   this.record('settle', { t: this.w.tick, k: Kind.Armor, id: c.id, ev: 'absorb', how: rob ? 'rob' : 'floor', part: hand ? 'hand' : 'body', n: it.kind, x: Math.round(c.x), y: Math.round(c.y) } as never);
   const name = ITEM_NAMES[it.kind] ?? '武具';
-  this.log(c.x, c.y, rob ? `{k:${Kind.Armor}}が、倒した相手の${name}を取り込んだ` : hand ? `{k:${Kind.Armor}}が床の${name}を取り込んだ` : `{k:${Kind.Armor}}が床の${name}を体に取り込んだ`);
 }
 
 /** 崩れる：体と手の武具を床に散らす（dropBelongings から。体のマナは die の releaseMana で土へ還る） */

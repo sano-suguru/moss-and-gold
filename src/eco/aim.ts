@@ -427,7 +427,6 @@ export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
       p.aimAt = this.step;
       this.brace(p, ax, ay, 1, BRACE_ARRIVE);
       this.partyMark(p, '!', true);
-      this.log(lead.x, lead.y, `${p.name ?? ''}の一行が目標に着き、武器を構えた（${AIM_NAMES[p.aim]}）`);
       this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'arrive', how: p.aim, n: p.aimId ?? 0, x: Math.round(lead.x), y: Math.round(lead.y) } as never);
     }
   }
@@ -485,8 +484,7 @@ export function endAim(this: Ecology, p: Party, lead: Cr, end: number): void {
     p.goal = 1;
     p.camp = -1;
     this.setExit(p);
-    this.log(lead.x, lead.y, `${p.name ?? ''}の一行は{k:${Kind.Goblin}}を見つけられず、集落のまわりを探しあぐねて引き返した`);
-  } else this.log(lead.x, lead.y, `${p.name ?? ''}の一行が目的（${AIM_NAMES[a]}）をあきらめた`);
+  }
 }
 
 /** 目標でない住みかのそばを通るとき：一瞬止まって身構え、住みかの方を向いて「？」。そのまま通り過ぎる */
@@ -503,11 +501,6 @@ export function passBrace(this: Ecology, p: Party, lead: Cr): void {
     this.brace(p, zx, zy, 2, BRACE_PASS);
     this.partyMark(p, '?', false);
     this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'pass', n: z[3], x: Math.round(lead.x), y: Math.round(lead.y) } as never);
-    if (this.step - (this.lastLogged[987] ?? -99999) > 1500) {
-      this.lastLogged[987] = this.step;
-      const what = z[3] < 0 ? `{k:${Kind.Orc}}の縄張り` : this.warrens.some((w) => w.id === z[3]) ? `{k:${Kind.Kobold}}の住処` : this.camps.find((cp) => cp.id === z[3])?.kind === 1 ? `{k:${Kind.Lizardman}}の村` : `{k:${Kind.Goblin}}の集落`;
-      this.log(lead.x, lead.y, `${p.name ?? ''}の一行が${what}のそばで身構え、そのまま通り過ぎた`);
-    }
     return;
   }
 }
