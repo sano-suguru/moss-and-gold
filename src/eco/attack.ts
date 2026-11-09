@@ -15,6 +15,7 @@
  */
 import { BLOOD, CR_EVERY, Cr, Ecology, Kind, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
+import { SWARM_SIP } from './vampskill';
 
 export interface Area {
   kind: 'fan' | 'circle' | 'line' | 'cross';
@@ -181,6 +182,7 @@ export function resolveVolleys(this: Ecology): void {
       if (a.k === Kind.Vampire && !a.dead && !a.away) {
         const got = Math.max(0, hp0 - Math.max(0, o.hp));
         a.hp = Math.min(this.maxHp(a), a.hp + got * 0.6);
+        if (!killed) this.vampSip(a, o, SWARM_SIP);
         this.fxAttacks.push({ t: this.w.tick, style: 'batreturn', col: 0, size: 1, ax: o.x, ay: o.y, dx: a.x, dy: a.y, did: o.id, aid: a.id, big: false, kill: false, fly: Math.max(6, Math.min(16, Math.round(Math.hypot(a.x - o.x, a.y - o.y) / 7))) });
         this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'swarmBlood', id: a.id, n: o.k, x: Math.round(o.x), y: Math.round(o.y) } as never);
       }

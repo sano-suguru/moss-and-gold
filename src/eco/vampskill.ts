@@ -3,10 +3,10 @@
  *
  * 三つの技を持つ。どれも溜め（src/eco/skill.ts）のあいだに打たれると止まる（ヴァンパイアは大物ではないので、軽い一撃でも止まる）。
  *   血吸い：手をかざして構え、5.5マス先までの相手から、血の玉を自分へ吸い寄せる。吸うあいだ（生き物の更新10回）は動かず、
- *           相手は少しずつ弱り、ヴァンパイアは吸った分だけ傷が癒える。相手が6.5マスより離れるか、壁の陰に入るか、ヴァンパイアが打たれると切れる。
+ *           相手は少しずつ弱り、ヴァンパイアは吸った分だけ傷が癒え、相手の血（養分）が腹に入る。相手が6.5マスより離れるか、壁の陰に入るか、ヴァンパイアが打たれると切れる。
  *   コウモリの群れ：従えるコウモリが2匹以上いれば、両腕を広げて構え、相手の方へ黒いコウモリの群れを6マスまで突っ込ませる。
  *           群れの通り道（1マスおきの丸い範囲）に、群れが届いた時にいる者を少し打って、怯ませる（動いていれば避けられる）。
- *           噛みついたコウモリは、吸った血をくわえてヴァンパイアのもとへ戻り、その分（打った分の6割）だけヴァンパイアの傷が癒える（src/eco/attack.ts の resolveVolleys）。
+ *           噛みついたコウモリは、吸った血をくわえてヴァンパイアのもとへ戻り、その分（打った分の6割）だけヴァンパイアの傷が癒え、血（養分）が腹に入る（src/eco/attack.ts の resolveVolleys）。
  *   霧の歩み：黒い霧になって消え、一行の後ろにいる後衛（魔法使い・狩人・僧侶・吟遊詩人）の背後に現れて、重い一撃を打つ。
  *           打ったら、また霧になって消え、元いた暗がりへ戻る（打って消える）。大きな火（焚き火、かがり火、炉、入口の灯り）の明かりの中へは出ない。
  *           （以前は打ったあとも一行の真ん中に残り、14〜40 tick で倒されていた）
@@ -15,7 +15,7 @@
  * 狙う相手の番号は aim に持つ（どちらもセーブに入る）。技を溜めはじめた時刻は cast（使ったあとの間に使う。三つの技で共通）。
  */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { CR_EVERY, Cr, Ecology, Job, Kind, sq } from '../ecology';
+import { CR_EVERY, Cr, Ecology, Job, Kind, SPEC, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import type { Skill } from './skill';
 
@@ -68,6 +68,28 @@ function darkFor(this: Ecology, x: number, y: number): boolean {
   if (k < 0 || this.w.lightBase[k] * this.dayNow > 60) return false;
   for (const f of this.fires()) if (f[2] > 3 * TILE && !this.weakCampAt(f[0], f[1]) && sq(x - f[0]) + sq(y - f[1]) < sq(f[2] + 2 * TILE)) return false;
   return true;
+}
+
+/** 血吸い1回分と、群れのコウモリが持ち帰る血1回分で、ヴァンパイアの腹に入る養分の上限 */
+export const DRAIN_SIP = 6;
+export const SWARM_SIP = 8;
+
+/**
+ * 相手 d の血（腹の中の物、なければ体）から n まで、ヴァンパイア c の腹へ移す（養分は移るだけで、増えも減りもしない）。
+ * 吸った血で腹が満ちれば、ヴァンパイアは狩りを終えて住処へ帰る（技で打つだけでは腹が満ちず、空腹のまま一行にかかりきりになっていた）
+ */
+export function vampSip(this: Ecology, c: Cr, d: Cr, n: number): void {
+  let want = Math.min(n, SPEC[Kind.Vampire].cap - c.food);
+  if (want <= 0) return;
+  const f = Math.min(want, Math.max(0, d.food));
+  d.food -= f;
+  want -= f;
+  const b = Math.min(want, Math.max(0, d.body - 1));
+  d.body -= b;
+  if (f + b > 0) {
+    c.food += f + b;
+    c.sinceMeal = 0;
+  }
 }
 
 /** 技の溜めと血吸いの進み（ヴァンパイアの更新のはじめに呼ぶ）。true なら、この回はこれで終わり */
@@ -157,8 +179,9 @@ function drainTick(this: Ecology, c: Cr): void {
   this.setDir(c, d.x - c.x, d.y - c.y);
   const hp0 = d.hp > 0 ? d.hp : this.maxHp(d);
   const killed = this.strike(c, d, DRAIN_MUL, false);
-  // 吸った分（相手の減った体力）だけ傷が癒える
+  // 吸った分（相手の減った体力）だけ傷が癒え、相手の血がヴァンパイアの腹に入る
   c.hp = Math.min(this.maxHp(c), c.hp + Math.max(0, hp0 - Math.max(0, d.hp)));
+  if (!killed) this.vampSip(c, d, DRAIN_SIP);
   c.act = 2;
   c.actT = 0;
   c.run--;
@@ -300,7 +323,8 @@ declare module '../ecology' {
   interface Ecology {
     vampSkill: typeof vampSkill;
     vampEngage: typeof vampEngage;
+    vampSip: typeof vampSip;
   }
 }
 
-Object.assign(Ecology.prototype, { vampSkill, vampEngage });
+Object.assign(Ecology.prototype, { vampSkill, vampEngage, vampSip });
