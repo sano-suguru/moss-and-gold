@@ -61,6 +61,8 @@ export const MINO_FAR = 30;
  */
 export function minotaur(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Minotaur];
+  // 斧の薙ぎ払いと突進（src/eco/charge.ts）
+  if (this.minoSkill(c)) return;
   if (c.act === 2 && c.actT < 5) return;
   const m = this.w.map;
   const home = this.inLair(c.x, c.y);
@@ -327,6 +329,8 @@ export function mimic(this: Ecology, c: Cr): void {
  */
 export function golem(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Golem];
+  // 両腕の振り下ろしと地割れ（src/eco/charge.ts）
+  if (this.golemSkill(c)) return;
   if (c.act === 2 && c.actT < 5) return;
   const m = this.w.map;
   // 見張る場所：宝物庫の中の、外とつながる入口のマス（はじめに一度だけ探す）
@@ -363,6 +367,8 @@ export function golem(this: Ecology, c: Cr): void {
       foe = o;
     }
   });
+  // 技を溜めはじめる（入口のそばの相手には振り下ろし、近づいてくる者には地割れ）
+  if (c.tx > 0 && this.golemEngage(c, foe as Cr | null)) return;
   if (foe) {
     const f = foe as Cr;
     c.dir = Math.abs(f.x - c.x) > Math.abs(f.y - c.y) ? (f.x > c.x ? 2 : 3) : f.y > c.y ? 0 : 1;

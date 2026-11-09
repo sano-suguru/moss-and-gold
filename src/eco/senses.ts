@@ -169,6 +169,8 @@ export function isLit(this: Ecology, o: Cr): boolean {
 export function canSense(this: Ecology, c: Cr, o: Cr): boolean {
   if ((o.st === 7 || o.st === 12) && this.isHidden(o) && !this.atDoorOf(c, o)) return false;
   const d2 = sq(o.x - c.x) + sq(o.y - c.y);
+  // 逃げて巣や住みかの中へ身を隠した者には、すぐそば（1.2マス）まで来ないと気づかない（src/eco/combat.ts の denHidden）
+  if (o.flee > 0 && o.act === 0 && d2 > 1.2 * TILE * 1.2 * TILE && this.denHidden(o)) return false;
   const T2 = TILE * TILE;
   const sense = Ecology.SENSE[c.k] ?? 'night';
   const los = () => lineOfSight(this.w.map, c.x, c.y, o.x, o.y);
@@ -353,10 +355,6 @@ export function lurk(this: Ecology, c: Cr): boolean {
     }
     c.lure = (best as Cr).id;
     c.lureAt = this.step;
-    if (this.step - (this.lastLogged[998] ?? -99999) > 3000) {
-      this.lastLogged[998] = this.step;
-      this.log(c.x, c.y, `{k:${c.k}}が冒険者の灯りを見つけ、暗がりに潜んだ`);
-    }
   }
   const t = this.byId.get(c.lure);
   if (!t || t.dead || t.away || this.step - c.lureAt > 2400) {
@@ -464,10 +462,6 @@ export function pester(this: Ecology, c: Cr): boolean {
         const L = Math.hypot(dx, dy) || 1;
         c.act = 1;
         this.tryMove(c, (dx / L) * SPEC[c.k].speed * 2, (dy / L) * SPEC[c.k].speed * 2);
-        if (this.step - (this.lastLogged[992] ?? -99999) > 4000) {
-          this.lastLogged[992] = this.step;
-          this.log(c.x, c.y, `冒険者の一行が{k:${Kind.Wisp}}の光に誘われた`);
-        }
       }
       return true;
     case Kind.Myconid:

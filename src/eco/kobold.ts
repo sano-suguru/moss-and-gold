@@ -184,6 +184,8 @@ export function warrenOf(this: Ecology, c: Cr): Warren | undefined {
 
 export function kobold(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Kobold];
+  // 住処のそばを通る冒険者の一行に立ちふさがる（src/eco/standoff.ts）
+  if (this.residentStand(c)) return;
   // 住処へ向かう道中：冒険者が近くにいる間は身をひそめて待ち、離れてから進む
   if ((c.st === 11 || c.st === 12) && this.koboldTransit(c)) return;
   // 冒険者に気づいたら、一行がずっと強ければ戦わずに逃げる（追いかけてはこない）
@@ -296,11 +298,29 @@ export function kobold(this: Ecology, c: Cr): void {
       let fk = -1;
       let fv = 49;
       const r0 = this.regionOf(this.tileOf(wr.x, wr.y));
+      const m0 = this.w.map;
+      // ほかのコボルトが立っているか、摘みに向かっている畑のマスは選ばない（空いたマスがなければ、集めに出るのをやめる）。
+      // （以前は皆がいちばん育ったマスを選び、3マスしかない畑の1マスに6匹ほどが群がって、狭い住処の中で歩く姿のまま詰まっていた。abc・かしたれ）
+      const taken = (k: number) => {
+        const kx = (k % m0.w) * TILE + 8;
+        const ky = Math.floor(k / m0.w) * TILE + 8;
+        let busy = false;
+        this.nearby(kx, ky, 1, (o) => {
+          if (busy || o === c || o.dead || o.k !== Kind.Kobold) return;
+          if (sq(o.x - kx) + sq(o.y - ky) < 10 * 10 || this.paths.get(o.id)?.gk === k) busy = true;
+        });
+        return busy;
+      };
       for (const k of this.farmTiles(wr))
-        if (this.w.fungus[k] > fv && (r0 < 0 || this.regionOf(k) === r0)) {
+        if (this.w.fungus[k] > fv && (r0 < 0 || this.regionOf(k) === r0) && (this.tileOf(c.x, c.y) === k || this.paths.get(c.id)?.gk === k || !taken(k))) {
           fv = this.w.fungus[k];
           fk = k;
         }
+      if (fk < 0 && this.farmTiles(wr).some((k) => this.w.fungus[k] > 49)) {
+        c.st = 0;
+        c.act = 0;
+        return;
+      }
       if (fk >= 0) {
         const m = this.w.map;
         c.act = 1;
@@ -803,10 +823,6 @@ export function checkTraps(this: Ecology): void {
     this.bleed(c, 2);
     this.noise(x, y, 7);
     this.markNotice(c, c, '!');
-    if (this.step - (this.lastLogged[996] ?? -99999) > 1500) {
-      this.lastLogged[996] = this.step;
-      this.log(x, y, `冒険者が{k:${Kind.Kobold}}の罠を踏んで傷を負った`);
-    }
     t.id = -1;
   }
   this.traps = this.traps.filter((t) => t.id >= 0);
@@ -851,10 +867,6 @@ export function watchWarrens(this: Ecology): void {
     const mine = members.reduce((a, c) => a + this.str(c), 0);
     if (wr.hide !== 1 && nd < 12 * TILE * 12 * TILE && threat > mine * 1.5) {
       wr.hide = 1;
-      if (this.step - (this.lastLogged[995] ?? -99999) > 3000) {
-        this.lastLogged[995] = this.step;
-        this.log(wr.x, wr.y, (near as Cr).k === Kind.Adventurer ? `{k:${Kind.Kobold}}たちが冒険者の気配に、住処の奥へ身をひそめた` : `{k:${Kind.Kobold}}たちが{k:${(near as Cr).k}}の気配に、住処の奥へ身をひそめた`);
-      }
       continue;
     }
     if (wr.hide === 1) {
@@ -871,7 +883,6 @@ export function watchWarrens(this: Ecology): void {
           c.hx = 0;
           c.hy = 0;
         }
-        this.log(wr.x, wr.y, `隠れていた{k:${Kind.Kobold}}たちが見つかり、奥へ逃げ散った`);
       }
     }
   }

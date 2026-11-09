@@ -92,6 +92,12 @@ export const enum Job {
 export interface Party {
   id: number;
   members: number[];
+  /** 皆で向かう相手に向かいはじめたときの、生きている仲間の数（src/eco/adventurer.ts の撤退） */
+  engageN?: number;
+  /** 撤退：下がり終える step 番号と、退く相手のいた所 */
+  retreatUntil?: number;
+  retreatX?: number;
+  retreatY?: number;
   /** 0 = 奥へ進む、1 = 引き返す */
   goal: number;
   tx: number;
@@ -537,8 +543,40 @@ export interface Cr {
   mana: number;
   /** 特別な個体：0 ふつう、1 火の精（サラマンダー）、2 亡霊の騎士（ゴースト）、4 大ネズミの王、5 ゴブリンの頭、6 水の精（スライム）、7 光の精（ウィスプ）、8 骨の竜（ドラゴン）、9 キノコの主（マイコニド） */
   elite: number;
+  /** 技を溜めはじめた時刻（tick。src/eco/skill.ts） */
+  cast: number;
+  /** 毒の残り（生き物の更新の回数）と、毒を与えた種（src/eco/attack.ts の poisonTick） */
+  poison: number;
+  poisonBy: number;
+  /** 怯みの残り（生き物の更新の回数。src/eco/charge.ts）：その場でふらついて立ち止まり、何もできない */
+  stun: number;
+  /** はね飛ばされている残り（生き物の更新の回数）と、1回の更新で飛ぶ量（px。src/eco/charge.ts） */
+  kb: number;
+  kbx: number;
+  kby: number;
+  /** ミノタウロスの突進：−1 突進の溜め中、1 以上 走っている残り（生き物の更新の回数）、0 突進していない（src/eco/charge.ts） */
+  run: number;
+  /** 突進で狙った相手（src/eco/charge.ts） */
+  aim: number;
   /** 死骸ができたときの養分（腐り具合の目安） */
   init: number;
+}
+
+/** 少し後で当たる攻撃：t（tick）に当たる。d が 0 以上なら、その相手を追いかけて当たる（魔法の矢）。d が −1 なら、(x, y) から半径 r の中にいる者に当たる（矢の雨） */
+export interface Volley {
+  t: number;
+  a: number;
+  d: number;
+  x: number;
+  y: number;
+  r: number;
+  mul: number;
+  /** 当たった者に与える毒（生き物の更新の回数。0 なら毒なし） */
+  poison: number;
+  /** 当たった者を怯ませる長さ（生き物の更新の回数。0 なら怯ませない。src/eco/charge.ts） */
+  stun?: number;
+  /** 落ちる攻撃で狙った相手（冒険者の矢の雨。関係のない小物には当てないため。src/eco/attack.ts） */
+  tgt?: number;
 }
 
 export interface Web {
@@ -567,7 +605,9 @@ export const HUNT1: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, K
 /** オークの獲物：ゴブリンは従える相手なので獲物にしない */
 export const HUNT_ORC: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Kobold, Kind.Ant, Kind.Adventurer, Kind.Dwarf];
 export const HUNT2: Kind[] = [Kind.Rat, Kind.Ant, Kind.Kobold];
-export const HUNT3: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Orc, Kind.Lizardman, Kind.Spider, Kind.Slime, Kind.Zombie, Kind.Adventurer];
+// ミノタウロスの獲物。スライムは狙わない（小さすぎる。突進と斧の薙ぎ払いを持たせてから、縄張りのスライムがまとめて倒され、
+// 8シードの10〜18日目でミノタウロスに倒されるスライムが main の14匹から38匹に増え、スライムが0匹の日が増えていた。ほかの獲物を狙った攻撃の巻き込みには当たる）
+export const HUNT3: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Orc, Kind.Lizardman, Kind.Spider, Kind.Zombie, Kind.Adventurer];
 export const HUNT4: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Lizardman, Kind.Orc, Kind.Slime, Kind.Zombie, Kind.Myconid, Kind.Adventurer];
 export const HUNT5: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Ant, Kind.Kobold, Kind.Goblin];
 export const HUNT6: Kind[] = [Kind.Rat];
@@ -897,7 +937,7 @@ export class Ecology {
    * sting 刺す、arrow 矢、orb 魔法の弾、beam 光線、drain 吸う、chill 冷たい手、acid 溶かす、spore 胞子。
    * col は色（0 白、1 金、2 炎、3 毒、4 魔、5 血、6 石、7 霜）、size は大きさ（0〜2）。big は強い一撃、kill はとどめ
    */
-  fxAttacks: { t: number; style: string; col: number; size: number; ax: number; ay: number; dx: number; dy: number; did: number; aid: number; big: boolean; kill: boolean }[] = [];
+  fxAttacks: { t: number; style: string; col: number; size: number; ax: number; ay: number; dx: number; dy: number; did: number; aid: number; big: boolean; kill: boolean; rad?: number; half?: number; n?: number; fly?: number }[] = [];
   /** 強い一撃があった tick（画面がほんの一瞬「ため」を入れるため。描画専用） */
   lastBigHit = -1;
 
@@ -910,6 +950,8 @@ export class Ecology {
 
   /** 攻撃が当たった所（tick、場所、打った側の場所） */
   fxHits: { t: number; x: number; y: number; ax: number; ay: number; id: number }[] = [];
+  /** 少し後で当たる攻撃（飛んでいる魔法の矢、降ってくる矢の雨。src/eco/attack.ts）。セーブに入れる */
+  volleys: Volley[] = [];
   /** 気づいた印：「！」（敵や獲物）か「？」（害のない相手） */
   fxMarks: { t: number; id: number; m: string }[] = [];
   /** マナから生まれた者（描画専用：生まれる場所にマナが集まって姿が現れる演出。セーブしない。シミュレーションの判断に使わない） */

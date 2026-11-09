@@ -334,10 +334,6 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
         const g = Math.min(t.gold, carry - c.gold);
         t.gold -= g;
         c.gold += g;
-        if (c.sp === 1 && this.step - (this.lastLogged[991] ?? -99999) > 4000) {
-          this.lastLogged[991] = this.step;
-          this.log(c.x, c.y, `若い{k:${Kind.Dragon}}が光る金貨をくわえて寝床へ運んでいる`);
-        }
       } else this.goTo(c, t.x, t.y, s.speed);
       return;
     }
@@ -393,10 +389,6 @@ export function dragon(this: Ecology, c: Cr, day: number): void {
         if (!this.dragonStepBack(c, p.x, p.y) && d < 20) this.fight(c, p);
       } else if (c.sp > 0 && d < (c.sp === 1 ? 5 : 6) * TILE && lineOfSight(m, c.x, c.y, p.x, p.y) && this.breathCovers(c, p.x, p.y)) {
         // （炎は口元から上下左右に吐くので、炎の扇に入る向きにいる相手にだけ吐く。斜めにいる相手には寄っていく。src/eco/fire.ts の breathCovers）
-        if (this.step - (this.lastLogged[Kind.Dragon] ?? -99999) > 2000) {
-          this.lastLogged[Kind.Dragon] = this.step;
-          this.log(c.x, c.y, `{k:${Kind.Dragon}}が炎を吐き、あたりが燃え上がった`);
-        }
         c.act = 2;
         c.actT = 0;
         c.ref2 = c.sp === 1 ? 7 : 12;

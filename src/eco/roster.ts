@@ -14,6 +14,7 @@
 import { Cr, Ecology, Job, Kind, Party, STR, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { ADV_NAMES, JOB_NAMES } from '../names';
+import { isJobItem } from './armor';
 
 /** 名簿の一人 */
 export interface Hero {
@@ -302,7 +303,6 @@ export function raiseGrave(this: Ecology, h: Hero, x: number, y: number): void {
   while (this.graves.length > GRAVE_MAX) {
     const old = this.graves.shift() as Grave;
     this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: 0, ev: 'gravegone', n: old.id, x: old.x, y: old.y } as never);
-    this.log(old.x, old.y, `${heroTitle(old)}の古い墓標が崩れて消えた`);
   }
 }
 
@@ -321,7 +321,6 @@ export function graveBrace(this: Ecology, p: Party, lead: Cr): void {
       return !!o && !o.dead && o.sp === Job.Priest;
     });
     this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'mourn', n: g.id, how: priest ? 1 : 0, x: Math.round(lead.x), y: Math.round(lead.y) } as never);
-    this.log(g.x, g.y, `${this.partyTitle(p)}の一行が、${heroTitle(g)}の墓標の前で立ち止まった${priest ? '（僧侶が祈りを捧げた）' : ''}`);
     return;
   }
 }
@@ -352,11 +351,27 @@ export function blessBrace(this: Ecology, p: Party, lead: Cr): void {
     });
     if (danger) continue;
     o.st = 99;
+    this.blessGearNear(o.x, o.y);
     this.brace(p, o.x, o.y, 5, GRAVE_STOP);
     const own = o.party === p.id ? 1 : 0;
     this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'bless', n: o.id, how: o.sp, own, x: Math.round(o.x), y: Math.round(o.y) } as never);
-    this.log(o.x, o.y, `${this.partyTitle(p)}の一行の僧侶が、倒れた${own ? '仲間' : '冒険者'}（${JOB_NAMES[o.sp]}）の亡骸を清めた`);
     return;
+  }
+}
+
+/**
+ * 亡骸を清めるとき、そのまわり（3マス）の、未練の宿った武具も清める：宿っていたマナは足もとの土へ還り（保存則のため）、
+ * もうマナを吸わず、リビングアーマーとして立ち上がらない（fuel を −1 にする。src/eco/armor.ts）
+ */
+export function blessGearNear(this: Ecology, x: number, y: number): void {
+  for (const it of this.gear) {
+    if (!isJobItem(it.kind) || it.fuel < 0 || sq(it.x - x) + sq(it.y - y) > 3 * TILE * 3 * TILE) continue;
+    const k = this.tileOf(it.x, it.y);
+    if (it.fuel > 0) {
+      if (k >= 0) this.w.mana[k] += it.fuel;
+      else this.w.manaFaded += it.fuel;
+    }
+    it.fuel = -1;
   }
 }
 
@@ -388,9 +403,10 @@ declare module '../ecology' {
     graveBrace: typeof graveBrace;
     blessBrace: typeof blessBrace;
     pickGrave: typeof pickGrave;
+    blessGearNear: typeof blessGearNear;
     ensureCrests: typeof ensureCrests;
     heroHurt: typeof heroHurt;
   }
 }
 
-Object.assign(Ecology.prototype, { recruit, fillRoster, heroOf, rankMul, pickHeroes, heroEnter, heroHome, rosterStep, raiseGrave, graveBrace, blessBrace, pickGrave, ensureCrests, heroHurt });
+Object.assign(Ecology.prototype, { recruit, fillRoster, heroOf, rankMul, pickHeroes, heroEnter, heroHome, rosterStep, raiseGrave, graveBrace, blessBrace, pickGrave, blessGearNear, ensureCrests, heroHurt });

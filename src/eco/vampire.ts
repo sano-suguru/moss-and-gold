@@ -21,6 +21,8 @@ const VAMP_PREY = new Set<number>([Kind.Rat, Kind.Goblin, Kind.Kobold, Kind.Liza
 export function vampire(this: Ecology, c: Cr, day: number): void {
   const s = SPEC[Kind.Vampire];
   if (this.leaveIfStarving(c)) return;
+  // 技の溜めと、血を吸っているあいだ（src/eco/vampskill.ts）
+  if (this.vampSkill(c)) return;
   const m = this.w.map;
   const k = this.tileOf(c.x, c.y);
   // 近くのコウモリを従える。従えるのは RETINUE_MAX 匹まで
@@ -65,21 +67,59 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
   }
   // 起きている冒険者の一行（7マス以内）からは、打ちかかられる前に退く（死ぬのはたいてい、松明を持つ一行に見つかったとき）。
   // 焚き火で眠っている者は避けない（寝込みを狙う）。打たれて間もないときは、退かずに打ち合う
-  if (this.w.tick - c.hitAt > 60) {
-    let n = 0;
+  // 一行に技を使ってから生き物の更新60回のあいだは、打たれたばかりでも打ち合わずに退く（打って退く）。
+  // ただし、そばの冒険者がコウモリに群がられて足止めされていれば、退かずに打ちかかる
+  // （以前は、技のあとに打ち返されると打ち合いに切り替わり、一行と殴り合って倒されていた。16シード×25日で、倒された52体のうち22体）
+  const afterSkill = this.w.tick - c.cast < 60 * CR_EVERY;
+  if (this.w.tick - c.hitAt > 60 || afterSkill) {
+    const foes: Cr[] = [];
     this.nearby(c.x, c.y, 7, (o) => {
       if (o.k !== Kind.Adventurer || o.dead || o.away || o.sleep > 0 || sq(o.x - c.x) + sq(o.y - c.y) > sq(7 * TILE)) return;
-      n++;
+      foes.push(o);
     });
+    const n = foes.length;
+    // 夜なら、退く前に技を使う（霧になって後衛の背後へ、コウモリの群れ、血吸い。src/eco/vampskill.ts）
+    if (n && day <= 0.05 && this.vampEngage(c, foes, null)) return;
+    const pinned = foes.some((o) => this.batPinned(o) && sq(o.x - c.x) + sq(o.y - c.y) < sq(2 * TILE));
     // 退くときは、住処への道をたどる（一行から離れる向きへ一歩ずつ動くと、壁に当たって住処の向きと行き来し、その場で足踏みしていた）
-    if (n && sq(c.hx - c.x) + sq(c.hy - c.y) > sq(2 * TILE)) {
+    if (n && !pinned && sq(c.hx - c.x) + sq(c.hy - c.y) > sq(2 * TILE)) {
       c.act = 1;
       c.ref = 0;
       this.goTo(c, c.hx, c.hy, s.speed * 1.3);
       return;
     }
   }
-  if (day > 0.05) {
+  // 夜明け前（1日の 0.1〜0.2）に住処が20マスより遠ければ、昼を待たずに物陰を探しはじめる（昼の眠気は夜明け前から来るので、
+  // 昼になってから探すと、住処へ帰る途中の通路で眠り込んでいた）
+  const farDawn = this.phaseNow >= 0.1 && this.phaseNow < 0.2 && sq(c.hx - c.x) + sq(c.hy - c.y) > sq(20 * TILE);
+  if (day > 0.05 || farDawn) {
+    // 昼になって住処が20マスより遠いか、住処が遠いまま眠気が出てきたら（眠りの目安の3割を超えたら）、近くの物陰（行き止まりや、人の気配の薄い暗い所）へ寄って、
+    // （眠気が出てから探しはじめると、住処から遠い所では物陰に着く前に通路で眠り込み、そこに棺を出していた）
+    // そこで眠り込んで棺を呼び出す（vampCoffin）。物陰は生き物の更新20回ごとに選び直し、tx, ty に持つ
+    // （以前はどこで眠り込んでもその場に棺を出したので、通路の真ん中の棺が僧侶や竜殺しに暴かれていた。16シード×25日で4回 → 17回）
+    const th = Ecology.SLEEP[Kind.Vampire]?.th ?? 1500;
+    if (sq(c.hx - c.x) + sq(c.hy - c.y) > 12 * 12 && (c.drowsy > th * 0.3 || sq(c.hx - c.x) + sq(c.hy - c.y) > sq(20 * TILE))) {
+      if (!c.tx || this.step % 20 === c.id % 20) {
+        const spot = this.vampHideSpot(c);
+        c.tx = spot ? spot[0] : 0;
+        c.ty = spot ? spot[1] : 0;
+      }
+      if (c.tx) {
+        if (sq(c.tx - c.x) + sq(c.ty - c.y) < 8 * 8) c.act = 0;
+        else {
+          c.act = 1;
+          const x0 = c.x;
+          const y0 = c.y;
+          this.goTo(c, c.tx, c.ty, s.speed);
+          if (sunAt(this.tileOf(c.x, c.y)) > 60) {
+            c.x = x0;
+            c.y = y0;
+            c.act = 0;
+          }
+        }
+        return;
+      }
+    }
     if (sq(c.hx - c.x) + sq(c.hy - c.y) > 12 * 12) {
       c.act = 1;
       const x0 = c.x;
@@ -162,6 +202,8 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
     }
     if (prey) {
       const p = prey as Cr;
+      // 離れた獲物には、血吸いやコウモリの群れを使う（src/eco/vampskill.ts）
+      if (this.vampEngage(c, [], p)) return;
       c.act = 1;
       if (sq(p.x - c.x) + sq(p.y - c.y) < 11 * 11) {
         // 一口では食べず、打ち合って仕留める（src/eco/combat.ts の hunt と同じ）
@@ -301,9 +343,54 @@ export function vampMistFx(this: Ecology, x: number, y: number, how: number): vo
 }
 
 /**
+ * 住処へ帰れないまま眠気の出てきたヴァンパイアが、棺を呼び出す物陰：いまいる所から10マス以内の、同じ洞窟の続きの床で、
+ * 日の光も大きな火の明かりも届かない所のうち、行き止まり（上下左右で開いているのが1つだけ）、人の気配の薄い所（冒険者の通り道から外れた所）、
+ * 壁ぎわ、近い所ほど選び、両側の開いた狭い通路は避ける（壁の多さだけで選ぶと、壁に挟まれた通路を選んで、通りかかった一行に棺を暴かれていた）。
+ * 見つからなければ null（その場で眠り込めば、その場に棺を出す）
+ */
+export function vampHideSpot(this: Ecology, c: Cr): [number, number] | null {
+  const m = this.w.map;
+  const tx = Math.floor(c.x / TILE);
+  const ty = Math.floor(c.y / TILE);
+  const k0 = this.tileOf(c.x, c.y);
+  const reg = k0 >= 0 ? this.regionOf(k0) : -1;
+  if (reg < 0) return null;
+  const fires = this.fires();
+  let best: [number, number] | null = null;
+  let bs = -1e9;
+  for (let y = Math.max(1, ty - 10); y <= Math.min(m.h - 2, ty + 10); y++)
+    for (let x = Math.max(1, tx - 10); x <= Math.min(m.w - 2, tx + 10); x++) {
+      const k = y * m.w + x;
+      if (m.solid[k] || this.regionOf(k) !== reg || this.w.lightBase[k] * this.dayNow > 60) continue;
+      const px = x * TILE + 8;
+      const py = y * TILE + 8;
+      if (!this.passable(c, px, py)) continue;
+      let lit = false;
+      for (const f of fires) if (sq(px - f[0]) + sq(py - f[1]) < sq(f[2] + 2 * TILE)) lit = true;
+      if (lit) continue;
+      let walls = 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) if (m.solid[k + dy * m.w + dx]) walls++;
+      // 上下左右のうち開いている向き。1つだけなら行き止まり（通り抜ける者がいない）、向かい合う2つだけなら通路（通り道になる）
+      const oe = !m.solid[k + 1];
+      const ow = !m.solid[k - 1];
+      const os = !m.solid[k + m.w];
+      const on = !m.solid[k - m.w];
+      const open4 = +oe + +ow + +os + +on;
+      const corridor = open4 === 2 && ((oe && ow) || (os && on));
+      const sc = walls * 2 + (open4 === 1 ? 14 : 0) - (corridor ? 12 : 0) - this.presenceAt(px, py) * 60 - Math.hypot(x - tx, y - ty) * 0.4;
+      if (sc > bs) {
+        bs = sc;
+        best = [px, py];
+      }
+    }
+  return best;
+}
+
+/**
  * 棺：昼、住処（hx, hy）に戻ったヴァンパイアは棺に入って蓋を閉め、日が暮れると出てくる。
  * 棺の中の間は誰にも狙われない（away として扱う）。ただし、僧侶か竜殺しの冒険者が棺のそば（2マス以内）まで来ると、
  * 蓋が暴かれて、ヴァンパイアはその場で起き上がって打ち合う。棺はヴァンパイアが生きている間、住処にある（描画は src/creatureView.ts）。
+ * 住処へ帰れないまま眠り込んだときは、その場に棺を呼び出して入る（その棺は、出てくると霧になって消える）。
  * true なら、今は棺の中（ほかの行いをしない）
  */
 export function vampCoffin(this: Ecology, c: Cr): boolean {
@@ -321,6 +408,10 @@ export function vampCoffin(this: Ecology, c: Cr): boolean {
     c.drowsy = 0;
     c.st = 0;
     c.away = false;
+    c.tx = 0;
+    c.ty = 0;
+    // 住処の外に呼び出した棺は、出てくると黒い霧になって消える
+    if (sq(c.hx - c.x) + sq(c.hy - c.y) > 2) this.vampMistFx(c.x, c.y, 0);
     c.sleep = 0;
     c.act = 0;
     if (!opener) this.vampCallBats(c);
@@ -333,11 +424,19 @@ export function vampCoffin(this: Ecology, c: Cr): boolean {
     }
     return false;
   }
-  if (c.st === 0 && !c.dead && !c.away && this.dayNow > 0.05 && (c.hx || c.hy) && sq(c.hx - c.x) + sq(c.hy - c.y) < 14 * 14 && this.w.tick - c.hitAt > 120) {
+  // 住処に着いたら住処の棺に入る。住処へ帰れないまま昼の眠気に負けて眠り込んだら、その場に黒い霧から棺を呼び出して入る
+  // （以前は通路の床でそのまま眠り、棺に入らずに無防備に寝ていた）
+  const atHome = (c.hx || c.hy) && sq(c.hx - c.x) + sq(c.hy - c.y) < 14 * 14;
+  if (c.st === 0 && !c.dead && !c.away && this.dayNow > 0.05 && (atHome || c.sleep > 0) && this.w.tick - c.hitAt > 120) {
     c.st = VAMP_COFFIN;
     c.away = true;
-    c.x = c.hx;
-    c.y = c.hy;
+    if (atHome) {
+      c.x = c.hx;
+      c.y = c.hy;
+    } else {
+      this.vampMistFx(c.x, c.y, 1);
+      this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'coffinAway', id: c.id, x: Math.round(c.x), y: Math.round(c.y) } as never);
+    }
     c.ref = 0;
     c.feed = 0;
     c.flee = 0;
@@ -409,7 +508,6 @@ export function vampRaiseFallen(this: Ecology, c: Cr, day: number): boolean {
       c.actT = 0;
       c.dir = Math.abs(d.x - c.x) > Math.abs(d.y - c.y) ? (d.x > c.x ? 2 : 3) : d.y > c.y ? 0 : 1;
       this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'raiseFallen', id: c.id, n: d.sp, x: Math.round(d.x), y: Math.round(d.y) } as never);
-      this.log(d.x, d.y, `{k:${Kind.Vampire}}が、倒れた冒険者の亡骸にかがみ込んだ`);
     }
     return true;
   }
@@ -581,6 +679,7 @@ declare module '../ecology' {
     vampScatter: typeof vampScatter;
     vampFly: typeof vampFly;
     vampCoffin: typeof vampCoffin;
+    vampHideSpot: typeof vampHideSpot;
     vampCallBats: typeof vampCallBats;
     batCalled: typeof batCalled;
     vampRaiseFallen: typeof vampRaiseFallen;
@@ -588,4 +687,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { vampire, batPinned, vampLair, vampCanScatter, vampScatter, vampFly, vampCoffin, vampCallBats, batCalled, vampRaiseFallen, vampMistFx });
+Object.assign(Ecology.prototype, { vampire, batPinned, vampLair, vampCanScatter, vampScatter, vampFly, vampCoffin, vampHideSpot, vampCallBats, batCalled, vampRaiseFallen, vampMistFx });

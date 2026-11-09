@@ -3,15 +3,21 @@ import { BLOOD, Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
 import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
 import { RANK_AT, packLook, unpackLook } from './eco/roster';
+import { SKILL_WIZARD_MISSILE } from './eco/skill';
+import { SKILL_VAMP_MIST } from './eco/vampskill';
+import { HOP_DT, HOP_N, hopAt } from './eco/charge';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
+import { lineOfSight } from './mapgen';
 import { heroOrbAt } from './sprites';
 
 /** 冒険者の攻撃で、技の演出を振り下ろしのコマまで遅らせる tick 数（攻撃のコマ 0 構え・1 振り上げのあと） */
 const ADV_STRIKE_LAG = 4;
 /** その攻撃の記録が、冒険者の振る技か（演出を振り下ろしのコマに合わせるもの） */
+/** 冒険者の職業の技のエフェクト（技は溜めてから放つので、打ち合いの一打ちのように遅らせない。src/eco/adventurer.ts） */
+const JOB_FX = new Set(['slashwave', 'greatsword', 'cross', 'missile', 'rain']);
 function advStrike(eco: Ecology, r: { aid: number; style: string }): boolean {
-  return eco.byId.get(r.aid)?.k === Kind.Adventurer && r.style !== 'grow' && r.style !== 'puff';
+  return eco.byId.get(r.aid)?.k === Kind.Adventurer && r.style !== 'grow' && r.style !== 'puff' && !JOB_FX.has(r.style);
 }
 
 const MAX_SPRITES = 4096;
@@ -388,7 +394,7 @@ export class CreatureView {
     const now = eco.w.tick;
     for (const r of eco.fxAttacks) {
       const age = now - r.t - (advStrike(eco, r) ? ADV_STRIKE_LAG : 0);
-      if (age < 0 || age > 24) continue;
+      if (age < 0 || age > (r.fly ?? 0) + 24) continue;
       if (!inView(r.dx, r.dy, 60) && !inView(r.ax, r.ay, 60)) continue;
       const vx = r.dx - r.ax;
       const vy = r.dy - r.ay;
@@ -447,6 +453,397 @@ export class CreatureView {
             if (sz >= 2) this.marks.push({ x: r.dx, y: r.dy + 3, key: `crack:${r.t % 3}`, t: now });
           }
           break;
+        case 'sweep': {
+          // 扇の薙ぎ払い（src/eco/attack.ts）：刃の軌跡が、扇の片側から反対側へ弧を描いて走る。弧の大きさが当たる範囲そのもの
+          const R = r.rad ?? 48;
+          const H = r.half ?? 1;
+          const a0 = Math.atan2(uy, ux);
+          if (age < 9) {
+            // 刃の先は3 tick で扇の片側から反対側へ走り、通ったあとに光の粒の弧が残って薄れる
+            const lead = Math.min(1, (age + 1) / 3);
+            const n = Math.max(10, Math.round((R * 2 * H) / 6));
+            const fr = Math.min(3, Math.max(0, age - 2) >> 1);
+            for (let i = 0; i <= n * lead; i++) {
+              const a = a0 - H + (2 * H * i) / n;
+              for (let k = 0.4; k <= 1.001; k += 0.15) push(r.ax + Math.cos(a) * R * k, r.ay + Math.sin(a) * R * k, 4, false, A.fx(`bit:4:${r.col}:${Math.min(3, fr + (k > 0.95 ? 0 : 1))}`), 0, 4);
+            }
+            if (age < 4) {
+              const a = a0 - H + 2 * H * lead;
+              push(r.ax + Math.cos(a) * R, r.ay + Math.sin(a) * R, lift - 2, Math.cos(a) < 0, A.fx(`slash2:2:${r.col}:${f6(age)}`), 0, 4);
+            }
+            if (age < 5) dyn.push({ x: r.ax + ux * R * 0.6, y: r.ay + uy * R * 0.6 - 8, r: R * 0.9, i: 0.35 * damp * (1 - age / 5), c: r.col === 1 ? 1 : 0 });
+          }
+          if (once)
+            for (let i = 0; i < 8; i++) {
+              const a = a0 - H + (2 * H * i) / 7;
+              this.bits.push({ x: r.ax + Math.cos(a) * R * 0.9, y: r.ay + Math.sin(a) * R * 0.9, z: 2, vx: Math.cos(a) * 0.8, vy: Math.sin(a) * 0.4, vz: 0.6, kind: 1, col: 0, t0: now, life: 14 });
+            }
+          break;
+        }
+        case 'wave': {
+          // 円の衝撃波（src/eco/attack.ts）：打った所から光の輪が広がる。輪が届く大きさが当たる範囲そのもの（僧侶の聖なる波動は金、火球の爆ぜは橙）
+          const R = r.rad ?? 48;
+          if (age < 10) {
+            const rr = R * Math.min(1, (age + 1) / 6);
+            const n = Math.max(8, Math.round((6.283 * rr) / 12));
+            const fr = Math.min(3, age >> 1);
+            for (let i = 0; i < n; i++) {
+              const a = (i / n) * 6.283;
+              push(r.ax + Math.cos(a) * rr, r.ay + Math.sin(a) * rr, 3, false, A.fx(`ring:1:${r.col}:${Math.min(5, 1 + fr)}`), 0, 4);
+              push(r.ax + Math.cos(a + 0.2) * rr * 0.92, r.ay + Math.sin(a + 0.2) * rr * 0.92, 5, false, A.fx(`bit:4:${r.col}:${fr}`), 0, 4);
+            }
+            if (age < 6) push(r.ax, r.ay + 3, 1, false, A.fx(`ring:2:${r.col}:${f6(age)}`), 0, 4);
+            dyn.push({ x: r.ax, y: r.ay - 6, r: rr + 20, i: 0.4 * damp * (1 - age / 10), c: r.col === 2 ? 2 : 1 });
+          }
+          if (once && R > 40) {
+            this.marks.push({ x: r.ax, y: r.ay + 3, key: `crack:${r.t % 3}`, t: now });
+            for (let i = 0; i < 10; i++) {
+              const a = (i / 10) * 6.283;
+              this.bits.push({ x: r.ax + Math.cos(a) * 8, y: r.ay + Math.sin(a) * 8, z: 2, vx: Math.cos(a) * 1.4, vy: Math.sin(a) * 0.7, vz: 1.2, kind: 0, col: 6, t0: now, life: 16 });
+            }
+          }
+          break;
+        }
+        case 'slashwave': {
+          // 戦士の飛ぶ斬撃（src/eco/adventurer.ts）：三日月形の斬撃の波（src/sprites.ts の fxCrescent2）。
+          // 振り抜きの引き伸ばされた弧から三日月にまとまって前へ飛び（4 tick）、止まった所で細くなって光の破片に砕けて散る。
+          // 走った長さが当たった範囲（2体まで貫いて止まる）。最初に当たった者には、斬撃が通るときに火花が散る
+          const len = r.rad ?? dist;
+          const d16 = (Math.round(Math.atan2(uy, ux) / (Math.PI / 8)) + 16) % 16;
+          const qAt = (g: number) => Math.min(1, (g + 0.6) / 4.6);
+          if (age < 8) {
+            const q = qAt(age);
+            const drift = age > 4 ? (age - 4) * 2 : 0;
+            const x = r.ax + ux * (len * q + drift);
+            const y = r.ay + uy * (len * q + drift);
+            push(x, y, lift, false, A.fx(`crescent2:${d16}:${age}`), 0, 4);
+            // 飛ぶあいだ、ひとつ前の位置に薄い残像
+            if (age >= 1 && age <= 4) push(r.ax + ux * len * qAt(age - 1), r.ay + uy * len * qAt(age - 1), lift, false, A.fx(`crescent2:${d16}:5`), 0, 4);
+            dyn.push({ x, y: y - 8, r: 38, i: 0.45 * damp * (1 - age / 8), c: 0 });
+          }
+          const tgt = eco.byId.get(r.did);
+          if (tgt) {
+            const qh = Math.max(0, Math.min(1, ((tgt.x - r.ax) * ux + (tgt.y - r.ay) * uy) / (len || 1)));
+            const hAge = age - Math.round(qh * 4);
+            if (hAge >= 0 && hAge < 4) push(tgt.x, tgt.y, lift, false, A.fx(`slashhit:${hAge}`), 0, 4);
+          }
+          break;
+        }
+        case 'greatsword': {
+          // 竜殺しの光の大剣（src/eco/adventurer.ts）：光の大剣（src/sprites.ts の fxGreatBlade の柄と鍔・刀身の一節・切っ先をつないだもの）が竜殺しの手から伸び、
+          // 扇の片側から反対側へゆっくり薙ぎ払う。うしろに薄れていく残像の剣が弧を描く。刀身の長さが当たる範囲
+          const R = r.rad ?? 88;
+          const H = r.half ?? 1.3;
+          const a0 = Math.atan2(uy, ux);
+          const blade = (a: number, f: number, hilt: boolean) => {
+            const cx = Math.cos(a);
+            const cy = Math.sin(a);
+            const d16 = (Math.round(a / (Math.PI / 8)) + 32) % 16;
+            if (hilt) push(r.ax + cx * 8, r.ay + cy * 8, lift + 2, false, A.fx(`gblade:${d16}:0:${f}`), 0, 4);
+            for (let d = 22; d < R - 10; d += 10) push(r.ax + cx * d, r.ay + cy * d, lift + 2, false, A.fx(`gblade:${d16}:1:${f}`), 0, 4);
+            push(r.ax + cx * (R - 8), r.ay + cy * (R - 8), lift + 2, false, A.fx(`gblade:${d16}:2:${f}`), 0, 4);
+          };
+          if (age < 9) {
+            const prog = Math.min(1, (age + 1) / 6);
+            const a = a0 - H + 2 * H * prog;
+            // 残像は振っているあいだだけ、淡く細く2本
+            if (age < 6) for (let k = 2; k >= 1; k--) if (prog - k * 0.12 > 0) blade(a0 - H + 2 * H * (prog - k * 0.12), k === 1 ? 2 : 3, false);
+            blade(a, age === 0 ? 0 : age < 6 ? 1 : age < 8 ? 2 : 3, true);
+            dyn.push({ x: r.ax + Math.cos(a) * R * 0.6, y: r.ay + Math.sin(a) * R * 0.6 - 8, r: R * 0.75, i: 0.5 * damp * (1 - age / 9), c: 1 });
+          }
+          if (once)
+            for (let i = 0; i < 10; i++) {
+              const a = a0 - H + (2 * H * i) / 9;
+              this.bits.push({ x: r.ax + Math.cos(a) * R * 0.95, y: r.ay + Math.sin(a) * R * 0.95, z: 2, vx: Math.cos(a) * 0.9, vy: Math.sin(a) * 0.45, vz: 0.7, kind: 1, col: 0, t0: now, life: 14 });
+            }
+          break;
+        }
+        case 'cross': {
+          // 僧侶のハンマー（src/eco/adventurer.ts）：打った所に光の十字架（src/sprites.ts の fxHolyCross）。衝撃の閃光から、地面を縦横に光が走り（当たる範囲そのもの、腕3マス）、
+          // 光の十字架が立ち上がって砕け、光の粒が立ちのぼる
+          if (age < 16) {
+            const f = Math.min(7, age < 2 ? age : 2 + Math.floor((age - 2) / 2));
+            push(r.dx, r.dy, 0, false, A.fx(`holycross:${f}`), 0, 4);
+            dyn.push({ x: r.dx, y: r.dy - 18, r: 70, i: 0.6 * damp * (1 - age / 16), c: 1 });
+          }
+          if (once) {
+            spray(0, 6, 8, 1.2, 2.0);
+            this.marks.push({ x: r.dx, y: r.dy + 3, key: `crack:${r.t % 3}`, t: now });
+          }
+          break;
+        }
+        case 'missile': {
+          // 魔法使いのマジックミサイル（src/eco/adventurer.ts）：白い芯の紫の魔力の弾（src/sprites.ts の fxMissileHead）が、
+          // 杖からまず左右へ分かれて飛び出し、それから曲がって狙った相手を追いかける。通り道に沿って、細くなっていく紫の帯の尾（fxMissileDisc を密に重ねたもの）を引き、
+          // 尾から魔力の粒がこぼれる。届くと紫に弾ける（fxMissileBurst）。4発は少しずつずれて飛び出す
+          const fly = r.fly ?? 8;
+          const tgt = eco.byId.get(r.did);
+          const ex = tgt && !tgt.dead ? tgt.x : r.dx;
+          const ey = tgt && !tgt.dead ? tgt.y : r.dy;
+          const ni = (r.n ?? 0) % 4;
+          const side = [-1, 1, -0.65, 0.65][ni];
+          const spread = Math.min(30, 14 + dist * 0.25) * (ni < 2 ? 1 : 0.7);
+          const ox = r.ax + ux * 4;
+          const oy = r.ay + uy * 4;
+          // 三次ベジェ：飛び出し（横へ、少しうしろへ）→ 相手の手前から真っすぐ相手へ
+          const c1x = ox - uy * spread * side - ux * 6;
+          const c1y = oy + ux * spread * side - uy * 6;
+          const c2x = ex - ux * dist * 0.35 - uy * spread * side * 0.3;
+          const c2y = ey - uy * dist * 0.35 + ux * spread * side * 0.3;
+          const at = (q: number) => {
+            const k = 1 - q;
+            const a1 = k * k * k, a2 = 3 * k * k * q, a3 = 3 * k * q * q, a4 = q * q * q;
+            return [a1 * ox + a2 * c1x + a3 * c2x + a4 * ex, a1 * oy + a2 * c1y + a3 * c2y + a4 * ey];
+          };
+          const start = ni * 0.6;
+          const qa = (age - start) / (fly - start);
+          if (qa >= 0 && qa < 1) {
+            const q = qa;
+            const [hx, hy] = at(q);
+            // 尾：弾から後ろへ、通り道に沿って密に（長さはおよそ弾の道のりの半分まで）
+            const tail = Math.min(q, 0.5);
+            const steps = Math.max(6, Math.round(tail * (dist + spread) / 1.6));
+            for (let i = steps; i >= 1; i--) {
+              const qq = q - (tail * i) / steps;
+              const [tx, ty] = at(qq);
+              const k = Math.min(5, Math.floor((i / steps) * 6));
+              push(tx, ty, lift + 3, false, A.fx(`mmdisc:${k}`), 0, 4);
+            }
+            // こぼれる粒：尾の途中から、少し外へ流れて光ってしぼむ
+            for (let j = 0; j < 2; j++) {
+              const ph = ((age + j * 1.9 + ni) % 4) / 4;
+              const [sx, sy] = at(Math.max(0, q - tail * (0.45 + j * 0.3)));
+              const ang = (r.t * 3 + j * 2.1 + ni) % 6.283;
+              push(sx + Math.cos(ang) * ph * 6, sy + Math.sin(ang) * ph * 4, lift + 3 + ph * 4, false, A.fx(`mmspark:${Math.min(3, Math.floor(ph * 4))}`), 0, 4);
+            }
+            push(hx, hy, lift + 3, false, A.fx(`mmhead:${age & 3}`), 0, 4);
+            dyn.push({ x: hx, y: hy - lift, r: 44, i: 0.6 * damp, c: 2 });
+            const [mx2, my2] = at(Math.max(0, q - tail * 0.5));
+            dyn.push({ x: mx2, y: my2 - lift, r: 30, i: 0.3 * damp, c: 2 });
+          } else if (age >= fly && age < fly + 6) {
+            push(ex, ey, lift, false, A.fx(`mmburst:${age - fly}`), 0, 4);
+            dyn.push({ x: ex, y: ey - lift, r: 48, i: 0.6 * damp * (1 - (age - fly) / 6), c: 2 });
+          }
+          break;
+        }
+        case 'rain': {
+          // 狩人の矢の雨（src/eco/adventurer.ts）：矢が弧を描いて高く上がり、狙った所のまわりに少しばらけて降る。落ちた所ごとに小さな毒の煙（fxPoisonPuff）、
+          // 落ちきると毒の煙の塊（fxPoisonCloud）がふくらんで散る（落ちたときにそこにいた者に当たる）
+          const fly = r.fly ?? 12;
+          const n = r.n ?? 6;
+          const R = r.rad ?? 20;
+          const H = Math.max(36, dist * 0.55);
+          for (let i = 0; i < n; i++) {
+            const lx = r.dx + ((((r.t * 7 + i * 53) % 21) - 10) / 10) * R * 0.8;
+            const ly = r.dy + ((((r.t * 11 + i * 37) % 21) - 10) / 10) * R * 0.6;
+            const q = (age - (i % 3) * 0.7 + 1) / fly;
+            if (q < 0) continue;
+            if (q < 1) {
+              const x = r.ax + (lx - r.ax) * q;
+              const y = r.ay + (ly - r.ay) * q;
+              const z = 8 + Math.sin(q * Math.PI) * H;
+              const sx = lx - r.ax;
+              const sy = ly - r.ay - Math.cos(q * Math.PI) * Math.PI * H;
+              const d8 = (Math.round(Math.atan2(sy, sx) / (Math.PI / 4)) + 8) % 8;
+              push(x, y, z, false, A.fx(`arrow2:${d8}`), 0, 4);
+            } else {
+              const pa = Math.floor((q - 1) * fly);
+              if (pa < 4) push(lx, ly, 3, false, A.fx(`ppuff:${pa}`), 0, 4);
+            }
+          }
+          if (age >= fly && age < fly + 16) push(r.dx, r.dy, 4, false, A.fx(`pcloud:${Math.min(7, (age - fly) >> 1)}`), 0, 4);
+          break;
+        }
+        case 'armorsweep':
+        case 'minosweep': {
+          // ミノタウロスの斧の薙ぎ払い（src/eco/charge.ts。リビングアーマーの武器の大振りは同じ形を未練の青白い光で）：鉄の銀から暗い赤へ移る重い軌跡の帯（src/sprites.ts の fxMinoSweep を扇の外の縁に沿って並べたもの）が、
+          // 扇の片側から反対側へ3 tick で走り、通ったあとは細く暗くなって消える（一本の太い帯。二重にすると虹の縞に見えた）。帯の外の縁までがおよそ当たる範囲
+          const R = r.rad ?? 64;
+          const H = r.half ?? 1.1;
+          const a0 = Math.atan2(uy, ux);
+          const n = Math.max(10, Math.round((2 * H * R) / 4));
+          for (const [k, rad, add] of [[0, 0.82, 0]] as [number, number, number][]) {
+            for (let i = 0; i <= n; i++) {
+              const q = i / n;
+              const pass = q * 3;
+              const fr = Math.floor(age - pass) + add;
+              if (age < pass || fr > 5) continue;
+              // 軌跡の先頭（通ったばかりの一片）と、弧の両端の一片は細く描く（太い一片だけが先に出たり端に残ったりすると、四角い塊に見えた）
+              const lead = (age - pass < 1 && age > 0.5) || i === 0 || i === n;
+              const edge = i === 1 || i === n - 1;
+              const a = a0 - H + 2 * H * q;
+              const d16 = (Math.round((a + Math.PI / 2) / (Math.PI / 8)) + 32) % 16;
+              push(r.ax + Math.cos(a) * R * rad, r.ay + Math.sin(a) * R * rad, lift - 2 - k, false, A.fx(`${r.style === 'armorsweep' ? 'asweep' : 'msweep'}:${d16}:${lead ? Math.max(4, fr) : edge ? Math.max(3, fr) : Math.max(0, fr)}`), 0, 4);
+            }
+          }
+          if (age < 6) dyn.push({ x: r.ax + ux * R * 0.6, y: r.ay + uy * R * 0.6 - 8, r: R * 0.8, i: 0.35 * damp * (1 - age / 6), c: 0 });
+          if (once) spray(1, 0, 6, 1.0, 0.8);
+          break;
+        }
+        case 'minocharge': {
+          // ミノタウロスの突進（src/eco/charge.ts）：走ったあとの道に、土ぼこりの雲が次々に立って散る
+          const m = eco.byId.get(r.aid);
+          const fly = r.fly ?? 20;
+          const L = dist;
+          const run = m && !m.dead && age <= fly ? Math.max(0, (m.x - r.ax) * ux + (m.y - r.ay) * uy) : L;
+          for (let d = 6, i = 0; d < Math.min(L, run); d += 12, i++) {
+            const born = (d / Math.max(1, L)) * fly;
+            const fa = Math.floor((age - born) / 2);
+            const side = (i % 2 ? 1 : -1) * 5;
+            // 大きな雲は3つに1つ（小さめのコマまで）、あいだは小さな土ぼこり
+            if (i % 3 === 0) {
+              if (fa >= 0 && fa <= 5) push(r.ax + ux * d - uy * side, r.ay + uy * d + ux * side, 2, false, A.fx(`dcloud:${Math.max(0, fa - 1)}`), 0, 4);
+            } else if (fa >= 0 && fa <= 3) push(r.ax + ux * d - uy * side, r.ay + uy * d + ux * side, 2, false, A.fx(`dpuff:${fa}`), 0, 4);
+          }
+          break;
+        }
+        case 'minoimpact': {
+          // 突進が当たった所の衝撃（src/sprites.ts の fxMinoImpact）：はね飛ばしは白い閃光と砂色の輪、戦士か僧侶が受け止めたら金の火花、壁なら大きな茶の輪と岩のかけら
+          if (age < 9) push(r.dx, r.dy, 4, false, A.fx(`mimpact:${r.col}:${Math.min(5, Math.floor(age * 0.7))}`), 0, 4);
+          if (age < 5) dyn.push({ x: r.dx, y: r.dy - 8, r: 40, i: 0.45 * damp * (1 - age / 5), c: r.col === 1 ? 1 : 0 });
+          if (once) spray(r.col === 2 ? 0 : 1, r.col === 1 ? 1 : 6, 6, 1.3, 1.4);
+          break;
+        }
+        case 'gslam': {
+          // ゴーレムの両腕の振り下ろし（src/eco/charge.ts）：打った所から、岩の破片と土の輪が3マスまで広がる（当たる範囲）。地面にひびが残る
+          if (age < 10) push(r.ax, r.ay, 1, false, A.fx(`gslam:${Math.min(5, Math.floor(age * 0.7))}`), 0, 4);
+          if (age < 6) dyn.push({ x: r.ax, y: r.ay - 10, r: 70, i: 0.45 * damp * (1 - age / 6), c: 0 });
+          if (once) {
+            spray(0, 6, 12, 1.6, 2.4);
+            spray(1, 0, 8, 1.0, 0.8);
+            this.marks.push({ x: r.ax, y: r.ay + 3, key: `crack:${r.t % 3}`, t: now });
+          }
+          break;
+        }
+        case 'gquake': {
+          // ゴーレムの跳ねる衝撃波（src/eco/charge.ts）：ゴーレムから相手の方へ、小さな丸い衝撃波が1マスおきに8回、1 tick ずつ間を置いて跳ねる（落ちる所は少し散らばる）。
+          // 落ちた所ごとに、中心が白く光って白っぽい輪が広がり（輪の大きさが当たる範囲）、灰色の破片が外へ散る。地面の種類を選ばない（白と灰色だけ）
+          const n = r.n ?? HOP_N;
+          for (let i = 1; i <= n; i++) {
+            const g = age - i * HOP_DT;
+            if (g < 0 || g >= 9) continue;
+            const [hx, hy] = hopAt(r.aid, r.rad ?? 0, r.ax, r.ay, ux, uy, i);
+            push(hx, hy, 1, false, A.fx(`shock:${Math.min(5, Math.floor(g * 0.7))}`), 0, 4);
+            if (g < 3) dyn.push({ x: hx, y: hy - 6, r: 22, i: 0.35 * damp * (1 - g / 3), c: 0 });
+            if (g < 6)
+              for (let j = 0; j < 2; j++) {
+                const a = j * 3.14 + i * 1.3;
+                const q = g / 6;
+                push(hx + Math.cos(a) * (4 + 8 * q), hy + Math.sin(a) * (4 + 8 * q) * 0.8, Math.sin(q * Math.PI) * 4, false, A.fx(`pebble:${(i + j) % 2}`), 0, 4);
+              }
+          }
+          break;
+        }
+        case 'armorbash': {
+          // リビングアーマーの盾の体当たり（src/eco/charge.ts）：走るあいだ、鎧の前に未練の青白い光の壁（src/sprites.ts の fxShieldWall）が立つ
+          const m = eco.byId.get(r.aid);
+          const fly = r.fly ?? 14;
+          if (m && !m.dead && age <= fly + 2) {
+            const d16 = (Math.round(Math.atan2(uy, ux) / (Math.PI / 8)) + 16) % 16;
+            const mx = m.x;
+            const my = m.y;
+            const f = age > fly ? 3 : age < 2 ? 0 : 1;
+            push(mx + ux * 9, my + uy * 9, lift, false, A.fx(`swall:${d16}:${f}`), 0, 4);
+            dyn.push({ x: mx + ux * 9, y: my + uy * 9 - lift, r: 34, i: 0.45 * damp, c: 2 });
+          }
+          break;
+        }
+        case 'drain': {
+          // ヴァンパイアの血吸い（src/eco/vampskill.ts）：相手からヴァンパイアの手もとへ、つやのある赤い血の玉（src/sprites.ts の fxBloodOrb）が、
+          // 細くなっていく赤い尾（fxBloodDisc を密に重ねたもの）を引いて、ゆるい弧を描きながら次々に流れていく。吸っているあいだだけ（切れたら消える）
+          const v = eco.byId.get(r.aid);
+          const d = eco.byId.get(r.did);
+          if (!v || v.dead || !d || d.dead || v.run <= 0 || v.aim !== r.did || age > (r.fly ?? 20)) break;
+          const sx = d.x;
+          const sy = d.y;
+          const fx = v.x + (v.dir === 2 ? 5 : v.dir === 3 ? -5 : 0);
+          const fy = v.y + (v.dir === 0 ? 3 : v.dir === 1 ? -3 : 0);
+          const L = Math.hypot(fx - sx, fy - sy) || 1;
+          const px = -(fy - sy) / L;
+          const py = (fx - sx) / L;
+          const at = (q: number, side: number) => {
+            const bend = Math.sin(q * Math.PI) * Math.min(10, L * 0.18) * side;
+            return [sx + (fx - sx) * q + px * bend, sy + (fy - sy) * q + py * bend];
+          };
+          for (let i = 0; i < 4; i++) {
+            const q = (age * 0.07 + i / 4) % 1;
+            const side = i % 2 ? 1 : -1;
+            const steps = 6;
+            for (let j = steps; j >= 1; j--) {
+              const qq = q - j * 0.035;
+              if (qq < 0) continue;
+              const [tx, ty] = at(qq, side);
+              push(tx, ty, lift + 1 + Math.sin(qq * Math.PI) * 4, false, A.fx(`bdisc:${Math.min(5, j - 1)}`), 0, 4);
+            }
+            const [hx, hy] = at(q, side);
+            push(hx, hy, lift + 1 + Math.sin(q * Math.PI) * 4, false, A.fx(`borb:${(Math.floor(age / 2) + i) & 3}`), 0, 4);
+          }
+          dyn.push({ x: fx, y: fy - 10, r: 26, i: 0.4 * damp, c: 6 });
+          dyn.push({ x: sx, y: sy - 8, r: 18, i: 0.25 * damp, c: 6 });
+          break;
+        }
+        case 'batswarm': {
+          // ヴァンパイアのコウモリの群れ（src/eco/vampskill.ts）：ヴァンパイアの前から相手の方へ、黒いコウモリの群れが帯になって突っ込み、
+          // 群れの先が届いた所で羽ばたいて渦を巻き、散っていく（当たるのは、群れが届いた時に通り道にいた者）
+          const fly = r.fly ?? 12;
+          const n = r.n ?? 8;
+          for (let i = 0; i < n; i++) {
+            const lag = (i % 4) * 0.9 + Math.floor(i / 4) * 0.4;
+            const p = (age - lag) / fly;
+            if (p < 0) continue;
+            const wob = Math.sin(age * 0.9 + i * 1.7) * (3 + (i % 3) * 2);
+            let bx: number;
+            let by: number;
+            let z = lift + 4 + (i % 3) * 3;
+            if (p <= 1) {
+              bx = r.ax + vx * p - uy * wob;
+              by = r.ay + vy * p + ux * wob;
+            } else {
+              const g = (age - lag - fly) / 8;
+              if (g >= 1) continue;
+              const an = i * 2.399 + g * 3;
+              bx = r.dx + Math.cos(an) * (4 + g * 18);
+              by = r.dy + Math.sin(an) * (4 + g * 18) * 0.6;
+              z += g * 10;
+            }
+            push(bx, by, z, vx < 0, A.index(1, 2, 1, (age + i) & 3), 0, 4);
+          }
+          break;
+        }
+        case 'batreturn': {
+          // コウモリの群れの戻り（src/eco/attack.ts の resolveVolleys）：噛みついたコウモリが、足に赤い血の玉をつかんで、
+          // 打たれた者からヴァンパイアのもとへ、ゆるい弧を描いて飛んで戻る。着くと、ヴァンパイアのまわりが赤く光る
+          const fly = r.fly ?? 10;
+          const v = eco.byId.get(r.aid);
+          const ex = v && !v.dead ? v.x : r.dx;
+          const ey = v && !v.dead ? v.y : r.dy;
+          const L = Math.hypot(ex - r.ax, ey - r.ay) || 1;
+          const px = -(ey - r.ay) / L;
+          const py = (ex - r.ax) / L;
+          for (let i = 0; i < 2; i++) {
+            const p = (age - i * 1.5) / fly;
+            if (p < 0 || p > 1) continue;
+            const bend = Math.sin(p * Math.PI) * 10 * (i ? -1 : 1);
+            const bx = r.ax + (ex - r.ax) * p + px * bend;
+            const by = r.ay + (ey - r.ay) * p + py * bend;
+            const z = lift + 6 + Math.sin(p * Math.PI) * 8;
+            push(bx, by, z, ex < r.ax, A.index(1, 2, 1, (age + i) & 3), 0, 4);
+            push(bx, by + 0.05, z - 4, false, A.fx(`borb:${(Math.floor(age / 2) + i) & 3}`), 0, 4);
+          }
+          const g = age - fly;
+          if (g >= 0 && g < 6) dyn.push({ x: ex, y: ey - 10, r: 30, i: 0.5 * damp * (1 - g / 6), c: 6 });
+          break;
+        }
+        case 'miststep': {
+          // 霧の歩み（src/eco/vampskill.ts）：消えた所から現れた所へ、黒い霧の筋が一瞬だけ走る
+          if (age >= 8) break;
+          for (let i = 0; i < 6; i++) {
+            const p = i / 5;
+            const g = age / 8;
+            push(r.ax + vx * p, r.ay + vy * p + 0.1, 6 + Math.sin(p * Math.PI) * 6, i % 2 === 1, A.mist(Math.min(3, Math.floor(g * 4 + (1 - p) * 1.5))), 0, 0);
+          }
+          break;
+        }
         case 'breath':
           break;
         case 'puff':
@@ -760,8 +1157,12 @@ export class CreatureView {
         const r = 10 + ((v.id + i * 13) % 9);
         pushSprite(v.hx + Math.cos(a) * r, v.hy + 4 + Math.sin(a) * r * 0.5, 0, i % 2 === 1, A.blood(0, (v.id + i) & 3), 0, 2);
       }
-      pushSprite(v.hx, v.hy + 2, 0, false, A.coffin(v.st !== VAMP_COFFIN), 0, 2);
+      // 住処の外で眠り込んだときは、その場に呼び出した棺で眠る（住処の棺は空のまま）
+      const away = v.st === VAMP_COFFIN && (Math.abs(v.x - v.hx) > 1 || Math.abs(v.y - v.hy) > 1);
+      pushSprite(v.hx, v.hy + 2, 0, false, A.coffin(v.st !== VAMP_COFFIN || away), 0, 2);
     }
+    for (const v of eco.list)
+      if (v.k === Kind.Vampire && !v.dead && v.st === VAMP_COFFIN && (Math.abs(v.x - v.hx) > 1 || Math.abs(v.y - v.hy) > 1) && inView(v.x, v.y, 24)) pushSprite(v.x, v.y + 2, 0, false, A.coffin(false), 0, 2);
     // コボルトの住処：畑の畝、奥の寝床、入口の飾り柱、罠
     for (const wr of eco.warrens) {
       if (wr.id < 0 || !inView(wr.x, wr.y, 96)) continue;
@@ -1161,7 +1562,8 @@ export class CreatureView {
     for (const ef of eco.fxVampMist) {
       const tt = eco.w.tick + alpha;
       const age = tt - ef.t;
-      const dur = ef.how ? 36 : 28;
+      // how：0 コウモリにばらけた、1 姿を戻した、2 霧の歩みで消えた、3 霧の歩みで現れた（src/eco/vampskill.ts）
+      const dur = ef.how === 1 ? 36 : ef.how >= 2 ? 18 : 28;
       if (age < 0 || age >= dur || !inView(ef.x, ef.y, 60)) continue;
       const ph = age / dur;
       for (let i = 0; i < 5; i++) {
@@ -1236,7 +1638,8 @@ export class CreatureView {
         act = 2;
         f = braced.get(c.id) === 1 ? 1 : 0;
       } else if (act === 2) {
-        f = Math.min(3, c.actT);
+        // 魔法使いの詠唱中（経過が負の数。src/eco/skill.ts）は、杖を掲げたコマのまま
+        f = c.actT < 0 ? 1 : Math.min(3, c.actT);
       } else if (act === 1 && c.x === c.px && c.y === c.py && eco.gaitPaused(c)) {
         // 歩き方の止まる番（大ネズミの「止まってあたりをうかがう」、一行の先頭が見回す、など）で、この更新ではその場から動いていない。
         // 行動の多くは移動のあとで「着いていなければ歩く姿」と姿を決め直すので、act は歩く姿のままになっている。
@@ -1285,6 +1688,90 @@ export class CreatureView {
             const ph = (t * 0.045 + i * 0.37) % 1;
             pushSprite(x + Math.sin(t * 0.2 + i * 2.1) * (4 + (i % 3) * 2), yy + 0.06, lift + 2 + ph * bh, false, A.speck(1, Math.min(3, Math.floor(ph * 4))), 0, 2);
           }
+        }
+      }
+      // ミノタウロスの突進の溜め（src/eco/charge.ts）：頭を下げて、鼻先から白い息を吹き、足もとで地面をかいて土ぼこりを立てる（描画専用）
+      if (sp === Kind.Minotaur && !c.dead && c.run === -1 && c.act === 2 && c.actT < 0) {
+        const t = eco.w.tick + alpha;
+        const fx = dir === 2 ? 1 : dir === 3 ? -1 : 0;
+        const fy = dir === 0 ? 1 : dir === 1 ? -1 : 0;
+        const ph = Math.floor(t / 2) % 4;
+        pushSprite(x + fx * 11, yy + fy * 4 + 0.05, lift + 14, false, A.fx(`snort:${ph}`), 0, 2);
+        pushSprite(x - fx * 6 + ((Math.floor(t / 3) & 1) ? 3 : -3), yy - fy * 3 + 0.05, lift + 1, false, A.fx(`dpuff:${Math.floor(t / 1.5) % 4}`), 0, 2);
+      }
+      // ゴーレムの溜め（src/eco/charge.ts）：体の符文が水色に光り、まわりに符文が浮かぶ（跳ねる衝撃波の溜めでは、走る向きを向いて構える。地面には何も出さない）（描画専用）
+      if (sp === Kind.Golem && !c.dead && c.act === 2 && c.actT < 0) {
+        const t = eco.w.tick + alpha;
+        const bh = Ecology.bodySize(sp);
+        for (let i = 0; i < 3; i++) {
+          const a = t * 0.12 + (i * Math.PI * 2) / 3;
+          pushSprite(x + Math.cos(a) * 10, yy + Math.sin(a) * 3 + 0.06, lift + bh * 0.6 + Math.sin(t * 0.3 + i) * 2, false, A.fx(`rune:${(i + Math.floor(t / 6)) % 4}`), 0, 2);
+        }
+        dyn.push({ x, y: yy - bh * 0.6, r: 46, i: 0.5 + 0.2 * Math.sin(t * 0.5), c: 2 });
+      }
+      // リビングアーマーの溜め（src/eco/charge.ts）：鎧の隙間から未練の青白い光が漏れ、光の粒が立ちのぼる（描画専用。体は src/creatureView.ts の震えで描く）
+      if (sp === Kind.Armor && !c.dead && c.act === 2 && c.actT < 0) {
+        const t = eco.w.tick + alpha;
+        const bh = Ecology.bodySize(sp);
+        dyn.push({ x, y: yy - bh * 0.5, r: 30 + (c.run === -1 ? 10 : 0), i: 0.45 + 0.2 * Math.sin(t * 1.3), c: 2 });
+        for (let i = 0; i < 3; i++) {
+          const ph = (t * 0.06 + i * 0.33 + c.id * 0.1) % 1;
+          pushSprite(x + Math.sin(i * 2.1 + t * 0.4) * 5, yy + 0.06, lift + bh * 0.3 + ph * bh * 0.8, false, A.fx(`bit:4:7:${Math.min(3, Math.floor(ph * 4))}`), 0, 2);
+        }
+      }
+      // ヴァンパイアの技の溜め（src/eco/vampskill.ts）：血吸いは、かざした手のまわりに赤い血の玉が集まって脈打つ。
+      // コウモリの群れは、まわりにコウモリが集まって渦を巻く。霧の歩みは、足もとから体が黒い霧になって崩れていく（描画専用）
+      if (sp === Kind.Vampire && !c.dead && c.act === 2 && c.actT < 0 && c.run < 0) {
+        const t = eco.w.tick + alpha;
+        const bh = Ecology.bodySize(sp);
+        const hx = x + (dir === 2 ? 6 : dir === 3 ? -6 : 0);
+        if (c.run === -1) {
+          for (let i = 0; i < 3; i++) {
+            const a = t * 0.5 + (i * Math.PI * 2) / 3;
+            pushSprite(hx + Math.cos(a) * 4, yy + Math.sin(a) * 2 + 0.06, lift + bh * 0.7 + Math.sin(a) * 2, false, A.fx(`borb:${(Math.floor(t / 2) + i) & 3}`), 0, 2);
+          }
+          dyn.push({ x: hx, y: yy - bh * 0.7, r: 24, i: 0.45, c: 6 });
+        } else if (c.run === -2) {
+          for (let i = 0; i < 6; i++) {
+            const a = t * 0.3 + (i * Math.PI * 2) / 6;
+            const rr = 10 + (i % 2) * 4;
+            pushSprite(x + Math.cos(a) * rr, yy + Math.sin(a) * rr * 0.5 + 0.06, lift + bh * 0.8 + (i % 3) * 3, Math.sin(a) > 0, A.index(1, 2, 1, (Math.floor(t) + i) & 3), 0, 2);
+          }
+        } else {
+          // 霧の歩みの溜め：溜めが進むほど、足もとから灰紫の影の霧（src/sprites.ts の fxShadowPuff）が湧いて体を包み、小さなコウモリが体からはがれて舞い上がる
+          const p = Math.max(0, Math.min(1, (SKILL_VAMP_MIST.windup + c.actT + alpha) / SKILL_VAMP_MIST.windup));
+          // 足もとに広がる影の霧の塊（溜めが進むほど大きく）と、体の手前と左右を立ちのぼる霧の玉
+          pushSprite(x, yy + 3, 1, false, A.fx(`scloud:${Math.min(2, Math.floor(p * 3))}`), 0, 2);
+          const n = 5 + Math.round(p * 7);
+          for (let i = 0; i < n; i++) {
+            const ph = (t * 0.1 + i / n) % 1;
+            const sw = 5 + p * 7;
+            pushSprite(x + Math.sin(i * 2.4 + t * 0.35) * sw, yy + 2 + (i % 3) + 0.08, lift + ph * bh * (0.5 + p * 0.7), i % 2 === 1, A.fx(`spuff:${Math.min(3, Math.floor(ph * 4))}`), 0, 2);
+          }
+          for (let i = 0; i < 2; i++) {
+            const ph = (t * 0.07 + i * 0.5) % 1;
+            if (p < 0.3) continue;
+            pushSprite(x + (i ? 1 : -1) * (3 + ph * 12), yy + 0.09, lift + bh * 0.6 + ph * 14, i === 0, A.index(1, 2, 1, (Math.floor(t) + i) & 3), 0, 0);
+          }
+          dyn.push({ x, y: yy - bh * 0.5, r: 26, i: 0.3 * p, c: 2 });
+        }
+      }
+      // 怯んだ者（src/eco/charge.ts）：頭の上で小さな星が三つ回る（描画専用）
+      if (!c.dead && c.stun > 0) {
+        const t = eco.w.tick + alpha;
+        const bh = Ecology.bodySize(sp) * 0.9 + 6;
+        for (let i = 0; i < 3; i++) {
+          const a = t * 0.35 + (i * Math.PI * 2) / 3;
+          pushSprite(x + Math.cos(a) * 6, yy + Math.sin(a) * 2 + 0.07, lift + bh + Math.sin(a) * 1.5, false, A.fx(`stunstar:${Math.floor(t / 2 + i) % 4}`), 0, 2);
+        }
+      }
+      // 毒の者（src/eco/attack.ts の poisonTick）：体のまわりから緑の泡が立ちのぼる（描画専用）
+      if (!c.dead && c.poison > 0) {
+        const t = eco.w.tick + alpha;
+        const bh = Ecology.bodySize(sp) * 0.8 + 4;
+        for (let i = 0; i < 3; i++) {
+          const ph = (t * 0.035 + i * 0.33 + c.id * 0.13) % 1;
+          pushSprite(x + Math.sin(t * 0.15 + i * 1.9) * (3 + (i % 2) * 3), yy + 0.06, lift + 2 + ph * bh, false, A.fx(`pbubble:${Math.min(3, Math.floor(ph * 4))}`), 0, 2);
         }
       }
       // マナから生まれた者の出現（描画専用）：生まれる場所にマナの粒が渦を巻いて集まり、影の姿から白く光って形が固まる。
@@ -1364,19 +1851,6 @@ export class CreatureView {
           pushSprite(x + Math.cos(a) * fh * 0.5, yy + 0.1, lift + 2 + ((i * 3 + Math.floor(t * 4)) % Math.max(2, Math.round(fh * 0.8))), false, A.fx('bit:3:7:0'), 0, 4);
         }
       }
-      // 逃げる途中で縮こまっている者（src/eco/combat.ts の cower）：相手の方を向いて小刻みに震え、3秒に一度、0.6秒ほど左右をうかがう。
-      // （立ち止まっているだけだと、動けなくなって固まったように見えるので、怯えていると分かる姿にする）
-      if (!c.dead && c.flee > 0 && c.act === 0 && c.sleep === 0 && !c.caught && sp !== Kind.Wisp && sp !== Kind.Ghost) {
-        x += Math.sin(t * 40 + c.id) * 0.6;
-        const ph = (t + (c.id % 13) * 0.23) % 3;
-        if (ph < 0.6) {
-          if (dir === 2) flip = !flip;
-          else {
-            dir = 2;
-            flip = ph < 0.3;
-          }
-        }
-      }
       // 床から養分を吸うスライム：吸う一口ごと（生き物の更新10回に1回）に、まわりの床から緑の粒が体へ吸い込まれる（src/eco/slime.ts の slimeCanSip）
       if (sp === Kind.Slime && !c.dead && c.elite !== 6 && eco.slimeCanSip(c)) {
         const age = ((((eco.step - (c.id % 10)) % 10) + 10) % 10) + alpha * 0.5;
@@ -1403,7 +1877,8 @@ export class CreatureView {
       }
       const bright = sp === Kind.Wisp && c.glow > 90 ? 1 : 0;
       // 隠れている者（ほかの生き物には気づかれない）：眺める人には、暗く沈んだ影の姿と光る目で見せる
-      const hidden = eco.isHidden(c);
+      // 身をひそめている者（コボルトとゴブリンの隠れ方と、逃げて巣や住みかの中へ身を隠した者。src/eco/combat.ts の denHidden）：暗がりに沈んで目だけが光る
+      const hidden = eco.isHidden(c) || (c.flee > 0 && c.act === 0 && sp !== Kind.Wisp && sp !== Kind.Ghost && eco.denHidden(c));
       const isCorpse = c.dead === 1 && c.actT >= 4 && sp !== Kind.Wisp && sp !== Kind.Slime && sp !== Kind.Ghost && sp !== Kind.Myconid;
       const eliteName = ['', 'firespirit', 'pknight', '', '', '', 'wspirit', 'lspirit', '', 'mlord'][c.elite] ?? '';
       // 冒険者は、名簿の人でも、名簿から外れた亡骸や眷属でも、手描きの体で描く（src/sprites.ts の heroSprite。姿は advLook）
@@ -1423,7 +1898,22 @@ export class CreatureView {
         // 魔法使いの攻撃：掲げた杖の宝玉が光る（掲げる・突き上げる・下ろすのコマで、明るく→いちばん明るく→薄れる。描画専用）
         if (csp === 1 && act === 2 && f >= 1 && !c.dead && !hidden) {
           const [ox, oy] = heroOrbAt(['down', 'up', 'side'][dir], f, adv.rank) as number[];
-          dyn.push({ x: x + (flip ? -ox : ox), y: yy + oy - lift, r: [0, 30, 44, 22][f], i: [0, 0.5, 0.85, 0.3][f] * (adv.rank === 0 ? 0.6 : 1), c: 1 });
+          const qx = x + (flip ? -ox : ox);
+          const qy = yy + oy - lift;
+          if (c.actT < 0) {
+            // 詠唱：溜めるにつれて宝玉の紫の光がふくらんで脈打ち、魔力の粒が宝玉へ吸い寄せられる
+            const p = Math.max(0, Math.min(1, (SKILL_WIZARD_MISSILE.windup + c.actT) / SKILL_WIZARD_MISSILE.windup));
+            const pulse = 1 + 0.15 * Math.sin(t * 18 + c.id);
+            dyn.push({ x: qx, y: qy, r: (18 + 34 * p) * pulse, i: (0.35 + 0.65 * p) * (adv.rank === 0 ? 0.8 : 1), c: 2 });
+            for (let i = 0; i < 5; i++) {
+              const ph = (t * 1.4 + i / 5 + c.id * 0.11) % 1;
+              const rr = 16 * (1 - ph);
+              const a = i * 1.26 + t * 2.5;
+              pushSprite(qx + Math.cos(a) * rr, yy + 0.1, -oy + lift + Math.sin(a) * rr * 0.6, false, A.fx(`bit:4:4:${3 - Math.min(3, Math.floor(ph * 4))}`), 0, 4);
+            }
+            // 溜めの後半は、宝玉の先に魔力の玉が灯る
+            if (p > 0.45) pushSprite(qx, yy + 0.1, -oy + lift + 2, false, A.fx(`orb2:4:${Math.floor(t * 12) & 3}`), 0, 4);
+          } else dyn.push({ x: qx, y: qy, r: [0, 30, 44, 22][f], i: [0, 0.5, 0.85, 0.3][f] * (adv.rank === 0 ? 0.6 : 1), c: 1 });
         }
         // 位が上がって初めての遠征：入ってきてしばらく、金の光の粒が体のまわりを立ちのぼる（「見違えた」）
         const pt = h && h.rank > 0 && h.ret === RANK_AT[h.rank] ? eco.parties.find((q) => q.id === c.party) : undefined;

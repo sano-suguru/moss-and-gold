@@ -18,6 +18,8 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   this.corpses = this.list.filter((c) => c.dead === 1 && c.units > 0 && c.k !== Kind.Wisp && c.k !== Kind.Slime && c.k !== Kind.Myconid);
   this.counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (const c of this.list) if (!c.dead) this.counts[c.k]++;
+  // 飛んでいた魔法の矢と、降ってきた矢の雨を当てる（src/eco/attack.ts）
+  this.resolveVolleys();
 
   for (const c of this.list) {
     if (c.dead === 2) continue;
@@ -59,6 +61,19 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
     if (this.batPinned(c)) {
       c.act = 1;
       c.flee = 0;
+      this.metabolism(c);
+      continue;
+    }
+    // 毒（src/eco/attack.ts）
+    if (c.poison > 0 && !c.away && this.poisonTick(c)) continue;
+    // はね飛ばされている者と怯み（src/eco/charge.ts）
+    if ((c.kb > 0 || c.stun > 0) && !c.away && this.knockTick(c)) {
+      this.metabolism(c);
+      continue;
+    }
+    // ヴァンパイアの霧の歩みの一撃のあとは、深手で逃げる処理より先に、霧になって元の暗がりへ戻る（src/eco/vampskill.ts）
+    // （逃げる処理が先だと、背後に現れた直後に一行に打ち返されて逃げに切り替わり、戻れずに倒されていた）
+    if (c.k === Kind.Vampire && c.run === -4 && this.vampSkill(c)) {
       this.metabolism(c);
       continue;
     }

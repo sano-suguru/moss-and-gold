@@ -4700,6 +4700,480 @@ function fxSlash2(size,col,f){
  }
  return {...fr,ax:R+2,ay:R+2};
 }
+/** 飛ぶ斬撃（高品質版）の色：白 → 水色 → 青 → 青紫 → 藍の縁取り。暗い所ほど紫へ寄せる */
+const CRES=[[255,255,255],[214,246,255],[150,214,255],[96,150,240],[78,96,206],[40,40,112]];
+/**
+ * 戦士の飛ぶ斬撃（高品質版）：三日月形の斬撃の波。d は向き（16方向、0 が右、時計回り）、f 0〜7。
+ *   0 振り抜き（引き伸ばされた細い弧と長い勢いの筋）、1 まとまる（一回り大きく明るい）、2〜4 満ちて飛ぶ（外の縁を光の帯が角から角へ走り、4 は角に星が光る）、
+ *   5 細くなる、6 光の破片に砕けて散る、7 消えかけの破片
+ * 形は、1ドットを4×4に分けて、そのうち形にかかる割合で決める（半分より多ければ塗り、少しかかるだけなら縁取りの色を置いて、縁の段差をなめらかにする）。
+ * 色は外の縁からの深さで、白・水色・青・青紫と変わり、外側に藍の縁取り。白と水色は光る（暗がりでも光って見える）。
+ * 向きごとに描き直すので、斜めでも線が崩れない
+ */
+function fxCrescent2(d,f){
+ const S=20,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const a=d*Math.PI/8,ca=Math.cos(a),sa=Math.sin(a);
+ const R=[15,15.5,14.5,14.5,14.5,14,14,14][f];
+ const K=[2.6,8,7.5,7.5,7.5,4.4,4.6,3.4][f];  // 中央の厚み
+ const back=[4,0,0,0,0,0,0,0][f];            // 振り抜きは少しうしろ
+ const span=[1.55,1.25,1.15,1.15,1.15,1.05,1.1,1.1][f]; // 角の角度（ラジアン）
+ const shade=[0,0,0,0,0,1,2,3][f];
+ const sheen=[-9,-9,-0.6,0.3,9,-9,-9,-9][f];  // 光の帯の位置（角度。範囲外なら無し）
+ const shards=f>=6, disp=f===6?2.2:4.2;
+ const inside=(u,v)=>{
+  // 外の縁の円（中心 0,0、半径 R）の中で、うしろの円（中心 −K,0）の外。角の角度まで
+  let uu=u+back,vv=v;
+  const phi=Math.atan2(vv,uu);
+  if(shards){
+   // 破片：角度を区切り、区切りごとに外へずらす
+   const seg=0.5,idx=Math.round(phi/seg),pc=idx*seg;
+   if(Math.abs(phi-pc)>seg*(f===6?0.36:0.28))return -1;
+   uu-=Math.cos(pc)*disp;vv-=Math.sin(pc)*disp;
+  }
+  const r1=Math.hypot(uu,vv),r2=Math.hypot(uu+K,vv),ph=Math.atan2(vv,uu);
+  if(Math.abs(ph)>span||r1>R||r2<R)return -1;
+  return R-r1;                                // 外の縁からの深さ
+ };
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+  let cover=0,dsum=0,ph0=0;
+  for(let sy=0;sy<4;sy++)for(let sx=0;sx<4;sx++){
+   const px=x-S+(sx+0.5)/4-0.5,py=y-S+(sy+0.5)/4-0.5;
+   const u=px*ca+py*sa+2,v=-px*sa+py*ca;
+   const dep=inside(u,v);
+   if(dep>=0){cover++;dsum+=dep;ph0+=Math.atan2(v,u+back)}
+  }
+  if(!cover)continue;
+  const cv=cover/16;
+  if(cv<0.5){ if(cv>=0.19)setPx(fr,x,y,CRES[Math.min(5,4+(shade>1?1:0))],false); continue; }
+  const dep=dsum/cover,ph=ph0/cover;
+  const th=Math.max(0.9,K*(1-Math.pow(Math.abs(ph)/span,2)));
+  let i=dep<1.7?0:dep<th*0.5?1:dep<th*0.78?2:dep<th*0.93?3:4;
+  if(Math.abs(ph-sheen)<0.16&&i>0)i--;       // 光の帯
+  i=Math.min(5,i+shade);
+  setPx(fr,x,y,CRES[i],i<=1&&f<=5);
+ }
+ // 振り抜きと満ちたコマの、うしろの勢いの筋（長さの違う三本）
+ if(f<=3){
+  const L=f===0?14:f===1?10:7;
+  for(const [sv,ln,ci] of [[0,L,2],[-5,L*0.65,3],[5,L*0.65,3]]){
+   for(let t=0;t<ln;t++){
+    const u=-K-2-back-t+R*0.55,v=sv;
+    const x=Math.round(S+u*ca-v*sa-2*ca),y=Math.round(S+u*sa+v*ca-2*sa);
+    setPx(fr,x,y,CRES[Math.min(5,ci+(t>ln*0.6?1:0))],false);
+   }
+  }
+ }
+ // 角に光る星（4コマ目）
+ if(f===4){
+  for(const sg of [-1,1]){
+   const u=Math.cos(span*0.92)*(R-1)+2,v=sg*Math.sin(span*0.92)*(R-1);
+   const cx=Math.round(S+u*ca-v*sa-2*ca),cy=Math.round(S+u*sa+v*ca-2*sa);
+   setPx(fr,cx,cy,CRES[0],true);
+   for(const [ox,oy] of [[1,0],[-1,0],[0,1],[0,-1]])setPx(fr,cx+ox,cy+oy,CRES[1],true);
+   for(const [ox,oy] of [[2,0],[-2,0],[0,2],[0,-2]])setPx(fr,cx+ox,cy+oy,CRES[3],false);
+  }
+ }
+ return {...fr,ax:S,ay:S};
+}
+/** 斬撃が当たった瞬間の火花：f 0〜3。白い芯から、青白い光の筋が八方へ伸び、細く短くなって消える */
+function fxSlashHit(f){
+ const S=9,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const L=[6,11,9,5][f],core=[2,2,1,0][f];
+ for(let k=0;k<8;k++){
+  const a=k*Math.PI/4+(k%2?0.2:0),ln=L*(k%2?0.6:1);
+  for(let t=0;t<=ln;t++){
+   const x=Math.round(S+Math.cos(a)*t),y=Math.round(S+Math.sin(a)*t);
+   const i=t<ln*0.35?(f<2?0:1):t<ln*0.7?2:3;
+   setPx(fr,x,y,CRES[Math.min(5,i+(f>=3?1:0))],i<=1);
+  }
+ }
+ for(let y=-core;y<=core;y++)for(let x=-core;x<=core;x++)if(Math.abs(x)+Math.abs(y)<=core)setPx(fr,S+x,S+y,CRES[0],true);
+ return {...fr,ax:S,ay:S};
+}
+/**
+ * 高品質版のエフェクトの共通の描き方：1ドットを4×4に分け、形の中にある分け目の割合で塗るかを決める。
+ * fn(x, y) は中心からの位置（ドットの小数）で、色の番号（0 がいちばん明るい）か、形の外なら −1 を返す。
+ * 半分より多くかかるドットは、かかった分け目の色の番号の平均で塗る。少しだけかかるドットには、色の表の最後（縁取りの色）を置いて縁の段差をなめらかにする。
+ * 色の番号が emisMax 以下のドットは光る（暗がりでも光って見える）。edge が false なら縁取りの色を置かない（重ねて帯にする絵は、縁取りが帯の中に点々と残る）
+ */
+function aaDraw(fr,cx,cy,pal,emisMax,fn,edge=true){
+ const out=pal.length-1;
+ for(let y=0;y<fr.H;y++)for(let x=0;x<fr.W;x++){
+  let cover=0,sum=0;
+  for(let sy=0;sy<4;sy++)for(let sx=0;sx<4;sx++){
+   const i=fn(x-cx+(sx+0.5)/4-0.5,y-cy+(sy+0.5)/4-0.5);
+   if(i>=0){cover++;sum+=i}
+  }
+  if(!cover)continue;
+  if(cover<8){if(edge&&cover>=3&&!fr.px[(y*fr.W+x)*4+3])setPx(fr,x,y,pal[out],false);continue}
+  const i=Math.min(out,Math.round(sum/cover));
+  setPx(fr,x,y,pal[i],i<=emisMax);
+ }
+}
+/** 金の光（竜殺しの大剣、僧侶の十字架）：白 → 淡い金 → 金 → 琥珀 → 茶の縁取り */
+const GOLDL=[[255,255,240],[255,240,176],[250,206,96],[218,150,50],[158,94,30],[78,42,16]];
+/** 紫の魔力（魔法使いのマジックミサイル）：白 → 淡い紫 → 紫 → 青紫 → 藍の縁取り */
+const PURPL=[[255,250,255],[240,204,255],[204,140,255],[158,90,240],[108,56,190],[50,24,96]];
+/** 毒の煙（狩人の矢の雨）：淡い黄緑 → 黄緑 → 緑 → 深緑 → 暗い緑の縁取り */
+const GRNL=[[226,255,186],[172,240,112],[112,202,72],[70,150,60],[40,100,50],[20,52,30]];
+
+/**
+ * 竜殺しの光の大剣の部品。d は向き（16方向、0 が右）、part 0 柄と鍔、1 刀身の一節（長さ12。つないで刀身にする）、2 切っ先、
+ * f 0 現れる（いちばん明るい）、1 満ちる、2 残像（細く淡い）、3 消えかけ（さらに細く）。刀身は中央の稜線が白く光り、刃の縁へ向かって金から琥珀へ
+ */
+function fxGreatBlade(d,part,f){
+ const S=14,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const a=d*Math.PI/8,ca=Math.cos(a),sa=Math.sin(a);
+ const shade=[0,0,1,2][f],wm=[1.1,1,0.55,0.35][f],hw=3.4*wm;
+ aaDraw(fr,S,S,GOLDL,f<=1?1:-1,(x,y)=>{
+  const s=x*ca+y*sa,t=-x*sa+y*ca,at=Math.abs(t);
+  const blade=(w)=>{if(at>w)return -1;const r=at/w;return Math.min(4,(r<0.25?0:r<0.55?1:r<0.82?2:3)+shade)};
+  if(part===1){ if(s<-6.5||s>6.5)return -1; return blade(hw); }
+  if(part===2){ if(s<-6.5||s>8)return -1; const w=hw*Math.min(1,(8-s)/12); return blade(Math.max(0.4,w)); }
+  // 柄と鍔：鍔は向きに直角の横木、柄は手もと、柄頭は丸い
+  if(Math.abs(s)<=1.6&&at<=7.5)return Math.min(4,(at>6?3:s<-0.4?2:1)+shade);
+  if(s<-1.6&&s>-8.5&&at<=1.4)return Math.min(4,3+(shade?1:0));
+  if(Math.hypot(s+9.6,t)<=2)return Math.min(4,2+shade);
+  if(s>1.6)return blade(hw);
+  return -1;
+ });
+ return {...fr,ax:S,ay:S};
+}
+
+/**
+ * 僧侶のハンマーの十字架：f 0〜7。打った所が中心（地面）。
+ *   0 衝撃の閃光（白い菱形と輪）、1 地面を縦横に光が走りはじめ、光の十字架が立ち上がりはじめる、2 光が腕3マスまで走り、十字架が満ちる（いちばん明るい）、
+ *   3 十字架を光の帯が上から下へ走る、4 十字架がひび割れて光の破片に分かれはじめる、5 破片が立ちのぼる、6・7 光の粒が残って消える。
+ * 地面の十字（当たる範囲そのもの、腕48ドット）の上に、縦に立つ十字架を重ねる
+ */
+function fxHolyCross(f){
+ const S=52,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const arm=[0,22,48,48,48,44,0,0][f];
+ const rayW=[0,2.6,3.2,2.8,2,1.2,0,0][f];
+ const crossH=[0,20,46,46,46,46,0,0][f];
+ const rise=[0,0,0,0,0,4,9,12][f];
+ const shade=[0,0,0,0,1,2,2,3][f];
+ const sheen=f===3?-30:-999;
+ const broken=f>=4;
+ aaDraw(fr,S,S,GOLDL,f<=3?1:0,(x,y)=>{
+  // 立つ十字架：縦木（地面から上へ crossH）と横木（上から3分の1の所）
+  if(crossH){
+   const yy=y+rise;
+   const top=-crossH,bar=-crossH*0.68;
+   let inC=-1;
+   if(Math.abs(x)<=3.2&&yy<=0&&yy>=top){const r=Math.abs(x)/3.2;inC=r<0.3?0:r<0.7?1:2}
+   if(Math.abs(yy-bar)<=3.2&&Math.abs(x)<=crossH*0.3){const r=Math.abs(yy-bar)/3.2;inC=Math.min(inC<0?9:inC,r<0.3?0:r<0.7?1:2)}
+   if(inC>=0){
+    if(broken){
+     // ひび割れ：縦と横に区切り、すき間をあける（破片は上へずれる）
+     const k=Math.floor((yy+60)/7),j=Math.floor((x+60)/7);
+     if((yy+60)%7<(f===4?1:2.4)||(x+60)%7<(f===4?0.6:2))return -1;
+     if(f>=5&&((k*3+j*5)%4===0))return -1;
+    }
+    if(Math.abs(yy-sheen)<4&&inC>0)inC--;
+    return Math.min(4,inC+shade);
+   }
+  }
+  // 地面の十字：縦横の光の帯（先ほど細い）
+  if(arm){
+   const ax=Math.abs(x),ay=Math.abs(y);
+   if(ax<=arm&&ay<=rayW*(1-0.6*ax/arm))return Math.min(4,(ay<rayW*0.35?0:ay<rayW*0.7?1:2)+shade);
+   if(ay<=arm&&ax<=rayW*(1-0.6*ay/arm))return Math.min(4,(ax<rayW*0.35?0:ax<rayW*0.7?1:2)+shade);
+  }
+  // 衝撃の閃光
+  if(f<=1){
+   const dd=Math.abs(x)+Math.abs(y)*1.3;
+   if(dd<=(f===0?8:5))return dd<3?0:1;
+   const rr=Math.hypot(x,y*1.3),R0=f===0?11:16;
+   if(Math.abs(rr-R0)<1.3)return 2;
+  }
+  return -1;
+ });
+ // 6・7 は光の粒（小さな十字の星）が上へ残る
+ if(f>=5){
+  const n=f===5?6:f===6?5:3;
+  for(let i=0;i<n;i++){
+   const x=Math.round(S+((i*37)%29)-14),y=Math.round(S-12-((i*23)%30)-rise*1.5);
+   setPx(fr,x,y,GOLDL[f===7?2:0],f<7);
+   if(f<7)for(const [ox,oy] of [[1,0],[-1,0],[0,1],[0,-1]])setPx(fr,x+ox,y+oy,GOLDL[2],false);
+  }
+ }
+ return {...fr,ax:S,ay:S};
+}
+
+/**
+ * マジックミサイルの弾：f 0〜3。白い芯と淡い紫の内側の紫の玉（直径9ドットほど）。芯の大きさがわずかに脈打つ
+ * （玉のまわりに光の輪を出すと、尾が輪に埋もれて紫の塊に見え、細い輪は点線に見えた）
+ */
+function fxMissileHead(f){
+ const S=9,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const R=4.6,core=[1.8,2.2,1.8,1.5][f];
+ aaDraw(fr,S,S,PURPL,2,(x,y)=>{
+  const r=Math.hypot(x,y);
+  if(r<=R){
+   // 左上に小さな光沢
+   if(Math.hypot(x+1.3,y+1.3)<1.1)return 0;
+   return r<core?0:r<3.1?1:r<4?2:3;
+  }
+  return -1;
+ });
+ return {...fr,ax:S,ay:S};
+}
+/**
+ * マジックミサイルの尾をつくる丸：k 0〜5（0 が弾のすぐうしろで、太く明るい。5 がいちばん先で、細く暗い）。
+ * 通り道に沿って密に重ねて、少しずつ細くなっていく帯にする（向きごとの絵をつなぐと、つなぎ目が段になった）
+ */
+function fxMissileDisc(k){
+ const S=5,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const R=[3.4,2.9,2.4,1.9,1.4,0.9][k];
+ const core=[0,1,1,2,2,3][k];
+ aaDraw(fr,S,S,PURPL,k<=3?2:-1,(x,y)=>{const r=Math.hypot(x,y);if(r>R)return -1;return Math.min(4,r<R*0.45?core:core+1)},false);
+ return {...fr,ax:S,ay:S};
+}
+/** 血の赤（ヴァンパイアの血吸い）：淡い桃 → 明るい赤 → 赤 → 暗い赤 → 黒ずんだ赤の縁取り */
+const BLOODL=[[255,226,220],[255,120,110],[214,40,48],[150,18,32],[92,8,20],[40,4,10]];
+/**
+ * ヴァンパイアの血吸いで、相手からヴァンパイアへ流れる血の玉：f 0〜3（少しずつ脈打つ）。左上に小さな光沢のある、つやのある赤い玉
+ */
+function fxBloodOrb(f){
+ const S=6,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const R=[3.4,3.0,2.7,3.1][f];
+ aaDraw(fr,S,S,BLOODL,1,(x,y)=>{
+  const r=Math.hypot(x,y);
+  if(r>R)return -1;
+  if(Math.hypot(x+1,y+1)<0.8)return 0;
+  return r<R*0.45?1:r<R*0.8?2:3;
+ });
+ return {...fr,ax:S,ay:S};
+}
+/** 血の玉の尾をつくる丸：k 0〜5（0 が玉のすぐうしろで太く明るい、5 がいちばん先で細く暗い）。通り道に沿って密に重ねる */
+function fxBloodDisc(k){
+ const S=4,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const R=[2.6,2.2,1.9,1.5,1.1,0.8][k];
+ const core=[1,1,2,2,3,3][k];
+ aaDraw(fr,S,S,BLOODL,k<=1?1:-1,(x,y)=>{const r=Math.hypot(x,y);if(r>R)return -1;return Math.min(4,r<R*0.5?core:core+1)},false);
+ return {...fr,ax:S,ay:S};
+}
+/** マジックミサイルの尾からこぼれる魔力の粒：f 0〜3（小さな四つ角の星が、光ってしぼむ） */
+function fxMissileSpark(f){
+ const S=3,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const c=PURPL[[0,1,2,3][f]];
+ setPx(fr,S,S,c,f<2);
+ if(f<3)for(const [ox,oy] of [[1,0],[-1,0],[0,1],[0,-1]])setPx(fr,S+ox,S+oy,PURPL[Math.min(4,f+2)],f<1);
+ if(f===0)for(const [ox,oy] of [[2,0],[-2,0],[0,2],[0,-2]])setPx(fr,S+ox,S+oy,PURPL[3],false);
+ return {...fr,ax:S,ay:S};
+}
+/** マジックミサイルが届いたときの弾け：f 0〜5。白い芯から紫の四つの光の筋が伸び、輪が広がって薄れる */
+function fxMissileBurst(f){
+ const S=12,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const L=[5,10,11,9,6,3][f],ring=[0,5,8,10,11,0][f],shade=[0,0,0,1,2,3][f];
+ aaDraw(fr,S,S,PURPL,1,(x,y)=>{
+  const ax=Math.abs(x),ay=Math.abs(y);
+  const ray=(u,v)=>u<=L&&v<=1.6*(1-u/(L+0.01))+0.3;
+  if(ray(ax,ay)||ray(ay,ax))return Math.min(4,(Math.max(ax,ay)<L*0.35?0:Math.max(ax,ay)<L*0.7?1:2)+shade);
+  if(ring&&Math.abs(Math.hypot(x,y)-ring)<1.1)return Math.min(4,2+shade);
+  if(f<=1&&Math.hypot(x,y)<3-f)return 0;
+  return -1;
+ });
+ return {...fr,ax:S,ay:S};
+}
+
+/** 煙の塊：f 0〜7。ふくらみ（0〜2）、渦を巻いて盛り上がり（3〜5）、ちぎれて散る（6・7）。左上から光の当たる丸い煙のかたまりを重ねて描く。pal は色（毒の緑、土ぼこりの茶、息の白） */
+function fxCloud(pal,f){
+ const S=24,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const g=[0.45,0.75,1,1.05,1.08,1.1,1.0,0.85][f];
+ const spread=[0,0,0,1,2,3,6,9][f];
+ const shade=[0,0,0,0,1,1,2,3][f];
+ // 煙のかたまり：[中心x, 中心y, 半径]
+ const puffs=[[0,0,9],[-8,2,6.5],[8,1,6.5],[-4,-6,6],[5,-6,6.5],[0,5,6],[-11,-3,4],[11,-4,4.2]];
+ const keep=f>=6?[0,1,2,4,5]:[0,1,2,3,4,5,6,7];
+ aaDraw(fr,S,S,pal,-1,(x,y)=>{
+  // いちばん深く重なっている塊（中心に近い塊）の陰を使う（塊ごとの陰の小さいほうを選ぶと、斜めの縞になった）
+  let best=-1,bestDepth=-1;
+  for(const k of keep){
+   const [px,py,pr]=puffs[k];
+   const ox=px*g+Math.sign(px)*spread,oy=py*g-spread*0.8-(k%3)*spread*0.3;
+   const R=pr*g*(f>=6?[1,0.8,0.55][f-5]:1);
+   const dx=x-ox,dy=y-oy,r=Math.hypot(dx,dy);
+   if(r>R)continue;
+   // 左上から光：かたまりの左上ほど明るい
+   const depth=R-r;
+   if(depth<=bestDepth)continue;
+   bestDepth=depth;
+   const lit=(-dx*0.6-dy*0.8)/R;
+   best=Math.min(4,(lit>0.55?0:lit>0.15?1:lit>-0.35?2:3)+shade);
+  }
+  return best;
+ });
+ return {...fr,ax:S,ay:S};
+}
+/** 小さな煙：f 0〜3（毒の煙、土ぼこり、鼻息）。pal は色 */
+function fxPuff(pal,f){
+ const S=7,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const R=[2.5,4.5,5.5,4.5][f],shade=[0,0,1,3][f];
+ aaDraw(fr,S,S,pal,-1,(x,y)=>{const r=Math.hypot(x,y+f*0.6);if(r>R)return -1;const lit=(-x*0.6-y*0.8)/R;return Math.min(4,(lit>0.4?0:lit>-0.1?1:2)+shade)});
+ return {...fr,ax:S,ay:S};
+}
+const fxPoisonCloud=(f)=>fxCloud(GRNL,f);
+const fxPoisonPuff=(f)=>fxPuff(GRNL,f);
+/** 影の霧（ヴァンパイアの霧の歩み）：淡い灰紫の照り → 灰紫 → 暗い紫 → 黒に近い紫の縁取り。暗い床の上でも塊が見えるように、上側を明るくする */
+const SHADEL=[[214,200,236],[160,140,196],[108,90,150],[70,56,108],[42,32,70],[20,14,36]];
+const fxShadowPuff=(f)=>fxPuff(SHADEL,f);
+const fxShadowCloud=(f)=>fxCloud(SHADEL,f);
+/** 土ぼこり（ミノタウロスの突進）：明るい砂色 → 茶 → 暗い茶の縁取り */
+const DUSTL=[[214,190,152],[178,150,112],[140,112,82],[104,82,60],[72,56,42],[40,30,22]];
+/** 鼻息の白い息 */
+const BREATHL=[[255,255,255],[232,238,246],[198,208,222],[156,168,186],[112,122,140],[62,68,82]];
+/** 鉄の重い軌跡（ミノタウロスの斧）：白い刃の光 → 鉄の銀 → 暗い銀 → 暗い赤 → 深い赤 → 縁取り */
+const STEELL=[[255,255,255],[214,222,232],[150,160,176],[128,44,46],[86,22,28],[38,12,16]];
+const fxDustCloud=(f)=>fxCloud(DUSTL,f);
+const fxDustPuff=(f)=>fxPuff(DUSTL,f);
+const fxSnort=(f)=>fxPuff(BREATHL,f);
+/**
+ * ミノタウロスの斧の薙ぎ払いの軌跡の一片：d は軌跡の進む向き（接線、16方向）、f 0〜5（0・1 刃が通る（いちばん明るい）、2・3 重い残り、4・5 薄れる）。
+ * 扇の外の縁に沿って並べて、太い帯の弧にする。外の縁が白い刃の光、内へ向かって鉄の銀から暗い赤へ（獣の力の重さ）。薄れるときは細く暗く
+ */
+function fxMinoSweep(d,f,pal=STEELL){
+ const S=11,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const a=d*Math.PI/8,ca=Math.cos(a),sa=Math.sin(a);
+ const thick=[16,15,12,9,6,3][f],shade=[0,0,1,1,2,3][f];
+ aaDraw(fr,S,S,pal,f<=1?1:-1,(x,y)=>{
+  const s=x*ca+y*sa;                          // 接線の向き
+  const t=-x*sa+y*ca;                         // 外（−）から内（＋）へ
+  if(Math.abs(s)>6.5)return -1;
+  const tt=t+thick/2;                         // 外の縁からの深さ
+  if(tt<0||tt>thick)return -1;
+  const r=tt/thick;
+  return Math.min(4,(r<0.16?0:r<0.38?1:r<0.6?2:r<0.82?3:4)+shade);
+ },false);
+ return {...fr,ax:S,ay:S};
+}
+/**
+ * ミノタウロスの突進が当たった所の衝撃：f 0〜5。kind 0 はね飛ばし（白い閃光と砂色の輪）、1 受け止め（金の火花と白い輪）、2 壁にぶつかった（大きな茶の輪と岩のかけら）。
+ * 輪は上から見た楕円で広がって薄れ、閃光の筋が四方へ伸びる
+ */
+function fxMinoImpact(kind,f){
+ const S=16,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const pal=kind===1?GOLDL:kind===2?DUSTL:BREATHL;
+ const ringR=[4,8,11,13,14,15][f]*(kind===2?1.1:1),ringW=[2,1.8,1.5,1.2,0.9,0.6][f],shade=[0,0,1,2,3,3][f];
+ const ray=[7,12,10,7,0,0][f];
+ aaDraw(fr,S,S,pal,f<=1?1:-1,(x,y)=>{
+  const yy=y*1.6;                              // 上から見た楕円
+  const r=Math.hypot(x,yy);
+  if(Math.abs(r-ringR)<=ringW)return Math.min(4,1+shade);
+  if(f<=1&&r<4-f*1.5)return 0;
+  const ax=Math.abs(x),ay=Math.abs(y);
+  if(ray&&((ax<=ray&&ay<=0.8*(1-ax/ray)+0.2)||(ay<=ray*0.6&&ax<=0.8*(1-ay/(ray*0.6))+0.2)))return Math.min(4,(Math.max(ax,ay*1.6)<ray*0.4?0:1)+shade);
+  return -1;
+ });
+ // 壁：岩のかけら
+ if(kind===2&&f>=1&&f<=4){
+  for(let i=0;i<6;i++){
+   const a=i*1.05+0.3,rr=ringR*0.8;
+   const x=Math.round(S+Math.cos(a)*rr),y=Math.round(S+Math.sin(a)*rr/1.6-f);
+   setPx(fr,x,y,DUSTL[3],false);setPx(fr,x+1,y,DUSTL[2],false);setPx(fr,x,y+1,DUSTL[4],false);
+  }
+ }
+ return {...fr,ax:S,ay:S};
+}
+/** 怯みの星：f 0〜3（黄色い四つ角の星が、光って小さくなる。頭の上を回る） */
+function fxStunStar(f){
+ const S=3,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const Y=[[255,255,220],[255,236,120],[230,180,50],[150,100,30]];
+ setPx(fr,S,S,Y[0],true);
+ const L=[2,2,1,1][f];
+ for(let t=1;t<=L;t++)for(const [ox,oy] of [[t,0],[-t,0],[0,t],[0,-t]])setPx(fr,S+ox,S+oy,Y[Math.min(3,t+(f>=2?1:0))],t===1);
+ return {...fr,ax:S,ay:S};
+}
+/** 岩（ゴーレムの技）：明るい石 → 灰 → 暗い灰 → 縁取り */
+const ROCKL=[[222,216,206],[178,172,162],[134,128,120],[96,92,86],[64,60,56],[34,32,30]];
+/** ゴーレムの符文の光：白 → 淡い水色 → 水色 → 青 → 深い青 */
+const RUNEL=[[240,255,255],[170,240,255],[96,200,240],[52,140,210],[30,84,150],[14,40,80]];
+/**
+ * ゴーレムの跳ねる衝撃波の輪：f 0〜5。落ちた瞬間に中心が白く光り、白から薄い灰色の小さな輪が広がって細く薄れる（半径はおよそ0.7マスまで。当たる範囲）。
+ * 地面の種類を選ばないように、白と灰色だけで描く。縁取りは置かない
+ */
+function fxShockRing(f){
+ const S=14,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const R=[3,6,8.5,10,11,11.5][f],th=[2,1.9,1.6,1.3,1,0.7][f],shade=[0,0,1,1,2,3][f];
+ aaDraw(fr,S,S,BREATHL,f<=1?1:-1,(x,y)=>{
+  const r=Math.hypot(x,y);
+  if(Math.abs(r-R)<=th){const k=(R+th-r)/(2*th);return Math.min(4,(k<0.35?0:k<0.75?1:2)+shade)}
+  if(f<=1&&r<(f===0?3:1.8))return 0;
+  return -1;
+ },false);
+ return {...fr,ax:S,ay:S};
+}
+/** 衝撃波で散る灰色の破片：v 0〜2（形と大きさの違う小さな石。左上から光が当たる） */
+function fxPebble(v){
+ const S=3,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const R=[1.6,2.1,2.6][v];
+ aaDraw(fr,S,S,ROCKL,-1,(x,y)=>{
+  const xx=x*(v===1?0.8:1),yy=y*(v===2?1.25:1);
+  if(Math.hypot(xx,yy)>R)return -1;
+  const lit=(-x-y)/R;
+  return lit>0.5?0:lit>-0.1?1:lit>-0.6?2:3;
+ });
+ return {...fr,ax:S,ay:S};
+}
+/** ゴーレムの振り下ろしの衝撃：f 0〜5。打った所から岩の破片と土の輪が広がる（半径はおよそ3マスまで。当たる範囲）。芯は白い閃光 */
+function fxGolemSlam(f){
+ const S=52,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const R=[10,22,34,44,48,49][f],th=[4,4,3.5,3,2,1.2][f],shade=[0,0,0,1,2,3][f];
+ aaDraw(fr,S,S,ROCKL,-1,(x,y)=>{
+  const r=Math.hypot(x,y);
+  if(Math.abs(r-R)<=th){const k=(r-R+th)/(2*th);return Math.min(4,(k<0.3?0:k<0.7?1:2)+shade)}
+  if(f<=1&&r<6-f*3)return 0;
+  return -1;
+ });
+ // 輪の上の岩のかけら
+ if(f>=1&&f<=4){
+  for(let i=0;i<14;i++){
+   const a=i*0.4488+(i%2)*0.2,rr=R+((i*7)%5)-2;
+   const x=Math.round(S+Math.cos(a)*rr),y=Math.round(S+Math.sin(a)*rr-f);
+   setPx(fr,x,y,ROCKL[1],false);setPx(fr,x+1,y,ROCKL[2],false);setPx(fr,x,y+1,ROCKL[3],false);setPx(fr,x+1,y+1,ROCKL[4],false);
+  }
+ }
+ return {...fr,ax:S,ay:S};
+}
+/** ゴーレムの溜めで光る符文：f 0〜3（形の違う小さな符文。水色に光る） */
+function fxRuneGlow(f){
+ const W=7,H=7,fr=blank(W,H);
+ const P=[["..#..",".###.","..#..","..#..",".#.#."],["#...#",".#.#.","..#..",".#.#.","#...#"],[".###.","#...#","#.#.#","#...#",".###."],["##.##","..#..","#####","..#..","##.##"]][f];
+ for(let y=0;y<5;y++)for(let x=0;x<5;x++)if(P[y][x]==='#')setPx(fr,x+1,y+1,RUNEL[(x+y)%3===0?0:1],true);
+ return {...fr,ax:3,ay:3};
+}
+/** 未練の青白い光（リビングアーマーの技）：白 → 淡い青白 → 青白 → くすんだ青 → 深い藍 → 縁取り */
+const GHOSTL=[[244,250,255],[196,226,250],[140,184,230],[92,128,186],[56,74,130],[26,32,64]];
+/** リビングアーマーの武器の大振りの軌跡の一片（ミノタウロスの斧と同じ形を、未練の青白い光で） */
+const fxArmorSweep=(d,f)=>fxMinoSweep(d,f,GHOSTL);
+/**
+ * リビングアーマーの盾の体当たりの光の壁：d は進む向き（16方向）、f 0〜3（0・1 濃い、2・3 薄れる）。
+ * 進む向きに直角な、前へ少しふくらんだ弓形の光の板（幅およそ22ドット）
+ */
+function fxShieldWall(d,f){
+ const S=13,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const a=d*Math.PI/8,ca=Math.cos(a),sa=Math.sin(a);
+ const thick=[4,4.5,3,1.8][f],shade=[0,0,1,2][f];
+ aaDraw(fr,S,S,GHOSTL,f<=1?1:-1,(x,y)=>{
+  const u=x*ca+y*sa,v=-x*sa+y*ca;
+  if(Math.abs(v)>11)return -1;
+  const bow=3*(1-(v/11)*(v/11));             // 前へふくらむ
+  const t=u-bow+thick/2;
+  if(t<0||t>thick)return -1;
+  const r=t/thick;
+  return Math.min(4,(r>0.7?0:r>0.4?1:2)+shade+(Math.abs(v)>9?1:0));
+ },false);
+ return {...fr,ax:S,ay:S};
+}
+/** 毒の者から立ちのぼる泡：f 0〜3（小さな泡 → ふくらむ → ふくらみきる → はじける） */
+function fxPoisonBubble(f){
+ const S=4,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ if(f===3){for(const [ox,oy] of [[0,-2],[0,2],[-2,0],[2,0]])setPx(fr,S+ox,S+oy,GRNL[1],false);return {...fr,ax:S,ay:S}}
+ const R=[1.6,2.4,3.1][f];
+ aaDraw(fr,S,S,GRNL,-1,(x,y)=>{const r=Math.hypot(x,y);if(r>R)return -1;if(Math.hypot(x+R*0.35,y+R*0.35)<R*0.3)return 0;return r>R-1?2:3});
+ return {...fr,ax:S,ay:S};
+}
 /** 爪痕：三本の裂け目。f 0〜2で伸び、3〜5で薄れる。裂け目の芯は暗く、片側の縁が明るい */
 function fxClaw2(col,f){
  const W=21,H=21,fr=blank(W,H),C=FXR[col],grow=[0.4,0.75,1,1,1,1][f],keep=[1,1,1,0.7,0.4,0.18][f];
@@ -5129,4 +5603,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

@@ -29,7 +29,9 @@
  *
  * 生き方：体のマナは、生き物の更新 ARMOR_LEAK 回ごとに1ずつ足もとの土へ漏れる。土のマナが濃い所（巡回する宝物庫など）では
  * 土から吸って補い（ARMOR_MANA_MAX まで）、取り込んだ武具の未練でも補う。マナが尽きると崩れる。マナが少ないと動きが鈍る。
- * 巡回：生まれた場所（hx, hy）と宝物庫のあいだを行き来し、着いた所でしばらく立ち番をする。
+ * 未練の持ち場：生まれた場所（hx, hy）から ARMOR_POST_R マスの内だけを見回り、その内の相手だけを襲い、その内の武具だけを拾う（撤退すれば振り切れる）。
+ * 体を保つのにマナを燃やし（ARMOR_BURN）、土から吸い続けないと保てない。何体も固まると土のマナが尽き、乏しい者から崩れる。
+ * 僧侶に清められた武具からは立ち上がらず、僧侶の十字架は甲冑に倍効く。
  * 巡回先を決めるとき、同じ洞窟の領域の ARMOR_SEEK_R マスの内に取り込める武具があれば、いちばん近いその武具へ向かう。
  * マナが少なくなると、土のマナが濃いほうへ向かう。
  * 取り込み：8マスの内の、見通しの利く床の武具。武器と盾は手に（ARMOR_HAND_MAX 個まで）、杖・聖印・リュート・弓は体に（ARMOR_BODY_MAX 個まで）。
@@ -66,20 +68,24 @@ export const ARMOR_RISE = 40;
 /** 体のマナ：1漏れるまでの生き物の更新の回数、土から吸って溜める上限、これを下回ると動きが鈍りマナの濃い所へ向かう量 */
 export const ARMOR_LEAK = 180;
 export const ARMOR_MANA_MAX = 120;
+/** 体を保つのに燃やすマナ：生き物の更新 ARMOR_BURN 回ごとに1（土へは戻らず消える）。同じ所に何体も固まると土のマナを吸い尽くし、乏しい者から崩れる */
+export const ARMOR_BURN = 60;
+/** 未練の持ち場：生まれた場所（hx, hy）からこのマス数の内でだけ襲い、武具を拾い、見回る */
+export const ARMOR_POST_R = 7;
 export const ARMOR_LOW = 30;
 /** 手に取り込める武器と盾の数と、取り込んでから次を取り込めるまでの生き物の更新の回数（通常速度で約1分。少しずつ強くなるのが見えるように） */
 export const ARMOR_HAND_MAX = 5;
 /** 倒した相手から奪う物は、強さの上限（ARMOR_HAND_MAX）を超えても、この数まで取り込む（強さは上がらず、巡る武具が増えるだけ） */
-export const ARMOR_ROB_MAX = 8;
+export const ARMOR_ROB_MAX = 5;
 export const ARMOR_ABSORB_GAP = 300;
 /** 未練の宿った武具（倒れた者の物）を拾い集めるときの間隔（生き物の更新の回数。一つずつ歩み寄って取り込むのが見えるように） */
 export const ARMOR_GATHER_GAP = 30;
 /** 巡回先を決めるとき、取り込める武具を探す半径（マス） */
-export const ARMOR_SEEK_R = 20;
-/** 体力：4 + ARMOR_HP_MUL ×（もとの強さ + 体の武具1つにつき ARMOR_BODY_HP）。ほかの種は 4 + 強さ×5。空の鎧は固い（src/eco/combat.ts の maxHp）。
+export const ARMOR_SEEK_R = ARMOR_POST_R;
+/** 体力：4 + ARMOR_HP_MUL ×（もとの強さ + 体の武具1つにつき ARMOR_BODY_HP）。ほかの種は 4 + 強さ×9（src/eco/combat.ts の HP_PER_STR。鎧はその2.4倍ほど）。空の鎧は固い（src/eco/combat.ts の maxHp）。
  *  手に取った武器と盾は体力を上げない（以前は武器で上がった強さにも12倍がかかり、武器5つで体力256＝ミノタウロスの約2.5倍の固さに、
  *  ミノタウロス並みの打撃が付いて、いる量あたりで冒険者をミノタウロスの約4.5倍倒していた） */
-export const ARMOR_HP_MUL = 12;
+export const ARMOR_HP_MUL = 22;
 export const ARMOR_BODY_HP = 2;
 /** 傷を直す：打たれてから何 tick 経てば直しはじめるか。直すのは、足もとの土のマナが ARMOR_MEND_SOIL 以上の所で立ち番をしているときだけで、
  *  生き物の更新 ARMOR_MEND_EVERY 回ごとに体力の30分の1を直し、体のマナを1使う（足もとの土へ還る）。
@@ -123,7 +129,8 @@ export function armorFoe(this: Ecology, o: Cr): boolean {
 
 /** 床の武具に宿るマナ：足もとの土が濃ければ吸って溜め、少しずつ薄れる（生き物の更新ごと。updateItems から） */
 export function fadeRemnant(this: Ecology, it: Item): void {
-  if (!isJobItem(it.kind)) return;
+  // 僧侶に清められた武具（fuel −1）は、もうマナを吸わない（src/eco/roster.ts の blessBrace）
+  if (!isJobItem(it.kind) || it.fuel < 0) return;
   // 吸うのは甲冑が立ち上がる量まで（甲冑の数が上限のあいだ、湧き口のそばの武具がマナを溜め続けないように）
   if (it.fuel < ARMOR_BIRTH_MANA && this.step % ARMOR_SOAK_EVERY === it.id % ARMOR_SOAK_EVERY) {
     const k = this.tileOf(it.x, it.y);
@@ -158,7 +165,7 @@ export function armorBirths(this: Ecology): void {
     if (!isJobItem(it.kind) || it.fuel <= 0 || ih(it.id, this.step, 701) % 3 !== 0 || !onFloor(it)) continue;
     const near = this.gear.filter((o) => isJobItem(o.kind) && sq(o.x - it.x) + sq(o.y - it.y) <= R2 && onFloor(o));
     let mana = 0;
-    for (const o of near) mana += o.fuel;
+    for (const o of near) mana += Math.max(0, o.fuel);
     if (mana < ARMOR_BIRTH_MANA) continue;
     if (this.list.some((o) => o.k === Kind.Armor && !o.dead && sq(o.x - it.x) + sq(o.y - it.y) < sq(10 * TILE))) continue;
     // 手を下した大物（竜など）や、武具を持つ者がそば（8マス）にいるあいだは、立ち上がらない（組み上がる間に倒されないように）
@@ -188,7 +195,7 @@ export function armorBirths(this: Ecology): void {
     for (const o of near) {
       if (body.length >= ARMOR_BODY_MAX || got >= ARMOR_BIRTH_MANA) break;
       body.push(o);
-      got += o.fuel;
+      got += Math.max(0, o.fuel);
     }
     if (got < ARMOR_BIRTH_MANA) continue;
     const ids = new Set(body.map((o) => o.id));
@@ -226,6 +233,7 @@ export function pickArmorPost(this: Ecology, c: Cr): void {
       if (!this.armorWants(c, it)) continue;
       const d = sq(it.x - c.x) + sq(it.y - c.y);
       if (d >= bd) continue;
+      if ((c.hx || c.hy) && sq(it.x - c.hx) + sq(it.y - c.hy) > ARMOR_POST_R * TILE * ARMOR_POST_R * TILE) continue;
       const ik = this.tileOf(it.x, it.y);
       if (ik < 0 || m.solid[ik] || (reg >= 0 && this.regionOf(ik) !== reg)) continue;
       bd = d;
@@ -237,8 +245,8 @@ export function pickArmorPost(this: Ecology, c: Cr): void {
       return;
     }
   }
+  // 未練の持ち場：生まれた場所のまわりだけを見回る（以前は生まれた場所と宝物庫を行き来し、宝物庫の入口に何体も集まって一行を次々に倒していた）
   const posts: [number, number][] = [];
-  if (m.vaultCenter.x >= 0) posts.push([m.vaultCenter.x * TILE + 8, m.vaultCenter.y * TILE + 8]);
   let tx = c.hx;
   let ty = c.hy;
   if (posts.length) {
@@ -329,7 +337,6 @@ export function absorbItem(this: Ecology, c: Cr, it: Item): void {
   this.noise(c.x, c.y, 5);
   this.record('settle', { t: this.w.tick, k: Kind.Armor, id: c.id, ev: 'absorb', how: rob ? 'rob' : 'floor', part: hand ? 'hand' : 'body', n: it.kind, x: Math.round(c.x), y: Math.round(c.y) } as never);
   const name = ITEM_NAMES[it.kind] ?? '武具';
-  this.log(c.x, c.y, rob ? `{k:${Kind.Armor}}が、倒した相手の${name}を取り込んだ` : hand ? `{k:${Kind.Armor}}が床の${name}を取り込んだ` : `{k:${Kind.Armor}}が床の${name}を体に取り込んだ`);
 }
 
 /** 崩れる：体と手の武具を床に散らす（dropBelongings から。体のマナは die の releaseMana で土へ還る） */
@@ -371,6 +378,11 @@ export function armor(this: Ecology, c: Cr): void {
     if (k >= 0) this.w.mana[k]++;
     else this.w.manaFaded++;
   }
+  // 体を保つのに、マナを少しずつ燃やす（消える）。吸い続けないと保てないので、固まった所では土のマナが尽きていく
+  if (this.step % ARMOR_BURN === (c.id + 7) % ARMOR_BURN && c.mana > 0) {
+    c.mana--;
+    this.w.manaFaded++;
+  }
   if (this.step % 4 === c.id % 4 && c.mana < ARMOR_MANA_MAX && k >= 0 && this.w.mana[k] >= 6) {
     const t = Math.min(2, this.w.mana[k] - 4, ARMOR_MANA_MAX - c.mana);
     this.w.mana[k] -= t;
@@ -397,6 +409,8 @@ export function armor(this: Ecology, c: Cr): void {
     }
     return;
   }
+  // 武器の大振りと盾の体当たり（src/eco/charge.ts）
+  if (this.armorSkill(c)) return;
   if (c.act === 2 && c.actT < 5) return;
   const sp = s.speed * (c.mana < ARMOR_LOW ? 0.6 : 1) * this.limp(c);
   // 武具を持つ侵入者を襲う
@@ -404,6 +418,8 @@ export function armor(this: Ecology, c: Cr): void {
   let bd = sq(6 * TILE);
   this.nearby(c.x, c.y, 6, (o) => {
     if (o.dead || o.away || !this.armorFoe(o) || !this.canSense(c, o)) return;
+    // 未練の持ち場（生まれた場所から ARMOR_POST_R マス）の外の相手は追わない（撤退すれば振り切れる）
+    if ((c.hx || c.hy) && sq(o.x - c.hx) + sq(o.y - c.hy) > ARMOR_POST_R * TILE * ARMOR_POST_R * TILE) return;
     const d = sq(o.x - c.x) + sq(o.y - c.y);
     if (d < bd) {
       bd = d;
@@ -414,6 +430,7 @@ export function armor(this: Ecology, c: Cr): void {
     const f = foe as Cr;
     this.markNotice(c, f, '!');
     c.dir = Math.abs(f.x - c.x) > Math.abs(f.y - c.y) ? (f.x > c.x ? 2 : 3) : f.y > c.y ? 0 : 1;
+    if (this.armorEngage(c, f, bd)) return;
     if (bd < 13 * 13) {
       if (this.fight(c, f)) {
         c.ref = f.id;
@@ -436,6 +453,7 @@ export function armor(this: Ecology, c: Cr): void {
     let bd2 = sq(8 * TILE);
     for (const it of this.gear) {
       if (!isJobItem(it.kind)) continue;
+      if ((c.hx || c.hy) && sq(it.x - c.hx) + sq(it.y - c.hy) > ARMOR_POST_R * TILE * ARMOR_POST_R * TILE) continue;
       const robbed = !!victim && isHandItem(it.kind) && nHand < ARMOR_ROB_MAX && sq(victim.x - it.x) + sq(victim.y - it.y) < sq(3 * TILE);
       if (!robbed && (since < (it.fuel > 0 ? ARMOR_GATHER_GAP : ARMOR_ABSORB_GAP) || !this.armorWants(c, it))) continue;
       const d = sq(it.x - c.x) + sq(it.y - c.y);

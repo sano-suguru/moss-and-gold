@@ -283,7 +283,7 @@ export function watchCamps(this: Ecology): void {
     const bold = this.campChief(cp);
     // 待ち伏せのさなかに負けそうになったら、皆で逃げ散る
     if (cp.hide === 2 && threat > mine * (bold ? 2 : 1.5)) {
-      this.scatterCamp(cp, members, a, `待ち伏せていた{k:${Kind.Goblin}}たちが劣勢になり、奥へ逃げ散った`);
+      this.scatterCamp(cp, members, a);
       continue;
     }
     if (cp.hide === 1) {
@@ -301,16 +301,12 @@ export function watchCamps(this: Ecology): void {
             break;
           }
         }
-      if (found || lit) this.scatterCamp(cp, members, a, lit ? `松明の光の縁で、隠れていた{k:${Kind.Goblin}}の目が光った。見つかった{k:${Kind.Goblin}}たちが奥へ逃げ散った` : `隠れていた{k:${Kind.Goblin}}たちが見つかり、奥へ逃げ散った`);
+      if (found || lit) this.scatterCamp(cp, members, a);
       continue;
     }
     if (nd > 13 * TILE * 13 * TILE) continue;
     if (threat > mine * (bold ? 2 : 1.5)) {
       cp.hide = 1;
-      if (this.step - (this.lastLogged[989] ?? -99999) > 3000) {
-        this.lastLogged[989] = this.step;
-        this.log(cp.x, cp.y, a.k === Kind.Adventurer ? `{k:${Kind.Goblin}}たちが冒険者の気配に、集落のまわりの暗がりへ散って隠れた` : `{k:${Kind.Goblin}}たちが{k:${a.k}}の気配に、暗がりへ散って隠れた`);
-      }
     } else if (party && cp.hide !== 2 && threat <= mine * (bold ? 1.3 : 1)) {
       // 一行が弱ければ、灯りのまわりの暗がりに潜んで、集落に踏み込むのを待つ
       cp.hide = 2;
@@ -319,16 +315,12 @@ export function watchCamps(this: Ecology): void {
         c.lure = a.id;
         c.lureAt = this.step;
       }
-      if (this.step - (this.lastLogged[988] ?? -99999) > 3000) {
-        this.lastLogged[988] = this.step;
-        this.log(cp.x, cp.y, `{k:${Kind.Goblin}}たちが、近づく冒険者を暗がりで待ち伏せている`);
-      }
     }
   }
 }
 
 /** 集落の皆が、相手から離れる方（深い方）へ逃げ散る。近ごろ襲われた回数に数える */
-export function scatterCamp(this: Ecology, cp: Camp, members: Cr[], a: Cr, msg: string): void {
+export function scatterCamp(this: Ecology, cp: Camp, members: Cr[], a: Cr): void {
   cp.hide = 0;
   cp.raids = (cp.raids ?? 0) + 1;
   for (const c of members) {
@@ -339,7 +331,6 @@ export function scatterCamp(this: Ecology, cp: Camp, members: Cr[], a: Cr, msg: 
     c.hx = 0;
     c.hy = 0;
   }
-  this.log(cp.x, cp.y, msg);
 }
 
 /** コボルトの住処の縄張り（住処から12マス、コボルトが住処を守る範囲）の中か。ゴブリンは食べ物を探すとき、ここを目当てにしない */
@@ -405,6 +396,8 @@ export function campOf(this: Ecology, c: Cr): Camp | undefined {
 
 export function goblin(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Goblin];
+  // 集落のそばを通る冒険者の一行に立ちふさがる（src/eco/standoff.ts）
+  if (this.residentStand(c)) return;
   if (c.st === 10) {
     this.leaveWithGroup(c);
     return;
@@ -680,7 +673,6 @@ export function updateCamps(this: Ecology): void {
       if ((cp.fuel ?? 0) > 0) {
         cp.fuel = (cp.fuel as number) - 1;
         this.deposit(cp.x, cp.y + 10, 1);
-        if (cp.fuel === 0) this.log(cp.x, cp.y, `{k:${kind}}の集落のかがり火が消えた`);
       }
     }
     // ゴブリンは、集落の蓄えが目安の3割以上あるときだけ子を産む（蓄えから産む）

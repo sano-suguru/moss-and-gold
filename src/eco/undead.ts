@@ -214,7 +214,7 @@ export function lichNear(this: Ecology, x: number, y: number): boolean {
 export function raiseUndead(this: Ecology, c: Cr, manyDead: boolean): void {
   const asLich = c.sp === Job.Wizard && manyDead && this.counts[Kind.Lich] === 0 && !this.list.some((o) => o.k === Kind.Lich && !o.dead);
   c.k = asLich ? Kind.Lich : Kind.Skeleton;
-  this.log(c.x, c.y, asLich ? `倒れた魔法使いの亡骸が{k:${Kind.Lich}}になった` : `冒険者の骨が{k:${Kind.Skeleton}}として起き上がった`);
+  if (asLich) this.log(c.x, c.y, `倒れた魔法使いの亡骸が{k:${Kind.Lich}}になった`);
   c.body = c.units;
   c.units = 0;
   c.food = 0;

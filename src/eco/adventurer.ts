@@ -6,6 +6,16 @@ import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
 import { ARMOR_REMNANT, isJobItem } from './armor';
 import type { World } from '../world';
+import { SKILL_HUNTER_RAIN, SKILL_PRIEST_HAMMER, SKILL_SLAYER_CLEAVE, SKILL_THIEF_THROW, SKILL_WARRIOR_SLASH, SKILL_WIZARD_MISSILE, type Skill } from './skill';
+import { HP_PER_STR } from './combat';
+
+/** 一行の撤退で下がる生き物の更新の回数（およそ12秒） */
+const RETREAT_N = 60;
+
+/** 職業ごとの技（src/eco/skill.ts）。吟遊詩人は戦わない */
+const JOB_SKILL: (Skill | undefined)[] = [SKILL_WARRIOR_SLASH, SKILL_WIZARD_MISSILE, SKILL_THIEF_THROW, SKILL_PRIEST_HAMMER, undefined, SKILL_HUNTER_RAIN, SKILL_SLAYER_CLEAVE];
+/** 職業ごとの技の届く距離（マス）：戦士の飛ぶ斬撃5、魔法使いのマジックミサイル10、盗賊の短剣投げ8、僧侶のハンマー3（十字架の腕はさらに3）、狩人の矢の雨12、竜殺しの大剣5.5 */
+const JOB_REACH = [5, 10, 8, 3, 0, 12, 5.5];
 
 /** 噂の総量（評判） */
 export function reputation(this: Ecology): number {
@@ -35,6 +45,8 @@ export function maybeParty(this: Ecology): void {
   }
   // 竜の噂があれば、竜殺しが一行を率いる
   if (r.dragon > 0.3 && !gobHunt) jobs[0] = Job.Slayer;
+  // 竜の寝床への道が町で知られていれば、3回に2回は竜殺しが一行を率いて竜退治に来る（src/eco/aim.ts。竜退治の場面を増やす）
+  else if (!gobHunt && this.lore.dragonWay && this.list.some((o) => o.k === Kind.Dragon && !o.dead && !o.away) && ih(this.step, 209, 7) % 3 !== 0) jobs[0] = Job.Slayer;
   if (gobHunt) jobs[0] = Job.Warrior;
   // 光がなければ進めない：魔法使いも僧侶もいなければ、戦士が一人松明を持つ。戦士もいなければ一人を戦士に
   if (!jobs.includes(Job.Wizard) && !jobs.includes(Job.Priest) && !jobs.includes(Job.Warrior)) jobs[jobs.length - 1] = Job.Warrior;
@@ -171,14 +183,37 @@ export function updateParties(this: Ecology): void {
         p.goal = 1;
         p.camp = -1;
         this.setExit(p);
-        this.log(alive[0].x, alive[0].y, `冒険者の一行が食料が乏しくなり、引き返した`);
         continue;
       }
+      // 一行の撤退：皆で向かっている相手との戦いで、仲間が倒れたか、一行の体力が半分を切ったら、一行ごと退く。
+      // 仲間が倒れていれば町へ帰り、倒れていなければ離れた所で休んでから、その相手を避けて探索を続ける
+      if (p.engage && (p.retreatUntil ?? 0) <= this.step) {
+        const e = this.byId.get(p.engage);
+        const fell = alive.length < (p.engageN ?? alive.length);
+        if (e && !e.dead && !e.away && (fell || avgHp < 0.5)) {
+          p.retreatUntil = this.step + RETREAT_N;
+          p.retreatX = Math.round(e.x);
+          p.retreatY = Math.round(e.y);
+          p.engage = 0;
+          p.camp = -1;
+          const dc = this.cellOf(e.x, e.y);
+          (p.danger ??= []).push([dc, 9999]);
+          if (p.danger.length > 30) p.danger.shift();
+          if (fell) {
+            p.goal = 1;
+            this.setExit(p);
+          }
+          this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'partyRetreat', n: e.k, how: fell ? 1 : 0, x: Math.round(alive[0].x), y: Math.round(alive[0].y) } as never);
+          this.log(alive[0].x, alive[0].y, `${this.partyTitle(p)}の一行が{k:${e.k}}にかなわず、${fell ? '倒れた仲間を残して' : '傷を負って'}退いた`);
+          continue;
+        }
+      }
+      // 撤退し終えた一行は、その場で焚き火を囲んで休む（帰り道でなければ）
+      if (p.retreatUntil && p.retreatUntil === this.step && p.goal === 0 && (p.camp ?? -1) < 0) this.startCamp(p, alive[0]);
       if (avgHp < 0.35 && p.goal === 0) {
         p.goal = 1;
         p.camp = -1;
         this.setExit(p);
-        this.log(alive[0].x, alive[0].y, `冒険者の一行が深手を負って引き返した`);
         continue;
       }
       // 地上が夜なら、早めに休む（夜は焚き火を囲む）
@@ -242,13 +277,13 @@ export function partyStr(this: Ecology, p: Party): number {
 
 /**
  * 一行が見積もる相手の強さ：強さに残りの体力の割合を掛ける。リビングアーマー（空の鎧）は、体力が強さのわりに大きい
- * （ふつうは 4 + 強さ×5、鎧は体の武具の数で決まる。src/eco/combat.ts の maxHp、src/eco/armor.ts の armorHp）ので、
+ * （ふつうは 4 + 強さ×HP_PER_STR、鎧は体の武具の数で決まる。src/eco/combat.ts の maxHp、src/eco/armor.ts の armorHp）ので、
  * ふつうの種と比べた体力の比を見積もりに掛ける。
  * 入れないと、武具を取り込んで強くなった鎧に一行が挑みつづけ、宝物庫の入口で次々に倒されていた（倒れた者の武具をまた鎧が取り込む）
  */
 export function foeStr(this: Ecology, o: Cr): number {
   const s = this.str(o) * (o.hp > 0 ? o.hp / this.maxHp(o) : 1);
-  return o.k === Kind.Armor ? (s * this.maxHp(o)) / (4 + 5 * this.str(o)) : s;
+  return o.k === Kind.Armor ? (s * this.maxHp(o)) / (4 + HP_PER_STR * this.str(o)) : s;
 }
 
 /**
@@ -363,7 +398,47 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       }
     }
   }
-  if (c.act === 2 && c.actT < 4) return;
+  // 職業の技の溜め（src/eco/skill.ts）：構えて動かずに溜め、溜めの途中で打たれると止まる（呪文は散って消える）
+  const skill = JOB_SKILL[c.sp] ?? null;
+  const sk = skill ? this.skillStep(c, skill) : '';
+  if (sk === 'charging') return;
+  // 近くのミノタウロスの突進の溜めを見たら、通り道から下がる（戦士と僧侶は受け止めに入る。src/eco/charge.ts）
+  if (sk !== 'ready' && this.advBrace(c)) return;
+  // 一行の撤退：後衛から先に、退く相手から離れる向きへ下がる。前衛（戦士・僧侶・竜殺し）は少し遅れて、しんがりとして下がり、すぐそばに来た相手とは打ち合う
+  if ((p.retreatUntil ?? 0) > this.step && p.retreatX !== undefined && sk !== 'ready') {
+    const rear = c.sp === Job.Warrior || c.sp === Job.Priest || c.sp === Job.Slayer;
+    const since = this.step - ((p.retreatUntil ?? 0) - RETREAT_N);
+    const rx = p.retreatX;
+    const ry = p.retreatY ?? c.y;
+    if (rear) {
+      let near: Cr | null = null;
+      this.nearby(c.x, c.y, 1, (o) => {
+        if (!near && !o.dead && !o.away && o.foe === c.id && this.w.tick - o.hitAt < 300 && sq(o.x - c.x) + sq(o.y - c.y) < 14 * 14) near = o;
+      });
+      if (near) {
+        this.fight(c, near as Cr);
+        return;
+      }
+    }
+    if (!rear || since >= 6) {
+      const dx = c.x - rx;
+      const dy = c.y - ry;
+      const L = Math.sqrt(dx * dx + dy * dy) || 1;
+      c.act = 1;
+      this.goTo(c, c.x + (dx / L) * 3 * TILE, c.y + (dy / L) * 3 * TILE, s.speed * 1.1);
+      if (rear) this.setDir(c, rx - c.x, ry - c.y);
+      return;
+    }
+    c.act = 0;
+    this.setDir(c, rx - c.x, ry - c.y);
+    return;
+  }
+  if (sk === 'broken') {
+    if (c.sp === Job.Wizard) this.fxAttacks.push({ t: this.w.tick, style: 'puff', col: 2, size: 0, ax: c.x, ay: c.y, dx: c.x, dy: c.y - 14, did: -1, aid: c.id, big: false, kill: false });
+    return;
+  }
+  const ready = sk === 'ready';
+  if (!ready && c.act === 2 && c.actT < 4) return;
   const lights = this.partyLights(p);
   const leader = this.byId.get(p.members[0]);
   // 探した範囲と、見かけた宝と、地表への別の横穴を覚える
@@ -420,7 +495,9 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
           else p.danger.push([dc, Math.round(os)]);
           if (p.danger.length > 30) p.danger.shift();
           const slayerHunt = (o.k === Kind.Dragon || o.k === Kind.Wyvern || o.k === Kind.Worm) && p.members.some((id) => this.byId.get(id)?.sp === Job.Slayer);
-          if (os > ps * 1.2 && !slayerHunt && p.goal === 0) {
+          // 見て引き返すのは、竜（ドラゴン・ワイバーン・ワーム）だけ。ほかの敵には強さに関わらず挑み、負けそうなら戦いの途中で一行ごと退く（retreat）
+          const wyrm = o.k === Kind.Dragon || o.k === Kind.Wyvern || o.k === Kind.Worm;
+          if (wyrm && os > ps * 1.2 && !slayerHunt && p.goal === 0) {
             p.goal = 1;
             p.camp = -1;
             this.setExit(p);
@@ -488,7 +565,11 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       }
     });
   // 手強い敵に気づいたら、一行に知らせる（かなわない相手は、見張りの判断で引き返す）
-  if (foe && !MINOR.includes((foe as Cr).k) && !p.engage && this.foeStr(foe as Cr) <= this.partyStr(p) * 1.2) p.engage = (foe as Cr).id;
+  // （以前は一行の1.2倍より強い相手には知らせず、皆で向かわなかった。いまは強さに関わらず皆で向かい、負けそうなら退く）
+  if (foe && !MINOR.includes((foe as Cr).k) && !p.engage && (p.retreatUntil ?? 0) <= this.step) {
+    p.engage = (foe as Cr).id;
+    p.engageN = p.members.filter((id) => !this.byId.get(id)?.dead).length;
+  }
   // 逃げていく弱い者（コボルトなど）は、すぐそばにいなければ追わない（射かけもしない）
   if (foe && (foe as Cr).flee > 0 && STR[(foe as Cr).k] <= 3 && sq((foe as Cr).x - c.x) + sq((foe as Cr).y - c.y) > 14 * 14) {
     if (p.engage === (foe as Cr).id) p.engage = 0;
@@ -498,20 +579,74 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     const f = foe as Cr;
     this.markNotice(c, f, '!');
     c.dir = Math.abs(f.x - c.x) > Math.abs(f.y - c.y) ? (f.x > c.x ? 2 : 3) : f.y > c.y ? 0 : 1;
-    if (c.sp === Job.Wizard) {
-      // 炎の呪文：離れた所から敵を焼き（毎回当たる。打ち合いの一打ちの半分ほど）、敵の足もとの苔とキノコも焼いてしまう（scorchMoss）。
-      // 燃える床は作らない（以前は敵の足もとに火をつけ、そばで打ち合う仲間の冒険者がその火で焼け死んでいた。燃える床はドラゴンの炎だけ）
-      c.act = 2;
-      c.actT = 0;
-      this.scorchMoss(this.tileOf(f.x, f.y));
-      if (this.strike(c, f, 0.5)) this.die(f, 'fight', c.k);
-      return;
+    const fd2 = sq(f.x - c.x) + sq(f.y - c.y);
+    const reach = JOB_REACH[c.sp] * TILE;
+    if (skill) {
+      // 職業の技（src/eco/skill.ts）：届く距離に敵がいれば溜め、溜め終わった回に放つ。使ったあとの間は溜め直さない。
+      // （以前は、近接の職は体が触れるくらい（1マス弱）でしか打てず、魔法使いは生き物の更新4回ごとに、狩人は3回に1回ほど、溜めなしで撃ち続けていた。
+      //  8シード×12日で、近接の一打ちを受ける前に死んだ大物が6割、魔法使いが打たれたのは25時間に1回、狩人は0回）
+      if (ready) {
+        c.act = 2;
+        c.actT = 0;
+        // 関係のない小物（大ネズミ・スライムなど）は、狙った相手か自分を襲ってきた相手でなければ巻き込まない（src/eco/attack.ts の advMinorOk）
+        const who = (o: Cr) => o.k !== Kind.Adventurer && o.k !== Kind.Dwarf && (o === f || o.foe === c.id || (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)));
+        const fl = Math.sqrt(fd2) || 1;
+        const ux = (f.x - c.x) / fl;
+        const uy = (f.y - c.y) / fl;
+        if (c.sp === Job.Warrior) {
+          // 剣を振り、斬撃の波を前へ飛ばす（5マスの直線。2体まで貫く）
+          this.areaStrike(c, c.x, c.y, ux, uy, { kind: 'line', r: reach, w: 10, max: 2 }, 1.2, { style: 'slashwave', col: 0 }, who);
+        } else if (c.sp === Job.Slayer) {
+          // 光の大剣の刀身が現れ、5.5マスの扇をゆっくり大きく薙ぎ払う（溜めは長く、一撃は重い）
+          this.areaStrike(c, c.x, c.y, ux, uy, { kind: 'fan', r: reach, half: 1.3 }, 2, { style: 'greatsword', col: 1 }, who);
+        } else if (c.sp === Job.Priest) {
+          // ハンマーを振り下ろし、打った所で光の十字架が爆ぜる（縦横に腕3マス）。打つのは敵の足もと（届く距離より遠ければ、届く距離の先）。
+          // アンデッドと夜の眷属には倍効く
+          const hd = Math.min(fl, reach);
+          const hx = c.x + ux * hd;
+          const hy = c.y + uy * hd;
+          const holy = (o: Cr) => o.k === Kind.Zombie || o.k === Kind.Skeleton || o.k === Kind.Lich || o.k === Kind.Thrall || o.k === Kind.Vampire || o.k === Kind.Armor;
+          const cross = { kind: 'cross' as const, r: 3 * TILE, w: 9 };
+          this.fxAttacks.push({ t: this.w.tick, style: 'cross', col: 1, size: 2, ax: c.x, ay: c.y, dx: hx, dy: hy, did: f.id, aid: c.id, big: true, kill: false, rad: cross.r });
+          this.areaStrike(c, hx, hy, ux, uy, cross, 1.2, { style: '', col: 1 }, (o) => who(o) && !holy(o));
+          this.areaStrike(c, hx, hy, ux, uy, cross, 2.4, { style: '', col: 1 }, (o) => who(o) && holy(o));
+        } else if (c.sp === Job.Wizard) {
+          // マジックミサイル：紫の魔力の尾を引く誘導弾を4発。狙う敵と、そのほか近くの敵（最大2体）へ分かれて飛び、届いたときに必ず当たる（1発は軽い）
+          const tg: Cr[] = [f];
+          this.nearby(c.x, c.y, Math.ceil(JOB_REACH[c.sp]), (o) => {
+            if (tg.length >= 3 || o === f || o.dead || o.away || !who(o) || sq(o.x - c.x) + sq(o.y - c.y) > reach * reach || !this.seenBy(c, lights, o)) return;
+            tg.push(o);
+          });
+          for (let i = 0; i < 4; i++) {
+            const t = tg[i % tg.length];
+            const fly = Math.round(6 + Math.sqrt(sq(t.x - c.x) + sq(t.y - c.y)) / 20);
+            this.queueVolley(c, { d: t.id, x: 0, y: 0, r: 0, mul: 0.5, poison: 0 }, fly);
+            this.fxAttacks.push({ t: this.w.tick, style: 'missile', col: 4, size: 1, ax: c.x, ay: c.y, dx: t.x, dy: t.y, did: t.id, aid: c.id, big: false, kill: false, n: i, fly });
+          }
+        } else if (c.sp === Job.Hunter) {
+          // 矢の雨：弧を描いて高く上がった矢が、狙った所のまわりに少しばらけて降る（1.3マス）。落ちたときにそこにいる者に当たり（動いていれば避けられる）、
+          // 当たった所で毒の煙が爆ぜて毒にする
+          const fly = 12;
+          this.queueVolley(c, { d: -1, x: f.x, y: f.y, r: 1.3 * TILE, mul: 1.2, poison: 25, tgt: f.id }, fly);
+          this.fxAttacks.push({ t: this.w.tick, style: 'rain', col: 3, size: 1, ax: c.x, ay: c.y, dx: f.x, dy: f.y, did: -1, aid: c.id, big: false, kill: false, rad: 1.3 * TILE, n: 6, fly });
+        } else if (fd2 <= sq(reach * 1.2)) {
+          // 盗賊の短剣投げ。構えているあいだに届く距離の外へ出られたら外れる
+          if (this.strike(c, f, 1)) this.die(f, 'fight', c.k);
+        }
+        return;
+      }
+      if (fd2 <= reach * reach && this.skillCanStart(c, skill)) {
+        this.skillStart(c, skill);
+        return;
+      }
     }
-    if (c.sp === Job.Hunter) {
-      // 弓：離れたところから射る（反撃を受けにくい）
-      c.act = 2;
-      c.actT = 0;
-      if (ih(c.id, f.id, this.step) % 3 === 0 && this.strike(c, f, 0.9)) this.die(f, 'fight', c.k);
+    if (c.sp === Job.Wizard || c.sp === Job.Hunter) {
+      // 離れて撃つ者が、使ったあとの間を待つあいだ：敵が近ければ（2.5マス）離れ、遠ければその場で構える
+      if (fd2 < 2.5 * TILE * 2.5 * TILE) {
+        c.act = 1;
+        this.fleeFrom(c, f, s.speed);
+        this.setDir(c, f.x - c.x, f.y - c.y);
+      } else c.act = 0;
       return;
     }
     if (sq(f.x - c.x) + sq(f.y - c.y) < 14 * 14) {
@@ -734,7 +869,6 @@ export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: numbe
   p.campUntil = this.step + (this.isNight() ? 2400 : 1500);
   p.dozeT = 0;
   p.dozeNext = 0;
-  this.log((best % m.w) * TILE + 8, Math.floor(best / m.w) * TILE + 8, `冒険者の一行が焚き火を囲んで休みはじめた`);
 }
 
 /** 焚き火を囲む一行に、焚き火のそば（僧侶が癒やせる所）で傷ついている者がいるか（僧侶が起きて手当てを続けるか） */
@@ -810,8 +944,6 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
   }
   lo.danger = lo.danger.filter((d) => this.w.tick - d[2] < DAY_TICKS_ECO * 3).slice(-60);
   p.saw |= 16;
-  if (c.gold > 0) this.log(c.x, c.y, `冒険者（${JOB_NAMES[c.sp]}）が金貨${c.gold}枚を持って生きて帰った`);
-  else if (p.members[0] === c.id) this.log(c.x, c.y, `冒険者の一行が引き返して外へ出た`);
   // 背負ってきた置き場の荷が残っていれば、それも持ち帰る
   this.exported += c.body + c.food + c.units;
   c.units = 0;
@@ -902,7 +1034,6 @@ export function dropBelongings(this: Ecology, c: Cr): void {
   }
   if (c.k !== Kind.Adventurer) return;
   this.fallen++;
-  this.log(c.x, c.y, `冒険者（${JOB_NAMES[c.sp]}）が倒れた`);
   const x = c.x;
   const y = c.y;
   if (c.torch > 0) this.dropItem(x + 4, y + 2, ItemKind.Torch, c.torch, n);

@@ -63,12 +63,6 @@ export function listenStep(this: Ecology, p: Party, alive: Cr[]): void {
   p.listenBy = van.id;
   this.partyMark(p, '?', true);
   this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'hear', how: n.s ?? 0, n: h.sp, x: Math.round(n.x), y: Math.round(n.y) } as never);
-  if (this.step - (this.lastLogged[990] ?? -99999) > 1500) {
-    this.lastLogged[990] = this.step;
-    const what = ['物音', '足音', 'うなり声'][n.s ?? 0];
-    const ear = h.sp === Job.Thief ? '盗賊が' : h.sp === Job.Hunter ? '狩人が' : '';
-    this.log(lead.x, lead.y, `冒険者の一行が、暗がりの奥の${what}に${ear ? ear + '気づき、' : ''}立ち止まって耳を澄ませた`);
-  }
 }
 
 /** 耳を澄ましている一行の者（adventurer から。戦う相手がいないとき）：音の方を向いて止まる。前衛は一歩前に出て構える。true ならこの回の更新はこれで終わり */

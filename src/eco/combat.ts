@@ -96,7 +96,6 @@ export function leaveIfStarving(this: Ecology, c: Cr): boolean {
     if (c.k === Kind.Dwarf) {
       // 生きて外へ出たドワーフが、ゴーレムの話を伝える
       if (this.hold?.golem) this.dwarfLore |= 1;
-      this.log(c.x, c.y, `{k:${Kind.Dwarf}}が住みかを捨てて外へ出ていった`);
     }
     c.body = 0;
     c.food = 0;
@@ -122,10 +121,9 @@ export function hunt(this: Ecology, c: Cr, R: number, kinds: Kind[], speed: numb
     if (c.k === Kind.Goblin && this.inKoboldLand(o.x, o.y)) return;
     // （夜襲に出る大物は、3割ほど飢えていれば、細った焚き火のそばの獲物も狙う。src/eco/night.ts）
     if (Ecology.FEARS_FIRE.has(c.k) && c.sinceMeal < SPEC[c.k].starve * 0.85 && this.fireDaunts(c, o.x, o.y)) return;
-    // 知性ある者は勝てない相手を避け、狡猾な者は自分より強い相手には挑まない
+    // 知性ある者と狡猾な者は、自分の2倍より強い相手には挑まない（以前は1.1倍・1.6倍で、大物どうしがほとんどぶつからなかった）
     const ts = this.str(o) * (o.hp > 0 ? o.hp / this.maxHp(o) : 1);
-    if (tier >= 3 && ts > me * 1.1) return;
-    if (tier === 2 && ts > me * 1.6) return;
+    if (tier >= 2 && ts > me * 2) return;
     // 焚き火で眠っている冒険者は、近くにいるものとして好んで狙う（寝込みを襲う）
     const d = (sq(o.x - c.x) + sq(o.y - c.y)) * (this.campSleeper(o) ? 0.25 : 1);
     if (d < bd) {
@@ -138,16 +136,12 @@ export function hunt(this: Ecology, c: Cr, R: number, kinds: Kind[], speed: numb
   this.markNotice(c, p, '!');
   c.act = 1;
   const d2 = sq(p.x - c.x) + sq(p.y - c.y);
+  // ミノタウロスは、4マスの内なら斧の薙ぎ払い、4〜8マスなら突進を溜める（src/eco/charge.ts）
+  if (c.k === Kind.Minotaur && this.minoEngage(c, p, d2)) return true;
   if (d2 < 11 * 11) {
     // 狩りは、相手が小さくても一口では食べず、打ち合って仕留めてから食べる（攻撃のエフェクトを見せる）。
     // 一口で食べるのは、クモの巣・ワームの丸のみ・空中でさらう・ミミックの丸のみ・死骸を食べる、の場面だけ
     this.fight(c, p);
-  } else if (c.k === Kind.Minotaur && d2 > 2 * TILE * 2 * TILE) {
-    // 一直線に突進し、壁にぶつかると一瞬よろめく
-    const x0 = c.x;
-    const y0 = c.y;
-    this.moveToward(c, p.x, p.y, speed * 1.8);
-    if (Math.abs(c.x - x0) + Math.abs(c.y - y0) < speed * 0.5) c.gait = 14;
   } else if (TIER[c.k] === 2 && d2 > 2 * TILE * 2 * TILE) {
     // 狡猾な種は、仲間がいれば回り込んで別々の方向から近づく
     let allies = 0;
@@ -163,11 +157,17 @@ export function hunt(this: Ecology, c: Cr, R: number, kinds: Kind[], speed: numb
   return true;
 }
 
+/**
+ * 体力の上限は 4 + 強さ × HP_PER_STR。一打ちの傷は強さの1.2〜2.4倍なので、強さが同じ相手なら、ふつうの一打ちでおよそ5打、技なら3打ほどで倒れる。
+ * （以前は 4 + 強さ×5 で、近くの仲間1人ごとに一打ちが4割重くなった（最大2.2倍）ので、一行に囲まれた大物は1〜2打で倒れていた）
+ */
+export const HP_PER_STR = 9;
+
 /** 体力の上限（強さに比例） */
 export function maxHp(this: Ecology, c: Cr): number {
   // リビングアーマー（空の鎧）は固い。固さは体になった武具の数で決まり、手に取った武器と盾は打撃（強さ）だけを上げる（src/eco/armor.ts の armorHp）
   if (c.k === Kind.Armor) return this.armorHp(c);
-  return Math.round(4 + this.str(c) * 5);
+  return Math.round(4 + this.str(c) * HP_PER_STR);
 }
 
 export function bleed(this: Ecology, c: Cr, n: number): void {
@@ -179,19 +179,18 @@ export function bleed(this: Ecology, c: Cr, n: number): void {
   if (this.blood.length > 400) this.blood.splice(0, this.blood.length - 400);
 }
 
-/** 一打ち：強さと仲間の数で傷を与える。倒せば true */
-export function strike(this: Ecology, a: Cr, d: Cr, mul = 1): boolean {
-  const allies = (c: Cr) => {
-    let n = 0;
-    this.nearby(c.x, c.y, 2, (o) => {
-      if (o !== c && !o.dead && o.k === c.k && sq(o.x - c.x) + sq(o.y - c.y) < 40 * 40) n++;
-    });
-    return Math.min(3, n);
-  };
+/**
+ * 一打ち：強さで傷を与える。倒せば true。fx が false なら、打つ者の攻撃のエフェクトを出さない（形のある攻撃は、形のエフェクトを別に一つ出す。src/eco/attack.ts）。
+ * （以前は、近くにいる同じ種の仲間1人ごとに一打ちが4割重くなっていた（最大2.2倍）。画面では1人が打っているだけなのに、
+ *  一行がそばにいるだけで倍の傷になり、囲まれた大物が1〜2打で倒れていた。数の力は、形のある攻撃で実際に皆が打つことで出す）
+ */
+export function strike(this: Ecology, a: Cr, d: Cr, mul = 1, fx = true): boolean {
   if (d.hp <= 0) d.hp = this.maxHp(d);
-  const sa = this.str(a) * (1 + 0.4 * allies(a));
+  const sa = this.str(a);
   const dmg = sa * (1.2 + (ih(a.id, d.id ^ this.step, 161) % 1000) / 1000 * 1.2) * mul;
   d.hp -= dmg;
+  // 大物の溜め（突進など）は、体力の上限の2割を超える重い一撃を受けたときだけ止まる（src/eco/charge.ts の breakWindup）
+  if (d.k !== Kind.Adventurer && d.act === 2 && d.actT < 0 && d.hp > 0 && dmg > this.maxHp(d) * 0.2) this.breakWindup(d);
   // リビングアーマーは、倒れずに強い一打を受けると、手の武器を落とす（src/eco/armor.ts）
   if (d.k === Kind.Armor && d.hp > 0) this.armorShed(d, dmg, a);
   // やられそうになったヴァンパイアは、コウモリの群れにばらけて逃げる（1日に1回、光の中ではできない。src/eco/vampire.ts）
@@ -208,7 +207,7 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1): boolean {
   if (d.k === Kind.Adventurer) this.campHit(d, a);
   this.fxHits.push({ t: this.w.tick, x: d.x, y: d.y, ax: a.x, ay: a.y, id: d.id });
   if (this.fxHits.length > 120) this.fxHits.splice(0, 40);
-  this.pushAttackFx(a, d, dmg > this.maxHp(d) * 0.4, d.hp <= 0);
+  if (fx) this.pushAttackFx(a, d, dmg > this.maxHp(d) * 0.4, d.hp <= 0);
   this.raiseAlarm(d, a);
   this.bleed(d, 1);
   // 焚き火のそばの小物との小競り合い（コウモリに血を吸われて払うなど）は、一行の皆を起こすほどの音を立てない
@@ -230,11 +229,7 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
   // 寝込みの一打ち：焚き火で眠っている冒険者への最初の一打ちは重く（1.5倍）、その打ち合いでは打ち返されない（src/eco/night.ts）
   const asleep = this.nightHit(a, d);
   if (this.strike(a, d, asleep ? 1.5 : 1)) {
-    if (a.k === Kind.Skeleton || a.k === Kind.Lich || a.k === Kind.Dwarf || a.k === Kind.Golem || a.k === Kind.Gargoyle || a.k === Kind.Armor || a.k === Kind.Thrall || (a.k === Kind.Adventurer && d.k !== Kind.Rat)) this.die(d, 'fight', a.k);
-    else this.eat(a, d, true);
-    // ヴァンパイアと、その眷属が倒した者は、眷属として起き上がることがある（src/eco/thrall.ts）
-    if (a.k === Kind.Vampire) this.vampClaim(a, d);
-    else if (a.k === Kind.Thrall) this.thrallClaim(a, d);
+    this.slay(a, d);
     return true;
   }
   // 打ち返し（逃げている者と、寝込みを打たれて飛び起きたばかりの者は打ち返さない）
@@ -291,8 +286,9 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
     const hd = Math.sqrt(sq(c.hx - c.x) + sq(c.hy - c.y)) || 1;
     const toward = ((f.x - c.x) * (c.hx - c.x) + (f.y - c.y) * (c.hy - c.y)) / (fd * hd);
     if (toward > 0.5 && fd < 8 * TILE && fd < hd) {
+      // 相手が3マスより離れていれば、相手を大きく回り込むように横へ動いて住みかを目指す（住みかの側へ曲がる向きを選ぶ）
       if (fd > 3 * TILE) {
-        this.cower(c, f);
+        this.skirt(c, f, sp);
         return true;
       }
       this.fleeFrom(c, f, sp);
@@ -310,11 +306,17 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
     // 住みかのそば（20px の内）まで逃げ帰っていて、相手が2マスより離れていれば、住みかで身を縮めてじっとする。
     // （以前はそこでも相手から離れる向きへ一歩ずつ動いたので、行き止まりにある住みかでは壁に押しつけたまま足を動かし続けた。
     //  seed27 では、住処のそばで休む冒険者への警戒（heedAlarm）が続き、コボルト10匹ほどが4〜6分足踏みしていた）
+    // 巣や住みかへ逃げ帰った者は、その中へ身を隠す（denHidden。画面では暗がりに沈んで目だけが光る）。隠れている間は、すぐそばまで来た者にしか気づかれない
     if ((c.hx || c.hy) && sq(c.hx - c.x) + sq(c.hy - c.y) <= 20 * 20 && sq(f.x - c.x) + sq(f.y - c.y) > 2 * TILE * 2 * TILE) {
       this.cower(c, f);
       return true;
     }
     this.fleeFrom(c, f, sp);
+  } else if ((c.hx || c.hy) && c.hungry < SPEC[c.k].starve * 0.5) {
+    // 物音におびえて（相手のいないまま）巣へ逃げ帰った者は、逃げる時間が切れるまで巣のそばで身をひそめる。
+    // （以前は巣の20px の内に着いたとたんに逃げるのをやめて餌探しへ戻り、次の物音でまた逃げ帰るのを、更新ごとに繰り返していた。
+    //  seed35 では、リザードマンが大ネズミを狩り続ける巣穴のそばで、大ネズミが何匹も巣の縁で行ったり来たりしていた）
+    c.act = 0;
   } else c.flee = 0;
   return true;
 }
@@ -331,10 +333,51 @@ export function fleeFrom(this: Ecology, c: Cr, f: Cr, sp: number): void {
   const x0 = c.x;
   const y0 = c.y;
   this.tryMove(c, (dx / L) * sp, (dy / L) * sp);
-  if (Math.abs(c.x - x0) + Math.abs(c.y - y0) < sp * 0.3) this.cower(c, f);
+  if (Math.abs(c.x - x0) + Math.abs(c.y - y0) >= sp * 0.3) return;
+  // 行き止まりで逃げ場がない：相手が飛びかかれる所（1.5マス）にいれば、向き直って噛みつき返す（窮鼠猫を噛む）。
+  // まだ離れていれば、相手の方へ向き直って身構える（cower）
+  if (L < 1.5 * TILE && this.str(c) > 0 && !f.away) {
+    this.setDir(c, f.x - c.x, f.y - c.y);
+    // 分析用：追い詰められて噛みつき返した（lib/moments.ts。続けて噛みついている間は、一匹ごとに生き物の更新20回に1回だけ数える）
+    if (this.step % 20 === c.id % 20) this.record('settle', { t: this.w.tick, k: c.k, ev: 'cornerBite', id: c.id, n: f.k, x: Math.round(c.x), y: Math.round(c.y) } as never);
+    if (this.fight(c, f)) c.flee = 0;
+    else c.act = 2;
+    return;
+  }
+  this.cower(c, f);
 }
 
-/** 逃げる者が、その場で縮こまる：立ち止まって相手の方を向く（画面では、src/creatureView.ts が小刻みに震わせ、ときどき左右をうかがわせる） */
+/**
+ * 住みかへ帰る道の途中に相手がいるとき、相手を回り込むように横へ動く。相手への向きに直角な二つの向きのうち、住みかの側の向きへ、
+ * 少し相手から離れる向きを混ぜて進む。ふさがっていれば反対の向きを試し、どちらも進めなければ身構える（cower）
+ */
+export function skirt(this: Ecology, c: Cr, f: Cr, sp: number): void {
+  const dx = c.x - f.x;
+  const dy = c.y - f.y;
+  const L = Math.sqrt(dx * dx + dy * dy) || 1;
+  const ux = dx / L;
+  const uy = dy / L;
+  const side = (c.hx - c.x) * -uy + (c.hy - c.y) * ux >= 0 ? 1 : -1;
+  for (const sg of [side, -side]) {
+    const vx = -uy * sg * 0.85 + ux * 0.5;
+    const vy = ux * sg * 0.85 + uy * 0.5;
+    const x0 = c.x;
+    const y0 = c.y;
+    this.tryMove(c, vx * sp, vy * sp);
+    if (Math.abs(c.x - x0) + Math.abs(c.y - y0) >= sp * 0.3) {
+      c.act = 1;
+      return;
+    }
+  }
+  this.cower(c, f);
+}
+
+/** 逃げて巣や住みかの中へ身を隠しているか（逃げている間に、住みかの20px の内で立ち止まっている） */
+export function denHidden(this: Ecology, o: Cr): boolean {
+  return !o.dead && o.flee > 0 && o.act === 0 && (o.hx !== 0 || o.hy !== 0) && sq(o.hx - o.x) + sq(o.hy - o.y) <= 20 * 20 && o.k !== Kind.Adventurer && o.k !== Kind.Dwarf;
+}
+
+/** 逃げる者が、その場で身構える：立ち止まって相手の方を向く（住みかのそばなら、その中へ身を隠したことになる。denHidden） */
 export function cower(this: Ecology, c: Cr, f: Cr): void {
   c.act = 0;
   this.setDir(c, f.x - c.x, f.y - c.y);
@@ -360,8 +403,10 @@ declare module '../ecology' {
     woundsAndFlight: typeof woundsAndFlight;
     fleeFrom: typeof fleeFrom;
     cower: typeof cower;
+    skirt: typeof skirt;
+    denHidden: typeof denHidden;
     limp: typeof limp;
   }
 }
 
-Object.assign(Ecology.prototype, { str, defend, leaveIfStarving, hunt, maxHp, bleed, strike, fight, woundsAndFlight, fleeFrom, cower, limp });
+Object.assign(Ecology.prototype, { str, defend, leaveIfStarving, hunt, maxHp, bleed, strike, fight, woundsAndFlight, fleeFrom, cower, skirt, denHidden, limp });

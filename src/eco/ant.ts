@@ -26,6 +26,9 @@ export function pickNest(this: Ecology): number {
     }
     if (f < 200) continue;
     if (this.colonies.some((o) => Math.abs(o.x - x * TILE) + Math.abs(o.y - y * TILE) < 30 * TILE)) continue;
+    // コボルトの住処とゴブリンの集落のそば（10マスの内）には巣を作らない。キノコの多い所を選ぶので、コボルトの畑に巣を作り、
+    // アリとコボルトが小さな住処に詰まって、畑の3マスを取り合っていた（abc・かしたれ）
+    if (this.warrens.some((o) => o.id >= 0 && sq(o.x - x * TILE) + sq(o.y - y * TILE) < 10 * TILE * 10 * TILE) || this.camps.some((o) => o.id >= 0 && sq(o.x - x * TILE) + sq(o.y - y * TILE) < 10 * TILE * 10 * TILE)) continue;
     const v = f - walls * 10;
     if (v > bv) {
       bv = v;
@@ -99,10 +102,16 @@ export function ant(this: Ecology, c: Cr): void {
   // （以前は番号が残ったまま探し直さず、何もしないまま歩く姿でその場に立ち続けていた）
   if (!target && c.ref2 > 0) c.ref2 = 0;
   if (!target && c.ref2 === 0) {
+    // 巣から歩いて行ける物（巣と同じ、つながった洞窟の領域にある物）だけを選ぶ
+    // （以前はまっすぐの距離だけで選んだので、岩に囲まれた隅の巣のアリが、壁の向こうの苔へ道が見つからないまま歩き続けた。abc の10〜18日目で40回）
+    const home = this.regionOf(this.tileOf(col.x, col.y));
+    // コボルトの住処の畑（住処から5マスの内）の苔とキノコは取らない（すでに住処のそばにある巣のアリが、畑を食べ尽くしてしまう）
+    const farm = (x: number, y: number) => this.warrens.some((o) => o.id >= 0 && sq(o.x - x) + sq(o.y - y) < 5 * TILE * 5 * TILE);
+    const reach = (x: number, y: number) => (home < 0 || this.regionOf(this.tileOf(x, y)) === home) && !farm(x, y);
     let bd = 14 * TILE * 14 * TILE;
     for (const o of this.corpses) {
       const d = sq(o.x - col.x) + sq(o.y - col.y);
-      if (d < bd) {
+      if (d < bd && reach(o.x, o.y)) {
         bd = d;
         target = o;
       }
@@ -110,7 +119,9 @@ export function ant(this: Ecology, c: Cr): void {
     if (target) c.ref2 = target.id;
     else {
       const k = this.findMoss(c, col.x, col.y, 8, 65);
-      const kk = k >= 0 ? k : this.findFungus(col.x, col.y, 8, c.id);
+      const k1 = k >= 0 && reach((k % this.w.map.w) * TILE + 8, Math.floor(k / this.w.map.w) * TILE + 8) ? k : -1;
+      const f = k1 >= 0 ? -1 : this.findFungus(col.x, col.y, 8, c.id);
+      const kk = k1 >= 0 ? k1 : f >= 0 && reach((f % this.w.map.w) * TILE + 8, Math.floor(f / this.w.map.w) * TILE + 8) ? f : -1;
       if (kk >= 0) {
         c.ref2 = -1 - kk;
       } else {
