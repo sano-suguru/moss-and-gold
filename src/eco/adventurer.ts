@@ -16,9 +16,9 @@ const RETREAT_N = 60;
 const JOB_SKILL: (Skill | undefined)[] = [SKILL_WARRIOR_SLASH, SKILL_WIZARD_MISSILE, SKILL_THIEF_THROW, SKILL_PRIEST_HAMMER, undefined, SKILL_HUNTER_RAIN, SKILL_SLAYER_CLEAVE];
 /** 職業ごとの技の届く距離（マス）：戦士の飛ぶ斬撃5、魔法使いのマジックミサイル10、盗賊の短剣投げ8、僧侶のハンマー3（十字架の腕はさらに3）、狩人の矢の雨12、竜殺しの大剣5.5 */
 const JOB_REACH = [5, 10, 8, 3, 0, 12, 5.5];
-/** 戦う相手に気づける遠さ（px）：打ってきた相手、灯りの輪か明るい床にいる敵、暗がりのすぐそばの敵（src/eco/adventurer.ts の「戦う」） */
+/** 戦う相手に気づける遠さ（px）：打ってきた相手、灯りの輪か明るい床にいる相手、暗がりのすぐそばの敵（src/eco/adventurer.ts の「戦う」） */
 const NOTICE_HIT = 12 * TILE;
-const NOTICE_LIT = 10 * TILE;
+const NOTICE_LIT = 5.5 * TILE;
 const NOTICE_DARK = 2 * TILE;
 
 /** 噂の総量（評判） */
@@ -550,8 +550,8 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   // 気づける遠さ（見通しが利くことが条件）：
   //   打ってきた相手は、暗がりでも NOTICE_HIT まで（打たれたら気づく。オークの投げ斧のように、灯りの外から打つ敵がいるので）。
   //   一行の灯りの輪の中か、明るい床にいる相手は NOTICE_LIT まで。暗がりの敵（雑魚は除く）は、すぐそば（NOTICE_DARK。盗賊は夜目が利いて3マス）なら気配で気づく。
-  //   （以前は、灯りの輪か明るい床にいる5.5マスの内の相手にしか気づかず、打たれても相手が暗がりにいれば向き直らなかった。
-  //    技の届く距離（魔法使い10マス・狩人12マスなど）より、見つけられる距離のほうがずっと短かった）
+  //   （以前は、打たれても相手が暗がりにいれば向き直らなかった。
+  //    灯りの中の相手を10マス先まで見えるようにも試したが、16シード×25日で、ヴァンパイアの血吸いが 62→16 回、ゴブリンの夜の盗みが 35→15 回に減ったので、5.5マスのままにした）
   if (!foe)
     this.nearby(c.x, c.y, NOTICE_HIT / TILE + 1, (o) => {
       if (o.dead || o.away) return;
