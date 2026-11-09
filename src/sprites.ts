@@ -4930,6 +4930,30 @@ function fxMissileDisc(k){
  aaDraw(fr,S,S,PURPL,k<=3?2:-1,(x,y)=>{const r=Math.hypot(x,y);if(r>R)return -1;return Math.min(4,r<R*0.45?core:core+1)},false);
  return {...fr,ax:S,ay:S};
 }
+/** 血の赤（ヴァンパイアの血吸い）：淡い桃 → 明るい赤 → 赤 → 暗い赤 → 黒ずんだ赤の縁取り */
+const BLOODL=[[255,226,220],[255,120,110],[214,40,48],[150,18,32],[92,8,20],[40,4,10]];
+/**
+ * ヴァンパイアの血吸いで、相手からヴァンパイアへ流れる血の玉：f 0〜3（少しずつ脈打つ）。左上に小さな光沢のある、つやのある赤い玉
+ */
+function fxBloodOrb(f){
+ const S=6,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const R=[3.4,3.0,2.7,3.1][f];
+ aaDraw(fr,S,S,BLOODL,1,(x,y)=>{
+  const r=Math.hypot(x,y);
+  if(r>R)return -1;
+  if(Math.hypot(x+1,y+1)<0.8)return 0;
+  return r<R*0.45?1:r<R*0.8?2:3;
+ });
+ return {...fr,ax:S,ay:S};
+}
+/** 血の玉の尾をつくる丸：k 0〜5（0 が玉のすぐうしろで太く明るい、5 がいちばん先で細く暗い）。通り道に沿って密に重ねる */
+function fxBloodDisc(k){
+ const S=4,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const R=[2.6,2.2,1.9,1.5,1.1,0.8][k];
+ const core=[1,1,2,2,3,3][k];
+ aaDraw(fr,S,S,BLOODL,k<=1?1:-1,(x,y)=>{const r=Math.hypot(x,y);if(r>R)return -1;return Math.min(4,r<R*0.5?core:core+1)},false);
+ return {...fr,ax:S,ay:S};
+}
 /** マジックミサイルの尾からこぼれる魔力の粒：f 0〜3（小さな四つ角の星が、光ってしぼむ） */
 function fxMissileSpark(f){
  const S=3,W=S*2+1,H=S*2+1,fr=blank(W,H);
@@ -5575,4 +5599,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

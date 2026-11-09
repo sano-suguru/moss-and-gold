@@ -338,6 +338,8 @@ export function fleeFrom(this: Ecology, c: Cr, f: Cr, sp: number): void {
   // まだ離れていれば、相手の方へ向き直って身構える（cower）
   if (L < 1.5 * TILE && this.str(c) > 0 && !f.away) {
     this.setDir(c, f.x - c.x, f.y - c.y);
+    // 分析用：追い詰められて噛みつき返した（lib/moments.ts。続けて噛みついている間は、一匹ごとに生き物の更新20回に1回だけ数える）
+    if (this.step % 20 === c.id % 20) this.record('settle', { t: this.w.tick, k: c.k, ev: 'cornerBite', id: c.id, n: f.k, x: Math.round(c.x), y: Math.round(c.y) } as never);
     if (this.fight(c, f)) c.flee = 0;
     else c.act = 2;
     return;

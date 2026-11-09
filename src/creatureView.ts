@@ -747,6 +747,78 @@ export class CreatureView {
           }
           break;
         }
+        case 'drain': {
+          // ヴァンパイアの血吸い（src/eco/vampskill.ts）：相手からヴァンパイアの手もとへ、つやのある赤い血の玉（src/sprites.ts の fxBloodOrb）が、
+          // 細くなっていく赤い尾（fxBloodDisc を密に重ねたもの）を引いて、ゆるい弧を描きながら次々に流れていく。吸っているあいだだけ（切れたら消える）
+          const v = eco.byId.get(r.aid);
+          const d = eco.byId.get(r.did);
+          if (!v || v.dead || !d || d.dead || v.run <= 0 || v.aim !== r.did || age > (r.fly ?? 20)) break;
+          const sx = d.x;
+          const sy = d.y;
+          const fx = v.x + (v.dir === 2 ? 5 : v.dir === 3 ? -5 : 0);
+          const fy = v.y + (v.dir === 0 ? 3 : v.dir === 1 ? -3 : 0);
+          const L = Math.hypot(fx - sx, fy - sy) || 1;
+          const px = -(fy - sy) / L;
+          const py = (fx - sx) / L;
+          const at = (q: number, side: number) => {
+            const bend = Math.sin(q * Math.PI) * Math.min(10, L * 0.18) * side;
+            return [sx + (fx - sx) * q + px * bend, sy + (fy - sy) * q + py * bend];
+          };
+          for (let i = 0; i < 4; i++) {
+            const q = (age * 0.07 + i / 4) % 1;
+            const side = i % 2 ? 1 : -1;
+            const steps = 6;
+            for (let j = steps; j >= 1; j--) {
+              const qq = q - j * 0.035;
+              if (qq < 0) continue;
+              const [tx, ty] = at(qq, side);
+              push(tx, ty, lift + 1 + Math.sin(qq * Math.PI) * 4, false, A.fx(`bdisc:${Math.min(5, j - 1)}`), 0, 4);
+            }
+            const [hx, hy] = at(q, side);
+            push(hx, hy, lift + 1 + Math.sin(q * Math.PI) * 4, false, A.fx(`borb:${(Math.floor(age / 2) + i) & 3}`), 0, 4);
+          }
+          dyn.push({ x: fx, y: fy - 10, r: 26, i: 0.4 * damp, c: 6 });
+          dyn.push({ x: sx, y: sy - 8, r: 18, i: 0.25 * damp, c: 6 });
+          break;
+        }
+        case 'batswarm': {
+          // ヴァンパイアのコウモリの群れ（src/eco/vampskill.ts）：ヴァンパイアの前から相手の方へ、黒いコウモリの群れが帯になって突っ込み、
+          // 群れの先が届いた所で羽ばたいて渦を巻き、散っていく（当たるのは、群れが届いた時に通り道にいた者）
+          const fly = r.fly ?? 12;
+          const n = r.n ?? 8;
+          for (let i = 0; i < n; i++) {
+            const lag = (i % 4) * 0.9 + Math.floor(i / 4) * 0.4;
+            const p = (age - lag) / fly;
+            if (p < 0) continue;
+            const wob = Math.sin(age * 0.9 + i * 1.7) * (3 + (i % 3) * 2);
+            let bx: number;
+            let by: number;
+            let z = lift + 4 + (i % 3) * 3;
+            if (p <= 1) {
+              bx = r.ax + vx * p - uy * wob;
+              by = r.ay + vy * p + ux * wob;
+            } else {
+              const g = (age - lag - fly) / 8;
+              if (g >= 1) continue;
+              const an = i * 2.399 + g * 3;
+              bx = r.dx + Math.cos(an) * (4 + g * 18);
+              by = r.dy + Math.sin(an) * (4 + g * 18) * 0.6;
+              z += g * 10;
+            }
+            push(bx, by, z, vx < 0, A.index(1, 2, 1, (age + i) & 3), 0, 4);
+          }
+          break;
+        }
+        case 'miststep': {
+          // 霧の歩み（src/eco/vampskill.ts）：消えた所から現れた所へ、黒い霧の筋が一瞬だけ走る
+          if (age >= 8) break;
+          for (let i = 0; i < 6; i++) {
+            const p = i / 5;
+            const g = age / 8;
+            push(r.ax + vx * p, r.ay + vy * p + 0.1, 6 + Math.sin(p * Math.PI) * 6, i % 2 === 1, A.mist(Math.min(3, Math.floor(g * 4 + (1 - p) * 1.5))), 0, 0);
+          }
+          break;
+        }
         case 'breath':
           break;
         case 'puff':
@@ -1060,8 +1132,12 @@ export class CreatureView {
         const r = 10 + ((v.id + i * 13) % 9);
         pushSprite(v.hx + Math.cos(a) * r, v.hy + 4 + Math.sin(a) * r * 0.5, 0, i % 2 === 1, A.blood(0, (v.id + i) & 3), 0, 2);
       }
-      pushSprite(v.hx, v.hy + 2, 0, false, A.coffin(v.st !== VAMP_COFFIN), 0, 2);
+      // 住処の外で眠り込んだときは、その場に呼び出した棺で眠る（住処の棺は空のまま）
+      const away = v.st === VAMP_COFFIN && (Math.abs(v.x - v.hx) > 1 || Math.abs(v.y - v.hy) > 1);
+      pushSprite(v.hx, v.hy + 2, 0, false, A.coffin(v.st !== VAMP_COFFIN || away), 0, 2);
     }
+    for (const v of eco.list)
+      if (v.k === Kind.Vampire && !v.dead && v.st === VAMP_COFFIN && (Math.abs(v.x - v.hx) > 1 || Math.abs(v.y - v.hy) > 1) && inView(v.x, v.y, 24)) pushSprite(v.x, v.y + 2, 0, false, A.coffin(false), 0, 2);
     // コボルトの住処：畑の畝、奥の寝床、入口の飾り柱、罠
     for (const wr of eco.warrens) {
       if (wr.id < 0 || !inView(wr.x, wr.y, 96)) continue;
@@ -1461,7 +1537,8 @@ export class CreatureView {
     for (const ef of eco.fxVampMist) {
       const tt = eco.w.tick + alpha;
       const age = tt - ef.t;
-      const dur = ef.how ? 36 : 28;
+      // how：0 コウモリにばらけた、1 姿を戻した、2 霧の歩みで消えた、3 霧の歩みで現れた（src/eco/vampskill.ts）
+      const dur = ef.how === 1 ? 36 : ef.how >= 2 ? 18 : 28;
       if (age < 0 || age >= dur || !inView(ef.x, ef.y, 60)) continue;
       const ph = age / dur;
       for (let i = 0; i < 5; i++) {
@@ -1615,6 +1692,31 @@ export class CreatureView {
         for (let i = 0; i < 3; i++) {
           const ph = (t * 0.06 + i * 0.33 + c.id * 0.1) % 1;
           pushSprite(x + Math.sin(i * 2.1 + t * 0.4) * 5, yy + 0.06, lift + bh * 0.3 + ph * bh * 0.8, false, A.fx(`bit:4:7:${Math.min(3, Math.floor(ph * 4))}`), 0, 2);
+        }
+      }
+      // ヴァンパイアの技の溜め（src/eco/vampskill.ts）：血吸いは、かざした手のまわりに赤い血の玉が集まって脈打つ。
+      // コウモリの群れは、まわりにコウモリが集まって渦を巻く。霧の歩みは、足もとから体が黒い霧になって崩れていく（描画専用）
+      if (sp === Kind.Vampire && !c.dead && c.act === 2 && c.actT < 0 && c.run < 0) {
+        const t = eco.w.tick + alpha;
+        const bh = Ecology.bodySize(sp);
+        const hx = x + (dir === 2 ? 6 : dir === 3 ? -6 : 0);
+        if (c.run === -1) {
+          for (let i = 0; i < 3; i++) {
+            const a = t * 0.5 + (i * Math.PI * 2) / 3;
+            pushSprite(hx + Math.cos(a) * 4, yy + Math.sin(a) * 2 + 0.06, lift + bh * 0.7 + Math.sin(a) * 2, false, A.fx(`borb:${(Math.floor(t / 2) + i) & 3}`), 0, 2);
+          }
+          dyn.push({ x: hx, y: yy - bh * 0.7, r: 24, i: 0.45, c: 6 });
+        } else if (c.run === -2) {
+          for (let i = 0; i < 6; i++) {
+            const a = t * 0.3 + (i * Math.PI * 2) / 6;
+            const rr = 10 + (i % 2) * 4;
+            pushSprite(x + Math.cos(a) * rr, yy + Math.sin(a) * rr * 0.5 + 0.06, lift + bh * 0.8 + (i % 3) * 3, Math.sin(a) > 0, A.index(1, 2, 1, (Math.floor(t) + i) & 3), 0, 2);
+          }
+        } else {
+          for (let i = 0; i < 4; i++) {
+            const ph = (t * 0.08 + i * 0.25) % 1;
+            pushSprite(x + Math.sin(i * 2.1 + t * 0.3) * 5, yy + 0.08, lift + ph * bh, i % 2 === 1, A.mist(Math.min(3, Math.floor(ph * 4))), 0, 0);
+          }
         }
       }
       // 怯んだ者（src/eco/charge.ts）：頭の上で小さな星が三つ回る（描画専用）

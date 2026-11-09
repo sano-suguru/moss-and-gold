@@ -169,7 +169,7 @@ export function resolveVolleys(this: Ecology): void {
       continue;
     }
     // 落ちる攻撃：打った者と同じ種には当たらない（冒険者の矢はドワーフにも当たらない）。霊とウィスプはすり抜ける
-    const who = (o: Cr) => o.k !== a.k && !(a.k === Kind.Adventurer && (o.k === Kind.Dwarf || !advMinorOk(o, a, v.tgt ?? 0))) && o.k !== Kind.Ghost && o.k !== Kind.Wisp;
+    const who = (o: Cr) => o.k !== a.k && !(a.k === Kind.Adventurer && (o.k === Kind.Dwarf || !advMinorOk(o, a, v.tgt ?? 0))) && !(a.k === Kind.Vampire && (o.k === Kind.Bat || o.k === Kind.Thrall)) && o.k !== Kind.Ghost && o.k !== Kind.Wisp;
     let first = true;
     this.nearby(v.x, v.y, Math.ceil(v.r / TILE) + 1, (o) => {
       if (o.dead || o.away || o.caught || !who(o) || sq(o.x - v.x) + sq(o.y - v.y) > v.r * v.r) return;
