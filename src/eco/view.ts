@@ -49,7 +49,7 @@ export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]):
   if (c.sleep === 2) state = 'ぐっすり眠っている';
   else if (c.sleep === 1) state = Ecology.SLEEP[c.k]?.kind === 'drift' ? '眠りながらゆっくり動いている' : 'うとうと眠っている';
   else if (c.sleep === 3) state = '半分だけ眠っている（片目を開けたまま）';
-  else if (c.flee > 0) state = '逃げている';
+  else if (c.flee > 0) state = this.denHidden(c) ? '巣に逃げ込んで、身を隠している' : c.act === 2 ? '追い詰められて、噛みつき返している' : c.act === 0 ? '逃げ場がなく、相手に向き直って身構えている' : '逃げている';
   else if (c.act === 2 && this.w.tick - c.hitAt < 120) state = '戦っている';
   else if (c.k === Kind.Rat && c.st === 11) state = c.ref2 ? '仲間のあとについて、新しい巣穴へ引っ越している' : '群れの先頭に立って、新しい巣穴へ引っ越している';
   else if (c.k === Kind.Goblin && c.st === 15) state = c.gait > 0 ? '光の縁に身をひそめて、焚き火をうかがっている' : c.gait < 0 ? '眠っている冒険者に忍び寄っている' : '暗がりを選んで、焚き火へ忍び寄っている';

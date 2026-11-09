@@ -169,6 +169,8 @@ export function isLit(this: Ecology, o: Cr): boolean {
 export function canSense(this: Ecology, c: Cr, o: Cr): boolean {
   if ((o.st === 7 || o.st === 12) && this.isHidden(o) && !this.atDoorOf(c, o)) return false;
   const d2 = sq(o.x - c.x) + sq(o.y - c.y);
+  // 逃げて巣や住みかの中へ身を隠した者には、すぐそば（1.2マス）まで来ないと気づかない（src/eco/combat.ts の denHidden）
+  if (o.flee > 0 && o.act === 0 && d2 > 1.2 * TILE * 1.2 * TILE && this.denHidden(o)) return false;
   const T2 = TILE * TILE;
   const sense = Ecology.SENSE[c.k] ?? 'night';
   const los = () => lineOfSight(this.w.map, c.x, c.y, o.x, o.y);

@@ -287,8 +287,9 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
     const hd = Math.sqrt(sq(c.hx - c.x) + sq(c.hy - c.y)) || 1;
     const toward = ((f.x - c.x) * (c.hx - c.x) + (f.y - c.y) * (c.hy - c.y)) / (fd * hd);
     if (toward > 0.5 && fd < 8 * TILE && fd < hd) {
+      // 相手が3マスより離れていれば、相手を大きく回り込むように横へ動いて住みかを目指す（住みかの側へ曲がる向きを選ぶ）
       if (fd > 3 * TILE) {
-        this.cower(c, f);
+        this.skirt(c, f, sp);
         return true;
       }
       this.fleeFrom(c, f, sp);
@@ -306,6 +307,7 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
     // 住みかのそば（20px の内）まで逃げ帰っていて、相手が2マスより離れていれば、住みかで身を縮めてじっとする。
     // （以前はそこでも相手から離れる向きへ一歩ずつ動いたので、行き止まりにある住みかでは壁に押しつけたまま足を動かし続けた。
     //  seed27 では、住処のそばで休む冒険者への警戒（heedAlarm）が続き、コボルト10匹ほどが4〜6分足踏みしていた）
+    // 巣や住みかへ逃げ帰った者は、その中へ身を隠す（denHidden。画面では暗がりに沈んで目だけが光る）。隠れている間は、すぐそばまで来た者にしか気づかれない
     if ((c.hx || c.hy) && sq(c.hx - c.x) + sq(c.hy - c.y) <= 20 * 20 && sq(f.x - c.x) + sq(f.y - c.y) > 2 * TILE * 2 * TILE) {
       this.cower(c, f);
       return true;
@@ -332,10 +334,49 @@ export function fleeFrom(this: Ecology, c: Cr, f: Cr, sp: number): void {
   const x0 = c.x;
   const y0 = c.y;
   this.tryMove(c, (dx / L) * sp, (dy / L) * sp);
-  if (Math.abs(c.x - x0) + Math.abs(c.y - y0) < sp * 0.3) this.cower(c, f);
+  if (Math.abs(c.x - x0) + Math.abs(c.y - y0) >= sp * 0.3) return;
+  // 行き止まりで逃げ場がない：相手が飛びかかれる所（1.5マス）にいれば、向き直って噛みつき返す（窮鼠猫を噛む）。
+  // まだ離れていれば、相手の方へ向き直って身構える（cower）
+  if (L < 1.5 * TILE && this.str(c) > 0 && !f.away) {
+    this.setDir(c, f.x - c.x, f.y - c.y);
+    if (this.fight(c, f)) c.flee = 0;
+    else c.act = 2;
+    return;
+  }
+  this.cower(c, f);
 }
 
-/** 逃げる者が、その場で縮こまる：立ち止まって相手の方を向く（画面では、src/creatureView.ts が小刻みに震わせ、ときどき左右をうかがわせる） */
+/**
+ * 住みかへ帰る道の途中に相手がいるとき、相手を回り込むように横へ動く。相手への向きに直角な二つの向きのうち、住みかの側の向きへ、
+ * 少し相手から離れる向きを混ぜて進む。ふさがっていれば反対の向きを試し、どちらも進めなければ身構える（cower）
+ */
+export function skirt(this: Ecology, c: Cr, f: Cr, sp: number): void {
+  const dx = c.x - f.x;
+  const dy = c.y - f.y;
+  const L = Math.sqrt(dx * dx + dy * dy) || 1;
+  const ux = dx / L;
+  const uy = dy / L;
+  const side = (c.hx - c.x) * -uy + (c.hy - c.y) * ux >= 0 ? 1 : -1;
+  for (const sg of [side, -side]) {
+    const vx = -uy * sg * 0.85 + ux * 0.5;
+    const vy = ux * sg * 0.85 + uy * 0.5;
+    const x0 = c.x;
+    const y0 = c.y;
+    this.tryMove(c, vx * sp, vy * sp);
+    if (Math.abs(c.x - x0) + Math.abs(c.y - y0) >= sp * 0.3) {
+      c.act = 1;
+      return;
+    }
+  }
+  this.cower(c, f);
+}
+
+/** 逃げて巣や住みかの中へ身を隠しているか（逃げている間に、住みかの20px の内で立ち止まっている） */
+export function denHidden(this: Ecology, o: Cr): boolean {
+  return !o.dead && o.flee > 0 && o.act === 0 && (o.hx !== 0 || o.hy !== 0) && sq(o.hx - o.x) + sq(o.hy - o.y) <= 20 * 20 && o.k !== Kind.Adventurer && o.k !== Kind.Dwarf;
+}
+
+/** 逃げる者が、その場で身構える：立ち止まって相手の方を向く（住みかのそばなら、その中へ身を隠したことになる。denHidden） */
 export function cower(this: Ecology, c: Cr, f: Cr): void {
   c.act = 0;
   this.setDir(c, f.x - c.x, f.y - c.y);
@@ -361,8 +402,10 @@ declare module '../ecology' {
     woundsAndFlight: typeof woundsAndFlight;
     fleeFrom: typeof fleeFrom;
     cower: typeof cower;
+    skirt: typeof skirt;
+    denHidden: typeof denHidden;
     limp: typeof limp;
   }
 }
 
-Object.assign(Ecology.prototype, { str, defend, leaveIfStarving, hunt, maxHp, bleed, strike, fight, woundsAndFlight, fleeFrom, cower, limp });
+Object.assign(Ecology.prototype, { str, defend, leaveIfStarving, hunt, maxHp, bleed, strike, fight, woundsAndFlight, fleeFrom, cower, skirt, denHidden, limp });

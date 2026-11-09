@@ -1712,19 +1712,6 @@ export class CreatureView {
           pushSprite(x + Math.cos(a) * fh * 0.5, yy + 0.1, lift + 2 + ((i * 3 + Math.floor(t * 4)) % Math.max(2, Math.round(fh * 0.8))), false, A.fx('bit:3:7:0'), 0, 4);
         }
       }
-      // 逃げる途中で縮こまっている者（src/eco/combat.ts の cower）：相手の方を向いて小刻みに震え、3秒に一度、0.6秒ほど左右をうかがう。
-      // （立ち止まっているだけだと、動けなくなって固まったように見えるので、怯えていると分かる姿にする）
-      if (!c.dead && c.flee > 0 && c.act === 0 && c.sleep === 0 && !c.caught && sp !== Kind.Wisp && sp !== Kind.Ghost) {
-        x += Math.sin(t * 40 + c.id) * 0.6;
-        const ph = (t + (c.id % 13) * 0.23) % 3;
-        if (ph < 0.6) {
-          if (dir === 2) flip = !flip;
-          else {
-            dir = 2;
-            flip = ph < 0.3;
-          }
-        }
-      }
       // 床から養分を吸うスライム：吸う一口ごと（生き物の更新10回に1回）に、まわりの床から緑の粒が体へ吸い込まれる（src/eco/slime.ts の slimeCanSip）
       if (sp === Kind.Slime && !c.dead && c.elite !== 6 && eco.slimeCanSip(c)) {
         const age = ((((eco.step - (c.id % 10)) % 10) + 10) % 10) + alpha * 0.5;
@@ -1751,7 +1738,8 @@ export class CreatureView {
       }
       const bright = sp === Kind.Wisp && c.glow > 90 ? 1 : 0;
       // 隠れている者（ほかの生き物には気づかれない）：眺める人には、暗く沈んだ影の姿と光る目で見せる
-      const hidden = eco.isHidden(c);
+      // 身をひそめている者（コボルトとゴブリンの隠れ方と、逃げて巣や住みかの中へ身を隠した者。src/eco/combat.ts の denHidden）：暗がりに沈んで目だけが光る
+      const hidden = eco.isHidden(c) || (c.flee > 0 && c.act === 0 && sp !== Kind.Wisp && sp !== Kind.Ghost && eco.denHidden(c));
       const isCorpse = c.dead === 1 && c.actT >= 4 && sp !== Kind.Wisp && sp !== Kind.Slime && sp !== Kind.Ghost && sp !== Kind.Myconid;
       const eliteName = ['', 'firespirit', 'pknight', '', '', '', 'wspirit', 'lspirit', '', 'mlord'][c.elite] ?? '';
       // 冒険者は、名簿の人でも、名簿から外れた亡骸や眷属でも、手描きの体で描く（src/sprites.ts の heroSprite。姿は advLook）
