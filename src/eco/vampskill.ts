@@ -286,14 +286,10 @@ export function vampEngage(this: Ecology, c: Cr, foes: Cr[], prey: Cr | null): b
   if (!near) return false;
   const bats = retinueNear.call(this, c);
   const canSwarm = (foes.length || near.k === Kind.Adventurer) && nd <= SWARM_LEN * SWARM_LEN && nd > sq(1.5 * TILE) && bats >= 2 && this.skillCanStart(c, SKILL_VAMP_SWARM);
-  // 血吸いは、冒険者（近づけば打ち返されて危ない相手）と、足止めしてくれるコウモリ（2匹以上）を連れていないときの獲物に使う。
-  // コウモリを連れていれば、大ネズミやゴブリンのような獲物には、これまでどおり近づいて、コウモリに群がらせて足止めしてから打ちかかる
-  // （血吸いをどの獲物にも使うと、離れたまま仕留めてしまい、足止めの場面が8シードで18回から3回に減った）
-  // 足止めしてくれるコウモリは、近くにいなくても数える（足止めのときは、コウモリが先に獲物の上へ飛んで旋回しているので、
-  // 近くのコウモリだけを数えると「コウモリがいない」とみなして血吸いで仕留めてしまい、足止めの場面が16シード×25日で80回から41回に減っていた）
-  let retinue = 0;
-  if (near.k !== Kind.Adventurer) for (const o of this.list) if (o.k === Kind.Bat && !o.dead && o.ref2 === c.id) retinue++;
-  const canDrain = (near.k === Kind.Adventurer || retinue < 2) && nd <= DRAIN_R * DRAIN_R && nd > sq(1.2 * TILE) && this.skillCanStart(c, SKILL_VAMP_DRAIN);
+  // 血吸いは冒険者（近づけば打ち返されて危ない相手）にだけ使う。大ネズミやコボルトのような獲物には、これまでどおり歩いて近づき、
+  // その間に従えたコウモリに群がらせて足止めしてから打ちかかる（獲物にも血吸いを使うと、離れたまま仕留めてしまい、
+  // コウモリが獲物に群がって足止めする場面が16シード×25日で80回から41回に減った。コウモリを連れていないときだけ獲物に使っても56回）
+  const canDrain = near.k === Kind.Adventurer && nd <= DRAIN_R * DRAIN_R && nd > sq(1.2 * TILE) && this.skillCanStart(c, SKILL_VAMP_DRAIN);
   // 傷を負っていれば（体力が85％を切っていれば）血吸いを先に、そうでなければコウモリの群れを先に使う
   if (canDrain && (c.hp < this.maxHp(c) * 0.85 || !canSwarm)) return start(SKILL_VAMP_DRAIN, -1, near);
   if (canSwarm) return start(SKILL_VAMP_SWARM, -2, near);
