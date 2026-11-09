@@ -549,7 +549,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   }
   // 気づける遠さ（見通しが利くことが条件）：
   //   打ってきた相手は、暗がりでも NOTICE_HIT まで（打たれたら気づく。オークの投げ斧のように、灯りの外から打つ敵がいるので）。
-  //   一行の灯りの輪の中か、明るい床にいる敵は NOTICE_LIT まで。暗がりの敵は、すぐそば（NOTICE_DARK。盗賊は夜目が利いて3マス）なら気配で気づく。
+  //   一行の灯りの輪の中か、明るい床にいる相手は NOTICE_LIT まで。暗がりの敵（雑魚は除く）は、すぐそば（NOTICE_DARK。盗賊は夜目が利いて3マス）なら気配で気づく。
   //   （以前は、灯りの輪か明るい床にいる5.5マスの内の相手にしか気づかず、打たれても相手が暗がりにいれば向き直らなかった。
   //    技の届く距離（魔法使い10マス・狩人12マスなど）より、見つけられる距離のほうがずっと短かった）
   if (!foe)
@@ -564,7 +564,8 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       if (!attacked && (c.sp === Job.Bard || (c.sp === Job.Thief && o.k !== Kind.Mimic))) return;
       const d = sq(o.x - c.x) + sq(o.y - c.y);
       const near = c.sp === Job.Thief ? 3 * TILE : NOTICE_DARK;
-      const reach = attacked ? NOTICE_HIT : this.seenBy(c, lights, o) ? NOTICE_LIT : d < near * near && !this.isHidden(o) ? near : 0;
+      // （暗がりの気配で気づくのは敵だけ。大ネズミなどの雑魚にまで気づくと、暗がりの雑魚を払う数が増え、大ネズミがはっきり減った）
+      const reach = attacked ? NOTICE_HIT : this.seenBy(c, lights, o) ? NOTICE_LIT : enemy && d < near * near && !this.isHidden(o) ? near : 0;
       if (d >= reach * reach || (d > 2 * TILE * 2 * TILE && !lineOfSight(this.w.map, c.x, c.y, o.x, o.y))) return;
       // 雑魚は、近く（2マス）に来たときか、自分に害をなしたときだけ払う
       if (minor && !enemy && !attacked && o.foe !== c.id && d > 2 * TILE * 2 * TILE) return;
