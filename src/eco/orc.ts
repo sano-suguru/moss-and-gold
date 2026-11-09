@@ -4,6 +4,7 @@ import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, 
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
+import { SKILL_ORC_ROAR } from './orcskill';
 
 export function pickLair(this: Ecology, near?: { x: number; y: number }): number {
   const m = this.w.map;
@@ -156,6 +157,11 @@ export function orcWary(this: Ecology, c: Cr): boolean {
           p.engageN = p.members.filter((id) => !this.byId.get(id)?.dead).length;
         }
         this.record('settle', { t: this.w.tick, k: Kind.Orc, ev: 'orcClash', id: c.id, how: advance ? 1 : 2, n: p.id, x: Math.round(c.x), y: Math.round(c.y) } as never);
+        // 決着の時に吠える：従う集落のゴブリンを呼び、一行の後衛を怖ませる（src/eco/orcskill.ts の雄叫び。ref は一行のまま残す）
+        if (!c.party && this.skillCanStart(c, SKILL_ORC_ROAR)) {
+          this.orcStartRoar(c);
+          return true;
+        }
         return advance ? false : true;
       }
       return true;

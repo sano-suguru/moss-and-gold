@@ -170,8 +170,10 @@ export function resolveVolleys(this: Ecology): void {
       continue;
     }
     // 落ちる攻撃：打った者と同じ種には当たらない（冒険者の矢はドワーフにも当たらない）。霊とウィスプはすり抜ける
-    const who = (o: Cr) => o.k !== a.k && !(a.k === Kind.Adventurer && (o.k === Kind.Dwarf || !advMinorOk(o, a, v.tgt ?? 0))) && !(a.k === Kind.Vampire && (o.k === Kind.Bat || o.k === Kind.Thrall)) && o.k !== Kind.Ghost && o.k !== Kind.Wisp;
+    // （オークの投げ斧は、従う集落のゴブリンにも当たらない。src/eco/orcskill.ts の axeHits）
+    const who = (o: Cr) => o.k !== a.k && !(a.k === Kind.Adventurer && (o.k === Kind.Dwarf || !advMinorOk(o, a, v.tgt ?? 0))) && !(a.k === Kind.Vampire && (o.k === Kind.Bat || o.k === Kind.Thrall)) && !(a.k === Kind.Orc && !this.axeHits(a, o)) && o.k !== Kind.Ghost && o.k !== Kind.Wisp;
     let first = true;
+    let axeHit = 0;
     this.nearby(v.x, v.y, Math.ceil(v.r / TILE) + 1, (o) => {
       if (o.dead || o.away || o.caught || !who(o) || sq(o.x - v.x) + sq(o.y - v.y) > v.r * v.r) return;
       if (v.poison > 0) this.poisonOn(o, a.k, v.poison);
@@ -186,13 +188,23 @@ export function resolveVolleys(this: Ecology): void {
         this.fxAttacks.push({ t: this.w.tick, style: 'batreturn', col: 0, size: 1, ax: o.x, ay: o.y, dx: a.x, dy: a.y, did: o.id, aid: a.id, big: false, kill: false, fly: Math.max(6, Math.min(16, Math.round(Math.hypot(a.x - o.x, a.y - o.y) / 7))) });
         this.record('settle', { t: this.w.tick, k: Kind.Vampire, ev: 'swarmBlood', id: a.id, n: o.k, x: Math.round(o.x), y: Math.round(o.y) } as never);
       }
+      // オークの投げ斧（src/eco/orcskill.ts）：分析用に記録する。遠くで倒した相手は食べない（その場で消えて見えるので）
+      if (a.k === Kind.Orc) {
+        axeHit++;
+        this.record('settle', { t: this.w.tick, k: Kind.Orc, ev: 'axeHit', id: a.id, n: o.k, how: killed ? 1 : 0, x: Math.round(o.x), y: Math.round(o.y) } as never);
+      }
       if (killed) {
-        this.slay(a, o, first);
+        this.slay(a, o, first && a.k !== Kind.Orc);
         first = false;
       } else if (v.stun) o.stun = Math.max(o.stun, v.stun);
       // 分析用：ゴーレムの跳ねる衝撃波に打たれた冒険者（lib/moments.ts が、一度の技で2人以上かを数える）
       if (a.k === Kind.Golem && o.k === Kind.Adventurer) this.record('settle', { t: this.w.tick, k: Kind.Golem, ev: 'quakeHit', id: a.id, at: a.cast, n: o.sp, x: Math.round(o.x), y: Math.round(o.y) } as never);
     });
+    // 投げ斧が届いた所：当たれば火花、外れれば床に打ちつけた土ぼこり（src/creatureView.ts の axehit）
+    if (a.k === Kind.Orc) {
+      this.fxAttacks.push({ t: this.w.tick, style: 'axehit', col: axeHit ? 1 : 0, size: 1, ax: a.x, ay: a.y, dx: v.x, dy: v.y, did: -1, aid: a.id, big: false, kill: false });
+      if (this.fxAttacks.length > 160) this.fxAttacks.splice(0, 60);
+    }
   }
 }
 

@@ -760,9 +760,14 @@ function axe(dir,P,hx,hy,sw,rest,k){
  const bx=tx+(dir==='side'?1:0.4),by=ty+1.4*k;
  P.push(PL([[bx,by-2.4*k],[bx+3*k,by-3.2*k],[bx+3.6*k,by],[bx+3*k,by+2.6*k],[bx,by+1.6*k]],'iron',3,{ol:1}),D(bx+3.2*k,by,RAMP.iron[4]));
 }
+/** 斧を投げたあとの手：握った鎖が拳から垂れ下がる（斧は鎖の先に出ている。src/eco/orcskill.ts） */
+function chainHeld(dir,P,hx,hy,sw,rest,k){
+ if(dir==='up'&&rest)return;
+ for(let i=0;i<4;i++)P.push(D(hx+(dir==='side'?0.7*i:0.25*i),hy+1+i*1.3*k,RAMP.iron[i%2?3:1]));
+}
 function orc(dir,act,f,v=0){
- // v: 0 斧、1 拾った剣と盾
- return humanoid(dir,act,f,{s:1.3,skin:'orc',skinD:'orcD',cloth:'leather',head:orcHead,tool:v===1?sword:axe,off:v===1?shieldOff:null,leg:5,bw:4,bh:3.6,hh:9,limb:1.25});
+ // v: 0 斧、1 拾った剣と盾、2 斧を投げて鎖を握る
+ return humanoid(dir,act,f,{s:1.3,skin:'orc',skinD:'orcD',cloth:'leather',head:orcHead,tool:v===1?sword:v===2?chainHeld:axe,off:v===1?shieldOff:null,leg:5,bw:4,bh:3.6,hh:9,limb:1.25});
 }
 
 function lzmHead(dir,P,x,y,dead,open,k){
@@ -5166,6 +5171,115 @@ function fxShieldWall(d,f){
  },false);
  return {...fr,ax:S,ay:S};
 }
+/** 雄叫びの赤橙（オークの雄叫び）：白に近い黄 → 黄橙 → 橙 → 赤 → 暗い赤 → 縁取り */
+const ROARL=[[255,250,226],[255,212,118],[250,146,56],[216,80,38],[148,38,28],[66,16,14]];
+/**
+ * オークの雄叫びの音の波の一片：d は外へ向かう向き（16方向、0 が右）、f 0〜5（0・1 濃く太い、2・3 細る、4・5 薄れてちぎれる）。
+ * 外へふくらんだ弓形の帯で、外の縁はのこぎりの歯のようにとがる。オークのまわりに並べて、広がる輪にする（src/creatureView.ts の roar）。
+ * 帯のまん中ほど明るく（光る）、内と外の縁へ向かって赤くなる
+ */
+function fxRoarArc(d,f){
+ const S=10,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const a=d*Math.PI/8,ca=Math.cos(a),sa=Math.sin(a);
+ const th=[4.4,4.8,3.8,3.2,2.8,2.2][f],shade=[0,0,1,1,2,3][f],half=[7,8.5,8.5,8.5,8,7.5][f];
+ const Rc=20;
+ aaDraw(fr,S,S,ROARL,f<=3?1:-1,(x,y)=>{
+  const u=x*ca+y*sa+Rc-1,v=-x*sa+y*ca;       // 弓の中心（内側に Rc 離れた所）からの位置
+  if(Math.abs(v)>half)return -1;
+  if(f>=4&&Math.abs(v)>2.5&&Math.floor(Math.abs(v)/3.2)%2===1)return -1; // 薄れるときはちぎれる
+  const taper=1-Math.pow(Math.abs(v)/half,2);
+  const saw=1-Math.abs((((v+20)/2.4)%2)-1);  // のこぎりの歯（0〜1）
+  const r=Math.hypot(u,v);
+  const t0=Rc-th*taper*0.5,t1=Rc+th*taper*0.5+1.8*saw*taper*(th/4.4);
+  if(r<t0||r>t1)return -1;
+  const q=(r-t0)/(t1-t0||1);                 // 0 内の縁 → 1 外の縁
+  const mid=Math.abs(q-0.45)*2;
+  return Math.min(4,(mid<0.35?0:mid<0.7?1:mid<0.9?2:3)+shade);
+ });
+ return {...fr,ax:S,ay:S};
+}
+/** 鎖の鉄（オークの投げ斧の鎖と、斧の頭）：白い光 → 明るい鉄 → 鉄 → 暗い鉄 → 縁取り */
+const CHAINL=[[250,252,255],[200,208,220],[140,148,164],[92,98,114],[56,60,72],[22,22,28]];
+/** 斧の柄の木：明るい木 → 茶 → 暗い茶 → 縁取り */
+const WOODL=[[214,170,112],[176,128,76],[134,92,52],[96,64,36],[64,42,24],[30,20,12]];
+/**
+ * オークの投げ斧：rot 0〜7（45°ずつ時計回りに回る）、blur 1 なら、回る刃の通った跡（淡い鉄の弧）を後ろに残す。
+ * 柄は木の段、頭は分厚い三日月の刃と、反対側の短い峰。刃先の縁がいちばん明るく（刃先だけ光ってきらめく）、峰へ向かって暗い鉄。柄の尻に鎖を留める輪
+ */
+function fxThrownAxe(rot,blur){
+ const S=10,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const a=rot*Math.PI/4-Math.PI/4,ca=Math.cos(a),sa=Math.sin(a);
+ const loc=(x,y)=>[x*ca+y*sa,-x*sa+y*ca];  // s は柄に沿って（+ が頭）、t は柄に直角（+ が刃先）
+ if(blur){
+  // 刃の通った跡：刃先の半径あたりを、刃のうしろ（回ってきた側）へ100°ほど
+  const ab=a+Math.atan2(3.5,5.5);
+  aaDraw(fr,S,S,CHAINL,-1,(x,y)=>{
+   const r=Math.hypot(x,y);
+   let back=ab-Math.atan2(y,x);
+   back=((back%(2*Math.PI))+2*Math.PI)%(2*Math.PI);
+   if(back<0.15||back>2.1)return -1;
+   const w=3.4*(1-back/2.1)+0.4;
+   if(Math.abs(r-7)>w)return -1;
+   return back<0.7?1:back<1.3?2:back<1.8?3:4;
+  },false);
+ }
+ // 柄
+ aaDraw(fr,S,S,WOODL,-1,(x,y)=>{
+  const [s,t]=loc(x,y);
+  if(s<-7.5||s>5||Math.abs(t)>1)return -1;
+  return t<-0.35?1:t<0.4?2:3;
+ },false);
+ // 柄の尻の鎖の輪
+ aaDraw(fr,S,S,CHAINL,-1,(x,y)=>{
+  const [s,t]=loc(x,y);
+  const r=Math.hypot(s+8.6,t);
+  if(r>1.7||r<0.55)return -1;
+  return s+8.6<0?2:3;
+ },false);
+ // 頭：三日月の刃と峰
+ aaDraw(fr,S,S,CHAINL,0,(x,y)=>{
+  const [s,t]=loc(x,y);
+  const ds=s-4.6;
+  if(t<-0.2){
+   if(t<-2.6||Math.abs(ds)>1.3)return -1;  // 峰
+   return t<-2?4:3;
+  }
+  const e=7.6-Math.hypot(ds,t+1.8);         // 刃先の縁からの深さ
+  if(e<0||Math.abs(ds)>1.7+0.62*t)return -1;
+  return e<1.1?0:e<2.3?1:t<1.6?3:2;
+ });
+ return {...fr,ax:S,ay:S};
+}
+/** 鎖の輪の一つ：d は鎖の向き（8方向、0 が右）、v 0 なら輪を正面から見た形（穴のある楕円）、1 なら横から見た形（細い棒）。交互に並べて鎖にする */
+function fxChainLink(d,v){
+ const S=4,W=9,H=9,fr=blank(W,H);
+ const a=d*Math.PI/4,ca=Math.cos(a),sa=Math.sin(a);
+ aaDraw(fr,S,S,CHAINL,-1,(x,y)=>{
+  const u=x*ca+y*sa,w=-x*sa+y*ca;
+  if(v){if(Math.abs(u)>2.2||Math.abs(w)>0.8)return -1;return w<0?1:3}
+  const e=(u/2.6)*(u/2.6)+(w/1.9)*(w/1.9);
+  if(e>1)return -1;
+  if((u/1.3)*(u/1.3)+(w/0.6)*(w/0.6)<1)return -1;
+  return x+y<0?1:e>0.7?3:2;
+ });
+ return {...fr,ax:S,ay:S};
+}
+/** 投げ斧が当たった火花：f 0〜3。白い芯から、橙の火花のくさびが八方へ伸び（長短交互）、細く短くなって消える */
+function fxAxeHit(f){
+ const S=10,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const L=[5,9.5,8.5,5][f],w0=[2.2,2,1.4,0.9][f],core=[2.6,2.2,1.2,0][f],shade=[0,0,1,2][f];
+ aaDraw(fr,S,S,ROARL,f<=2?1:-1,(x,y)=>{
+  const r=Math.hypot(x,y);
+  if(r<core)return 0;
+  const ang=Math.atan2(y,x)+0.2;
+  const k=Math.round(ang/(Math.PI/4)),ra=k*Math.PI/4;
+  const len=L*(k%2?0.6:1);
+  const along=r*Math.cos(ang-ra),side=Math.abs(r*Math.sin(ang-ra));
+  if(along<0||along>len||side>w0*(1-along/len)+0.3)return -1;
+  return Math.min(4,(along<len*0.35?0:along<len*0.7?1:2)+shade);
+ },false);
+ return {...fr,ax:S,ay:S};
+}
 /** 毒の者から立ちのぼる泡：f 0〜3（小さな泡 → ふくらむ → ふくらみきる → はじける） */
 function fxPoisonBubble(f){
  const S=4,W=S*2+1,H=S*2+1,fr=blank(W,H);
@@ -5603,4 +5717,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
