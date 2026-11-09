@@ -10,7 +10,7 @@
  *           大きな火（焚き火、かがり火、炉、入口の灯り）の明かりの中へは出ない。松明の明かりの中へは出るが、すぐに暗がりへ退く（打って逃げる）。
  *
  * 状態：溜めているあいだは run に技の番号（−1 血吸い、−2 コウモリの群れ、−3 霧の歩み）、血を吸っているあいだは run に残りの回数（正の数）、
- * 血吸いは冒険者にだけ使う。狙う相手の番号は aim に持つ（どちらもセーブに入る）。技を溜めはじめた時刻は cast（使ったあとの間に使う。三つの技で共通）。
+ * 狙う相手の番号は aim に持つ（どちらもセーブに入る）。技を溜めはじめた時刻は cast（使ったあとの間に使う。三つの技で共通）。
  */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { CR_EVERY, Cr, Ecology, Job, Kind, sq } from '../ecology';
@@ -245,9 +245,11 @@ export function vampEngage(this: Ecology, c: Cr, foes: Cr[], prey: Cr | null): b
   }
   if (!near) return false;
   if ((foes.length || near.k === Kind.Adventurer) && nd <= SWARM_LEN * SWARM_LEN && nd > sq(1.5 * TILE) && this.skillCanStart(c, SKILL_VAMP_SWARM) && retinueNear.call(this, c) >= 2) return start(SKILL_VAMP_SWARM, -2, near);
-  // 血吸いは、冒険者（近づけば打ち返されて危ない相手）にだけ使う。大ネズミやゴブリンのような獲物には、これまでどおり近づいて、
-  // コウモリに群がらせて足止めしてから打ちかかる（血吸いを獲物にも使うと、離れたまま仕留めてしまい、足止めの場面が消えた）
-  if (near.k === Kind.Adventurer && nd <= DRAIN_R * DRAIN_R && nd > sq(1.2 * TILE) && this.skillCanStart(c, SKILL_VAMP_DRAIN)) return start(SKILL_VAMP_DRAIN, -1, near);
+  // 血吸いは、冒険者（近づけば打ち返されて危ない相手）と、足止めしてくれるコウモリ（2匹以上）を連れていないときの獲物に使う。
+  // コウモリを連れていれば、大ネズミやゴブリンのような獲物には、これまでどおり近づいて、コウモリに群がらせて足止めしてから打ちかかる
+  // （血吸いをどの獲物にも使うと、離れたまま仕留めてしまい、足止めの場面が8シードで18回から3回に減った。冒険者にだけ使うと、
+  //  一行の松明の明かりの手前までしか近づけないので、一度も使わなかった）
+  if ((near.k === Kind.Adventurer || retinueNear.call(this, c) < 2) && nd <= DRAIN_R * DRAIN_R && nd > sq(1.2 * TILE) && this.skillCanStart(c, SKILL_VAMP_DRAIN)) return start(SKILL_VAMP_DRAIN, -1, near);
   return false;
 }
 
