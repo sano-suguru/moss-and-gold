@@ -5,6 +5,7 @@ import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor'
 import { CRUMBLING, KIN_STOP, RANK_AT, packLook, unpackLook } from './eco/roster';
 import { SKILL_WIZARD_MISSILE } from './eco/skill';
 import { SKILL_VAMP_MIST } from './eco/vampskill';
+import { SKILL_GHOST_WAIL } from './eco/ghostskill';
 import { SKILL_ORC_ROAR } from './eco/orcskill';
 import { BONE_KINDS, BONE_SP, LICH_RISE, RISE_N } from './eco/undead';
 import { HOP_DT, HOP_N, hopAt } from './eco/charge';
@@ -868,6 +869,33 @@ export class CreatureView {
           if (age === 0 || once) for (let i = 0; i < 6; i++) this.bits.push({ x: r.ax, y: r.ay, z: 1, vx: Math.cos(i * 1.05) * 1.1, vy: Math.sin(i * 1.05) * 0.5, vz: 0.4, kind: 1, col: 0, t0: now, life: 14 });
           break;
         }
+        case 'wail': {
+          // ゴーストの金切り声（src/eco/ghostskill.ts）：ゴーストのまわりに、青白くうねる音の波（src/sprites.ts の fxWailArc を輪に並べたもの）が、
+          // 3 tick おきに四重に広がる（いちばん外の波が届く所が、金切り声の届く所）。まわりが一瞬、冷たく青白く照らされる
+          const R = r.rad ?? 48;
+          for (let w = 0; w < 4; w++) {
+            const g = (age - w * 3) / 12;
+            if (g < 0 || g >= 1) continue;
+            const rr = 8 + (R - 8) * (1 - (1 - g) * (1 - g));
+            const f = Math.min(5, Math.floor(g * 6) + (w >> 1));
+            const n = Math.max(6, Math.round((2 * Math.PI * rr) / 14));
+            for (let j = 0; j < n; j++) {
+              const a = (j / n) * Math.PI * 2 + w * 0.5;
+              const ex = Math.cos(a);
+              const ey = Math.sin(a) * 0.72;
+              const d16 = (Math.round(Math.atan2(ey, ex) / (Math.PI / 8)) + 16) % 16;
+              push(r.ax + ex * rr, r.ay + ey * rr, 8, false, A.fx(`wailarc:${d16}:${f}`), 0, 4);
+            }
+          }
+          if (age < 8) dyn.push({ x: r.ax, y: r.ay - 12, r: 56 + age * 6, i: 0.5 * damp * (1 - age / 8), c: 7 });
+          break;
+        }
+        case 'phase': {
+          // 刃をすり抜けたゴースト（src/eco/ghostskill.ts）：元の所に、上へほどけていく青白い残像（体は横へ揺らいで描く。生き物の描画の中）
+          if (age >= 10) break;
+          push(r.dx, r.dy, 6, flip, A.fx(`gsmear:${Math.min(3, age >> 1)}`), 0, 4);
+          break;
+        }
         case 'axethrow': {
           // オークの投げ斧（src/eco/orcskill.ts）：回る斧（src/sprites.ts の fxThrownAxe。刃の通った跡つき）が、鎖を引いて手から狙った所へ弧を描いて飛び、
           // 届いたら、オークが鎖をたぐって、斧は引きずられるように（だんだん速く）手元へ戻る。鎖は鉄の輪（fxChainLink）を交互に並べ、飛ぶあいだはたるみ、たぐるときはぴんと張る
@@ -1057,7 +1085,9 @@ export class CreatureView {
             }
           break;
         case 'chill':
-          if (age < 6) push(r.dx, r.dy, lift, false, A.fx(`blast:1:7:${f6(age)}`), 0, 4);
+          // ゴーストの冷たい手（src/eco/ghostskill.ts）など：触れた所に霜の結晶が弾け（src/sprites.ts の fxFrost）、氷のかけらが散る
+          if (age < 12) push(r.dx, r.dy, lift, false, A.fx(`frost:${Math.min(5, age >> 1)}`), 0, 4);
+          if (age < 4) dyn.push({ x: r.dx, y: r.dy - lift, r: 26, i: 0.35 * damp * (1 - age / 4), c: 7 });
           if (once) {
             spray(3, 7, 5, 1.0, 1.6);
             this.marks.push({ x: r.dx, y: r.dy + 3, key: `stain:2:${r.t % 3}`, t: now });
@@ -1760,6 +1790,16 @@ export class CreatureView {
     // 物音に耳を澄ます一行：前に出た前衛だけが構える
     for (const p of eco.parties) if ((p.listenT ?? 0) > eco.step && p.listenBy) braced.set(p.listenBy, 2);
     this.pruneHeroLooks(eco);
+    // 刃をすり抜けたばかりのゴースト：揺らぐ向き（打った者の向きと直角）と経過（src/eco/ghostskill.ts の ghostPhase）
+    const ghostPhaseAt = new Map<number, { age: number; sx: number; sy: number }>();
+    for (const r of eco.fxAttacks) {
+      if (r.style !== 'phase') continue;
+      const age = eco.w.tick - r.t + alpha;
+      if (age < 0 || age >= 10) continue;
+      const L = Math.hypot(r.dx - r.ax, r.dy - r.ay) || 1;
+      const side = (r.did + r.t) % 2 ? 1 : -1;
+      ghostPhaseAt.set(r.did, { age, sx: (-(r.dy - r.ay) / L) * side, sy: ((r.dx - r.ax) / L) * side });
+    }
     for (const ord of this.order) {
       const c = ord.c;
       let x = ord.x;
@@ -2236,9 +2276,33 @@ export class CreatureView {
       // 大グモの糸吐きの溜め（src/eco/spiderskill.ts）：腹を持ち上げ、腹の先（向きと反対の側）に白い糸の玉が膨らむ
       const spit = sp === Kind.Spider && !c.dead && c.act === 2 && c.actT < 0 && c.run === -1 ? Math.min(1, Math.max(0, (5 + c.actT) / 5)) : -1;
       if (spit >= 0) lift += 1 + spit;
+      // 刃をすり抜けたゴースト（src/eco/ghostskill.ts）：打たれた向きと直角に、体が横へ揺らいでから戻る（元の所には残像。drawAttacks の phase）
+      if (sp === Kind.Ghost && !c.dead) {
+        const ph = ghostPhaseAt.get(c.id);
+        if (ph) {
+          const k = Math.sin((ph.age / 10) * Math.PI);
+          x += ph.sx * 7 * k;
+          yy += ph.sy * 3 * k;
+        }
+      }
       if (holy > 0) pushSprite(x, yy, lift, flip, frame, holy, 7, (c.id * 0.6180339) % 1);
       else pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0) + (thrallOf && !hidden && veil !== 2 ? 6 : 0), (c.id * 0.6180339) % 1);
       if (armorGear) for (const g of armorGear) if (g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
+      // ゴーストの金切り声の溜め（src/eco/ghostskill.ts）：口もとに青白い冷気の玉が膨らみ、まわりから冷気の粒が渦を巻いて吸い寄せられる（体のあとに描く）
+      if (sp === Kind.Ghost && !c.dead && c.run === -1 && c.act === 2 && c.actT < 0) {
+        const p = Math.max(0, Math.min(1, (SKILL_GHOST_WAIL.windup + c.actT + alpha) / SKILL_GHOST_WAIL.windup));
+        const mx = x + (dir === 2 ? (flip ? -3 : 3) : 0);
+        const my = yy + (dir === 0 ? 0.3 : dir === 1 ? -0.3 : 0.1);
+        const ml = lift + 11;
+        for (let i = 0; i < 6; i++) {
+          const q = (p * 1.6 + i / 6) % 1;
+          const a = i * 1.047 + q * 3.2 + t * 0.15;
+          const rr = 16 * (1 - q);
+          pushSprite(mx + Math.cos(a) * rr, my + 0.02, ml + Math.sin(a) * rr * 0.5, false, A.fx(`wailcore:0`), 0, 4);
+        }
+        pushSprite(mx, my + 0.05, ml, false, A.fx(`wailcore:${Math.min(3, Math.floor(p * 4))}`), 0, 4);
+        dyn.push({ x: mx, y: yy - ml, r: 14 + 14 * p, i: 0.12 + 0.25 * p, c: 7 });
+      }
       // （糸の玉は体のあとに描く：先に描くと体に隠れる）
       if (spit >= 0) {
         const bx = dir === 2 ? -4 : dir === 3 ? 4 : 0;

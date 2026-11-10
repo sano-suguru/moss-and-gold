@@ -37,6 +37,11 @@ export interface Check {
 
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 const RUN_A = { seeds: ['かしたれ', 'seed8', 'abc', 'seed7'], from: 10, to: 18 };
+/**
+ * ゴブリンの夜の盗み：main の10〜18日目に盗みに出たのは seed40 5回・seed30 5回・seed17 3回・abc 1回（ほかの多くのシードは0〜1回）。
+ * （以前は RUN_A の4シードで見ていたが、その4シードでは10〜18日目に合わせて1回しか起きず、ほかの変更で展開が分かれただけで落ちた）
+ */
+const RUN_RAID = { seeds: ['seed40', 'seed30', 'seed17', 'abc'], from: 10, to: 18 };
 /** オークの取り立て：縄張りが長く続くシード（オークのいる日数が上限1でも2でも16日ほど） */
 // リビングアーマーは、冒険者が倒れて武具の溜まった所でしか生まれず、どのシードで起きるかが版ごとに入れ替わる。1シードの展開で項目が揺れないよう、出やすいシードを広く並べる。
 // 迷路をなくした（#41）main の10〜18日目の取り込みは かしたれ 24・seed23 20・seed5 5・seed17 3・seed40 1、
@@ -199,7 +204,7 @@ export const CHECKS: Check[] = [
   {
     // 冒険者の作り直しの二歩目：夜、蓄えの乏しい集落のゴブリンが、焚き火を囲む一行のところへ盗みに出る
     name: 'ゴブリンが夜に盗みに出る（4シードで1回以上）',
-    ...RUN_A,
+    ...RUN_RAID,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 12 && x.ev === 'raid').length);
       const rob = rs.map((r) => r.settle.filter((x) => x.k === 12 && x.ev === 'rob').length);
@@ -355,6 +360,17 @@ export const CHECKS: Check[] = [
       const cut = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'silkCut').length);
       const seeds = bind.filter((v) => v > 0).length;
       return { ok: sum(bind) >= 20 && sum(cut) >= 20 && seeds >= 8, value: `縛った ${sum(bind)}（${seeds}シード）、切って抜けた ${sum(cut)}` };
+    },
+  },
+  {
+    // ゴーストの技（src/eco/ghostskill.ts）：金切り声で冒険者を打ってすくませ、冒険者の刃はゴーストの体をすり抜ける。15シードの合計で見る
+    name: 'ゴーストが金切り声で冒険者を打ち、冒険者の刃がゴーストをすり抜ける（15シードの合計でそれぞれ20回以上・8シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const wail = rs.map((r) => r.settle.filter((x) => x.k === 7 && x.ev === 'ghostWail' && x.how > 0).length);
+      const phase = rs.map((r) => r.settle.filter((x) => x.k === 7 && x.ev === 'ghostPhase' && x.n === 25).length);
+      const seeds = wail.filter((v) => v > 0).length;
+      return { ok: sum(wail) >= 20 && sum(phase) >= 20 && seeds >= 8, value: `金切り声 ${sum(wail)}（${seeds}シード）、すり抜け ${sum(phase)}（${phase.filter((v) => v > 0).length}シード）` };
     },
   },
   {

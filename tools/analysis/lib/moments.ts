@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-const K = { Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5 };
+const K = { Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5, Ghost: 7 };
 
 export interface Moment {
   key: string;
@@ -124,6 +124,11 @@ export const MOMENTS: Moment[] = [
   { key: 'spiderBindAdv', label: '大グモ：糸を吐いて冒険者を縛った' },
   { key: 'silkCut', label: '大グモ：糸に縛られた冒険者が、糸を切って抜けた' },
   { key: 'spiderBite', label: '大グモ：糸で縛った相手に跳びかかって噛みついた' },
+  { key: 'ghostWail', label: 'ゴースト：金切り声で相手を打ってすくませた' },
+  { key: 'ghostWailAdv', label: 'ゴースト：金切り声で冒険者を打ってすくませた' },
+  { key: 'ghostTouch', label: 'ゴースト：冷たい手で生きた者を打った' },
+  { key: 'ghostTouchAdv', label: 'ゴースト：冷たい手で冒険者を打った' },
+  { key: 'ghostPhaseAdv', label: 'ゴースト：冒険者の刃が体をすり抜けた' },
   { key: 'armorRise', label: 'リビングアーマー：武具が寄り集まって立ち上がった' },
   { key: 'armorAbsorb', label: 'リビングアーマー：武具を取り込んだ（床の物と奪った物）' },
   { key: 'armorRob', label: 'リビングアーマー：倒した相手の武具を奪って取り込んだ' },
@@ -269,6 +274,11 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     spiderBindAdv: ev(K.Spider, 'spiderBind').filter((x) => x.n === K.Adventurer).length,
     silkCut: ev(K.Adventurer, 'silkCut').length,
     spiderBite: ev(K.Spider, 'spiderBite').length,
+    ghostWail: ev(K.Ghost, 'ghostWail').filter((x) => x.n > 0).length,
+    ghostWailAdv: ev(K.Ghost, 'ghostWail').filter((x) => x.how > 0).length,
+    ghostTouch: ev(K.Ghost, 'ghostTouch').length,
+    ghostTouchAdv: ev(K.Ghost, 'ghostTouch').filter((x) => x.n === K.Adventurer).length,
+    ghostPhaseAdv: ev(K.Ghost, 'ghostPhase').filter((x) => x.n === K.Adventurer).length,
     vampDrain: s.filter((x) => x.k === K.Vampire && x.ev === 'drain').length,
     vampSwarm: s.filter((x) => x.k === K.Vampire && x.ev === 'swarm').length,
     vampSwarmBlood: s.filter((x) => x.k === K.Vampire && x.ev === 'swarmBlood').length,

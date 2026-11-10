@@ -232,6 +232,8 @@ export function ghost(this: Ecology, c: Cr, day: number): void {
     this.die(c, 'faded');
     return;
   }
+  // 近くの生きた者を襲う：金切り声と冷たい手（src/eco/ghostskill.ts）。相手のいないときだけ、光を嫌って漂う
+  if (this.ghostSkill(c)) return;
   // 光を嫌い、暗い方へ漂う
   const m = this.w.map;
   const k = this.tileOf(c.x, c.y);

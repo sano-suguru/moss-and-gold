@@ -90,7 +90,7 @@ export function areaStrike(this: Ecology, a: Cr, cx: number, cy: number, ux: num
  */
 export function slay(this: Ecology, a: Cr, d: Cr, canEat = true): boolean {
   let ate = false;
-  if (a.k === Kind.Skeleton || a.k === Kind.Lich || a.k === Kind.Dwarf || a.k === Kind.Golem || a.k === Kind.Gargoyle || a.k === Kind.Armor || a.k === Kind.Thrall || (a.k === Kind.Adventurer && d.k !== Kind.Rat) || !canEat) this.die(d, 'fight', a.k);
+  if (a.k === Kind.Skeleton || a.k === Kind.Lich || a.k === Kind.Dwarf || a.k === Kind.Golem || a.k === Kind.Gargoyle || a.k === Kind.Armor || a.k === Kind.Thrall || a.k === Kind.Ghost || (a.k === Kind.Adventurer && d.k !== Kind.Rat) || !canEat) this.die(d, 'fight', a.k);
   else {
     this.eat(a, d, true);
     ate = true;
