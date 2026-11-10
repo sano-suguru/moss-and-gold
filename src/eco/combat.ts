@@ -187,6 +187,8 @@ export function bleed(this: Ecology, c: Cr, n: number): void {
  *  一行がそばにいるだけで倍の傷になり、囲まれた大物が1〜2打で倒れていた。数の力は、形のある攻撃で実際に皆が打つことで出す）
  */
 export function strike(this: Ecology, a: Cr, d: Cr, mul = 1, fx = true): boolean {
+  // ゴーストの体は、魔法と聖なる攻撃でない一打ちの多くをすり抜ける（src/eco/ghostskill.ts）
+  if (d.k === Kind.Ghost && this.ghostPhase(a, d, fx)) return false;
   if (d.hp <= 0) d.hp = this.maxHp(d);
   const sa = this.str(a);
   const dmg = sa * (1.2 + (ih(a.id, d.id ^ this.step, 161) % 1000) / 1000 * 1.2) * mul;
@@ -235,7 +237,8 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
     return true;
   }
   // 打ち返し（逃げている者と、寝込みを打たれて飛び起きたばかりの者は打ち返さない）
-  if (d.flee <= 0 && this.str(d) > 0 && !asleep) {
+  // ゴーストは、人（冒険者とドワーフ）のほかには打ち返さない（モンスターとは命を取り合わない。src/eco/ghostskill.ts）
+  if (d.flee <= 0 && this.str(d) > 0 && !asleep && !(d.k === Kind.Ghost && a.k !== Kind.Adventurer && a.k !== Kind.Dwarf)) {
     d.act = 2;
     d.actT = 0;
     // コウモリに群がられている者の打ち返しは弱い（src/eco/vampire.ts の batPinned）
