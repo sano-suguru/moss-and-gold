@@ -5,6 +5,7 @@ import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
 import { ARMOR_REMNANT, ARMOR_REMNANT_KIN, isJobItem } from './armor';
+import { BONE_SP } from './undead';
 import type { World } from '../world';
 import { SKILL_HUNTER_RAIN, SKILL_PRIEST_HAMMER, SKILL_SLAYER_CLEAVE, SKILL_THIEF_THROW, SKILL_WARRIOR_SLASH, SKILL_WIZARD_MISSILE, type Skill } from './skill';
 import { HP_PER_STR } from './combat';
@@ -1023,7 +1024,8 @@ export function dropBelongings(this: Ecology, c: Cr): void {
     });
     return;
   }
-  if (c.k === Kind.Skeleton && c.init) {
+  // （冒険者のほかの人型の骨（sp = BONE_SP + 生前の種）は、職業の道具を持たない。src/eco/undead.ts の raiseBones）
+  if (c.k === Kind.Skeleton && c.init && c.sp < BONE_SP) {
     this.dropJobItems(c);
     c.init = 0;
     return;

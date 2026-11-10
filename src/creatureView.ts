@@ -1943,7 +1943,7 @@ export class CreatureView {
             ? this.atlas.hero(csp, false, adv.look, adv.rank, 0, 3, 3)
             : this.atlas.corpse(sp, 2)
           : this.atlas.hero(csp, !thrallOf && c.torch > 0 && csp !== 1 && csp < 4, adv.look, adv.rank, dir, act, f)
-        : !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : csp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][csp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? csp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
+        : !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp === Kind.Zombie ? c.sp : sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : csp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][csp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? csp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
       // 名簿の冒険者の演出（位の光、位が上がったときの光の粒など。src/eco/roster.ts）
       if (adv && !isCorpse) {
         const h = thrallOf ? eco.roster.find((q) => q.cid === c.id) ?? null : eco.heroOf(c);
