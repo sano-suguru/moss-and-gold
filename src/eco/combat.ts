@@ -1,5 +1,6 @@
 /** Ecology のメソッド：強さと戦い、飢えて去ること、傷と戦い（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
+import { BONE_SP } from './undead';
 import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { thrallStr } from './thrall';
@@ -12,7 +13,8 @@ import { ARMOR_HAND_MAX } from './armor';
 export function str(this: Ecology, c: Cr): number {
   if (c.k === Kind.Adventurer) return JOB_STR[c.sp] * TIER_MUL[c.init] * this.rankMul(c) * (c.sp === Job.Thief && c.act === 2 ? 1.6 : 1);
   // スケルトンは生前の装備で強さが決まる。武器を拾ったゴブリンとオークは強くなる
-  if (c.k === Kind.Skeleton) return c.init ? JOB_STR[c.sp] * 1.2 : 3;
+  // 冒険者のほかの人型の骨は、生前の強さの7割（2以上。src/eco/undead.ts の raiseBones）
+  if (c.k === Kind.Skeleton) return c.sp >= BONE_SP ? Math.max(2, Math.round(STR[c.sp - BONE_SP] * 0.7)) : c.init ? JOB_STR[c.sp] * 1.2 : 3;
   if (c.k === Kind.Dwarf) return DWARF_STR[c.sp];
   if (c.k === Kind.Thrall) return thrallStr(c);
   // リビングアーマーは、手に取り込んだ武器と盾1つごとに強くなる（src/eco/armor.ts）

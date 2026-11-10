@@ -6,10 +6,14 @@
  *  2. 取り込み：溜まり場に残った武具や、巡回の途中で見つけた床の武具に歩み寄って、一つずつ取り込む。剣や盾は手に持った姿になり（強くなる）、
  *     杖や聖印などは体に溶け込む。
  *  3. 奪う：武具を持つ侵入者を倒し、その場に落ちた武具を取り込む。
- *  4. 崩れる：倒されるか、マナが尽きると、体と手の武具が床に散らばる。散った武具は、また次の甲冑やゴブリンの拾い物になる。
+ *  4. 崩れる：倒されるか、マナが尽きると、体と手の武具が砕け散り、青白い未練が抜けて消える。砕けた武具は、もう次の甲冑の材料にならない
+ *     （以前は武具が床に散らばり、また次の甲冑の材料になって、同じ武具から何度でも甲冑が立ち上がった）。
  *
  * 未練：冒険者が倒れると、落とした職業の道具（剣・盾・杖・鎚矛・短剣・聖印・リュート・弓・大剣）に、持ち主の未練としてマナが宿る
  * （床の道具の fuel。1つにつき ARMOR_REMNANT。新しいマナの湧き口として world.manaBorn に足す。src/eco/adventurer.ts の dropJobItems）。
+ * ドワーフ（戦士の斧（床では鎚矛）と盾、鍛冶屋の金槌（鎚矛））と、武器を拾ったゴブリン・オークが倒れたときも、落とした武具に未練が宿る
+ * （ドワーフは ARMOR_REMNANT、ゴブリン・オークは ARMOR_REMNANT_KIN。src/eco/adventurer.ts の dropBelongings）。
+ * 甲冑が打たれて落とした武器と、清められた武具（fuel −1）は、もうマナを吸わない（未練の抜けた武具）。
  * 床の職業の道具は、足もとの土のマナが濃い（ARMOR_SOAK_MIN 以上）と、生き物の更新 ARMOR_SOAK_EVERY 回ごとに1ずつ、ARMOR_BIRTH_MANA まで吸って溜める
  * （土から道具へ移すだけで、総量は変わらない。未練の薄れた古い武具でも、マナの濃い所に置かれていれば、また溜まっていく）。
  * 溜まったマナは少しずつ薄れて消え（world.manaFaded）、拾った者がいれば、その者の体のマナ（Cr.mana）に移る。
@@ -53,8 +57,10 @@ import { Cr, DIR16, Ecology, Item, ItemKind, Kind, SPEC, STR, ih, sq } from '../
 import { lineOfSight, TILE } from '../mapgen';
 import { ITEM_NAMES } from './inspect';
 
-/** 冒険者が倒れたとき、落とした職業の道具1つに宿る未練（マナ） */
+/** 冒険者とドワーフが倒れたとき、落とした職業の道具1つに宿る未練（マナ） */
 export const ARMOR_REMNANT = 24;
+/** 武器を拾ったゴブリン・オークが倒れたとき、落とした武器に宿る未練（拾い物なので、持ち主の未練は冒険者の半分） */
+export const ARMOR_REMNANT_KIN = 12;
 /** 未練が1薄れるまでの生き物の更新の回数（24 なら約4日で消える） */
 export const ARMOR_REMNANT_FADE = 1200;
 /** 誕生：武具を集める半径（マス）、要る未練の合計、体にする武具の数の上限、組み上がる長さ（生き物の更新の回数） */
@@ -163,7 +169,8 @@ export function armorBirths(this: Ecology): void {
   };
   for (const it of this.gear) {
     if (!isJobItem(it.kind) || it.fuel <= 0 || ih(it.id, this.step, 701) % 3 !== 0 || !onFloor(it)) continue;
-    const near = this.gear.filter((o) => isJobItem(o.kind) && sq(o.x - it.x) + sq(o.y - it.y) <= R2 && onFloor(o));
+    // （未練の抜けた武具（fuel −1：甲冑から落ちた物、清められた物）は、新しい甲冑の体にしない）
+    const near = this.gear.filter((o) => isJobItem(o.kind) && o.fuel >= 0 && sq(o.x - it.x) + sq(o.y - it.y) <= R2 && onFloor(o));
     let mana = 0;
     for (const o of near) mana += Math.max(0, o.fuel);
     if (mana < ARMOR_BIRTH_MANA) continue;
@@ -300,7 +307,8 @@ export function armorShed(this: Ecology, c: Cr, dmg: number, by: Cr): void {
     x = c.x;
     y = c.y;
   }
-  this.dropItem(x, y, kd, 0, this.ownerNote(c, 'shed'));
+  // 甲冑から落ちた武器は未練が抜けていて、もうマナを吸わない（fuel −1。拾い直すことはできる）
+  this.dropItem(x, y, kd, -1, this.ownerNote(c, 'shed'));
   c.lureAt = Math.max(c.lureAt, this.step + ARMOR_SHED_DAZE);
   this.record('settle', { t: this.w.tick, k: Kind.Armor, id: c.id, ev: 'shed', n: kd, by: by.k, x: Math.round(c.x), y: Math.round(c.y) } as never);
 }
@@ -339,32 +347,22 @@ export function absorbItem(this: Ecology, c: Cr, it: Item): void {
   const name = ITEM_NAMES[it.kind] ?? '武具';
 }
 
-/** 崩れる：体と手の武具を床に散らす（dropBelongings から。体のマナは die の releaseMana で土へ還る） */
+/**
+ * 崩れる：体と手の武具が砕け散る（dropBelongings から。体のマナは die の releaseMana で土へ還る）。砕けた武具は床に残らず、次の甲冑の材料にならない。
+ * 画面には、武具の破片が飛び散り、青白い未練が立ちのぼって消える（src/creatureView.ts の armorshatter）
+ */
 export function scatterArmor(this: Ecology, c: Cr): void {
   const kit = this.armorKit.get(c.id);
   this.armorKit.delete(c.id);
-  if (!kit) return;
-  const m = this.w.map;
-  const n = this.ownerNote(c, 'fell');
-  const kinds = kit.slice(1);
-  kinds.forEach((kd, i) => {
-    const j = DIR16[(ih(c.id, i, 709) & 15)];
-    const r = 5 + (ih(c.id, i, 710) % 9);
-    let x = c.x + j[0] * r;
-    let y = c.y + j[1] * r * 0.7;
-    const k = this.tileOf(x, y);
-    if (k < 0 || m.solid[k]) {
-      x = c.x;
-      y = c.y;
-    }
-    this.dropItem(x, y, kd, 0, n);
-  });
+  const kinds = kit ? kit.slice(1) : [];
   this.armorFalls.push(Math.round(c.x), Math.round(c.y), this.step);
   if (this.armorFalls.length > 24) this.armorFalls.splice(0, 3);
-  // 崩れる土ぼこり（描画専用）
+  // 崩れる土ぼこり（描画専用）と、砕け散る武具の破片
   this.effects.push({ x: c.x, y: c.y, t: this.w.tick });
+  this.fxAttacks.push({ t: this.w.tick, style: 'armorshatter', col: 0, size: 2, ax: c.x, ay: c.y, dx: c.x, dy: c.y, did: -1, aid: c.id, big: true, kill: false, n: Math.max(2, kinds.length) });
+  if (this.fxAttacks.length > 160) this.fxAttacks.splice(0, 60);
   this.record('settle', { t: this.w.tick, k: Kind.Armor, id: c.id, ev: 'fall', n: kinds.length, x: Math.round(c.x), y: Math.round(c.y) } as never);
-  this.log(c.x, c.y, `{k:${Kind.Armor}}が崩れ、武具が床に散らばった`);
+  this.log(c.x, c.y, `{k:${Kind.Armor}}が崩れ、武具が砕け散った`);
 }
 
 /** リビングアーマーの行い（生き物の更新ごと） */
