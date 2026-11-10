@@ -73,6 +73,11 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       this.metabolism(c);
       continue;
     }
+    // 大グモの糸に縛られている者は、その場でもがき、隣の相手だけを打つ（src/eco/spiderskill.ts）
+    if (c.bind > 0 && !c.away && this.boundStep(c)) {
+      this.metabolism(c);
+      continue;
+    }
     // ヴァンパイアの霧の歩みの一撃のあとは、深手で逃げる処理より先に、霧になって元の暗がりへ戻る（src/eco/vampskill.ts）
     // （逃げる処理が先だと、背後に現れた直後に一行に打ち返されて逃げに切り替わり、戻れずに倒されていた）
     if (c.k === Kind.Vampire && c.run === -4 && this.vampSkill(c)) {
@@ -118,6 +123,11 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
     }
     // オークの技（雄叫び・投げ斧）の溜めと、使う判断（src/eco/orcskill.ts）
     if (c.k === Kind.Orc && this.orcSkill(c)) {
+      this.metabolism(c);
+      continue;
+    }
+    // 大グモの技（糸吐き）の溜めと、吐いたあとの噛みつき、使う判断（src/eco/spiderskill.ts）。火を怖がって離れるより先に（松明を持つ冒険者に糸を吐く）
+    if (c.k === Kind.Spider && this.spiderSkill(c)) {
       this.metabolism(c);
       continue;
     }

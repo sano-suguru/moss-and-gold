@@ -46,6 +46,7 @@ export function kinZombies(this: Ecology): number {
 /** 起き上がりはじめる（スケルトン・ゾンビ・リッチ）：その場で RISE_N 回の更新のあいだ組み上がる */
 export function startRise(this: Ecology, c: Cr, from: number): void {
   c.st = 10;
+  c.bind = 0;
   c.lureAt = this.step;
   c.act = 0;
   c.actT = 0;

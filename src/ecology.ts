@@ -560,6 +560,8 @@ export interface Cr {
   run: number;
   /** 突進で狙った相手（src/eco/charge.ts） */
   aim: number;
+  /** 大グモの糸に縛られている残り（生き物の更新の回数。src/eco/spiderskill.ts）：その場から動けずにもがくが、隣の相手は打てる */
+  bind: number;
   /** 死骸ができたときの養分（腐り具合の目安） */
   init: number;
 }
@@ -579,6 +581,8 @@ export interface Volley {
   stun?: number;
   /** 落ちる攻撃で狙った相手（冒険者の矢の雨。関係のない小物には当てないため。src/eco/attack.ts） */
   tgt?: number;
+  /** 当たった者を糸で縛る（大グモの糸吐き。打たない。src/eco/spiderskill.ts）。0 なら縛らない */
+  bind?: number;
 }
 
 export interface Web {

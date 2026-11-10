@@ -165,6 +165,11 @@ export function resolveVolleys(this: Ecology): void {
     // マジックミサイルが届く前に、撃った魔法使いが倒れたとき。seed41 では5日目に体力が NaN になったゴーレムが、25日目までに冒険者を8人倒していた）
     const a = this.byId.get(v.a);
     if (!a || a.dead) continue;
+    // 大グモの糸：打たずに、届いた所の一人を縛る（src/eco/spiderskill.ts の silkLands）
+    if (v.bind) {
+      this.silkLands(a, v);
+      continue;
+    }
     if (v.d >= 0) {
       const d = this.byId.get(v.d);
       if (!d || d.dead || d.away) continue;

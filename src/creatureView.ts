@@ -959,6 +959,49 @@ export class CreatureView {
           // 幼竜の煙の息の練習：口元から灰色の煙の塊がふわりと出る
           if (once) for (let i = 0; i < 4; i++) this.bits.push({ x: r.dx + ux * i * 2, y: r.dy, z: 10 + i, vx: ux * 0.5 + (i - 1.5) * 0.1, vy: 0, vz: 0.25, kind: 1, col: 0, t0: now, life: 16 });
           break;
+        case 'silk': {
+          // 大グモの糸吐き（src/eco/spiderskill.ts）：白い糸の帯が、少したわみ、波打ちながら相手へ伸びる（先は毛羽立つ糸の塊）。
+          // 届いたあとも、張った帯が少しのあいだ残り、細って消える
+          const F = Math.max(1, r.fly ?? 6);
+          const p = Math.min(1, age / F);
+          const fade = age < F ? 0 : (age - F) / 7;
+          if (fade >= 1) break;
+          const sx = r.ax + (r.dx > r.ax ? 3 : r.dx < r.ax ? -3 : 0);
+          const n = Math.max(3, Math.round((dist * p) / 2));
+          for (let i = 0; i <= n; i++) {
+            const s2 = (i / n) * p;
+            if (fade > 0.5 && (i + Math.floor(age)) % 3 === 0) continue;
+            const wob = Math.sin(s2 * 9 - age * 0.9) * 1.6 * (1 - p * 0.6) * (1 - fade);
+            const sag = Math.sin(Math.PI * (s2 / Math.max(p, 0.01))) * Math.min(8, dist * 0.08) * (age < F ? 1 : 0.4);
+            const px = sx + vx * s2 - uy * wob;
+            const py = r.ay + vy * s2 + ux * wob;
+            push(px, py, 5 + (4 - 5) * s2 - sag * 0.5, false, A.fx(`sdot:${fade > 0 ? 2 : i % 3 === 0 ? 0 : 1}`), 0, 4);
+          }
+          if (age < F) {
+            push(sx + vx * p, r.ay + vy * p, 5 - p, false, A.fx(`shead:${age & 3}`), 0, 4);
+            dyn.push({ x: sx + vx * p, y: r.ay + vy * p - 6, r: 14, i: 0.12 * damp, c: 0 });
+          }
+          break;
+        }
+        case 'silkhit':
+          // 糸が届いた所：床か相手の足もとに、放射状に糸が貼りつく
+          if (age < 8) push(r.dx, r.dy + 0.04, 0, false, A.fx(`ssplat:${Math.min(3, age >> 1)}`), 0, 4);
+          if (once && r.col === 1) for (let i = 0; i < 4; i++) this.bits.push({ x: r.dx, y: r.dy, z: 6, vx: Math.cos(i * 1.57 + 0.4) * 0.8, vy: Math.sin(i * 1.57 + 0.4) * 0.4, vz: 0.8, kind: 2, col: 0, t0: now, life: 10 });
+          break;
+        case 'silkcut': {
+          // 縛っていた糸が切れる（冒険者は刃物か松明で切る、ほかの者はもがいて引きちぎる）：白い糸の切れ端が、くるくる回りながら散って落ちる
+          if (r.col === 1 && age < 6) push(r.dx, r.dy, 6, (r.t & 1) === 1, A.fx(`slash2:0:0:${f6(age)}`), 0, 4);
+          if (age < 18)
+            for (let i = 0; i < 6; i++) {
+              const a = i * 1.047 + (r.t % 5);
+              const sp2 = 0.9 + (i % 3) * 0.35;
+              const bx = r.dx + Math.cos(a) * sp2 * age * 0.9;
+              const by = r.dy + Math.sin(a) * sp2 * age * 0.45;
+              const z = Math.max(0, 5 + age * 0.9 - age * age * 0.07);
+              push(bx, by, z, false, A.fx(`sbit:${(i + (age >> 2)) % 6}`), 0, 4);
+            }
+          break;
+        }
         case 'bless': {
           // 僧侶に清められた骨が崩れる（src/eco/roster.ts の blessCrumble）：骨の形の金の光が地面に満ち、金の光の粒になって立ちのぼり、細って消える。
           // 足もとに金の輪が一度広がり、聖印の光が一つ昇る
@@ -2190,9 +2233,27 @@ export class CreatureView {
       // リビングアーマーの武具（芯の後ろ側の分。手前の分は芯のあと）
       const armorGear = sp === Kind.Armor && !c.dead && veil === 0 ? this.armorGear(eco, A, c, x, yy, lift, t) : null;
       if (armorGear) for (const g of armorGear) if (!g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
+      // 大グモの糸吐きの溜め（src/eco/spiderskill.ts）：腹を持ち上げ、腹の先（向きと反対の側）に白い糸の玉が膨らむ
+      const spit = sp === Kind.Spider && !c.dead && c.act === 2 && c.actT < 0 && c.run === -1 ? Math.min(1, Math.max(0, (5 + c.actT) / 5)) : -1;
+      if (spit >= 0) lift += 1 + spit;
       if (holy > 0) pushSprite(x, yy, lift, flip, frame, holy, 7, (c.id * 0.6180339) % 1);
       else pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0) + (thrallOf && !hidden && veil !== 2 ? 6 : 0), (c.id * 0.6180339) % 1);
       if (armorGear) for (const g of armorGear) if (g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
+      // （糸の玉は体のあとに描く：先に描くと体に隠れる）
+      if (spit >= 0) {
+        const bx = dir === 2 ? -4 : dir === 3 ? 4 : 0;
+        pushSprite(x + bx, yy + 0.08, lift + 8 + spit * 3, false, A.fx(`sball:${Math.min(3, Math.floor(spit * 4))}`), 0, 4);
+        dyn.push({ x: x + bx, y: yy - lift - 9, r: 10 + 8 * spit, i: 0.1 + 0.15 * spit, c: 0 });
+      }
+      // 大グモの糸に縛られている者：足もとに巻きついた糸が、もがくたびにずれる（Cr.bind。src/eco/spiderskill.ts）
+      if (c.bind > 0 && !c.dead) {
+        const bs = Ecology.bodySize(sp);
+        const wz = bs <= 8 ? 0 : bs <= 11 ? 1 : 2;
+        const wf = Math.floor(t * 5 + c.id) & 1;
+        pushSprite(x, yy + 0.07, Math.max(0, lift - 1), false, A.fx(`swrap:${wz}:${wf}`), 0, 4);
+        // 胴にも糸が回る（足もとは手前の者に隠れやすいので）
+        pushSprite(x, yy + 0.08, lift + bs * 0.45, wf === 1, A.fx(`swrap:${Math.max(0, wz - 1)}:${1 - wf}`), 0, 4);
+      }
       // 糸の繭を抱えて食べるクモ：体の手前に繭、巻き始めは白い糸の粒が繭のまわりを回る
       {
         const cc = this.eatCocoon.get(c.id);
