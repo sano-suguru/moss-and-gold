@@ -105,7 +105,7 @@ export function campPetty(this: Ecology, a: Cr, d: Cr): boolean {
  * 起きている見張りが、灯りの中で自分の向いている側に手強い敵を見たら、一行を起こす。
  * 眠りの浅い盗賊は、近く（3マス）に来た敵にときどき自分で目を覚まし、一行を起こす。
  * 一行が起きているあいだは、起きている誰かに敵が見えるかぎり、起きている期間を延ばす。
- * 起きている期間が終わったら、そのあいだの被害しだいで、焚き火を消して発つ
+ * 起きている期間が終わったら、そのあいだの被害しだいで（倒れた者・深手）、焚き火を消して発つ
  */
 export function campWatch(this: Ecology, p: Party, alive: Cr[]): void {
   const awake = (p.wakeT ?? 0) > this.step;
@@ -115,6 +115,8 @@ export function campWatch(this: Ecology, p: Party, alive: Cr[]): void {
     const hp = alive.reduce((s, o) => s + (o.hp > 0 ? o.hp / this.maxHp(o) : 1), 0) / Math.max(1, alive.length);
     p.wakeT = 0;
     p.wakeN = 0;
+    // コボルトのスリングの小石を当てられた回数は、起きている期間ごとに数える（重なれば、その場で発つ。src/eco/koboldskill.ts）
+    p.stoned = 0;
     if (lost || hp < 0.5) {
       const lead = alive[0];
       this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'campBreak', how: lost ? 'lost' : 'hurt', x: Math.round(lead.x), y: Math.round(lead.y) } as never);

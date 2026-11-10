@@ -23,6 +23,15 @@ const NOTICE_LIT = 5.5 * TILE;
 const NOTICE_DARK = 2 * TILE;
 
 /** 噂の総量（評判） */
+
+/**
+ * 逃げていく者か（逃げている者と、逃げ出す前にスリングを回しているコボルト。src/eco/koboldskill.ts）。弱い者なら冒険者は追わない。
+ * （スリングを回す0.8秒のあいだを逃げていない敵と見ると、一行がそのコボルトへ向かって住処のそばまで寄り、16シード×25日で、
+ *  冒険者に倒されるコボルトが116→142匹、最後の数が219→185匹に減った）
+ */
+function runsOff(o: Cr): boolean {
+  return o.flee > 0 || (o.k === Kind.Kobold && o.run === -1);
+}
 export function reputation(this: Ecology): number {
   const r = this.rumors;
   return r.light + r.gold * 2 + r.undead + r.beast + r.dragon * 2;
@@ -544,7 +553,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   // 一行で向かっている手強い敵がいれば、まずそれ
   if (p.engage) {
     const e = this.byId.get(p.engage);
-    const runner = e && ((e.flee > 0 && STR[e.k] <= 3) || this.orcYields(p, e)) && !(e.id === c.foe && this.w.tick - c.hitAt < 150);
+    const runner = e && ((runsOff(e) && STR[e.k] <= 3) || this.orcYields(p, e)) && !(e.id === c.foe && this.w.tick - c.hitAt < 150);
     if (e && !e.dead && !e.away && !runner && sq(e.x - c.x) + sq(e.y - c.y) < 10 * TILE * 10 * TILE && c.sp !== Job.Bard && c.sp !== Job.Thief) foe = e;
     else if (!e || e.dead || e.away || runner) p.engage = 0;
   }
@@ -573,7 +582,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       // 雑魚は、近く（2マス）に来たときか、自分に害をなしたときだけ払う
       if (minor && !enemy && !attacked && o.foe !== c.id && d > 2 * TILE * 2 * TILE) return;
       // 逃げていく弱い者（コボルトなど）は、追いかけて倒しには行かない
-      if (!attacked && o.flee > 0 && STR[o.k] <= 3 && d > 1.5 * TILE * 1.5 * TILE) return;
+      if (!attacked && runsOff(o) && STR[o.k] <= 3 && d > 1.5 * TILE * 1.5 * TILE) return;
       if (d < bd) {
         bd = d;
         foe = o;
@@ -590,7 +599,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     p.engageN = p.members.filter((id) => !this.byId.get(id)?.dead).length;
   }
   // 逃げていく弱い者（コボルトなど）は、すぐそばにいなければ追わない（射かけもしない）
-  if (foe && (foe as Cr).flee > 0 && STR[(foe as Cr).k] <= 3 && sq((foe as Cr).x - c.x) + sq((foe as Cr).y - c.y) > 14 * 14) {
+  if (foe && runsOff(foe as Cr) && STR[(foe as Cr).k] <= 3 && sq((foe as Cr).x - c.x) + sq((foe as Cr).y - c.y) > 14 * 14) {
     if (p.engage === (foe as Cr).id) p.engage = 0;
     foe = null;
   }
@@ -929,6 +938,7 @@ export function endCamp(this: Ecology, p: Party): void {
   }
   p.camp = -1;
   p.fatigue = 0;
+  p.stoned = 0;
   p.lastCamp = this.step;
 }
 

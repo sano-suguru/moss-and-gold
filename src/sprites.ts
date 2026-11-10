@@ -519,7 +519,7 @@ function humanoid(dir,act,f,o){
   P.push(C(cx-0.6*k,sh,cx-1.4*k-sw,hip-0.6*k+aL,0.85*r,skD));
   if(o.off&&!o.offFront)o.off('side',P,cx-1.4*k-sw,hip-0.6*k+aL,k,q);
   if(o.tail)P.push(C(cx-2*k,hip-k,cx-(o.tail+2)*k,hip+1.6*k+bob,(o.tailR||0.7)*k,sk));
-  const hx=cx+k+sw+(at?[0,-2,3,1.5][q]*k:0)+hu*0.5,hy=hip-0.6*k+aL+(at?[0,-5,-1,0][q]*k:0);
+  const hx=cx+k+sw+(at?[0,-2,3,1.5][q]*k:0)+hu*0.5,hy=hip-0.6*k+aL+(at?[0,-5,-1,0][q]*k:0)-(at&&q===1?(o.reach||0)*k:0);
   if(o.tool&&!at)o.tool('side',P,hx,hy,0,true,k);
   P.push(E(cx,hip-bh*0.9,bw*0.82,bh,cl,{ol:1}));
   P.push(C(cx+0.5*k,hip,cx+0.5*k+st,feet,r*1.05,sk),C(cx+0.5*k+st,feet,cx+1.8*k+st,feet,0.85*r,sk));
@@ -536,7 +536,7 @@ function humanoid(dir,act,f,o){
  }
  const back=dir==='up';
  const lA=mv?[-1,0,1,0][q]:0;
- const ar=at?[0,-5,-1,0][q]*k:0;
+ const ar=(at?[0,-5,-1,0][q]*k:0)-(at&&q===1?(o.reach||0)*k:0);
  const hx=cx+bw+0.6*k,hy=hip-0.6*k+sw+ar+aL;
  if(o.tool&&(!at||back))o.tool(back?'up':'down',P,hx,hy,0,true,k);
  if(o.cape&&!back)o.cape('down',P,cx,sh,hip,feet,q,mv,k);
@@ -576,7 +576,8 @@ function pick(dir,P,hx,hy,sw,rest){
  P.push(LN(hx,hy+1,tx,ty,'wood',2,{no:1}));
  P.push(LN(tx-2.2,ty+0.8,tx+2.2,ty-0.8,'iron',3,{no:1}),D(tx+2.4,ty-0.6,RAMP.iron[4]));
 }
-function kobold(dir,act,f){return humanoid(dir,act,f,{skin:'kob',skinD:'kobD',cloth:'cloth',head:kobHead,tool:pick,tail:true,leg:4,bw:3.4,bh:2.8,hh:7.8})}
+/** コボルト。sling なら、つるはしを持たずに片手を高く掲げた姿（スリングを頭の上で回す溜め。ひもと袋は src/creatureView.ts で重ねる） */
+function kobold(dir,act,f,sling=false){return humanoid(dir,act,f,{skin:'kob',skinD:'kobD',cloth:'cloth',head:kobHead,tool:sling?null:pick,reach:sling?4:0,tail:true,leg:4,bw:3.4,bh:2.8,hh:7.8})}
 // ===== ジャイアントアント =====
 function ant(dir,act,f,carry){
  const P=[],q=mod(f,4),mv=act==='move',at=act==='attack';
@@ -5145,6 +5146,75 @@ function fxPebble(v){
  });
  return {...fr,ax:S,ay:S};
 }
+/** 革（コボルトのスリング）：淡い光 → 明るい革 → 革 → 濃い革 → こげ茶 → 縁取り */
+const LEATHERL=[[246,232,206],[206,168,118],[160,116,70],[116,80,46],[78,52,30],[36,24,14]];
+/**
+ * コボルトのスリング：頭の上で回す革ひもと、先の袋（小石入り）。f 0〜7 で袋が右から時計回りに45°ずつ回る。
+ * 中心（掲げた手）から楕円の軌道の上の袋までひもが伸び、袋の後ろに、回った跡が淡い革色の帯になって残る（後ろほど細く淡い）
+ */
+function fxSlingWhirl(f){
+ const S=11,W=S*2+1,H=13,cy=6,fr=blank(W,H);
+ const rx=9,ry=3.8,a=f*Math.PI/4;
+ const px=Math.cos(a)*rx,py=Math.sin(a)*ry;
+ const L=Math.hypot(px,py)||1,ux=px/L,uy=py/L;
+ aaDraw(fr,S,cy,LEATHERL,1,(x,y)=>{
+  // 袋：濃い革の袋の口から、灰色の小石がのぞく
+  const dp=Math.hypot(x-px,(y-py)*1.1);
+  if(dp<=1.1)return 0;
+  if(dp<=2.2)return dp<1.6?2:3;
+  // ひも：手から袋まで
+  const u=x*ux+y*uy,t=Math.abs(-x*uy+y*ux);
+  if(u>-0.4&&u<L&&t<0.62)return 2;
+  // 回った跡：袋の後ろ150°ほどの帯（袋に近いほど太く明るい）
+  const e=Math.hypot(x/rx,y/ry);
+  let da=a-Math.atan2(y/ry,x/rx);
+  da=((da%(2*Math.PI))+2*Math.PI)%(2*Math.PI);
+  if(da<2.6){const w=0.2*(1-da/2.6)+0.04;if(Math.abs(e-1)<w)return da<0.8?1:da<1.7?2:3}
+  return -1;
+ },false);
+ // 手もとの結び目
+ aaDraw(fr,S,cy,LEATHERL,-1,(x,y)=>Math.hypot(x,y)<=1.2?3:-1,false);
+ return {...fr,ax:S,ay:cy};
+}
+/** スリングで飛ぶ小石：k 0 小石（左上が光る灰色の石）、1・2 飛んだ跡に残る土色の粒（だんだん小さく淡く） */
+function fxSlingStone(k){
+ const S=3,W=7,H=7,fr=blank(W,H);
+ if(k===0){
+  aaDraw(fr,S,S,ROCKL,0,(x,y)=>{
+   const d=Math.hypot(x*0.9,y);
+   if(d>2.2)return -1;
+   const lit=(-x-y)/2.2;
+   return lit>0.55?0:lit>-0.1?1:lit>-0.6?2:3;
+  });
+ } else {
+  const R=k===1?1.1:0.75;
+  aaDraw(fr,S,S,DUSTL,-1,(x,y)=>Math.hypot(x,y)<=R?(k===1?1:2):-1,false);
+ }
+ return {...fr,ax:S,ay:S};
+}
+/** 小石が当たって砕ける：f 0〜3。白い閃光の芯と土ぼこりの輪から、角ばった灰色の石のかけらが六方へ飛び、小さくなって消える */
+function fxStoneHit(f){
+ const S=9,W=S*2+1,H=S*2+1,fr=blank(W,H);
+ const dist=[2.5,4.6,6.6,7.8][f],sz=[2.1,2,1.7,1.3][f],core=[2.8,1.8,0,0][f];
+ // 土ぼこり：つぶれた輪が広がって薄れる
+ const dr=[1.6,3.4,4.6,5.4][f],dw=[1.8,2.4,2.2,1.5][f];
+ aaDraw(fr,S,S,DUSTL,-1,(x,y)=>{const d=Math.hypot(x,y/0.7);if(Math.abs(d-dr)>=dw)return -1;const lit=(-x-y)/(dr+dw);return Math.min(4,(lit>0.2?1:2)+(f>>1))},false);
+ aaDraw(fr,S,S,ROCKL,0,(x,y)=>{
+  const d=Math.hypot(x,y);
+  if(d<=core)return d<core*0.55?0:1;
+  if(f<=1&&((Math.abs(x)<0.55&&Math.abs(y)<core+2.6)||(Math.abs(y)<0.55&&Math.abs(x)<core+2.6)))return f===0?0:1;
+  for(let i=0;i<6;i++){
+   const a=i*Math.PI/3+0.3+(i%2)*0.25,r=dist*(i%2?0.8:1);
+   const cx=Math.cos(a)*r,cy=Math.sin(a)*r*0.75;
+   const rx=x-cx,ry=y-cy,ca=Math.cos(a+i),sa=Math.sin(a+i);
+   const u=rx*ca+ry*sa,t=-rx*sa+ry*ca;
+   const s2=sz*(i%3===0?1.15:0.9);
+   if(Math.abs(u)+Math.abs(t)*1.4<=s2){const lit=(-rx-ry)/s2;return Math.min(4,(lit>0.25?1:lit>-0.4?2:3)+(f>=3?1:0))}
+  }
+  return -1;
+ });
+ return {...fr,ax:S,ay:S};
+}
 /** ゴーレムの振り下ろしの衝撃：f 0〜5。打った所から岩の破片と土の輪が広がる（半径はおよそ3マスまで。当たる範囲）。芯は白い閃光 */
 function fxGolemSlam(f){
  const S=52,W=S*2+1,H=S*2+1,fr=blank(W,H);
@@ -5992,4 +6062,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxSlingWhirl, fxSlingStone, fxStoneHit, fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

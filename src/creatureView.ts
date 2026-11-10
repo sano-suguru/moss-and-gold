@@ -5,6 +5,7 @@ import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor'
 import { CRUMBLING, KIN_STOP, RANK_AT, packLook, unpackLook } from './eco/roster';
 import { SKILL_WIZARD_MISSILE } from './eco/skill';
 import { SKILL_VAMP_MIST } from './eco/vampskill';
+import { SKILL_KOBOLD_SLING } from './eco/koboldskill';
 import { SKILL_GHOST_WAIL } from './eco/ghostskill';
 import { SKILL_ORC_ROAR } from './eco/orcskill';
 import { BONE_KINDS, BONE_SP, LICH_RISE, RISE_N } from './eco/undead';
@@ -945,6 +946,38 @@ export class CreatureView {
           push(axx, axy + 0.06, az, false, A.fx(`taxe:${rot}:${age <= fly ? 1 : 0}`), 0, 4);
           break;
         }
+        case 'sling': {
+          // コボルトのスリングの小石（src/eco/koboldskill.ts）：掲げた手から、狙った所へ山なりに飛ぶ灰色の小石。後ろに土色の粒が二つ、だんだん小さく残る
+          const F = Math.max(1, r.fly ?? 6);
+          if (age > F) break;
+          const at = (q: number) => {
+            const z = 13 + (7 - 13) * q + Math.sin(q * Math.PI) * Math.min(18, 6 + dist * 0.12);
+            return [r.ax + vx * q, r.ay + vy * q, z];
+          };
+          for (let j = 2; j >= 0; j--) {
+            const q = (age - j * 0.7) / F;
+            if (q < 0) continue;
+            const [sx, sy, sz2] = at(Math.min(1, q));
+            push(sx, sy + 0.05, sz2, false, A.fx(`sstone:${j}`), 0, 4);
+          }
+          break;
+        }
+        case 'slinghit': {
+          // 小石が届いた所：当たれば白い閃光から石のかけらと土ぼこりが散る（src/sprites.ts の fxStoneHit）。外れれば床で跳ねて転がり、土ぼこりが立つ
+          if (r.col === 1) {
+            if (age < 8) push(r.dx, r.dy + 0.1, 9, false, A.fx(`stonehit:${Math.min(3, age >> 1)}`), 0, 4);
+            if (age < 3) dyn.push({ x: r.dx, y: r.dy - 9, r: 14, i: 0.25 * damp * (1 - age / 3), c: 0 });
+            if (once) spray(0, 0, 3, 1.1, 1.3);
+          } else {
+            if (age < 8) push(r.dx, r.dy + 0.1, 1, false, A.fx(`dpuff:${Math.min(3, age >> 1)}`), 0, 4);
+            if (age < 12) {
+              const q = age / 12;
+              const hop = Math.abs(Math.sin(q * Math.PI * 2.5)) * 5 * (1 - q);
+              push(r.dx + ux * 14 * Math.sqrt(q), r.dy + uy * 14 * Math.sqrt(q) + 0.05, hop, false, A.fx('sstone:0'), 0, 4);
+            }
+          }
+          break;
+        }
         case 'axehit': {
           // 投げ斧が届いた所：当たれば白い芯から橙の火花のくさびが八方へ（src/sprites.ts の fxAxeHit）、外れれば床を打った土ぼこりとひび
           if (r.col === 1) {
@@ -1234,7 +1267,7 @@ export class CreatureView {
       case Kind.Ghost: return A.named('ghost', dir, act, f);
       case Kind.Myconid: return A.named('myconid', dir, act, f);
       case Kind.Ant: return A.named('ant', dir, act, f, v);
-      case Kind.Kobold: return A.named('kobold', dir, act, f);
+      case Kind.Kobold: return A.named('kobold', dir, act, f, v);
       case Kind.Salamander: return A.named('salamander', dir, act, f);
       case Kind.Goblin: return A.named('goblin', dir, act, f, v);
       case Kind.Orc: return A.named('orc', dir, act, f, v);
@@ -2133,7 +2166,7 @@ export class CreatureView {
             ? this.atlas.hero(csp, false, adv.look, adv.rank, 0, 3, 3)
             : this.atlas.corpse(sp, 2)
           : this.atlas.hero(csp, !thrallOf && c.torch > 0 && csp !== 1 && csp < 4, adv.look, adv.rank, dir, act, f)
-        : !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp === Kind.Zombie ? c.sp : sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : csp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][csp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? csp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
+        : !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp === Kind.Zombie ? c.sp : sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : csp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][csp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Kobold ? (c.run === -1 && act === 2 && c.actT < 0 ? 1 : 0) : sp === Kind.Dwarf ? csp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
       // 名簿の冒険者の演出（位の光、位が上がったときの光の粒など。src/eco/roster.ts）
       if (adv && !isCorpse) {
         const h = thrallOf ? eco.roster.find((q) => q.cid === c.id) ?? null : eco.heroOf(c);
@@ -2302,6 +2335,13 @@ export class CreatureView {
         }
         pushSprite(mx, my + 0.05, ml, false, A.fx(`wailcore:${Math.min(3, Math.floor(p * 4))}`), 0, 4);
         dyn.push({ x: mx, y: yy - ml, r: 14 + 14 * p, i: 0.12 + 0.25 * p, c: 7 });
+      }
+      // コボルトのスリングの溜め（src/eco/koboldskill.ts）：高く掲げた手を中心に、革ひもの先の袋を頭の上でぐるぐる回す（だんだん速く）。体のあとに描く
+      if (sp === Kind.Kobold && !c.dead && c.run === -1 && c.act === 2 && c.actT < 0) {
+        const p = Math.max(0, Math.min(1, (SKILL_KOBOLD_SLING.windup + c.actT + alpha) / SKILL_KOBOLD_SLING.windup));
+        const hx = x + (dir === 2 ? -1 : dir === 3 ? 1 : 4);
+        const spin = Math.floor(t * (18 + 14 * p) + c.id) & 7;
+        pushSprite(hx, yy + 0.09, lift + 14, false, A.fx(`slingw:${spin}`), 0, 4);
       }
       // （糸の玉は体のあとに描く：先に描くと体に隠れる）
       if (spit >= 0) {

@@ -56,5 +56,6 @@ import './standoff';
 import './vampskill';
 import './orcskill';
 import './spiderskill';
+import './koboldskill';
 import './ghostskill';
 import './save';
