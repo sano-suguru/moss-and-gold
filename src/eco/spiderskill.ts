@@ -4,11 +4,12 @@
  * 糸吐き：近づいてきた相手へ、腹を持ち上げて溜め（およそ1秒。腹の先に白い糸の玉が膨らむ）、白い糸の帯を吐く。
  *   帯は少したわみながら、吐いたときに相手がいた所へ伸び、届いた時にそこ（半径 SILK_R）にいる者を一人だけ縛る（動いていれば外れる）。
  *   縛られた者（Cr.bind）は、その場から動けずにもがくが、隣の相手は打てる（boundStep）。冒険者は刃物か松明で約2秒で糸を切って抜け、
- *   ほかの者は約4秒もがいて抜ける。抜けると、白い糸の切れ端が散る。
+ *   白い糸の切れ端が散る。
  *   吐いたクモは、縛った相手が動けないあいだに跳びかかって毒牙で噛みつく（倒しても冒険者は食べない。亡骸は残る）。噛まれた冒険者はクモに気づいて打ち返す。
- *   相手：起きている冒険者（5マスの内）と、このクモを打ってきたゴブリン・コボルト（3マスの内。身を守るとき）。大物・飛ぶ者・霊、スライムや大トカゲなどの獣には吐かない
+ *   相手は、起きている冒険者（5マスの内）だけ。
  *   （はじめは巣で足を取られる強さの者すべてにしていたが、スライム・大トカゲ・マイコニドまで縛り、8シードの10〜18日目で843回と多すぎた。
- *    そばを通るゴブリン・コボルトにも吐くと412回で、噛みつきに行ったクモがコボルトに打ち返されて食べられ、コボルトの生まれる数が倍になった）。
+ *    ゴブリン・コボルトにも吐くと412回で、コボルトの生まれる数が倍になった（65→135）。クモを打ってきたゴブリン・コボルトだけにすると、
+ *    打ってくる相手はたいてい隣にいて近すぎるので、一度も吐かなかった）。
  *   使ったあと30秒は吐かない（一つの戦いにたいてい1回）。溜めの途中で打たれると止まる。
  *
  * 状態：溜めているあいだは run に −1、吐いたあと（糸が飛ぶ間と、噛みつきに行く間）は run に残りの回数、狙う相手は aim（どれもセーブに入る）。
@@ -20,16 +21,14 @@ import type { Skill } from './skill';
 
 /** 糸吐き：およそ1秒溜め、使ったあと30秒は吐かない */
 export const SKILL_SPIDER_SPIT: Skill = { windup: 5, cool: 150 };
-/** 糸の届く遠さ（px。冒険者と、ほかの者）と、近すぎて吐かない遠さ */
+/** 糸の届く遠さと、近すぎて吐かない遠さ（px） */
 const SPIT_MAX = 5 * TILE;
-const SPIT_KIN = 3 * TILE;
 const SPIT_MIN = 1.5 * TILE;
 /** 糸の帯の伸びる速さ（生き物の更新1回あたりの px）と、届いた所で縛る丸の半径 */
 const SILK_SPEED = 26;
 const SILK_R = 10;
-/** 縛る長さ（生き物の更新の回数）：冒険者は刃物か松明で約2秒で切る、ほかの者は約4秒もがいて抜ける */
+/** 縛る長さ（生き物の更新の回数）：冒険者は刃物か松明で約2秒で糸を切って抜ける */
 export const BIND_ADV = 10;
-export const BIND_OTHER = 20;
 /** 吐いたあと、縛った相手へ噛みつきに行く長さ（生き物の更新の回数）と、噛みつく間合い（px）、毒の長さ */
 const POUNCE_N = 24;
 const BITE_D = 12;
@@ -39,10 +38,9 @@ const LEAP_SPEED = 5;
 /** 縛られた者が隣の相手を打つ間合い（px） */
 const BOUND_REACH = 14;
 
-/** 糸で縛れる相手か：起きている冒険者か、ゴブリン・コボルト */
+/** 糸で縛れる相手か：起きている冒険者 */
 export function silkOk(this: Ecology, o: Cr): boolean {
-  if (o.dead || o.away || o.caught || o.bind > 0 || o.sleep > 0) return false;
-  return o.k === Kind.Adventurer || o.k === Kind.Goblin || o.k === Kind.Kobold;
+  return o.k === Kind.Adventurer && !o.dead && !o.away && !o.caught && o.bind <= 0 && o.sleep <= 0;
 }
 
 /** 技の溜めと、吐いたあとの噛みつき（大グモの判断のはじめに呼ぶ）。true なら、この回はこれで終わり */
@@ -101,7 +99,7 @@ export function spiderSkill(this: Ecology, c: Cr): boolean {
   return true;
 }
 
-/** 糸を吐く相手：見通しが利き、気づいている、いちばん近い相手（冒険者は5マス、このクモを打ってきたゴブリン・コボルトは3マスの内。近すぎる相手には吐かない） */
+/** 糸を吐く相手：見通しが利き、気づいている、いちばん近い冒険者（5マスの内。近すぎる相手には吐かない） */
 export function spitTarget(this: Ecology, c: Cr): Cr | null {
   const m = this.w.map;
   let best: Cr | null = null;
@@ -109,10 +107,7 @@ export function spitTarget(this: Ecology, c: Cr): Cr | null {
   this.nearby(c.x, c.y, Math.ceil(SPIT_MAX / TILE) + 1, (o) => {
     if (o === c || !this.silkOk(o)) return;
     const d = sq(o.x - c.x) + sq(o.y - c.y);
-    const far = o.k === Kind.Adventurer ? SPIT_MAX : SPIT_KIN;
-    if (d < SPIT_MIN * SPIT_MIN || d > far * far || d >= bd) return;
-    // ゴブリン・コボルトには、このクモを打ってきた相手にだけ吐く
-    if (o.k !== Kind.Adventurer && (c.foe !== o.id || this.w.tick - c.hitAt > 200)) return;
+    if (d < SPIT_MIN * SPIT_MIN || d > SPIT_MAX * SPIT_MAX || d >= bd) return;
     if (!this.canSense(c, o) || !lineOfSight(m, c.x, c.y, o.x, o.y)) return;
     bd = d;
     best = o;
@@ -145,7 +140,7 @@ export function silkLands(this: Ecology, a: Cr, v: { x: number; y: number; r: nu
   let best: Cr | null = null;
   let bd = v.r * v.r;
   this.nearby(v.x, v.y, Math.ceil(v.r / TILE) + 1, (o) => {
-    if (o === a || o.k === Kind.Spider || !this.silkOk(o)) return;
+    if (!this.silkOk(o)) return;
     const d = sq(o.x - v.x) + sq(o.y - v.y) - (o.id === v.tgt ? 1 : 0);
     if (d > bd) return;
     bd = d;
@@ -153,7 +148,7 @@ export function silkLands(this: Ecology, a: Cr, v: { x: number; y: number; r: nu
   });
   const o = best as Cr | null;
   if (o) {
-    o.bind = o.k === Kind.Adventurer ? BIND_ADV : BIND_OTHER;
+    o.bind = BIND_ADV;
     // （縛った相手に、このクモを打ってきた相手として覚えさせない：覚えさせると、縛られた冒険者が抜けたあとクモを狙って倒し、
     //  16シード×25日で冒険者に倒されるクモが642→903匹に増え、巣にかかった獲物を食べる場面が895→500回に減った。
     //  冒険者は噛みつかれた時に、打たれたときのふつうの仕組みでクモに気づく）
