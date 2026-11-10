@@ -324,6 +324,17 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // アンデッド（src/eco/undead.ts）：冒険者のほかの人型の骨がスケルトンとして、まだ肉のある人型の亡骸がゾンビとして起き上がる。
+    // どのシードで起きるかは展開で変わるので、15シードの合計で見る（main の10日目から実行した10〜18日目の8シードで、骨93回・ゾンビ23回）
+    name: '人型の骨がスケルトンとして、肉のある亡骸がゾンビとして起き上がる（15シードの合計で骨10回・ゾンビ3回以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const bone = rs.map((r) => r.births.filter((x) => x.k === 26 && x.origin === 'raised' && [12, 10, 13, 28, 14].includes(x.from)).length);
+      const zom = rs.map((r) => r.births.filter((x) => x.k === 6 && x.origin === 'raised' && [12, 10, 13, 14].includes(x.from)).length);
+      return { ok: sum(bone) >= 10 && sum(zom) >= 3, value: `骨 ${sum(bone)}（${bone.filter((n) => n > 0).length}シード）、ゾンビ ${sum(zom)}（${zom.filter((n) => n > 0).length}シード）` };
+    },
+  },
+  {
     name: 'オークが貢ぎ物を取り立てる（15シードの合計で1回以上）',
     ...RUN_TRIB,
     test: (rs) => {
