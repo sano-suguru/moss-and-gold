@@ -346,6 +346,18 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 大グモの糸吐き（src/eco/spiderskill.ts）：近づいた冒険者に糸を吐いて縛り、縛られた冒険者は糸を切って抜ける。15シードの合計で見る
+    // （main の10日目から実行した10〜18日目の、この15シードで、冒険者を縛ったのは279回、14シードで起きた）
+    name: '大グモが糸を吐いて冒険者を縛り、冒険者が糸を切って抜ける（15シードの合計でそれぞれ20回以上・8シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const bind = rs.map((r) => r.settle.filter((x) => x.k === 4 && x.ev === 'spiderBind' && x.n === 25).length);
+      const cut = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'silkCut').length);
+      const seeds = bind.filter((v) => v > 0).length;
+      return { ok: sum(bind) >= 20 && sum(cut) >= 20 && seeds >= 8, value: `縛った ${sum(bind)}（${seeds}シード）、切って抜けた ${sum(cut)}` };
+    },
+  },
+  {
     // アンデッド（src/eco/undead.ts）：冒険者のほかの人型の骨がスケルトンとして、まだ肉のある人型の亡骸がゾンビとして起き上がる。
     // どのシードで起きるかは展開で変わるので、15シードの合計で見る（main の10日目から実行した10〜18日目の8シードで、骨93回・ゾンビ23回）
     name: '人型の骨がスケルトンとして、肉のある亡骸がゾンビとして起き上がる（15シードの合計で骨10回・ゾンビ3回以上）',

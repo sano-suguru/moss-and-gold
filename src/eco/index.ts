@@ -55,4 +55,5 @@ import './charge';
 import './standoff';
 import './vampskill';
 import './orcskill';
+import './spiderskill';
 import './save';

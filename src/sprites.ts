@@ -5238,6 +5238,88 @@ function fxGoldMote(f){
  },false);
  return {...fr,ax:S,ay:S};
 }
+/** クモの糸：白 → 淡い青白 → 薄い灰 → 灰 → 青灰の縁取り */
+const SILKL=[[255,255,255],[238,242,248],[210,216,228],[170,178,194],[124,130,148],[60,62,78]];
+/** 大グモの腹の先に膨らむ糸の玉（糸吐きの溜め）：f 0〜3 でだんだん大きく。てっぺんに光の当たる白い照り */
+function fxSilkBall(f){
+ const S=5,W=11,H=11,fr=blank(W,H),R=[1.5,2.1,2.7,3.3][f];
+ aaDraw(fr,S,S,SILKL,0,(x,y)=>{
+  const d=Math.hypot(x,y);
+  if(d>R)return -1;
+  const lit=(-x*0.5-y*0.85)/R;
+  return Math.min(4,lit>0.45?0:lit>-0.1?1:d>R*0.8?3:2);
+ });
+ return {...fr,ax:S,ay:S};
+}
+/** 糸の帯をつなぐ丸い粒（密に並べて帯にする）：k 0 太い、1 中、2 細い。縁取りは置かない */
+function fxSilkDot(k){
+ const S=2,W=5,H=5,fr=blank(W,H),R=[1.45,1.1,0.8][k];
+ aaDraw(fr,S,S,SILKL,0,(x,y)=>{const d=Math.hypot(x,y);if(d>R)return -1;return k===0?(d<R*0.5?0:1):k===1?1:2},false);
+ return {...fr,ax:S,ay:S};
+}
+/** 伸びていく糸の帯の先：白い糸の塊のまわりに、細い繊維が毛羽立つ。f 0〜3 で毛羽の向きが回る */
+function fxSilkHead(f){
+ const S=5,W=11,H=11,fr=blank(W,H);
+ aaDraw(fr,S,S,SILKL,0,(x,y)=>{
+  const d=Math.hypot(x,y);
+  if(d<=2.2)return d<1.1?0:1;
+  const a=Math.atan2(y,x)+f*0.8;
+  const k=Math.round(a/(Math.PI/3));
+  if(Math.abs(a-k*Math.PI/3)*d<0.45&&d<4.2)return d<3.2?2:3;
+  return -1;
+ },false);
+ return {...fr,ax:S,ay:S};
+}
+/**
+ * 糸に縛られた者の足もとに巻きつく糸：size 0 小（ゴブリン・コボルト）、1 中（冒険者）、2 大、f 0・1（もがいて糸がずれる）。
+ * 足もとの楕円の帯の中を、波打つ糸が何本も斜めに交わり、帯の上下の縁にも糸が回る
+ */
+function fxSilkWrap(size,f){
+ const w=[5,6.5,8][size],h=[4,5.5,7][size];
+ const S=10,W=S*2+1,H=12,by=10,fr=blank(W,H);
+ aaDraw(fr,S,by,SILKL,1,(x,y)=>{
+  const u=x/w,v=(y+h*0.5)/(h*0.5);
+  if(u*u+v*v>1.15)return -1;
+  // 足もとの手前を回る糸（下の縁の弧）
+  if(v>0.2&&Math.abs(Math.hypot(u,v)-1)<0.13)return 1;
+  // 斜めに交わる糸（3本。もがくとずれる）
+  for(let j=0;j<3;j++){
+   const yy=-h*0.5+(j-1)*h*0.28+Math.sin(x*0.7+j*2.3+f*1.4)*h*0.22;
+   if(Math.abs(y-yy)<0.36)return j===1?0:2;
+  }
+  return -1;
+ },false);
+ return {...fr,ax:S,ay:by};
+}
+/** 切れて散る糸の切れ端：v 0〜5（長さと曲がり方の違う、白い糸の小さな切れ端） */
+function fxSilkBit(v){
+ const S=4,W=9,H=9,fr=blank(W,H);
+ const a0=v*1.1,L=[3.2,2.6,3.6,2.2,3,2.8][v],bend=[0.5,-0.7,0.3,0.9,-0.4,0.6][v];
+ aaDraw(fr,S,S,SILKL,0,(x,y)=>{
+  for(let t=-L;t<=L;t+=0.25){
+   const a=a0+bend*t/L;
+   const px=Math.cos(a)*t,py=Math.sin(a)*t*0.8;
+   if(Math.hypot(x-px,y-py)<0.55)return Math.abs(t)<L*0.5?0:2;
+  }
+  return -1;
+ },false);
+ return {...fr,ax:S,ay:S};
+}
+/** 糸が床か相手に届いた所に貼りつく糸：f 0〜3（白い放射状の糸が広がり、細って薄れる） */
+function fxSilkSplat(f){
+ const S=7,W=15,H=11,fr=blank(W,H),R=[3,5,6,6.5][f],shade=[0,0,1,2][f];
+ aaDraw(fr,S,5,SILKL,f<2?0:-1,(x,y)=>{
+  const yy=y/0.6,d=Math.hypot(x,yy);
+  if(d>R)return -1;
+  if(d<1.4)return Math.min(4,shade);
+  const a=Math.atan2(yy,x);
+  const k=Math.round(a/(Math.PI/4));
+  if(Math.abs(a-k*Math.PI/4)*d<0.5)return Math.min(4,1+shade+(d>R*0.7?1:0));
+  if(Math.abs(d-R*0.62)<0.4)return Math.min(4,2+shade);
+  return -1;
+ },false);
+ return {...fr,ax:S,ay:5};
+}
 /** 鉄の破片（リビングアーマーが砕け散る）：白い光 → 明るい鉄 → 鉄 → 暗い鉄 → 縁取り */
 const SHARDL=[[250,252,255],[200,208,222],[146,154,170],[96,102,118],[58,62,74],[24,24,30]];
 /** 砕けた武具の破片：v 0〜5（形と向きの違う、とがった小さな鉄の欠片。光の当たる縁が白くきらめく） */
@@ -5822,4 +5904,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
