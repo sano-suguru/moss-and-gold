@@ -42,7 +42,6 @@ const RUN_A = { seeds: ['かしたれ', 'seed8', 'abc', 'seed7'], from: 10, to: 
  * （以前は RUN_A の4シードで見ていたが、その4シードでは10〜18日目に合わせて1回しか起きず、ほかの変更で展開が分かれただけで落ちた）
  */
 const RUN_RAID = { seeds: ['seed40', 'seed30', 'seed17', 'abc'], from: 10, to: 18 };
-/** オークの取り立て：縄張りが長く続くシード（オークのいる日数が上限1でも2でも16日ほど） */
 // リビングアーマーは、冒険者が倒れて武具の溜まった所でしか生まれず、どのシードで起きるかが版ごとに入れ替わる。1シードの展開で項目が揺れないよう、出やすいシードを広く並べる。
 // 迷路をなくした（#41）main の10〜18日目の取り込みは かしたれ 24・seed23 20・seed5 5・seed17 3・seed40 1、
 // 炎を傷に変えたコード（#42。冒険者の倒れる数が減った）では かしたれ 16・seed5 14・seed17 8・seed8 5。
@@ -64,7 +63,7 @@ const RUN_RAID = { seeds: ['seed40', 'seed30', 'seed17', 'abc'], from: 10, to: 1
 // まれな出来事の項目（RUN_WIDE）と同じく、16シードの合計で見る（16シードでは main 8・ヴァンパイアに従うコウモリを直したコードの0日目から 7・
 // main の15日目から 6、取り込みは 11・10・7、崩れるのは 6・8・4。15〜23日目に実行するシードは10から16に増える）
 const RUN_ARMOR = { seeds: ['abc', 'かしたれ', 'はじまりの洞窟', 'seed4', 'seed5', 'seed6', 'seed7', 'seed8', 'seed40', 'seed41', 'seed18', 'seed27', 'seed23', 'seed35', 'seed17', 'seed30'], from: 15, to: 23 };
-// まれな出来事（僧侶が亡骸の前で祈る、オークの取り立て）を見るシードの組。どのシードで起きるかは変更のたびに入れ替わり、
+// まれな出来事（僧侶が亡骸の前で祈る。以前はオークの取り立ても）を見るシードの組。どのシードで起きるかは変更のたびに入れ替わり、
 // 数シードを選ぶやり方では、ほかの PR の変更で展開が分かれるたびに落ちて、シードを選び直していた（#55・#57・#58）。
 // ほかの項目で10〜18日目を実行している14シードに seed17 を足し、15シードの合計で見る（実行するシードは seed17 の1つだけ増える）。
 // アリの混雑を直したコード（main #58 の後）では、10〜18日目の15シードの合計が、祈り main 10・0日目から 6・main の10日目から 7、
@@ -72,17 +71,11 @@ const RUN_ARMOR = { seeds: ['abc', 'かしたれ', 'はじまりの洞窟', 'see
 const RUN_WIDE = { seeds: ['abc', 'かしたれ', 'はじまりの洞窟', 'seed4', 'seed5', 'seed6', 'seed7', 'seed8', 'seed40', 'seed41', 'seed18', 'seed27', 'seed35', 'seed30', 'seed17'], from: 10, to: 18 };
 const RUN_BLESS = RUN_WIDE;
 const RUN_ORC = { seeds: ['かしたれ', 'seed27'], from: 10, to: 18 };
-// オークの取り立ては、従う集落に蓄えがたまったときだけ起きるまれな出来事（16シード×25日で約25回、起きるのは6シードほど）。
-// いまのコードで10〜18日目に起きているシードを選ぶ。焚き火の夜襲の二歩目（#29）のコードで、
-// 0日目から実行すると abc 11.7日目・seed27 15.5日目から何度も、#28 の main の10日目から続けると seed23 15.8日目ほか（どちらでも起きるシードはない）。
-// 以前の かしたれ は六歩目（#16）のあと、seed41・seed18 は焚き火の眠り（#28）のあと、18日目までに起きなくなった。
-// クモの巣の変更（#38）のコードで0日目から実行すると、abc・seed27・seed23 では起きず、seed41・seed30 で起きる（#37 の main では seed23・seed41・seed30 で起きる）。
-// どちらのスナップショットから始めても通るよう、seed23・seed41・seed30 にしていた。
-// 壁から床へ1マスだけ突き出た岩を作らないようにした地形（#49）では、0日目から実行した10〜18日目に seed23・seed41 で起きず、seed30 は1回か0回。
-// 起きるのは abc 6・seed7 8・seed17 2（#48 を取り込む前のコードでは abc 6・seed17 7・seed35 4）なので、abc・seed7・seed17 にする
-// （どのシードもほかの項目で10〜18日目を実行しているので、実行するシードは増えない）
-// （以前は数シードを選んでいたが、#54・#58 の後で起きるシードが入れ替わり、そのたびに落ちたので、RUN_WIDE の15シードで見る）
-const RUN_TRIB = RUN_WIDE;
+// オークの貢ぎ物の取り立て（src/eco/orc.ts の collectTribute）は、check の項目にしない。
+// main でも16シード×25日で13回、10〜18日目は1回（seed7）、15〜23日目は6回（4シード）しかなく、
+// コボルトのスリングを足した版では、展開が分かれただけで、15シードの10〜18日目が0回にも、25日で30回ほどにもなった。
+// どのシードを選んでも短い実行では確かめられないので、ab の「見せたい場面」の表（lib/moments.ts の tribute）で起きたシードの数を追う
+// （以前は数シードを選び、起きるシードが入れ替わるたびに選び直し、#59 からは RUN_WIDE の15シードの合計で見ていた）
 // 倒れた冒険者がヴァンパイアの眷属として起き上がる場面（src/eco/vampire.ts の vampRaiseFallen）は、check の項目にしない。
 // 16シードの10〜18日目で main でも1体（縦穴のコウモリのねぐらを直したコードを main の10日目から続けると0体）、10〜25日目でも0〜5体のまれな出来事で、
 // どのシードを選んでも短い実行では確かめられない。ヴァンパイアが倒した者を眷属にする仕組みは、RUN_A の項目（旋回と眷属）で確かめ、
@@ -375,13 +368,14 @@ export const CHECKS: Check[] = [
   },
   {
     // コボルトのスリングの投石（src/eco/koboldskill.ts）：冒険者の一行に気づいて逃げ出す前に、振り向いて小石を投げて当てる。15シードの合計で見る
-    name: 'コボルトが逃げ出す前にスリングで小石を投げ、冒険者に当てる（15シードの合計で20回以上・8シード以上）',
+    // （main の10日目から実行した10〜18日目の、この15シードで、当たったのは1032回、10シードで起きた。コボルトのいるシードは展開で入れ替わるので、シード数には余裕を置く）
+    name: 'コボルトが逃げ出す前にスリングで小石を投げ、冒険者に当てる（15シードの合計で20回以上・6シード以上）',
     ...RUN_WIDE,
     test: (rs) => {
       const hit = rs.map((r) => r.settle.filter((x) => x.k === 10 && x.ev === 'stoneHit').length);
       const thrown = rs.map((r) => r.settle.filter((x) => x.k === 10 && x.ev === 'sling').length);
       const seeds = hit.filter((v) => v > 0).length;
-      return { ok: sum(hit) >= 20 && seeds >= 8, value: `投げた ${sum(thrown)}、当たった ${sum(hit)}（${seeds}シード）` };
+      return { ok: sum(hit) >= 20 && seeds >= 6, value: `投げた ${sum(thrown)}、当たった ${sum(hit)}（${seeds}シード）` };
     },
   },
   {
@@ -393,14 +387,6 @@ export const CHECKS: Check[] = [
       const bone = rs.map((r) => r.births.filter((x) => x.k === 26 && x.origin === 'raised' && [12, 10, 13, 28, 14].includes(x.from)).length);
       const zom = rs.map((r) => r.births.filter((x) => x.k === 6 && x.origin === 'raised' && [12, 10, 13, 14].includes(x.from)).length);
       return { ok: sum(bone) >= 10 && sum(zom) >= 3, value: `骨 ${sum(bone)}（${bone.filter((n) => n > 0).length}シード）、ゾンビ ${sum(zom)}（${zom.filter((n) => n > 0).length}シード）` };
-    },
-  },
-  {
-    name: 'オークが貢ぎ物を取り立てる（15シードの合計で1回以上）',
-    ...RUN_TRIB,
-    test: (rs) => {
-      const n = rs.map((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'tribute').length);
-      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },
   {
@@ -450,16 +436,6 @@ export const CHECKS: Check[] = [
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 2 && x.ev === 'reenter').length);
       return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
-    },
-  },
-  {
-    // 七巡目：取り立ては腹を空かせたときに、要る分（腹の空き＝120まで）を、蓄えの半分まで。空振り（0）はログに残さない
-    name: 'オークの取り立ては1回につき1〜120',
-    ...RUN_TRIB,
-    test: (rs) => {
-      const t = rs.flatMap((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'tribute'));
-      const v = t.length ? sum(t.map((x) => x.n ?? 0)) / t.length : 0;
-      return { ok: t.length > 0 && t.every((x) => x.n >= 1 && x.n <= 120), value: `${t.length} 回、平均 ${v.toFixed(0)}` };
     },
   },
   {

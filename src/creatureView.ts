@@ -2155,9 +2155,7 @@ export class CreatureView {
       const bright = sp === Kind.Wisp && c.glow > 90 ? 1 : 0;
       // 隠れている者（ほかの生き物には気づかれない）：眺める人には、暗く沈んだ影の姿と光る目で見せる
       // 身をひそめている者（コボルトとゴブリンの隠れ方と、逃げて巣や住みかの中へ身を隠した者。src/eco/combat.ts の denHidden）：暗がりに沈んで目だけが光る
-      // スリングを回しているコボルトは、隠れていても影にせず描く（暗がりから身を乗り出して投げる。src/eco/koboldskill.ts。描画だけ）
-      const slinging = sp === Kind.Kobold && c.run === -1 && c.act === 2 && c.actT < 0;
-      const hidden = !slinging && (eco.isHidden(c) || (c.flee > 0 && c.act === 0 && sp !== Kind.Wisp && sp !== Kind.Ghost && eco.denHidden(c)));
+      const hidden = eco.isHidden(c) || (c.flee > 0 && c.act === 0 && sp !== Kind.Wisp && sp !== Kind.Ghost && eco.denHidden(c));
       const isCorpse = c.dead === 1 && c.actT >= 4 && sp !== Kind.Wisp && sp !== Kind.Slime && sp !== Kind.Ghost && sp !== Kind.Myconid;
       const eliteName = ['', 'firespirit', 'pknight', '', '', '', 'wspirit', 'lspirit', '', 'mlord'][c.elite] ?? '';
       // 冒険者は、名簿の人でも、名簿から外れた亡骸や眷属でも、手描きの体で描く（src/sprites.ts の heroSprite。姿は advLook）
