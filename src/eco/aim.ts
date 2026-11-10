@@ -59,6 +59,11 @@ export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: bool
     // ゴブリン退治：いちばん最近盗みを働いた集落（逃げ帰ったゴブリンの足跡を、盗まれた一行がたどって町に伝えた）。
     // その集落がすでに捨てられていれば、その近くの別の集落（場所を知らなければ当て推量で探す）
     let best: Camp | null = this.camps.find((cp) => cp.id >= 0 && cp.kind === 0 && r.goblinCamp && cp.id === r.goblinCamp) ?? null;
+    // オークに従う集落があれば、そちらを先に選ぶ（オークがゴブリンを従えていることは、外の世界にも噂として届いていて、場所も知られている）。
+    // 一行がオークの縄張りに踏み込み、オークが吠えて集落のゴブリンを呼ぶ場面になる（src/eco/orc.ts の meetParty）
+    // （以前は盗みを働いた集落だけを選び、一行はオークに従う集落のそばをほとんど通らなかった）
+    const vassal = best && best.lx ? null : this.camps.filter((cp) => cp.id >= 0 && cp.kind === 0 && (cp.lx || cp.ly) && this.list.some((o) => o.k === Kind.Orc && !o.dead && !o.away && o.hx === cp.lx && o.hy === cp.ly)).sort((a, b) => sq(a.x - (r.goblinCampX || r.goblinX)) + sq(a.y - (r.goblinCampY || r.goblinY)) - (sq(b.x - (r.goblinCampX || r.goblinX)) + sq(b.y - (r.goblinCampY || r.goblinY))) || a.id - b.id)[0];
+    if (vassal) best = vassal;
     const known = !!best;
     if (!best) {
       const ox = r.goblinCampX || r.goblinX;

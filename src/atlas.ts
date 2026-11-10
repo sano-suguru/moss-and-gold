@@ -1,4 +1,4 @@
-import { beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, vampMist, livingArmor, heroSprite, heroBed, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
+import { fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, vampMist, livingArmor, heroSprite, heroBed, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -362,7 +362,7 @@ export function buildAtlas(): Atlas {
     ['kobold', 1, (d, a, f) => kobold(d, a, f) as RawFrame],
     ['salamander', 1, (d, a, f) => salamander(d, a, f) as RawFrame],
     ['goblin', 3, (d, a, f, v) => goblin(d, a, f, v) as RawFrame],
-    ['orc', 2, (d, a, f, v) => orc(d, a, f, v) as RawFrame],
+    ['orc', 3, (d, a, f, v) => orc(d, a, f, v) as RawFrame],
     ['lizardman', 1, (d, a, f) => lizardman(d, a, f) as RawFrame],
     ['minotaur', 1, (d, a, f) => minotaur(d, a, f) as RawFrame],
     ['troll', 1, (d, a, f) => troll(d, a, f) as RawFrame],
@@ -642,6 +642,11 @@ export function buildAtlas(): Atlas {
   // リビングアーマー：武器の大振りの軌跡（16方向×6コマ）と、盾の体当たりの光の壁（16方向×4コマ）
   for (let d = 0; d < 16; d++) for (let f = 0; f < 6; f++) addFx(`asweep:${d}:${f}`, fxArmorSweep(d, f) as RawFrame);
   for (let d = 0; d < 16; d++) for (let f = 0; f < 4; f++) addFx(`swall:${d}:${f}`, fxShieldWall(d, f) as RawFrame);
+  // オーク：雄叫びの音の波の一片（16方向×6コマ）、投げ斧（8つの回り×跡の有無）、鎖の輪（8方向×2形）、斧が当たった火花（4コマ）
+  for (let d = 0; d < 16; d++) for (let f = 0; f < 6; f++) addFx(`roararc:${d}:${f}`, fxRoarArc(d, f) as RawFrame);
+  for (let r = 0; r < 8; r++) for (let b = 0; b < 2; b++) addFx(`taxe:${r}:${b}`, fxThrownAxe(r, b) as RawFrame);
+  for (let d = 0; d < 8; d++) for (let v = 0; v < 2; v++) addFx(`chain:${d}:${v}`, fxChainLink(d, v) as RawFrame);
+  for (let f = 0; f < 4; f++) addFx(`axehit:${f}`, fxAxeHit(f) as RawFrame);
   // アンデッド：スケルトンがリッチに変わる光の柱（6コマ）、リビングアーマーが砕け散る破片（6種）
   for (let f = 0; f < 6; f++) addFx(`lpillar:${f}`, fxLichPillar(f) as RawFrame);
   for (let v = 0; v < 6; v++) addFx(`shard:${v}`, fxShard(v) as RawFrame);

@@ -324,6 +324,16 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // オークの技（src/eco/orcskill.ts）：雄叫びで小物を逃がすか後衛を怖ませ、鎖のついた投げ斧を当てる。オークのいるシードが版ごとに入れ替わるので、15シードの合計で見る
+    name: 'オークが雄叫びで相手をおびえさせ、投げ斧を当てる（15シードの合計で雄叫び4回・投げ斧4回以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const roar = rs.map((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'orcRoar' && x.n > 0).length);
+      const axe = rs.map((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'axeHit').length);
+      return { ok: sum(roar) >= 4 && sum(axe) >= 4, value: `雄叫び ${sum(roar)}（${roar.filter((n) => n > 0).length}シード）、投げ斧 ${sum(axe)}（${axe.filter((n) => n > 0).length}シード）` };
+    },
+  },
+  {
     // アンデッド（src/eco/undead.ts）：冒険者のほかの人型の骨がスケルトンとして、まだ肉のある人型の亡骸がゾンビとして起き上がる。
     // どのシードで起きるかは展開で変わるので、15シードの合計で見る（main の10日目から実行した10〜18日目の8シードで、骨93回・ゾンビ23回）
     name: '人型の骨がスケルトンとして、肉のある亡骸がゾンビとして起き上がる（15シードの合計で骨10回・ゾンビ3回以上）',

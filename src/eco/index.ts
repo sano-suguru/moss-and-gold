@@ -54,4 +54,5 @@ import './attack';
 import './charge';
 import './standoff';
 import './vampskill';
+import './orcskill';
 import './save';

@@ -17,6 +17,10 @@ const RETREAT_N = 60;
 const JOB_SKILL: (Skill | undefined)[] = [SKILL_WARRIOR_SLASH, SKILL_WIZARD_MISSILE, SKILL_THIEF_THROW, SKILL_PRIEST_HAMMER, undefined, SKILL_HUNTER_RAIN, SKILL_SLAYER_CLEAVE];
 /** 職業ごとの技の届く距離（マス）：戦士の飛ぶ斬撃5、魔法使いのマジックミサイル10、盗賊の短剣投げ8、僧侶のハンマー3（十字架の腕はさらに3）、狩人の矢の雨12、竜殺しの大剣5.5 */
 const JOB_REACH = [5, 10, 8, 3, 0, 12, 5.5];
+/** 戦う相手に気づける遠さ（px）：打ってきた相手、灯りの輪か明るい床にいる相手、暗がりのすぐそばの敵（src/eco/adventurer.ts の「戦う」） */
+const NOTICE_HIT = 12 * TILE;
+const NOTICE_LIT = 5.5 * TILE;
+const NOTICE_DARK = 2 * TILE;
 
 /** 噂の総量（評判） */
 export function reputation(this: Ecology): number {
@@ -536,7 +540,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   const MINOR = [Kind.Rat, Kind.Bat, Kind.Ant, Kind.Myconid, Kind.Salamander, Kind.Lizard, Kind.Spider, Kind.Slime];
   if (c.sp === Job.Slayer) ENEMY.push(Kind.Dragon, Kind.Wyvern, Kind.Worm);
   let foe: Cr | null = null;
-  let bd = 5.5 * TILE * 5.5 * TILE;
+  let bd = 1e18;
   // 一行で向かっている手強い敵がいれば、まずそれ
   if (p.engage) {
     const e = this.byId.get(p.engage);
@@ -544,8 +548,13 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     if (e && !e.dead && !e.away && !runner && sq(e.x - c.x) + sq(e.y - c.y) < 10 * TILE * 10 * TILE && c.sp !== Job.Bard && c.sp !== Job.Thief) foe = e;
     else if (!e || e.dead || e.away || runner) p.engage = 0;
   }
+  // 気づける遠さ（見通しが利くことが条件）：
+  //   打ってきた相手は、暗がりでも NOTICE_HIT まで（打たれたら気づく。オークの投げ斧のように、灯りの外から打つ敵がいるので）。
+  //   一行の灯りの輪の中か、明るい床にいる相手は NOTICE_LIT まで。暗がりの敵（雑魚は除く）は、すぐそば（NOTICE_DARK。盗賊は夜目が利いて3マス）なら気配で気づく。
+  //   （以前は、打たれても相手が暗がりにいれば向き直らなかった。
+  //    灯りの中の相手を10マス先まで見えるようにも試したが、16シード×25日で、ヴァンパイアの血吸いが 62→16 回、ゴブリンの夜の盗みが 35→15 回に減ったので、5.5マスのままにした）
   if (!foe)
-    this.nearby(c.x, c.y, 6, (o) => {
+    this.nearby(c.x, c.y, NOTICE_HIT / TILE + 1, (o) => {
       if (o.dead || o.away) return;
       const attacked = o.id === c.foe && this.w.tick - c.hitAt < 150;
       // 目標でない住民（住処・集落・村・縄張りの者）には、自分たちから戦いを始めない
@@ -554,8 +563,13 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       const minor = MINOR.includes(o.k) && (o.k !== Kind.Bat || o.st === 0 || o.foe === c.id);
       if (!enemy && !minor && !attacked) return;
       if (!attacked && (c.sp === Job.Bard || (c.sp === Job.Thief && o.k !== Kind.Mimic))) return;
-      if (!this.seenBy(c, lights, o)) return;
       const d = sq(o.x - c.x) + sq(o.y - c.y);
+      const near = c.sp === Job.Thief ? 3 * TILE : NOTICE_DARK;
+      // （暗がりの気配で気づくのは敵だけ。大ネズミなどの雑魚にまで気づくと、暗がりの雑魚を払う数が増え、大ネズミがはっきり減った）
+      // （盗みに忍び寄るゴブリンも、暗がりの気配では気づかれない。見張りが気配で盗人に気づくと、夜の盗みがはっきり減った）
+      const sneaking = o.k === Kind.Goblin && o.st >= 15 && o.st <= 18;
+      const reach = attacked ? NOTICE_HIT : this.seenBy(c, lights, o) ? NOTICE_LIT : enemy && !sneaking && d < near * near && !this.isHidden(o) ? near : 0;
+      if (d >= reach * reach || (d > 2 * TILE * 2 * TILE && !lineOfSight(this.w.map, c.x, c.y, o.x, o.y))) return;
       // 雑魚は、近く（2マス）に来たときか、自分に害をなしたときだけ払う
       if (minor && !enemy && !attacked && o.foe !== c.id && d > 2 * TILE * 2 * TILE) return;
       // 逃げていく弱い者（コボルトなど）は、追いかけて倒しには行かない
@@ -567,7 +581,11 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     });
   // 手強い敵に気づいたら、一行に知らせる（かなわない相手は、見張りの判断で引き返す）
   // （以前は一行の1.2倍より強い相手には知らせず、皆で向かわなかった。いまは強さに関わらず皆で向かい、負けそうなら退く）
-  if (foe && !MINOR.includes((foe as Cr).k) && !p.engage && (p.retreatUntil ?? 0) <= this.step) {
+  // 暗がりから血を吸うヴァンパイア（灯りの中に見えていない）には、打たれて気づいても、一行で暗がりへ踏み込まない。
+  // 吸われた者はヴァンパイアの方を向いて構え、届く技のある者は撃ち返す（src/eco/vampskill.ts の血吸い。
+  // 打たれたら気づくようにしたとき、一行が暗がりへ詰め寄ってヴァンパイアを追い払い、血吸いが16シード×25日で62→13回に減った）
+  const darkVamp = !!foe && (foe as Cr).k === Kind.Vampire && !this.seenBy(c, lights, foe as Cr);
+  if (foe && !darkVamp && !MINOR.includes((foe as Cr).k) && !p.engage && (p.retreatUntil ?? 0) <= this.step) {
     p.engage = (foe as Cr).id;
     p.engageN = p.members.filter((id) => !this.byId.get(id)?.dead).length;
   }
@@ -652,6 +670,10 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     }
     if (sq(f.x - c.x) + sq(f.y - c.y) < 14 * 14) {
       this.fight(c, f);
+      return;
+    }
+    if (darkVamp) {
+      c.act = 0;
       return;
     }
     c.act = 1;

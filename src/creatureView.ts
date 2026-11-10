@@ -5,6 +5,7 @@ import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor'
 import { RANK_AT, packLook, unpackLook } from './eco/roster';
 import { SKILL_WIZARD_MISSILE } from './eco/skill';
 import { SKILL_VAMP_MIST } from './eco/vampskill';
+import { SKILL_ORC_ROAR } from './eco/orcskill';
 import { BONE_KINDS, BONE_SP, LICH_RISE, RISE_N } from './eco/undead';
 import { HOP_DT, HOP_N, hopAt } from './eco/charge';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
@@ -842,6 +843,92 @@ export class CreatureView {
             const p = i / 5;
             const g = age / 8;
             push(r.ax + vx * p, r.ay + vy * p + 0.1, 6 + Math.sin(p * Math.PI) * 6, i % 2 === 1, A.mist(Math.min(3, Math.floor(g * 4 + (1 - p) * 1.5))), 0, 0);
+          }
+          break;
+        }
+        case 'roar': {
+          // オークの雄叫び（src/eco/orcskill.ts）：オークのまわりに、赤橙ののこぎり歯の音の波（src/sprites.ts の fxRoarArc を輪に並べたもの）が、
+          // 4 tick おきに三重に広がる（いちばん外の波が届く所が、雄叫びの届く所）。足もとから土ぼこりが立ち、まわりが一瞬赤く照らされる
+          const R = r.rad ?? 80;
+          for (let w = 0; w < 3; w++) {
+            const g = (age - w * 4) / 12;
+            if (g < 0 || g >= 1) continue;
+            const rr = 10 + (R - 10) * (1 - (1 - g) * (1 - g));
+            const f = Math.min(5, Math.floor(g * 6) + w);
+            const n = Math.max(8, Math.round((2 * Math.PI * rr) / 15));
+            for (let j = 0; j < n; j++) {
+              const a = (j / n) * Math.PI * 2 + w * 0.4;
+              const ex = Math.cos(a);
+              const ey = Math.sin(a) * 0.72;
+              const d16 = (Math.round(Math.atan2(ey, ex) / (Math.PI / 8)) + 16) % 16;
+              push(r.ax + ex * rr, r.ay + ey * rr, 6, false, A.fx(`roararc:${d16}:${f}`), 0, 4);
+            }
+          }
+          if (age < 6) dyn.push({ x: r.ax, y: r.ay - 14, r: 60 + age * 8, i: 0.5 * damp * (1 - age / 6), c: 1 });
+          if (age === 0 || once) for (let i = 0; i < 6; i++) this.bits.push({ x: r.ax, y: r.ay, z: 1, vx: Math.cos(i * 1.05) * 1.1, vy: Math.sin(i * 1.05) * 0.5, vz: 0.4, kind: 1, col: 0, t0: now, life: 14 });
+          break;
+        }
+        case 'axethrow': {
+          // オークの投げ斧（src/eco/orcskill.ts）：回る斧（src/sprites.ts の fxThrownAxe。刃の通った跡つき）が、鎖を引いて手から狙った所へ弧を描いて飛び、
+          // 届いたら、オークが鎖をたぐって、斧は引きずられるように（だんだん速く）手元へ戻る。鎖は鉄の輪（fxChainLink）を交互に並べ、飛ぶあいだはたるみ、たぐるときはぴんと張る
+          const m = eco.byId.get(r.aid);
+          if (!m || m.dead) break;
+          const fly = r.fly ?? 8;
+          const back = r.n ?? 6;
+          if (age > fly + back) break;
+          const fx = m.dir === 2 ? 1 : m.dir === 3 ? -1 : 0;
+          const fy = m.dir === 0 ? 1 : m.dir === 1 ? -1 : 0;
+          const hx = m.x + fx * 7 + (fx ? 0 : 4);
+          const hy = m.y + fy * 2 + 0.2;
+          const hz = 12;
+          let axx: number;
+          let axy: number;
+          let az: number;
+          let sag: number;
+          let rot: number;
+          if (age <= fly) {
+            const p = age / fly;
+            axx = hx + (r.dx - hx) * p;
+            axy = hy + (r.dy - hy) * p;
+            az = hz + (8 - hz) * p + Math.sin(p * Math.PI) * 8;
+            sag = 3 + 4 * (1 - p);
+            rot = (Math.floor(age * 1.6) * (r.dx >= r.ax ? 1 : -1)) & 7;
+          } else {
+            const q = (age - fly) / back;
+            const e = q * q;
+            axx = r.dx + (hx - r.dx) * e;
+            axy = r.dy + (hy - r.dy) * e;
+            az = 8 + (hz - 8) * e + (q < 0.15 ? -3 * (1 - q / 0.15) : 0);
+            sag = 0;
+            // たぐられる斧は、柄の尻（鎖の輪）を手の方へ向けて引きずられる
+            const pa = Math.atan2(hy - axy, hx - axx);
+            rot = (Math.round((pa + Math.PI + Math.PI / 4) / (Math.PI / 4)) + 16) & 7;
+          }
+          const L = Math.hypot(axx - hx, axy - hy);
+          const ca = (axx - hx) / (L || 1);
+          const sa = (axy - hy) / (L || 1);
+          const d8 = (Math.round(Math.atan2(sa, ca) / (Math.PI / 4)) + 8) % 8;
+          const nl = Math.floor(L / 3.2);
+          for (let i = 1; i < nl; i++) {
+            const t = i / nl;
+            const z = hz + (az - hz) * t - Math.sin(t * Math.PI) * sag;
+            push(hx + (axx - hx) * t, hy + (axy - hy) * t + 0.03, z, false, A.fx(`chain:${d8}:${i & 1}`), 0, 4);
+          }
+          push(axx, axy + 0.06, az, false, A.fx(`taxe:${rot}:${age <= fly ? 1 : 0}`), 0, 4);
+          break;
+        }
+        case 'axehit': {
+          // 投げ斧が届いた所：当たれば白い芯から橙の火花のくさびが八方へ（src/sprites.ts の fxAxeHit）、外れれば床を打った土ぼこりとひび
+          if (r.col === 1) {
+            if (age < 8) push(r.dx, r.dy + 0.1, 9, false, A.fx(`axehit:${Math.min(3, Math.floor(age / 2))}`), 0, 4);
+            if (age < 4) dyn.push({ x: r.dx, y: r.dy - 9, r: 26, i: 0.4 * damp * (1 - age / 4), c: 1 });
+            if (once) spray(4, 2, 6, 1.4, 1.6);
+          } else {
+            if (age < 8) push(r.dx, r.dy + 0.1, 2, false, A.fx(`dpuff:${Math.min(3, Math.floor(age / 2))}`), 0, 4);
+            if (once) {
+              spray(1, 0, 4, 0.9, 0.9);
+              this.marks.push({ x: r.dx, y: r.dy + 2, key: `crack:${r.t % 3}`, t: now });
+            }
           }
           break;
         }
@@ -1721,6 +1808,16 @@ export class CreatureView {
         const ph = Math.floor(t / 2) % 4;
         pushSprite(x + fx * 11, yy + fy * 4 + 0.05, lift + 14, false, A.fx(`snort:${ph}`), 0, 2);
         pushSprite(x - fx * 6 + ((Math.floor(t / 3) & 1) ? 3 : -3), yy - fy * 3 + 0.05, lift + 1, false, A.fx(`dpuff:${Math.floor(t / 1.5) % 4}`), 0, 2);
+      }
+      // オークの雄叫びの溜め（src/eco/orcskill.ts）：斧を掲げて胸を反らし、口を開けて息を吸う。鼻先から白い息が荒く吹き、足もとに土ぼこり、体のまわりが赤く熱を帯びる（描画専用）
+      if (sp === Kind.Orc && !c.dead && c.run === -1 && c.act === 2 && c.actT < 0) {
+        const t = eco.w.tick + alpha;
+        const p = Math.max(0, Math.min(1, (SKILL_ORC_ROAR.windup + c.actT + alpha) / SKILL_ORC_ROAR.windup));
+        const fx = dir === 2 ? 1 : dir === 3 ? -1 : 0;
+        const bh = Ecology.bodySize(sp);
+        for (let i = 0; i < 2; i++) pushSprite(x + fx * 7 + (i ? 3 : -3) * (fx ? 0.3 : 1), yy + 0.05, lift + bh + 2 + ((t * 0.6 + i * 2) % 4), false, A.fx(`snort:${(Math.floor(t / 2) + i) % 4}`), 0, 2);
+        pushSprite(x + ((Math.floor(t / 3) & 1) ? 4 : -4), yy + 0.05, lift + 1, false, A.fx(`dpuff:${Math.floor(t / 1.5) % 4}`), 0, 2);
+        dyn.push({ x, y: yy - bh * 0.6, r: 24 + 16 * p, i: (0.15 + 0.3 * p) * (1 + 0.15 * Math.sin(t * 1.7)), c: 1 });
       }
       // ゴーレムの溜め（src/eco/charge.ts）：体の符文が水色に光り、まわりに符文が浮かぶ（跳ねる衝撃波の溜めでは、走る向きを向いて構える。地面には何も出さない）（描画専用）
       if (sp === Kind.Golem && !c.dead && c.act === 2 && c.actT < 0) {

@@ -78,6 +78,11 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       this.metabolism(c);
       continue;
     }
+    // オークの斧が鎖の先に出ているあいだは、逃げる処理より先に、その場で鎖をたぐる（src/eco/orcskill.ts）
+    if (c.k === Kind.Orc && c.run > 0 && this.orcSkill(c)) {
+      this.metabolism(c);
+      continue;
+    }
     // アンデッドの起き上がりと、スケルトンがリッチに変わる間（src/eco/undead.ts）
     if ((c.k === Kind.Skeleton || c.k === Kind.Zombie || c.k === Kind.Lich) && (c.st === 10 || c.st === 11) && this.undeadRise(c)) {
       this.metabolism(c);
@@ -107,6 +112,11 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       continue;
     }
     if (this.doSleep(c, day, this.phaseNow)) {
+      this.metabolism(c);
+      continue;
+    }
+    // オークの技（雄叫び・投げ斧）の溜めと、使う判断（src/eco/orcskill.ts）
+    if (c.k === Kind.Orc && this.orcSkill(c)) {
       this.metabolism(c);
       continue;
     }

@@ -244,6 +244,8 @@ export function abandonCamp(this: Ecology, cp: Camp, reason: number): boolean {
  * 群れより明らかに強ければ暗がりに散って隠れ（hide 1）、一行が弱ければ暗がりで待ち伏せる（hide 2）。
  * 隠れているのを見つかったり、待ち伏せで負けそうになったら、皆で深い方へ逃げ散る（一行が去れば戻る）
  */
+/** 見張りに起こされたオークの眠気（生き物の更新の回数ぶん。オークが眠くなるのは1500。起こされてから2分ほどは眠らない） */
+const ORC_WOKEN = 900;
 export function watchCamps(this: Ecology): void {
   for (const cp of this.camps) {
     if (cp.id < 0 || cp.kind !== 0) continue;
@@ -279,6 +281,20 @@ export function watchCamps(this: Ecology): void {
     }
     const a = near as Cr;
     const members = this.campMembers(cp);
+    // オークに従う集落：起きている見張りが一行に気づいたら、縄張りのオークを起こす（眠っていたオークが飛び起きて駆けつける。src/eco/orc.ts の meetParty）。
+    // （一行は昼に来ることが多く、夜に動くオークは眠ったままで、集落が守られなかった）
+    if (party && (cp.lx || cp.ly)) {
+      const sentry = members.find((c) => c.sleep <= 0 && c.flee <= 0 && sq(c.x - a.x) + sq(c.y - a.y) < 14 * TILE * 14 * TILE);
+      if (sentry)
+        for (const o of this.list) {
+          if (o.k !== Kind.Orc || o.dead || o.away || o.hx !== cp.lx || o.hy !== cp.ly || o.sleep <= 0) continue;
+          o.sleep = 0;
+          o.drowsy = Math.min(o.drowsy, ORC_WOKEN);
+          this.markNotice(sentry, a, '!');
+          this.markNotice(o, a, '!');
+          this.record('settle', { t: this.w.tick, k: Kind.Orc, ev: 'woken', id: o.id, n: cp.id, x: Math.round(o.x), y: Math.round(o.y) } as never);
+        }
+    }
     const mine = members.reduce((s, c) => s + (c.flee > 0 ? 0 : this.str(c)), 0);
     const bold = this.campChief(cp);
     // 待ち伏せのさなかに負けそうになったら、皆で逃げ散る

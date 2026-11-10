@@ -4,6 +4,7 @@ import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, 
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
+import { SKILL_ORC_ROAR } from './orcskill';
 
 export function pickLair(this: Ecology, near?: { x: number; y: number }): number {
   const m = this.w.map;
@@ -58,6 +59,8 @@ export function orc(this: Ecology, c: Cr): void {
   }
   // 用心棒：従う集落のそば（8マス）に来たコボルトを追い払う（縄張りから25マスまで）
   if (this.guardVassals(c)) return;
+  // 集落の前で迎え撃つ：従う集落に冒険者の一行が近づいたら、駆けつけて吠え、ゴブリンと一緒に襲いかかる
+  if (this.meetParty(c)) return;
   if (sq(c.hx - c.x) + sq(c.hy - c.y) > 5 * TILE * 5 * TILE) {
     c.act = 1;
     this.goTo(c, c.hx, c.hy, s.speed);
@@ -156,6 +159,11 @@ export function orcWary(this: Ecology, c: Cr): boolean {
           p.engageN = p.members.filter((id) => !this.byId.get(id)?.dead).length;
         }
         this.record('settle', { t: this.w.tick, k: Kind.Orc, ev: 'orcClash', id: c.id, how: advance ? 1 : 2, n: p.id, x: Math.round(c.x), y: Math.round(c.y) } as never);
+        // 決着の時に吠える：従う集落のゴブリンを呼び、一行の後衛を怖ませる（src/eco/orcskill.ts の雄叫び。ref は一行のまま残す）
+        if (!c.party && this.skillCanStart(c, SKILL_ORC_ROAR)) {
+          this.orcStartRoar(c);
+          return true;
+        }
         return advance ? false : true;
       }
       return true;
@@ -270,6 +278,64 @@ export function guardVassals(this: Ecology, c: Cr): boolean {
     return true;
   }
   return false;
+}
+
+/**
+ * 縄張りで迎え撃つ：従う集落を持つオークの縄張り（寝床から MEET_LAIR、オークから MEET_ORC の内の従う集落から MEET_CAMP の内）に冒険者の一行が入ったら、オークは一行のもとへ駆けつける。
+ * 一行に MEET_ROAR まで近づいたら、吠えて（従う集落のゴブリンが駆けつける。src/eco/orcskill.ts の雄叫び）一行に襲いかかる（st 22：にらみ合いのあとの襲いかかりと同じ動き）。
+ * 一行がはっきり強ければ、近づいたところで今までどおり見極め（orcWary）、にらみ合いから始まる。true なら今はそのために動いている
+ * （以前は、オークの寝床が集落から12マス以上離れていて、一行が集落を通っても、オークは寝床のそばにいたまま関わらなかった。
+ *  吠えても集落のゴブリンは遠すぎて駆けつけず、加勢の場面がほとんど起きなかった）
+ */
+const MEET_CAMP = 20 * TILE;
+const MEET_LAIR = 15 * TILE;
+const MEET_ORC = 30 * TILE;
+const MEET_ROAR = 6 * TILE;
+export function meetParty(this: Ecology, c: Cr): boolean {
+  if (c.hungry || c.flee > 0 || c.party || c.st !== 0 || !this.parties.length) return false;
+  let best: Cr | null = null;
+  let bp = 0;
+  let bd = 1e18;
+  // 縄張り：寝床（住みかの印）のまわりと、従う集落のまわり
+  const zones: [number, number, number][] = [];
+  if (c.hx || c.hy) zones.push([c.hx, c.hy, MEET_LAIR]);
+  for (const cp of this.vassalsOf(c)) if (sq(cp.x - c.x) + sq(cp.y - c.y) <= MEET_ORC * MEET_ORC) zones.push([cp.x, cp.y, MEET_CAMP]);
+  if (!this.vassalsOf(c).length) return false;
+  for (const [zx, zy, zr] of zones) {
+    for (const p of this.parties) {
+      if ((p.camp ?? -1) >= 0 || this.orcYieldsTo(p)) continue;
+      for (const id of p.members) {
+        const o = this.byId.get(id);
+        if (!o || o.dead || o.away || sq(o.x - zx) + sq(o.y - zy) > zr * zr) continue;
+        const d = sq(o.x - c.x) + sq(o.y - c.y);
+        if (d < bd) {
+          bd = d;
+          best = o;
+          bp = p.id;
+        }
+      }
+    }
+  }
+  if (!best) return false;
+  const o = best as Cr;
+  this.setDir(c, o.x - c.x, o.y - c.y);
+  if (bd < MEET_ROAR * MEET_ROAR) {
+    c.st = 22;
+    c.ref = bp;
+    c.lureAt = this.step;
+    this.markNotice(c, o, '!');
+    this.record('settle', { t: this.w.tick, k: Kind.Orc, ev: 'orcMeet', id: c.id, n: bp, x: Math.round(c.x), y: Math.round(c.y) } as never);
+    if (this.skillCanStart(c, SKILL_ORC_ROAR)) this.orcStartRoar(c);
+    return true;
+  }
+  c.act = 1;
+  this.goTo(c, o.x, o.y, SPEC[c.k].speed * 1.3);
+  return true;
+}
+
+/** 一行が退いているあいだは迎え撃たない（逃げる一行を集落の外まで追わない） */
+export function orcYieldsTo(this: Ecology, p: Party): boolean {
+  return (p.retreatUntil ?? 0) > this.step;
 }
 
 /** 貢ぎ物の取り立て：従う集落へ行き、要る分（蓄えの半分まで）を袋に詰めて（units）縄張りへ持ち帰り、食べる */
@@ -413,6 +479,8 @@ declare module '../ecology' {
     orc: typeof orc;
     vassalsOf: typeof vassalsOf;
     guardVassals: typeof guardVassals;
+    meetParty: typeof meetParty;
+    orcYieldsTo: typeof orcYieldsTo;
     collectTribute: typeof collectTribute;
     updateVassals: typeof updateVassals;
     goCollect: typeof goCollect;
@@ -424,4 +492,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { pickLair, orc, vassalsOf, guardVassals, collectTribute, updateVassals, goCollect, checkOrcMouths, orcTargetFrom, orcWary, partyMight, orcYields });
+Object.assign(Ecology.prototype, { pickLair, orc, vassalsOf, guardVassals, meetParty, orcYieldsTo, collectTribute, updateVassals, goCollect, checkOrcMouths, orcTargetFrom, orcWary, partyMight, orcYields });
