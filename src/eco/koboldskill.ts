@@ -11,7 +11,7 @@
  *   （打ってきた相手として覚えさせると、逃げても追って射かけ、16シード×25日で、冒険者に倒されるコボルトが116→516匹、
  *    コボルトが画面にいる割合が63.9→54.0%に減り、住みついた群れの減ったオークも来る数が572→444に減った）。
  *   焚き火で野営している一行に当たれば、一行が飛び起きる（src/eco/night.ts の campHit）。起きているあいだに STONED_LEAVE 回当てられたら、
- *   起きている期間が終わったところで、焚き火を消して発つ（src/eco/night.ts の campWatch）。
+ *   その場で焚き火を消して発つ（起きている期間が終わるのを待つと、当たるたびに期間が延び、seed7 では10回以上当てられてから発っていた）。
  *   （はじめは野営の一行が当てられても気づかず、住処のそばで野営されると、出入りのたびに逃げては戻って投げ、seed7 では盗賊1人に6分ほどで59回当たっていた）
  *   使ったあと30秒は投げない（そのあいだに一行に出会えば、今までどおり、すぐに逃げる）。
  *   投げるのも当たるのも静かで、物音は立てない
@@ -149,6 +149,10 @@ export function stoneLands(this: Ecology, a: Cr, v: { x: number; y: number; r: n
     if (p && (p.camp ?? -1) >= 0) {
       this.campHit(o, a);
       p.stoned = (p.stoned ?? 0) + 1;
+      if (p.stoned >= STONED_LEAVE) {
+        this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'campBreak', how: 'stoned', x: Math.round(o.x), y: Math.round(o.y) } as never);
+        this.endCamp(p);
+      }
     }
     // 溜めていた技が止まる（src/eco/adventurer.ts で、溜めの途中で打たれたときと同じ。魔法使いの呪文は散って消える）
     if (o.act === 2 && o.actT < 0) {
