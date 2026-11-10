@@ -1,5 +1,6 @@
 /** Ecology のメソッド：生き物の更新1回（step。src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
+import { BONE_CAP, BONE_KINDS, ZOMBIE_KINDS } from './undead';
 import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
@@ -74,6 +75,11 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
     // ヴァンパイアの霧の歩みの一撃のあとは、深手で逃げる処理より先に、霧になって元の暗がりへ戻る（src/eco/vampskill.ts）
     // （逃げる処理が先だと、背後に現れた直後に一行に打ち返されて逃げに切り替わり、戻れずに倒されていた）
     if (c.k === Kind.Vampire && c.run === -4 && this.vampSkill(c)) {
+      this.metabolism(c);
+      continue;
+    }
+    // アンデッドの起き上がりと、スケルトンがリッチに変わる間（src/eco/undead.ts）
+    if ((c.k === Kind.Skeleton || c.k === Kind.Zombie || c.k === Kind.Lich) && (c.st === 10 || c.st === 11) && this.undeadRise(c)) {
       this.metabolism(c);
       continue;
     }
@@ -279,6 +285,15 @@ export function decay(this: Ecology, c: Cr): void {
       return;
     }
   }
+  // 冒険者のほかの人型（ゴブリン・コボルト・オーク・ドワーフ・リザードマン）の亡骸も、骨になったあと、死者の多い暗い所で起き上がる（src/eco/undead.ts の raiseBones）
+  if (BONE_KINDS.includes(c.k) && stage === 2 && c.actT > 1500 && this.step % 50 === c.id % 50 && this.counts[Kind.Skeleton] < BONE_CAP) {
+    const k = this.tileOf(c.x, c.y);
+    const lichNear = this.lichNear(c.x, c.y);
+    if (k >= 0 && this.lit(k, this.day) < 0.15 && this.manaAround(k) >= 8 && (this.deathsAt(c.x, c.y) >= 300 || lichNear) && ih(c.id, this.step, 141) % (lichNear ? 6 : 30) === 0) {
+      this.raiseBones(c);
+      return;
+    }
+  }
   // 暗く湿った所で、スライムに見つからずに残った死骸は、ゾンビとして起き上がることがある（リッチのそばではずっと起き上がりやすい）
   // 骨の竜：成竜の亡骸が、マナの濃い暗がりでゲーム内の半日ほど眠ったあと、骨の竜として起き上がる
   if (c.k === Kind.Dragon && c.sp >= 2 && c.elite !== 8 && c.actT > DAY_TICKS_ECO / 4 && this.step % 50 === c.id % 50) {
@@ -299,7 +314,8 @@ export function decay(this: Ecology, c: Cr): void {
       return;
     }
   }
-  if ((c.k === Kind.Rat || c.k === Kind.Lizard) && stage < 2 && c.actT > 500 && c.ref === 0) {
+  // 大ネズミ・大トカゲのほか、人型（ゴブリン・コボルト・オーク・リザードマン）のまだ肉のある亡骸も（ZOMBIE_KINDS）。肉が尽きると骨に戻り、骨はまたスケルトンとして起き上がりうる
+  if (ZOMBIE_KINDS.includes(c.k) && stage < 2 && c.actT > 500 && c.ref === 0) {
     const k = this.tileOf(c.x, c.y);
     const boost = this.step % 50 === c.id % 50 && this.lichNear(c.x, c.y);
     if (k >= 0 && this.lit(k, this.day) < 0.15 && this.manaAround(k) >= 10 && (this.w.moist[k] >= 70 || boost) && ih(c.id, this.step, 51) % (boost ? 8 : 800) === 0) {
@@ -313,6 +329,10 @@ export function decay(this: Ecology, c: Cr): void {
       c.actT = 0;
       c.hungry = 0;
       c.glow = 0;
+      c.party = 0;
+      c.torch = 0;
+      c.hp = -1;
+      this.startRise(c, c.sp);
     }
   }
 }

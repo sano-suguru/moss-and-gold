@@ -1,4 +1,4 @@
-import { fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, vampMist, livingArmor, heroSprite, heroBed, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
+import { beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, vampMist, livingArmor, heroSprite, heroBed, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -351,6 +351,10 @@ export function buildAtlas(): Atlas {
   const NAMED: [string, number, (d: string, a: string, f: number, v: number) => RawFrame][] = [
     ['zrat', 1, (d, a, f) => zrat(d, a, f) as RawFrame],
     ['zlizard', 1, (d, a, f) => zlizard(d, a, f) as RawFrame],
+    ['zgoblin', 1, (d, a, f) => zgoblin(d, a, f) as RawFrame],
+    ['zkobold', 1, (d, a, f) => zkobold(d, a, f) as RawFrame],
+    ['zorc', 1, (d, a, f) => zorc(d, a, f) as RawFrame],
+    ['zlizardman', 1, (d, a, f) => zlizardman(d, a, f) as RawFrame],
     ['slime', 3, (d, a, f, v) => slime(d, a, f, [0.55, 0.78, 1][v]) as RawFrame],
     ['ghost', 1, (d, a, f) => ghost(d, a, f) as RawFrame],
     ['myconid', 1, (d, a, f) => myconid(d, a, f) as RawFrame],
@@ -373,6 +377,7 @@ export function buildAtlas(): Atlas {
     // スケルトン：v = 0 素手、1 戦士、2 盗賊、3 僧侶、4 狩人、5 吟遊詩人、6 竜殺しの装備
     ['skel', 7, (d, a, f, v) => skeleton(['none', 'warrior', 'thief', 'priest', 'hunter', 'bard', 'slayer'][v], d, a, f) as RawFrame],
     ['lich', 1, (d, a, f) => lich(d, a, f) as RawFrame],
+    ['bskel', 5, (d, a, f, v) => beastSkeleton(BSKEL_KINDS[v], d, a, f) as RawFrame],
     // リビングアーマー：宙に浮く胸当てと冑（武具は描画のときに重ねる。src/creatureView.ts）
     ['armor', 1, (d, a, f) => livingArmor(d, a, f) as RawFrame],
     ['pup', 1, (d, a, f) => ratPup(d, a, f) as RawFrame],
@@ -637,6 +642,9 @@ export function buildAtlas(): Atlas {
   // リビングアーマー：武器の大振りの軌跡（16方向×6コマ）と、盾の体当たりの光の壁（16方向×4コマ）
   for (let d = 0; d < 16; d++) for (let f = 0; f < 6; f++) addFx(`asweep:${d}:${f}`, fxArmorSweep(d, f) as RawFrame);
   for (let d = 0; d < 16; d++) for (let f = 0; f < 4; f++) addFx(`swall:${d}:${f}`, fxShieldWall(d, f) as RawFrame);
+  // アンデッド：スケルトンがリッチに変わる光の柱（6コマ）、リビングアーマーが砕け散る破片（6種）
+  for (let f = 0; f < 6; f++) addFx(`lpillar:${f}`, fxLichPillar(f) as RawFrame);
+  for (let v = 0; v < 6; v++) addFx(`shard:${v}`, fxShard(v) as RawFrame);
   // ゴーレム：振り下ろしの衝撃（6コマ）、符文（4種）
   for (let f = 0; f < 6; f++) addFx(`gslam:${f}`, fxGolemSlam(f) as RawFrame);
   for (let f = 0; f < 4; f++) addFx(`rune:${f}`, fxRuneGlow(f) as RawFrame);
