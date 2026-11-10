@@ -188,6 +188,8 @@ export interface Party {
   /** 焚き火の夜（src/eco/night.ts）：起こされて構えている期間の終わり（step 番号。0 なら眠っている）、起きたときの人数、気づいた敵のいた所 */
   wakeT?: number;
   wakeN?: number;
+  /** 野営の一行が、起きているあいだにコボルトのスリングの小石を当てられた回数（src/eco/koboldskill.ts） */
+  stoned?: number;
   wakeX?: number;
   wakeY?: number;
   /** 焚き火を囲みはじめた step 番号（焚き火が細るのを決める。src/eco/night.ts の campFire） */

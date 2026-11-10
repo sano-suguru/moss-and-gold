@@ -938,6 +938,7 @@ export function endCamp(this: Ecology, p: Party): void {
   }
   p.camp = -1;
   p.fatigue = 0;
+  p.stoned = 0;
   p.lastCamp = this.step;
 }
 
