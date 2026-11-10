@@ -2,7 +2,7 @@ import type { Atlas } from './atlas';
 import { BLOOD, Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
 import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
-import { RANK_AT, packLook, unpackLook } from './eco/roster';
+import { CRUMBLING, KIN_STOP, RANK_AT, packLook, unpackLook } from './eco/roster';
 import { SKILL_WIZARD_MISSILE } from './eco/skill';
 import { SKILL_VAMP_MIST } from './eco/vampskill';
 import { SKILL_ORC_ROAR } from './eco/orcskill';
@@ -959,6 +959,16 @@ export class CreatureView {
           // 幼竜の煙の息の練習：口元から灰色の煙の塊がふわりと出る
           if (once) for (let i = 0; i < 4; i++) this.bits.push({ x: r.dx + ux * i * 2, y: r.dy, z: 10 + i, vx: ux * 0.5 + (i - 1.5) * 0.1, vy: 0, vz: 0.25, kind: 1, col: 0, t0: now, life: 16 });
           break;
+        case 'bless': {
+          // 僧侶に清められた骨が崩れる（src/eco/roster.ts の blessCrumble）：骨の形の金の光が地面に満ち、金の光の粒になって立ちのぼり、細って消える。
+          // 足もとに金の輪が一度広がり、聖印の光が一つ昇る
+          const f = Math.floor(age / 5);
+          if (f < 8) push(r.dx, r.dy + 0.05, 0, false, A.fx(`bdust:${r.size}:${f}`), 0, 4);
+          if (age < 12) push(r.dx, r.dy + 2, 1, false, A.fx(`ring:${Math.min(1, r.size)}:1:${f6(Math.floor(age / 2))}`), 0, 4);
+          if (age < 30) push(r.dx, r.dy, 14 + age * 0.9, false, A.pray(1 + Math.min(2, Math.floor(age / 10))), 0, 4);
+          if (age < 36) dyn.push({ x: r.dx, y: r.dy - 8 - age * 0.3, r: 46 - age * 0.6, i: 0.6 * damp * (1 - age / 36), c: 1 });
+          break;
+        }
         case 'grow':
           // 竜が育った瞬間：紫のマナの光が集まって弾け、古い鱗がはがれ落ちる
           if (age < 6) push(r.dx, r.dy, 16, false, A.fx(`blast:2:4:${f6(5 - age)}`), 0, 4);
@@ -2088,6 +2098,18 @@ export class CreatureView {
         const ph = (t * 0.2 + c.id * 0.37) % 1;
         if (ph < 0.45) pushSprite(x, yy, 6 + ph * 40, false, A.pray(1 + Math.min(2, Math.floor(ph * 6.7))), 0, 2);
       }
+      // 清められて崩れる前の骨：祈る間にだんだん金色に光り（シェーダーの kind 7）、金の粒が立ちのぼりはじめる。
+      // 祈りの終わりに金の光の粒になって崩れる（drawAttacks の 'bless'。src/eco/roster.ts の blessBrace・blessCrumble）
+      let holy = 0;
+      if (isCorpse && c.st === CRUMBLING) {
+        holy = Math.min(1, Math.max(0.05, (eco.step - c.lureAt) / KIN_STOP));
+        dyn.push({ x, y: yy - 6, r: 18 + 22 * holy, i: 0.15 + 0.4 * holy, c: 1 });
+        const n = 1 + Math.floor(holy * 4);
+        for (let i = 0; i < n; i++) {
+          const ph = (t * 0.6 + i / n + c.id * 0.21) % 1;
+          pushSprite(x + Math.sin(i * 2.3 + c.id) * 6 * (1 - ph * 0.4), yy + 0.05, 2 + ph * (12 + 14 * holy), false, A.fx(`gmote:${Math.min(3, Math.floor(ph * 4))}`), 0, 4);
+        }
+      }
       let glow = c.glow / 255;
       // リビングアーマーの冑の覗き穴の光：マナが十分なら灯り続け、少なくなるとちらつく（描画専用）
       if (sp === Kind.Armor && !c.dead) glow = c.mana < ARMOR_LOW ? ((Math.floor(t * 6) * 7 + c.id * 13) % 5 < 2 ? 0 : 0.3) : 0.8;
@@ -2168,7 +2190,8 @@ export class CreatureView {
       // リビングアーマーの武具（芯の後ろ側の分。手前の分は芯のあと）
       const armorGear = sp === Kind.Armor && !c.dead && veil === 0 ? this.armorGear(eco, A, c, x, yy, lift, t) : null;
       if (armorGear) for (const g of armorGear) if (!g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
-      pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0) + (thrallOf && !hidden && veil !== 2 ? 6 : 0), (c.id * 0.6180339) % 1);
+      if (holy > 0) pushSprite(x, yy, lift, flip, frame, holy, 7, (c.id * 0.6180339) % 1);
+      else pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0) + (thrallOf && !hidden && veil !== 2 ? 6 : 0), (c.id * 0.6180339) % 1);
       if (armorGear) for (const g of armorGear) if (g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
       // 糸の繭を抱えて食べるクモ：体の手前に繭、巻き始めは白い糸の粒が繭のまわりを回る
       {

@@ -171,6 +171,8 @@ export interface Party {
   passed?: number[];
   /** 立ち止まった墓標（同じ墓標では一度だけ。src/eco/roster.ts） */
   mourned?: number[];
+  /** 冒険者でない亡骸（人型の亡骸と、倒されたアンデッドの残骸）へ、次に僧侶が祈れる step 番号（src/eco/roster.ts の blessBrace） */
+  kinBlessT?: number;
   /** 見かけた竜の場所（生きて帰れば噂になる） */
   dgx?: number;
   dgy?: number;

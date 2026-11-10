@@ -1226,6 +1226,17 @@ void main() {
     if (a8 > 251.5 && a8 < 253.5) a8 = 255.0;
     kind = 1.0;
   }
+  // 僧侶に清められて崩れる前の骨（kind 7）：その姿のまま、明るさに応じて琥珀から白金の色に寄せ、自ら光る（強さは glow。0〜1）
+  float holy = 0.0;
+  if (kind > 6.5 && kind < 7.5) {
+    float l = dot(tx.rgb, vec3(0.3, 0.5, 0.2));
+    float lg = clamp(l * 1.25, 0.0, 1.0);
+    vec3 gold = (lg < 0.8 ? mix(vec3(96.0, 50.0, 14.0), vec3(250.0, 196.0, 84.0), lg / 0.8) : mix(vec3(250.0, 196.0, 84.0), vec3(255.0, 246.0, 196.0), (lg - 0.8) / 0.2)) / 255.0;
+    holy = clamp(glow, 0.0, 1.0);
+    tx.rgb = mix(tx.rgb, gold, holy);
+    glow = 0.0;
+    kind = 1.0;
+  }
   // 石像：その姿のまま石の色に（光る部分も光らない）
   if (kind > 2.5) {
     float l = dot(tx.rgb, vec3(0.3, 0.5, 0.2));
@@ -1308,6 +1319,7 @@ void main() {
       if (!solidPx(l + s)) col += normalize(Ls + 0.001) * 0.42 * min(1.0, lum * 1.6);
     }
   }
+  if (holy > 0.0) col = max(col, tx.rgb * (0.35 + 0.65 * holy) * holy);
   if (fxLit) {
     float lumT = dot(tx.rgb, vec3(0.3, 0.5, 0.2));
     col = max(col, tx.rgb * (lumT > 0.75 ? 0.85 : 0.5));

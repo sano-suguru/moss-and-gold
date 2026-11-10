@@ -5192,6 +5192,52 @@ function fxLichPillar(f){
  });
  return {...fr,ax:cx,ay:by};
 }
+/**
+ * 僧侶に清められた骨が崩れる：size 0 小（ゴブリン・コボルト）、1 中、2 大（オーク・リッチ）、f 0〜7。足もとが地面。
+ *   0 骨の形の金の光が地面に満ちて、粒がはがれはじめる、1・2 光の塊がしぼみ、粒が立ちのぼる、3〜7 粒が広がりながら昇り、細って消える。
+ * 粒は白 → 淡い金 → 金 → 琥珀の順に暗くなり、縁取りは置かない（光の粒に暗い縁が残らないように）
+ */
+function fxBoneDust(size,f){
+ const S=16,W=S*2+1,H=44,by=40,fr=blank(W,H);
+ const hw=[5,7,9][size],N=14+size*5;
+ const hs=(i,k)=>{const v=Math.sin(i*12.9898+k*78.233)*43758.5453;return v-Math.floor(v)};
+ const gs=[];
+ for(let i=0;i<N;i++){
+  const h1=hs(i,1),h2=hs(i,2),h3=hs(i,3);
+  if(f>=3&&h3*5<f-2.5)continue;                     // 終わりにかけて粒が一つずつ消える
+  const x0=(h1*2-1)*hw,y0=-h2*2.4;
+  const x=x0*(1+f*0.1)+(h2-0.5)*f*1.8;
+  const y=y0-f*(0.9+h3*2.8)-f*f*0.1;
+  const r=[1.45,1.3,1.15,1.05,0.95,0.85,0.75,0.65][f];
+  gs.push([x,y,r]);
+ }
+ const base=[0,0,0,1,1,1,2,2][f];
+ const pw=hw*[1.05,0.8,0.5][f]||0,ph=[2.6,2,1.3][f]||0,pb=[0,0,1][f];
+ aaDraw(fr,S,by,GOLDL,f<=5?2:1,(x,y)=>{
+  let best=-1;
+  if(f<3){const d=Math.hypot(x/pw,(y+1)/ph);if(d<=1)best=Math.min(3,(d<0.45?0:d<0.8?1:2)+pb)}
+  for(const [gx,gy,r] of gs){
+   const d=Math.hypot(x-gx,y-gy)/r;
+   if(d>1)continue;
+   const i=Math.min(3,d<0.5?base:base+1);
+   if(best<0||i<best)best=i;
+  }
+  return best;
+ },false);
+ return {...fr,ax:S,ay:by};
+}
+/** 清められて崩れる前の骨から立ちのぼる金の粒：f 0〜3（0 きらめく十字、1 丸い粒、2・3 細って暗くなる）。光る */
+function fxGoldMote(f){
+ const S=3,W=7,H=7,fr=blank(W,H);
+ aaDraw(fr,S,S,GOLDL,2,(x,y)=>{
+  const d=Math.hypot(x,y);
+  if(f===0){if(d<0.9)return 0;if((Math.abs(x)<0.45&&Math.abs(y)<2.8)||(Math.abs(y)<0.45&&Math.abs(x)<2.8))return 1;return -1}
+  const r=[0,1.5,1.15,0.85][f];
+  if(d>r)return -1;
+  return Math.min(4,(d<r*0.5?0:1)+f-1);
+ },false);
+ return {...fr,ax:S,ay:S};
+}
 /** 鉄の破片（リビングアーマーが砕け散る）：白い光 → 明るい鉄 → 鉄 → 暗い鉄 → 縁取り */
 const SHARDL=[[250,252,255],[200,208,222],[146,154,170],[96,102,118],[58,62,74],[24,24,30]];
 /** 砕けた武具の破片：v 0〜5（形と向きの違う、とがった小さな鉄の欠片。光の当たる縁が白くきらめく） */
@@ -5776,4 +5822,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

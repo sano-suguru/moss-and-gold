@@ -250,6 +250,18 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 冒険者でない亡骸を清める：僧侶のいる一行が、起き上がりうる所の人型の亡骸か、倒されたアンデッドの残骸の前で祈る。骨は祈りの終わりに金の光の粒になって崩れる
+    // （src/eco/roster.ts の blessBrace・blessCrumble）。どのシードで起きるかは展開で変わるので、15シードの合計で見る
+    // （main の10日目から実行した10〜18日目の8シードで、人型の亡骸15回・残骸12回、8シード中7シードで起きた）
+    name: '僧侶が人型の亡骸かアンデッドの残骸を清め、骨が金の粒に崩れる（15シードの合計で清め5回・崩れる3回以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 25 && (x.ev === 'blessKin' || x.ev === 'blessUndead')).length);
+      const cr = rs.map((r) => r.settle.filter((x) => x.ev === 'crumble').length);
+      return { ok: sum(n) >= 5 && sum(cr) >= 3, value: `清め ${sum(n)}（${n.filter((v) => v > 0).length}シード）、崩れる ${sum(cr)}（${cr.filter((v) => v > 0).length}シード）` };
+    },
+  },
+  {
     // 戦利品を担いで帰る：目標を果たした一行が、倒した相手にちなむ戦利品を手に入れる
     name: '目標を果たした一行が戦利品を手に入れる（4シードで1回以上）',
     ...RUN_A,
