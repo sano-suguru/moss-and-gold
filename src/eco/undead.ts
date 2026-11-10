@@ -5,6 +5,111 @@ import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
 
+/**
+ * 骨になって起き上がる人型（冒険者のほか）。ゴブリン・コボルト・オーク・ドワーフ・リザードマンの亡骸も、暗く死者の多い所で骨になったあと、
+ * 骨が寄り集まって起き上がる（以前は冒険者の亡骸だけが起き上がり、冒険者が倒れにくくなると、アンデッドの場面がまとめて減った）。
+ * 冒険者以外のスケルトンは、sp に BONE_SP + 生前の種を持つ（強さと骨の大きさが生前の種で決まる。src/eco/combat.ts の str、src/sprites.ts の beastSkeleton）
+ */
+export const BONE_KINDS: number[] = [Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Dwarf, Kind.Lizardman];
+export const BONE_SP = 100;
+/** 冒険者以外の亡骸から起き上がるスケルトンの数の上限（冒険者の亡骸から起き上がる分を含めた、スケルトン全体の数で見る） */
+export const BONE_CAP = 6;
+/** まだ肉のある亡骸がゾンビとして起き上がる種 */
+export const ZOMBIE_KINDS: number[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Lizardman];
+/**
+ * 人型の亡骸が起き上がるのに要る足もとのマナ（まわり9マスの平均）。亡骸の多くは、マナの薄い所（6シードの12・16・20日目で、中央値1・4分の3が2以下）にあるので、
+ * 冒険者の亡骸（6）や獣のゾンビ（10）より低くする（8では、16シード×8日で4シードでしか起き上がらず、ゾンビは一度も起き上がらなかった）
+ */
+export const KIN_RISE_MANA = 2;
+/** 人型のゾンビの数の上限（ゴブリンやコボルトの亡骸は多いので、増えすぎないように） */
+export const KIN_ZOMBIE_CAP = 4;
+/** ゾンビとして起き上がる人型 */
+export const KIN_ZOMBIES: number[] = [Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Lizardman];
+/** 起き上がる長さ（生き物の更新の回数。約6秒）：そのあいだ、その場で骨が寄り集まる（ゾンビは亡骸がひきつって身を起こす）。st 10 */
+export const RISE_N = 30;
+/**
+ * リッチへの変化：足もとの土のマナがこれ以上の所にいるスケルトンは、生き物の更新 LICH_SIP_EVERY 回ごとにマナを1吸い、
+ * 体のマナが LICH_MANA に達したら、紫の光の柱に包まれて（LICH_RISE 回の更新。st 11）リッチに変わる（リッチは同時に1体まで）
+ */
+export const LICH_SOIL = 14;
+export const LICH_SIP_EVERY = 10;
+export const LICH_MANA = 40;
+export const LICH_RISE = 40;
+
+/** いる人型のゾンビの数 */
+export function kinZombies(this: Ecology): number {
+  let n = 0;
+  for (const o of this.list) if (o.k === Kind.Zombie && !o.dead && KIN_ZOMBIES.includes(o.sp)) n++;
+  return n;
+}
+
+/** 起き上がりはじめる（スケルトン・ゾンビ・リッチ）：その場で RISE_N 回の更新のあいだ組み上がる */
+export function startRise(this: Ecology, c: Cr, from: number): void {
+  c.st = 10;
+  c.lureAt = this.step;
+  c.act = 0;
+  c.actT = 0;
+  this.record('births', { t: this.w.tick, k: c.k, origin: 'raised', from, x: Math.round(c.x), y: Math.round(c.y) } as never);
+}
+
+/** 人型の骨（冒険者のほか）がスケルトンとして起き上がる */
+export function raiseBones(this: Ecology, c: Cr): void {
+  const orig = c.k;
+  c.k = Kind.Skeleton;
+  c.sp = BONE_SP + orig;
+  c.body = c.units;
+  c.units = 0;
+  c.food = 0;
+  c.dead = 0;
+  c.hungry = 0;
+  c.init = 0;
+  c.party = 0;
+  c.torch = 0;
+  c.mana = 0;
+  c.hp = -1;
+  c.hx = c.x;
+  c.hy = c.y;
+  this.counts[c.k]++;
+  this.startRise(c, orig);
+}
+
+/**
+ * 起き上がりと、リッチへの変化の進み（生き物の更新ごと、ほかの行いより先に）。true ならこの回はこれで終わり。
+ * 起き上がるあいだ（st 10）と、リッチに変わるあいだ（st 11）は、その場で動かない（描画は src/creatureView.ts）
+ */
+export function undeadRise(this: Ecology, c: Cr): boolean {
+  if (c.st === 10) {
+    if (this.step - c.lureAt < RISE_N) {
+      c.act = 0;
+      return true;
+    }
+    c.st = 0;
+    return false;
+  }
+  if (c.st !== 11 || c.k !== Kind.Skeleton) return false;
+  if (this.step - c.lureAt < LICH_RISE) {
+    c.act = 0;
+    return true;
+  }
+  // リッチに変わる（吸ったマナは体に持ったまま。倒れれば土へ還る）
+  const from = c.sp >= BONE_SP ? c.sp - BONE_SP : Kind.Adventurer;
+  this.counts[Kind.Skeleton]--;
+  c.k = Kind.Lich;
+  this.counts[Kind.Lich]++;
+  c.st = 0;
+  c.hx = c.x;
+  c.hy = c.y;
+  c.hp = this.maxHp(c);
+  c.act = 0;
+  c.actT = 0;
+  // 変わった瞬間：紫のマナの光が弾けて輪が広がる（描画は src/creatureView.ts の grow。竜が育つときと同じ）
+  this.fxAttacks.push({ t: this.w.tick, style: 'grow', col: 4, size: 2, ax: c.x, ay: c.y, dx: c.x, dy: c.y, did: -1, aid: c.id, big: true, kill: false });
+  if (this.fxAttacks.length > 160) this.fxAttacks.splice(0, 60);
+  this.log(c.x, c.y, `濃いマナを吸い続けた骨が、{k:${Kind.Lich}}になった`);
+  this.record('settle', { t: this.w.tick, k: Kind.Lich, ev: 'lichRise', id: c.id, n: from, x: Math.round(c.x), y: Math.round(c.y) } as never);
+  return true;
+}
+
 export function addDeath(this: Ecology, x: number, y: number, k: number = -1): void {
   // はかない種（ウィスプ、スライム）の死は、死者の多さに数えない
   if (k === Kind.Wisp || k === Kind.Slime) return;
@@ -226,8 +331,9 @@ export function raiseUndead(this: Ecology, c: Cr, manyDead: boolean): void {
   c.party = 0;
   c.hx = c.x;
   c.hy = c.y;
-  c.st = 0;
+  c.hp = -1;
   this.counts[c.k]++;
+  this.startRise(c, Kind.Adventurer);
 }
 
 export function skeleton(this: Ecology, c: Cr, day: number): void {
@@ -267,6 +373,45 @@ export function skeleton(this: Ecology, c: Cr, day: number): void {
       this.goTo(c, f.x, f.y, s.speed);
     }
     return;
+  }
+  // 濃いマナを吸う：足もとの土のマナが濃い所では、少しずつ吸い、たまったら紫の光の柱に包まれてリッチに変わる（リッチがいないときだけ）
+  if (this.step % LICH_SIP_EVERY === c.id % LICH_SIP_EVERY) {
+    const k = this.tileOf(c.x, c.y);
+    if (k >= 0 && this.manaAround(k) >= LICH_SOIL && this.counts[Kind.Lich] === 0) {
+      this.takeMana(c, k, 1, 1);
+      if (c.mana >= LICH_MANA && !this.list.some((o) => o.k === Kind.Lich && !o.dead)) {
+        c.st = 11;
+        c.lureAt = this.step;
+        c.act = 0;
+        this.record('settle', { t: this.w.tick, k: Kind.Skeleton, ev: 'lichStart', id: c.id, n: c.sp >= BONE_SP ? c.sp - BONE_SP : Kind.Adventurer, x: Math.round(c.x), y: Math.round(c.y) } as never);
+        return;
+      }
+    }
+  }
+  // 骨は濃いマナに惹かれる：ときどき、住みか（さまよう中心）を、まわり12マスの内のマナのより濃い暗がりへ移す
+  if (this.step % 600 === c.id % 600) {
+    const m = this.w.map;
+    const k0 = this.tileOf(c.hx, c.hy);
+    let best = k0 >= 0 ? this.manaAround(k0) + 4 : 0;
+    let bx = c.hx;
+    let by = c.hy;
+    const reg = this.regionOf(this.tileOf(c.x, c.y));
+    for (let i = 0; i < 12; i++) {
+      const h = ih(c.id, this.step, 144 + i);
+      const x = Math.floor(c.x / TILE) + ((h & 31) % 25) - 12;
+      const y = Math.floor(c.y / TILE) + (((h >>> 5) & 31) % 25) - 12;
+      if (x < 1 || y < 1 || x >= m.w - 1 || y >= m.h - 1) continue;
+      const k = y * m.w + x;
+      if (m.solid[k] || m.lava[k] || this.regionOf(k) !== reg || this.lit(k, this.day) > 0.2) continue;
+      const v = this.manaAround(k);
+      if (v > best) {
+        best = v;
+        bx = x * TILE + 8;
+        by = y * TILE + 8;
+      }
+    }
+    c.hx = bx;
+    c.hy = by;
   }
   // 暗がりをさまよう（生まれた場所から離れすぎない）：120回のうち60回、ふつうに近い速さで歩き、残りは立ち止まる。
   // （以前はふつうの速さの0.6倍で歩き、脚を動かしながら3秒で半タイルも進まず、足踏みして見えていた）
@@ -354,6 +499,10 @@ export function scavenge(this: Ecology, c: Cr): boolean {
 
 declare module '../ecology' {
   interface Ecology {
+    startRise: typeof startRise;
+    kinZombies: typeof kinZombies;
+    raiseBones: typeof raiseBones;
+    undeadRise: typeof undeadRise;
     addDeath: typeof addDeath;
     zombie: typeof zombie;
     spawnGhosts: typeof spawnGhosts;
@@ -368,4 +517,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { addDeath, zombie, spawnGhosts, ghost, followOwner, deathsAt, lichNear, raiseUndead, skeleton, lich, scavenge });
+Object.assign(Ecology.prototype, { kinZombies, startRise, raiseBones, undeadRise, addDeath, zombie, spawnGhosts, ghost, followOwner, deathsAt, lichNear, raiseUndead, skeleton, lich, scavenge });

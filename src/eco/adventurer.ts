@@ -4,7 +4,8 @@ import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, 
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
-import { ARMOR_REMNANT, isJobItem } from './armor';
+import { ARMOR_REMNANT, ARMOR_REMNANT_KIN, isJobItem } from './armor';
+import { BONE_SP } from './undead';
 import type { World } from '../world';
 import { SKILL_HUNTER_RAIN, SKILL_PRIEST_HAMMER, SKILL_SLAYER_CLEAVE, SKILL_THIEF_THROW, SKILL_WARRIOR_SLASH, SKILL_WIZARD_MISSILE, type Skill } from './skill';
 import { HP_PER_STR } from './combat';
@@ -1013,19 +1014,29 @@ export function dropBelongings(this: Ecology, c: Cr): void {
     this.scatterArmor(c);
     return;
   }
-  // ドワーフの戦士と鍛冶屋は、手の武器（床の道具では鎚矛として扱う）を落とす。坑夫のつるはしは武器ではないので落とさない。
-  // 未練は宿らない（宿るのは冒険者の道具だけ。src/eco/armor.ts）
+  // ドワーフの戦士と鍛冶屋は、手の武器（床の道具では鎚矛として扱う）を落とし、戦士は盾も落とす。坑夫のつるはしは武器ではないので落とさない。
+  // 冒険者と同じく、持ち主の未練としてマナが宿る（新しいマナの湧き口。リビングアーマーの材料になる。src/eco/armor.ts）
   if (c.k === Kind.Dwarf) {
-    if (c.sp === 1 || c.sp === 2) this.dropItem(c.x + 3, c.y + 2, ItemKind.Mace, 0, this.ownerNote(c, 'fell'));
+    const kinds = c.sp === 2 ? [ItemKind.Mace, ItemKind.Shield] : c.sp === 1 ? [ItemKind.Mace] : [];
+    kinds.forEach((kd, i) => {
+      this.w.manaBorn += ARMOR_REMNANT;
+      this.dropItem(c.x + 3 - i * 7, c.y + 2 - i * 2, kd, ARMOR_REMNANT, this.ownerNote(c, 'fell'));
+    });
     return;
   }
-  if (c.k === Kind.Skeleton && c.init) {
+  // （冒険者のほかの人型の骨（sp = BONE_SP + 生前の種）は、職業の道具を持たない。src/eco/undead.ts の raiseBones）
+  if (c.k === Kind.Skeleton && c.init && c.sp < BONE_SP) {
     this.dropJobItems(c);
     c.init = 0;
     return;
   }
   if (c.k === Kind.Goblin || c.k === Kind.Orc) {
-    if (c.party) this.dropItem(c.x, c.y, c.party, 0, n);
+    // 拾って持っていた武器には、拾い物の未練（冒険者の半分）が宿る（src/eco/armor.ts）
+    if (c.party) {
+      const rem = isJobItem(c.party) ? ARMOR_REMNANT_KIN : 0;
+      this.w.manaBorn += rem;
+      this.dropItem(c.x, c.y, c.party, rem, n);
+    }
     if (c.torch > 0) this.dropItem(c.x + 3, c.y, ItemKind.Torch, c.torch, n);
     else if (c.torch < 0) this.dropItem(c.x + 3, c.y, ItemKind.Stub, 0, n);
     c.party = 0;

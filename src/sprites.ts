@@ -428,6 +428,11 @@ function rotFrame(fr,rot,seed,eyes){
 }
 function zrat(dir,act,f){return rotFrame(rat(dir,act,f),0.12,7,true)}
 function zlizard(dir,act,f){return rotFrame(lizard(dir,act,f),0.12,11,true)}
+/** 人型のゾンビ（src/eco/step.ts の decay）：生前の姿のまま、くすんだ緑の肌と剥がれた皮 */
+function zgoblin(dir,act,f){return rotFrame(goblin(dir,act,f,0),0.14,13,true)}
+function zkobold(dir,act,f){return rotFrame(kobold(dir,act,f),0.14,17,true)}
+function zorc(dir,act,f){return rotFrame(orc(dir,act,f,0),0.14,19,true)}
+function zlizardman(dir,act,f){return rotFrame(lizardman(dir,act,f),0.14,23,true)}
 // ===== 骨 =====
 function bones(sp){
  const P=[];
@@ -4026,6 +4031,9 @@ function skelHead(helm){return(dir,P,x,y,dead,open,k)=>{
  if(helm==='helm')P.push(PL([[x-3.4*K,y],[x-3.2*K,y-3.2*K],[x,y-4.4*K],[x+3.2*K,y-3.2*K],[x+3.4*K,y]],'mail',2,{ol:1}));
  if(helm==='slayer'){P.push(PL([[x-3.6*K,y-0.2*K],[x-3.4*K,y-3.4*K],[x,y-4.6*K],[x+3.4*K,y-3.4*K],[x+3.6*K,y-0.2*K]],'plate',2,{ol:1}),C(x-3*K,y-2.6*K,x-6*K,y-6*K,0.9*K,'horn'));if(!side)P.push(C(x+3*K,y-2.6*K,x+6*K,y-6*K,0.9*K,'horn'))}
  if(helm==='hood')P.push(PL([[x-3.8*K,y+1.6*K],[x-3.6*K,y-2.6*K],[x,y-4.6*K],[x+3.6*K,y-2.6*K],[x+3.8*K,y+1.6*K],[x+2.6*K,y-1.2*K],[x-2.6*K,y-1.2*K]],'hood',2,{ol:1}));
+ // 獣の骨の頭：鼻づらの長い頭蓋（コボルト・リザードマン）、下顎から牙の伸びる頭蓋（オーク）
+ if(helm==='snout'){if(side)P.push(PL([[x+1.8*K,y-0.6*K],[x+5.6*K,y+0.6*K],[x+5.4*K,y+2*K],[x+1.6*K,y+2.4*K]],'bone',2,{ol:1}),D(x+5*K,y+1.2*K,RAMP.boot[1]));else if(!back)P.push(E(x,y+2.4*K,1.6*K,1.2*K,'bone',{ol:1}),D(x-0.5*K,y+2.4*K,RAMP.boot[1]),D(x+0.5*K,y+2.4*K,RAMP.boot[1]))}
+ if(helm==='tusk'&&!back){const tx=side?[x+2.8*K]:[x-1.8*K,x+1.8*K];tx.forEach(t=>P.push(D(t,y+2.6*K,COL.white),D(t,y+1.8*K,COL.white)))}
  if(helm==='crown'){P.push(PL([[x-3*K,y-2*K],[x-3*K,y-4.6*K],[x-1.6*K,y-3.4*K],[x,y-5.2*K],[x+1.6*K,y-3.4*K],[x+3*K,y-4.6*K],[x+3*K,y-2*K]],'bardY',2,{ol:1}),D(x,y-3*K,RAMP.gemR[3]))}
 }}
 const SKEYE=[200,120,255];
@@ -4039,6 +4047,22 @@ function skeleton(gear,dir,act,f){
  const fr=humanoid(dir,act,f,{s:1.35,leg:5.2,bw:2.6,bh:3.2,hh:9.2,limb:0.75,skin:'bone',skinD:'bone',cloth:'bone',head:skelHead(g.helm),tool:g.tool||null,off:g.off||null,pad:g.pad||null,decor:ribs});
  // 眼窩の奥の小さな光
  return fr;
+}
+/**
+ * 冒険者のほかの人型の骨（src/eco/undead.ts の raiseBones）：生前の種ごとの大きさと頭蓋。kind = goblin|kobold|orc|dwarf|lizardman。
+ * ゴブリンとコボルトは小さく、オークは大きく、ドワーフは低く横に広い（鉄の兜が残る）。コボルトとリザードマンは鼻づらの長い頭蓋に尾の骨
+ */
+const BSKEL_KINDS=['goblin','kobold','orc','dwarf','lizardman'];
+function beastSkeleton(kind,dir,act,f){
+ const base={skin:'bone',skinD:'bone',cloth:'bone',decor:ribs,tool:null,off:null};
+ const o={
+  goblin:{s:1.0,leg:4.4,bw:2.2,bh:2.6,hh:7.6,limb:0.7,head:skelHead(null)},
+  kobold:{s:0.95,leg:4,bw:2.4,bh:2.6,hh:7.8,limb:0.7,head:skelHead('snout'),tail:3,tailR:0.6},
+  orc:{s:1.6,leg:5,bw:3.2,bh:3.4,hh:9,limb:0.85,head:skelHead('tusk')},
+  dwarf:{s:1.15,leg:3.6,bw:3.2,bh:3,hh:8.2,limb:0.85,head:skelHead('helm')},
+  lizardman:{s:1.3,leg:5.2,bw:2.6,bh:3.2,hh:8.6,limb:0.75,head:skelHead('snout'),tail:6,tailR:0.8},
+ }[kind];
+ return humanoid(dir,act,f,{...base,...o});
 }
 function lichCape(dir,P,cx,sh,hip,feet,q,mv,k){
  const sw=mv?[-1,0,1,0][q]:0,L=dir==='side'?-3.8*k:-4.4*k,Rr=dir==='side'?3.4*k:4.4*k;
@@ -5143,6 +5167,41 @@ function fxRuneGlow(f){
  for(let y=0;y<5;y++)for(let x=0;x<5;x++)if(P[y][x]==='#')setPx(fr,x+1,y+1,RUNEL[(x+y)%3===0?0:1],true);
  return {...fr,ax:3,ay:3};
 }
+/**
+ * スケルトンがリッチに変わるときの紫の光の柱：f 0〜5（0・1 細く立ちのぼる、2・3 太く満ちる、4・5 細って消える）。
+ * 足もとが太く、上へ細くなる柱。芯が白く光り、縁へ向かって紫から藍へ。上の端はちぎれて揺らめく（描画は src/creatureView.ts の st 11）
+ */
+function fxLichPillar(f){
+ const W=19,H=49,fr=blank(W,H),cx=9,by=46;
+ const w0=[2.2,3.4,5.2,5.6,3.6,2][f],top=[30,40,44,44,40,34][f],shade=[1,0,0,0,1,2][f];
+ aaDraw(fr,cx,by,PURPL,f<=4?2:1,(x,y)=>{
+  const h=-y;                                 // 足もとからの高さ
+  if(h<-1.5||h>top)return -1;
+  const t=Math.max(0,h)/top;
+  const wob=Math.sin(h*0.45+f*1.7)*0.8*t;
+  let w=w0*(1-0.55*t)+(h<2?1.4*(1-Math.max(0,h)/2):0);
+  if(t>0.8&&Math.floor(h/2.5+f)%2===1)w*=0.4;  // 上の端はちぎれる
+  const r=Math.abs(x-wob)/Math.max(0.6,w);
+  if(r>1)return -1;
+  return Math.min(4,(r<0.3?0:r<0.6?1:r<0.85?2:3)+shade+(t>0.85?1:0));
+ });
+ return {...fr,ax:cx,ay:by};
+}
+/** 鉄の破片（リビングアーマーが砕け散る）：白い光 → 明るい鉄 → 鉄 → 暗い鉄 → 縁取り */
+const SHARDL=[[250,252,255],[200,208,222],[146,154,170],[96,102,118],[58,62,74],[24,24,30]];
+/** 砕けた武具の破片：v 0〜5（形と向きの違う、とがった小さな鉄の欠片。光の当たる縁が白くきらめく） */
+function fxShard(v){
+ const S=5,W=11,H=11,fr=blank(W,H);
+ const a=v*1.05+0.4,ca=Math.cos(a),sa=Math.sin(a),L=[4.2,3.4,4.8,3,4,3.6][v],w=[1.6,2,1.3,2.2,1.5,1.8][v];
+ aaDraw(fr,S,S,SHARDL,0,(x,y)=>{
+  const u=x*ca+y*sa,t=-x*sa+y*ca;
+  if(u<-L*0.6||u>L)return -1;
+  const half=u<0?w*(1+u/(L*0.6)):w*(1-u/L);   // 菱形のとがった欠片
+  if(Math.abs(t)>half)return -1;
+  return t<-half*0.4?0:t<half*0.3?2:3;
+ });
+ return {...fr,ax:S,ay:S};
+}
 /** 未練の青白い光（リビングアーマーの技）：白 → 淡い青白 → 青白 → くすんだ青 → 深い藍 → 縁取り */
 const GHOSTL=[[244,250,255],[196,226,250],[140,184,230],[92,128,186],[56,74,130],[26,32,64]];
 /** リビングアーマーの武器の大振りの軌跡の一片（ミノタウロスの斧と同じ形を、未練の青白い光で） */
@@ -5603,4 +5662,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

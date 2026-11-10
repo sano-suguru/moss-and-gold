@@ -5,6 +5,7 @@ import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor'
 import { RANK_AT, packLook, unpackLook } from './eco/roster';
 import { SKILL_WIZARD_MISSILE } from './eco/skill';
 import { SKILL_VAMP_MIST } from './eco/vampskill';
+import { BONE_KINDS, BONE_SP, LICH_RISE, RISE_N } from './eco/undead';
 import { HOP_DT, HOP_N, hopAt } from './eco/charge';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
@@ -844,6 +845,27 @@ export class CreatureView {
           }
           break;
         }
+        case 'armorshatter': {
+          // リビングアーマーが砕け散る（src/eco/armor.ts の scatterArmor）：武具の鉄の破片が回りながら外へ飛び散って床に落ち、青白い未練が立ちのぼって消える。
+          // 砕けた武具は床に残らない（次の甲冑の材料にならない）
+          if (age >= 26) break;
+          const n = (r.n ?? 3) * 3;
+          for (let i = 0; i < n; i++) {
+            const a = i * 2.399 + (r.aid % 7);
+            const sp2 = 10 + ((i * 37 + r.aid) % 14);
+            const g = Math.min(1, age / 14);
+            const e = 1 - (1 - g) * (1 - g);
+            const z = lift + 6 + Math.sin(g * Math.PI) * (8 + (i % 4) * 3) - g * (lift + 4);
+            if (age > 20 && (i + age) % 3 === 0) continue;
+            push(r.ax + Math.cos(a) * sp2 * e, r.ay + Math.sin(a) * sp2 * e * 0.6, Math.max(0, z), false, A.fx(`shard:${(i + Math.floor(age / 2) * (g < 1 ? 1 : 0)) % 6}`), 0, 4);
+          }
+          for (let i = 0; i < 5; i++) {
+            const ph = (age / 26 + i * 0.13) % 1;
+            push(r.ax + Math.sin(i * 2.1 + age * 0.2) * 6, r.ay + 0.05, 4 + ph * 26, false, A.fx(`bit:4:7:${Math.min(3, Math.floor(ph * 4))}`), 0, 4);
+          }
+          if (age < 6) dyn.push({ x: r.ax, y: r.ay - 10, r: 40, i: 0.45 * damp * (1 - age / 6), c: 7 });
+          break;
+        }
         case 'breath':
           break;
         case 'puff':
@@ -1038,7 +1060,7 @@ export class CreatureView {
     const A = this.atlas;
     switch (sp) {
       case Kind.Slime: return A.named('slime', dir, act, f, v);
-      case Kind.Zombie: return A.named(orig === Kind.Lizard ? 'zlizard' : 'zrat', dir, act, f);
+      case Kind.Zombie: return A.named(orig === Kind.Lizard ? 'zlizard' : orig === Kind.Goblin ? 'zgoblin' : orig === Kind.Kobold ? 'zkobold' : orig === Kind.Orc ? 'zorc' : orig === Kind.Lizardman ? 'zlizardman' : 'zrat', dir, act, f);
       case Kind.Ghost: return A.named('ghost', dir, act, f);
       case Kind.Myconid: return A.named('myconid', dir, act, f);
       case Kind.Ant: return A.named('ant', dir, act, f, v);
@@ -1059,7 +1081,8 @@ export class CreatureView {
       case Kind.Dragon: return A.named(['dragonH', 'dragonY', 'dragon', 'dragonB'][Math.min(3, orig)], dir, act, f, v);
       // 姿のわからない冒険者（石像、丸のみにされる獲物など）：職ごとの既定の見た目（orig が職）
       case Kind.Adventurer: return A.hero(orig, false, ADV_DEFAULT_LOOK[orig] ?? ADV_DEFAULT_LOOK[0], ADV_DEFAULT_RANK, dir, act, f);
-      case Kind.Skeleton: return A.named('skel', dir, act, f, v);
+      // 冒険者のほかの人型の骨（sp = BONE_SP + 生前の種。src/eco/undead.ts の raiseBones）は、生前の種ごとの大きさの骨
+      case Kind.Skeleton: return orig >= BONE_SP ? A.named('bskel', dir, act, f, Math.max(0, BONE_KINDS.indexOf(orig - BONE_SP))) : A.named('skel', dir, act, f, v);
       case Kind.Lich: return A.named('lich', dir, act, f);
       case Kind.Dwarf: return A.named('dwarf', dir, act, f, v);
       case Kind.Armor: return A.named('armor', dir, act, f, v);
@@ -1840,6 +1863,37 @@ export class CreatureView {
         if (p < 0.8) veil = 1;
         else if (p < 0.9) veil = 3;
       }
+      // アンデッドの起き上がり（描画専用。st 10 の間。src/eco/undead.ts）：スケルトンは、床の骨が震え、紫のマナの粒が吸い込まれ、半ばで骨が組み上がって立ち上がる。
+      // ゾンビは、まだ肉のある亡骸がひきつり、紫の粒をまとって身を起こす
+      if ((sp === Kind.Skeleton || sp === Kind.Zombie || sp === Kind.Lich) && c.st === 10 && !c.dead) {
+        const p = Math.max(0, Math.min(1, (eco.step - c.lureAt + alpha) / RISE_N));
+        const orig = sp === Kind.Zombie ? c.sp : sp === Kind.Skeleton && c.sp >= BONE_SP ? c.sp - BONE_SP : Kind.Adventurer;
+        if (p < 0.55) {
+          const shake = (Math.floor(t * (6 + p * 30)) % 2 ? 1 : -1) * (0.3 + p * 2.2);
+          pushSprite(x + shake, yy + 1, Math.max(0, p - 0.35) * 14, false, A.corpse(orig, sp === Kind.Zombie ? 0 : 2), 0, 2);
+          veil = 1;
+        } else if (p < 0.68) veil = 3;
+        if (p > 0.08 && p < 0.85)
+          for (let i = 0; i < 7; i++) {
+            const ph = (t * 0.8 + i / 7) % 1;
+            const a = i * 2.4 + t * 2.5;
+            pushSprite(x + Math.cos(a) * 14 * (1 - ph), yy + Math.sin(a) * 6 * (1 - ph) + 0.05, 2 + ph * 10, false, A.manaMote(Math.min(3, Math.floor(ph * 4))), 0, 2);
+          }
+        if (p > 0.4 && p < 0.8) dyn.push({ x, y: yy - 8, r: 30, i: 0.35 * (1 - Math.abs(p - 0.6) / 0.2), c: 2 });
+      }
+      // スケルトンがリッチに変わる（描画専用。st 11 の間）：足もとから紫の光の柱が立ちのぼって骨を包み、マナの粒が渦を巻いて吸い込まれる。柱の満ちる半ばで白く光る
+      if (sp === Kind.Skeleton && c.st === 11 && !c.dead) {
+        const p = Math.max(0, Math.min(1, (eco.step - c.lureAt + alpha) / LICH_RISE));
+        const f6 = Math.min(5, Math.floor(p * 6));
+        pushSprite(x, yy + 0.2, 0, false, A.fx(`lpillar:${f6}`), 0, 4);
+        for (let i = 0; i < 8; i++) {
+          const ph = (t * 1.1 + i / 8) % 1;
+          const a = i * 0.785 + t * 4;
+          pushSprite(x + Math.cos(a) * 16 * (1 - ph), yy + Math.sin(a) * 7 * (1 - ph) + 0.05, 2 + ph * 24, false, A.manaMote(Math.min(3, Math.floor(ph * 4))), 0, 2);
+        }
+        dyn.push({ x, y: yy - 16, r: 40 + 30 * p, i: 0.5 + 0.4 * Math.sin(p * Math.PI), c: 2 });
+        if (p > 0.55 && p < 0.7) veil = 3;
+      }
       if (veil === 1) continue;
       // クモの巣の糸の中：捕まった者はもがいて小刻みに揺れ、足を取られた者は糸を引きずって揺れる。どちらも白い糸がまとわりつく
       if (!c.dead && eco.webs.length && (c.caught || (eco.webEffect(c) === 2 && eco.inWeb(c)))) {
@@ -1889,7 +1943,7 @@ export class CreatureView {
             ? this.atlas.hero(csp, false, adv.look, adv.rank, 0, 3, 3)
             : this.atlas.corpse(sp, 2)
           : this.atlas.hero(csp, !thrallOf && c.torch > 0 && csp !== 1 && csp < 4, adv.look, adv.rank, dir, act, f)
-        : !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : csp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][csp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? csp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
+        : !isCorpse && eliteName ? this.atlas.named(eliteName, dir, act, f, 0) : isCorpse ? this.atlas.corpse(sp === Kind.Zombie ? c.sp : sp, eco.corpseStage(c)) : this.frameOf(sp, c.elite === 8 ? 3 : csp, dir, act, f, bright, sp === Kind.Slime ? eco.slimeSize(c) : sp === Kind.Ant && c.units > 0 ? 1 : sp === Kind.Dragon && c.st === 2 ? 1 : sp === Kind.Skeleton ? (c.init ? [1, 0, 2, 3, 5, 4, 6][csp] : 0) : sp === Kind.Goblin ? (c.torch > 0 ? 2 : c.party ? 1 : 0) : sp === Kind.Orc ? (c.party ? 1 : 0) : sp === Kind.Dwarf ? csp : sp === Kind.Rat && eco.w.tick - c.bornAt < 14400 / 4 ? 1 : 0);
       // 名簿の冒険者の演出（位の光、位が上がったときの光の粒など。src/eco/roster.ts）
       if (adv && !isCorpse) {
         const h = thrallOf ? eco.roster.find((q) => q.cid === c.id) ?? null : eco.heroOf(c);
