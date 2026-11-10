@@ -47,6 +47,8 @@ const SCARE_FLEE = 30;
  *  逃げ場のない獣が噛みつき返す場面が64→891回に増え、コボルトのいる時間が70%→58%に減った）
  */
 const SCARE_R = 1.5 * TILE;
+/** 追い払われない、住みかのそばの広さ（px） */
+const HOME_R = 6 * TILE;
 /** 襲う・追い払うモンスターの強さの上限（これより強い大物は相手にしない） */
 const SCARE_STR = 10;
 /** 魔法と聖なる攻撃でない一打ちが、すり抜ける割合（百分率） */
@@ -61,7 +63,16 @@ const NOT_LIVING = new Set<number>([
 /** ゴーストが襲う生きた者か */
 export function ghostPrey(this: Ecology, o: Cr): boolean {
   if (o.dead || o.away || o.caught || o.sleep > 0 || NOT_LIVING.has(o.k) || this.airborne(o)) return false;
-  return isPerson(o) || (STR[o.k] < SCARE_STR && o.flee <= 0);
+  return isPerson(o) || (STR[o.k] < SCARE_STR && o.flee <= 0 && !nearHome(o));
+}
+
+/**
+ * 住処・集落・巣のそば（HOME_R の内）にいるモンスターは、ゴーストに追い払われない（自分の住みかでは踏みとどまる）。
+ * （住みかのそばでも追い払うと、逃げては住みかへ戻り、また追い払われるのを繰り返し、
+ *  15シードの10〜18日目で、ぶらつくゴブリンの引っかかりが main の2975回から5144回に増えた）
+ */
+function nearHome(o: Cr): boolean {
+  return (o.hx !== 0 || o.hy !== 0) && sq(o.hx - o.x) + sq(o.hy - o.y) < HOME_R * HOME_R;
 }
 
 /** 命のやりとりをする相手（人：冒険者とドワーフ） */
@@ -189,7 +200,7 @@ export function ghostWail(this: Ecology, c: Cr): void {
     if (sq(o.x - c.x) + sq(o.y - c.y) > WAIL_R * WAIL_R || !lineOfSight(m, c.x, c.y, o.x, o.y)) return;
     if (o.torch > 0) o.torch = o.k === Kind.Adventurer ? 1 : -1;
     if (!isPerson(o)) {
-      if (STR[o.k] < SCARE_STR) {
+      if (STR[o.k] < SCARE_STR && !nearHome(o)) {
         scareOff(c, o);
         scared++;
       }
