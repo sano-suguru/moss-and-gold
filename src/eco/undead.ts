@@ -16,6 +16,15 @@ export const BONE_SP = 100;
 export const BONE_CAP = 6;
 /** まだ肉のある亡骸がゾンビとして起き上がる種 */
 export const ZOMBIE_KINDS: number[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Lizardman];
+/**
+ * 人型の亡骸が起き上がるのに要る足もとのマナ（まわり9マスの平均）。亡骸の多くは、マナの薄い所（6シードの12・16・20日目で、中央値1・4分の3が2以下）にあるので、
+ * 冒険者の亡骸（6）や獣のゾンビ（10）より低くする（8では、16シード×8日で4シードでしか起き上がらず、ゾンビは一度も起き上がらなかった）
+ */
+export const KIN_RISE_MANA = 2;
+/** 人型のゾンビの数の上限（ゴブリンやコボルトの亡骸は多いので、増えすぎないように） */
+export const KIN_ZOMBIE_CAP = 4;
+/** ゾンビとして起き上がる人型 */
+export const KIN_ZOMBIES: number[] = [Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Lizardman];
 /** 起き上がる長さ（生き物の更新の回数。約6秒）：そのあいだ、その場で骨が寄り集まる（ゾンビは亡骸がひきつって身を起こす）。st 10 */
 export const RISE_N = 30;
 /**
@@ -26,6 +35,13 @@ export const LICH_SOIL = 14;
 export const LICH_SIP_EVERY = 10;
 export const LICH_MANA = 60;
 export const LICH_RISE = 40;
+
+/** いる人型のゾンビの数 */
+export function kinZombies(this: Ecology): number {
+  let n = 0;
+  for (const o of this.list) if (o.k === Kind.Zombie && !o.dead && KIN_ZOMBIES.includes(o.sp)) n++;
+  return n;
+}
 
 /** 起き上がりはじめる（スケルトン・ゾンビ・リッチ）：その場で RISE_N 回の更新のあいだ組み上がる */
 export function startRise(this: Ecology, c: Cr, from: number): void {
@@ -484,6 +500,7 @@ export function scavenge(this: Ecology, c: Cr): boolean {
 declare module '../ecology' {
   interface Ecology {
     startRise: typeof startRise;
+    kinZombies: typeof kinZombies;
     raiseBones: typeof raiseBones;
     undeadRise: typeof undeadRise;
     addDeath: typeof addDeath;
@@ -500,4 +517,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { startRise, raiseBones, undeadRise, addDeath, zombie, spawnGhosts, ghost, followOwner, deathsAt, lichNear, raiseUndead, skeleton, lich, scavenge });
+Object.assign(Ecology.prototype, { kinZombies, startRise, raiseBones, undeadRise, addDeath, zombie, spawnGhosts, ghost, followOwner, deathsAt, lichNear, raiseUndead, skeleton, lich, scavenge });
