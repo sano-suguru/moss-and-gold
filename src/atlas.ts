@@ -1,4 +1,4 @@
-import { fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, vampMist, livingArmor, heroSprite, heroBed, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
+import { fxSlingWhirl, fxSlingStone, fxStoneHit, fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, vampMist, livingArmor, heroSprite, heroBed, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -359,7 +359,8 @@ export function buildAtlas(): Atlas {
     ['ghost', 1, (d, a, f) => ghost(d, a, f) as RawFrame],
     ['myconid', 1, (d, a, f) => myconid(d, a, f) as RawFrame],
     ['ant', 2, (d, a, f, v) => ant(d, a, f, v === 1) as RawFrame],
-    ['kobold', 1, (d, a, f) => kobold(d, a, f) as RawFrame],
+    // コボルト：0 ふだん、1 スリングを掲げた溜めの姿（つるはしを持たない。src/eco/koboldskill.ts）
+    ['kobold', 2, (d, a, f, v) => kobold(d, a, f, v === 1) as RawFrame],
     ['salamander', 1, (d, a, f) => salamander(d, a, f) as RawFrame],
     ['goblin', 3, (d, a, f, v) => goblin(d, a, f, v) as RawFrame],
     ['orc', 3, (d, a, f, v) => orc(d, a, f, v) as RawFrame],
@@ -671,6 +672,10 @@ export function buildAtlas(): Atlas {
   // ゴーレムの跳ねる衝撃波の輪（6コマ）と、散る破片（3種）
   for (let f = 0; f < 6; f++) addFx(`shock:${f}`, fxShockRing(f) as RawFrame);
   for (let v = 0; v < 3; v++) addFx(`pebble:${v}`, fxPebble(v) as RawFrame);
+  // コボルトのスリングの投石（src/eco/koboldskill.ts）
+  for (let f = 0; f < 8; f++) addFx(`slingw:${f}`, fxSlingWhirl(f) as RawFrame);
+  for (let k = 0; k < 3; k++) addFx(`sstone:${k}`, fxSlingStone(k) as RawFrame);
+  for (let f = 0; f < 4; f++) addFx(`stonehit:${f}`, fxStoneHit(f) as RawFrame);
   for (let kind = 0; kind < 5; kind++) for (let col = 0; col < 8; col++) for (let f = 0; f < 4; f++) addFx(`bit:${kind}:${col}:${f}`, fxBit(kind, col, f) as RawFrame);
   for (let v = 0; v < 3; v++) addFx(`crack:${v}`, fxCrack(v) as RawFrame);
   // クモの糸の繭（クモの巣にかかった獲物を巻いたもの）：0 大、1 中、2 小（食べられて細っていく）

@@ -374,6 +374,17 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // コボルトのスリングの投石（src/eco/koboldskill.ts）：冒険者の一行に気づいて逃げ出す前に、振り向いて小石を投げて当てる。15シードの合計で見る
+    name: 'コボルトが逃げ出す前にスリングで小石を投げ、冒険者に当てる（15シードの合計で20回以上・8シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const hit = rs.map((r) => r.settle.filter((x) => x.k === 10 && x.ev === 'stoneHit').length);
+      const thrown = rs.map((r) => r.settle.filter((x) => x.k === 10 && x.ev === 'sling').length);
+      const seeds = hit.filter((v) => v > 0).length;
+      return { ok: sum(hit) >= 20 && seeds >= 8, value: `投げた ${sum(thrown)}、当たった ${sum(hit)}（${seeds}シード）` };
+    },
+  },
+  {
     // アンデッド（src/eco/undead.ts）：冒険者のほかの人型の骨がスケルトンとして、まだ肉のある人型の亡骸がゾンビとして起き上がる。
     // どのシードで起きるかは展開で変わるので、15シードの合計で見る（main の10日目から実行した10〜18日目の8シードで、骨93回・ゾンビ23回）
     name: '人型の骨がスケルトンとして、肉のある亡骸がゾンビとして起き上がる（15シードの合計で骨10回・ゾンビ3回以上）',

@@ -199,6 +199,8 @@ export function kobold(this: Ecology, c: Cr): void {
       const a = adv as Cr;
       const p = this.parties.find((q) => q.id === a.party);
       if ((p ? this.partyStr(p) : this.str(a)) > this.str(c) * 2) {
+        // 逃げ出す前に一度だけ振り向いて、スリングで小石を投げる（溜め終わったら逃げ出す。src/eco/koboldskill.ts）
+        if (this.koboldSlingStart(c, a)) return;
         c.flee = 90 + (ih(c.id, this.step, 232) % 40);
         c.foe = a.id;
         c.lure = 0;

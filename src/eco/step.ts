@@ -131,6 +131,11 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       this.metabolism(c);
       continue;
     }
+    // コボルトのスリングの投石の溜めと、投げたあとに逃げ出すまで（src/eco/koboldskill.ts）
+    if (c.k === Kind.Kobold && c.run === -1 && this.koboldSkill(c)) {
+      this.metabolism(c);
+      continue;
+    }
     if ((c.k === Kind.Orc && this.orcWary(c)) || this.heedAlarm(c) || this.fearFire(c) || this.lurk(c) || this.territory(c) || this.retreatStep(c) || this.shyOfPeople(c)) {
       this.metabolism(c);
       continue;

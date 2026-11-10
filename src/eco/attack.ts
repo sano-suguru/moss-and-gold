@@ -170,6 +170,11 @@ export function resolveVolleys(this: Ecology): void {
       this.silkLands(a, v);
       continue;
     }
+    // コボルトの小石：冒険者にだけ、小さな傷を負わせる（打ってきた相手としては覚えさせない。src/eco/koboldskill.ts の stoneLands）
+    if (a.k === Kind.Kobold) {
+      this.stoneLands(a, v);
+      continue;
+    }
     if (v.d >= 0) {
       const d = this.byId.get(v.d);
       if (!d || d.dead || d.away) continue;
