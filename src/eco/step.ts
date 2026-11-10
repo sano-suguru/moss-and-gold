@@ -5,6 +5,7 @@ import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, 
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { VAMP_SCATTER } from './vampire';
+import { BLESSED, CRUMBLING } from './roster';
 import type { World } from '../world';
 
 export function update(this: Ecology, tick: number, day: number, phase: number): void {
@@ -274,6 +275,8 @@ export function decay(this: Ecology, c: Cr): void {
   }
   // ヴァンパイアの印の付いた亡骸は、眷属として起き上がる（src/eco/thrall.ts）
   if (this.raiseThrall(c)) return;
+  // 僧侶に清められた骨は、祈りの終わりに金の光の粒になって崩れる（src/eco/roster.ts の blessCrumble）
+  if (this.blessCrumble(c)) return;
   // 何もされなければ、死骸はとてもゆっくり朽ちて土に返る。骨はさらに長く残る（ミノタウロスの縄張りの骨は、その4倍。寝床に骨が積もる）
   const stage = this.corpseStage(c);
   const every = stage === 2 ? (this.inLair(c.x, c.y) ? 1600 : 400) : 60;
@@ -286,7 +289,7 @@ export function decay(this: Ecology, c: Cr): void {
     return;
   }
   // 清められていない冒険者の亡骸は、骨になったあと、多くが死んだ暗い所で起き上がる
-  if (c.k === Kind.Adventurer && c.st !== 99 && c.actT > 1500 && this.step % 50 === c.id % 50) {
+  if (c.k === Kind.Adventurer && c.st !== BLESSED && c.actT > 1500 && this.step % 50 === c.id % 50) {
     const k = this.tileOf(c.x, c.y);
     const deaths = this.deathsAt(c.x, c.y);
     const lichNear = this.lichNear(c.x, c.y);
@@ -295,8 +298,10 @@ export function decay(this: Ecology, c: Cr): void {
       return;
     }
   }
-  // 冒険者のほかの人型（ゴブリン・コボルト・オーク・ドワーフ・リザードマン）の亡骸も、骨になったあと、死者の多い暗い所で起き上がる（src/eco/undead.ts の raiseBones）
-  if (BONE_KINDS.includes(c.k) && stage === 2 && c.actT > 1500 && this.step % 50 === c.id % 50 && this.counts[Kind.Skeleton] < BONE_CAP) {
+  // 冒険者のほかの人型（ゴブリン・コボルト・オーク・ドワーフ・リザードマン）の亡骸も、骨になったあと、死者の多い暗い所で起き上がる（src/eco/undead.ts の raiseBones）。
+  // 僧侶に清められた亡骸（src/eco/roster.ts の blessBrace）は起き上がらない
+  const blessed = c.st === BLESSED || c.st === CRUMBLING;
+  if (BONE_KINDS.includes(c.k) && !blessed && stage === 2 && c.actT > 1500 && this.step % 50 === c.id % 50 && this.counts[Kind.Skeleton] < BONE_CAP) {
     const k = this.tileOf(c.x, c.y);
     const lichNear = this.lichNear(c.x, c.y);
     if (k >= 0 && this.lit(k, this.day) < 0.15 && this.manaAround(k) >= KIN_RISE_MANA && (this.deathsAt(c.x, c.y) >= 300 || lichNear) && ih(c.id, this.step, 141) % (lichNear ? 6 : 30) === 0) {
@@ -327,7 +332,7 @@ export function decay(this: Ecology, c: Cr): void {
   // 大ネズミ・大トカゲのほか、人型（ゴブリン・コボルト・オーク・リザードマン）のまだ肉のある亡骸も（ZOMBIE_KINDS）。肉が尽きると骨に戻り、骨はまたスケルトンとして起き上がりうる
   // （人型は、要るマナが KIN_RISE_MANA と低いかわりに、同時に KIN_ZOMBIE_CAP 体まで）
   const kin = KIN_ZOMBIES.includes(c.k);
-  if (ZOMBIE_KINDS.includes(c.k) && stage < 2 && c.actT > 500 && c.ref === 0 && (!kin || this.kinZombies() < KIN_ZOMBIE_CAP)) {
+  if (ZOMBIE_KINDS.includes(c.k) && !blessed && stage < 2 && c.actT > 500 && c.ref === 0 && (!kin || this.kinZombies() < KIN_ZOMBIE_CAP)) {
     const k = this.tileOf(c.x, c.y);
     const boost = this.step % 50 === c.id % 50 && this.lichNear(c.x, c.y);
     if (k >= 0 && this.lit(k, this.day) < 0.15 && this.manaAround(k) >= (kin ? KIN_RISE_MANA : 10) && (this.w.moist[k] >= 70 || boost) && ih(c.id, this.step, 51) % (boost ? 8 : 800) === 0) {

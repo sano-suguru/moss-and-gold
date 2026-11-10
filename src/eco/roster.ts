@@ -15,6 +15,7 @@ import { Cr, Ecology, Job, Kind, Party, STR, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { ADV_NAMES, JOB_NAMES } from '../names';
 import { isJobItem } from './armor';
+import { BONE_KINDS, KIN_RISE_MANA } from './undead';
 
 /** 名簿の一人 */
 export interface Hero {
@@ -79,6 +80,16 @@ const GRAVE_R = 6;
 const BLESS_R = 6;
 /** 一行の先頭から何マス以内に起きている手強い相手がいると、祈らずに通り過ぎるか */
 const BLESS_SAFE = 6;
+/** 清められた亡骸の印（st）：起き上がらず、聖印の光が立ちのぼる */
+export const BLESSED = 99;
+/** 清められて、祈りの終わりに金の光の粒になって崩れる骨の印（st）。祈り始めた step 番号は lureAt */
+export const CRUMBLING = 98;
+/** 冒険者でない亡骸の前で止まる長さ（生き物の更新の回数。冒険者の亡骸の半分）。骨はこの長さのあと崩れる */
+export const KIN_STOP = 30;
+/** 冒険者でない亡骸へ祈る間隔（一行ごと。生き物の更新の回数。600回はゲーム内の約2時間） */
+const KIN_GAP = 600;
+/** 清めると崩れる、倒されたアンデッドの残骸 */
+const BLESS_REMAINS: number[] = [Kind.Skeleton, Kind.Zombie, Kind.Lich];
 
 /** 姿の値：髪 0〜5、肌 0〜3、身につける色 0〜5、体つき 0〜2、頭の形 0〜1、頭の飾り（+1 して 1〜13、0 はまだない）、傷（1 眼帯、2 頭の包帯） */
 export function packLook(hair: number, skin: number, color: number, build: number, head: number, crest = -1, scar = 0): number {
@@ -326,10 +337,19 @@ export function graveBrace(this: Ecology, p: Party, lead: Cr): void {
 }
 
 /**
- * 冒険者の亡骸に気づいた、僧侶のいる一行：皆が立ち止まって亡骸の方を向き、僧侶が祈って清める（aimStep から）。
- * 清められた亡骸は、スケルトンやリッチとして起き上がらず、ヴァンパイアの眷属にもならない（src/eco/step.ts、src/eco/vampire.ts）。
+ * 亡骸に気づいた、僧侶のいる一行：皆が立ち止まって亡骸の方を向き、僧侶が祈って清める（aimStep から）。
  * 清めは祈り始めた時点で付く（途中で襲われても清まったまま）。清めの印が付くので、同じ亡骸の前で二度は立ち止まらない。
- * 立ち止まらない場面は墓標と同じ（身構えている、戦いに向かっている、焚き火で休んでいる、物音に耳を澄ませている）
+ * 立ち止まらない場面は墓標と同じ（身構えている、戦いに向かっている、焚き火で休んでいる、物音に耳を澄ませている）。
+ *
+ * 祈る相手は、見える所にあるうちの先に、冒険者の亡骸。清められた冒険者の亡骸は、スケルトンやリッチとして起き上がらず、
+ * ヴァンパイアの眷属にもならない（src/eco/step.ts、src/eco/vampire.ts）。亡骸は骨になっても残り、聖印の光が立ちのぼる。
+ * 冒険者の亡骸が見えなければ、冒険者でない亡骸にも祈る（以前は冒険者の亡骸だけが相手で、冒険者が倒れにくくなると、祈りの場面がまとめて減った）：
+ *  - 人型（ゴブリン・コボルト・オーク・ドワーフ・リザードマン）の亡骸のうち、起き上がりうる所（暗く、足もとにマナがあり、死者が多いかリッチが近い。
+ *    src/eco/step.ts の decay と同じ条件）にあるもの（riseSpot）。肉の残る亡骸は、清められると残ったまま起き上がらなくなる（聖印の光が立ちのぼる）。
+ *  - 倒されたスケルトン・ゾンビ・リッチの残骸（場所を問わない）。
+ *  骨（人型の骨と、アンデッドの残骸）は、祈る間に金色に光り、祈りの終わりに金の光の粒になって立ちのぼって消える（blessCrumble）。
+ *  冒険者でない亡骸の前で止まる長さは冒険者の亡骸の半分（KIN_STOP）で、一行ごとに生き物の更新 KIN_GAP 回に1回まで
+ *  （人型の亡骸は冒険者の亡骸よりずっと多いので、毎回止まると探索が進まない）。ヴァンパイアの印の付いた亡骸（眷属になる）には祈らない
  */
 export function blessBrace(this: Ecology, p: Party, lead: Cr): void {
   if ((p.braceT ?? 0) > this.step || p.engage || (p.camp ?? -1) >= 0 || (p.listenT ?? 0) > this.step) return;
@@ -339,24 +359,74 @@ export function blessBrace(this: Ecology, p: Party, lead: Cr): void {
   });
   if (!priest) return;
   const m = this.w.map;
+  // 一行のそばに、起きている手強い相手（強さ6以上：リビングアーマー、ゴーレム、ミノタウロスなど）がいれば祈らない。
+  // 亡骸は冒険者が倒された所、たとえば宝物庫の入口のゴーレムの前に溜まるので、その近くで立ち止まると次々に倒されて、亡骸がまた増えていた。
+  // 祈る間、一行はその場で止まる（亡骸へは歩み寄らない）ので、危ないかどうかは一行の先頭のまわりで見る
+  let danger = -1;
+  const safe = () => {
+    if (danger < 0) {
+      danger = 0;
+      this.nearby(lead.x, lead.y, BLESS_SAFE, (q) => {
+        if (!danger && !q.dead && !q.away && q.sleep === 0 && q.k !== Kind.Adventurer && q.k !== Kind.Dwarf && STR[q.k] >= 6) danger = 1;
+      });
+    }
+    return danger === 0;
+  };
+  const seen = (o: Cr) => sq(o.x - lead.x) + sq(o.y - lead.y) <= BLESS_R * TILE * BLESS_R * TILE && lineOfSight(m, lead.x, lead.y, o.x, o.y);
   for (const o of this.corpses) {
-    if (o.k !== Kind.Adventurer || o.dead !== 1 || o.units <= 0 || o.st === 99) continue;
-    if (sq(o.x - lead.x) + sq(o.y - lead.y) > BLESS_R * TILE * BLESS_R * TILE || !lineOfSight(m, lead.x, lead.y, o.x, o.y)) continue;
-    // 一行のそばに、起きている手強い相手（強さ6以上：リビングアーマー、ゴーレム、ミノタウロスなど）がいれば祈らない。
-    // 亡骸は冒険者が倒された所、たとえば宝物庫の入口のゴーレムの前に溜まるので、その近くで立ち止まると次々に倒されて、亡骸がまた増えていた。
-    // 祈る間、一行はその場で止まる（亡骸へは歩み寄らない）ので、危ないかどうかは一行の先頭のまわりで見る
-    let danger = false;
-    this.nearby(lead.x, lead.y, BLESS_SAFE, (q) => {
-      if (!danger && !q.dead && !q.away && q.sleep === 0 && q.k !== Kind.Adventurer && q.k !== Kind.Dwarf && STR[q.k] >= 6) danger = true;
-    });
-    if (danger) continue;
-    o.st = 99;
+    if (o.k !== Kind.Adventurer || o.dead !== 1 || o.units <= 0 || o.st === BLESSED) continue;
+    if (!seen(o) || !safe()) continue;
+    o.st = BLESSED;
     this.blessGearNear(o.x, o.y);
     this.brace(p, o.x, o.y, 5, GRAVE_STOP);
     const own = o.party === p.id ? 1 : 0;
     this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'bless', n: o.id, how: o.sp, own, x: Math.round(o.x), y: Math.round(o.y) } as never);
     return;
   }
+  if ((p.kinBlessT ?? 0) > this.step) return;
+  for (const o of this.corpses) {
+    if (o.dead !== 1 || o.units <= 0 || o.st === BLESSED || o.st === CRUMBLING) continue;
+    const undead = BLESS_REMAINS.includes(o.k);
+    if (!undead && !BONE_KINDS.includes(o.k)) continue;
+    if (o.lure && this.byId.get(o.lure)?.k === Kind.Vampire) continue;
+    // アンデッド祓いの一行は、目標を果たすまでリッチの残骸を崩さない（果たしたとき、そばのリッチの残骸を見て杖を戦利品にする。src/eco/loot.ts の takeTrophy）
+    if (o.k === Kind.Lich && p.aim === 4 && !p.aimEnd) continue;
+    if (!seen(o) || (!undead && !this.riseSpot(o.x, o.y)) || !safe()) continue;
+    const bones = undead || this.corpseStage(o) === 2;
+    if (bones) {
+      // 祈りの終わり（生き物の更新 KIN_STOP 回あと）に崩れる。祈り始めた step 番号を lureAt に持つ（ヴァンパイアの印の付いた亡骸は選ばないので、lureAt は空いている）
+      o.st = CRUMBLING;
+      o.lureAt = this.step;
+    } else o.st = BLESSED;
+    this.brace(p, o.x, o.y, 5, KIN_STOP);
+    p.kinBlessT = this.step + KIN_GAP;
+    this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: undead ? 'blessUndead' : 'blessKin', n: o.k, how: bones ? 1 : 0, x: Math.round(o.x), y: Math.round(o.y) } as never);
+    return;
+  }
+}
+
+/** 人型の亡骸が起き上がりうる所か（暗く、足もとにマナがあり、死者が多いかリッチが近い。src/eco/step.ts の decay の、骨とゾンビの起き上がりに共通の条件） */
+export function riseSpot(this: Ecology, x: number, y: number): boolean {
+  const k = this.tileOf(x, y);
+  return k >= 0 && this.lit(k, this.day) < 0.15 && this.manaAround(k) >= KIN_RISE_MANA && (this.deathsAt(x, y) >= 300 || this.lichNear(x, y));
+}
+
+/**
+ * 清められた骨が崩れる（step.ts の decay から。祈り始めてから生き物の更新 KIN_STOP 回たったら）：金の光の粒になって立ちのぼり、消える。
+ * 残っていた養分は足もとの土へ、体のマナも土へ還す（保存則のため）。描画は src/creatureView.ts の drawAttacks の 'bless'
+ */
+export function blessCrumble(this: Ecology, c: Cr): boolean {
+  if (c.st !== CRUMBLING || this.step - c.lureAt < KIN_STOP) return false;
+  const undead = BLESS_REMAINS.includes(c.k);
+  this.releaseMana(c);
+  this.deposit(c.x, c.y, c.units);
+  c.units = 0;
+  c.dead = 2;
+  this.fxAttacks.push({ t: this.w.tick, style: 'bless', col: 1, size: c.k === Kind.Orc || c.k === Kind.Lich ? 2 : c.k === Kind.Kobold || c.k === Kind.Goblin ? 0 : 1, ax: c.x, ay: c.y, dx: c.x, dy: c.y, did: -1, aid: c.id, big: false, kill: false, fly: 16 });
+  if (this.fxAttacks.length > 160) this.fxAttacks.splice(0, 60);
+  this.log(c.x, c.y, undead ? `僧侶の祈りで、倒れた{k:${c.k}}の骸が金の光にほどけた` : `僧侶の祈りで、{k:${c.k}}の骨が金の光にほどけた`);
+  this.record('settle', { t: this.w.tick, k: c.k, id: c.id, ev: 'crumble', x: Math.round(c.x), y: Math.round(c.y) } as never);
+  return true;
 }
 
 /**
@@ -402,6 +472,8 @@ declare module '../ecology' {
     raiseGrave: typeof raiseGrave;
     graveBrace: typeof graveBrace;
     blessBrace: typeof blessBrace;
+    riseSpot: typeof riseSpot;
+    blessCrumble: typeof blessCrumble;
     pickGrave: typeof pickGrave;
     blessGearNear: typeof blessGearNear;
     ensureCrests: typeof ensureCrests;
@@ -409,4 +481,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { recruit, fillRoster, heroOf, rankMul, pickHeroes, heroEnter, heroHome, rosterStep, raiseGrave, graveBrace, blessBrace, pickGrave, blessGearNear, ensureCrests, heroHurt });
+Object.assign(Ecology.prototype, { recruit, fillRoster, heroOf, rankMul, pickHeroes, heroEnter, heroHome, rosterStep, raiseGrave, graveBrace, blessBrace, riseSpot, blessCrumble, pickGrave, blessGearNear, ensureCrests, heroHurt });
