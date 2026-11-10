@@ -70,7 +70,6 @@ const RUN_ARMOR = { seeds: ['abc', 'かしたれ', 'はじまりの洞窟', 'see
 // 取り立て main 10・5・2（取り立ては main の10日目から続けると seed17 でしか起きなかった）
 const RUN_WIDE = { seeds: ['abc', 'かしたれ', 'はじまりの洞窟', 'seed4', 'seed5', 'seed6', 'seed7', 'seed8', 'seed40', 'seed41', 'seed18', 'seed27', 'seed35', 'seed30', 'seed17'], from: 10, to: 18 };
 const RUN_BLESS = RUN_WIDE;
-const RUN_ORC = { seeds: ['かしたれ', 'seed27'], from: 10, to: 18 };
 // オークの貢ぎ物の取り立て（src/eco/orc.ts の collectTribute）は、check の項目にしない。
 // main でも16シード×25日で13回、10〜18日目は1回（seed7）、15〜23日目は6回（4シード）しかなく、
 // コボルトのスリングを足した版では、展開が分かれただけで、15シードの10〜18日目が0回にも、25日で30回ほどにもなった。
@@ -325,12 +324,15 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 六歩目：オークは勝ち目のない一行には威嚇して退く
-    name: 'オークが強い一行に威嚇して退く（かしたれ・seed27 で1回以上）',
-    ...RUN_ORC,
+    // 六歩目：オークは勝ち目のない一行には威嚇して退く。オークのいるシードは展開で入れ替わるので、15シードの合計で見る
+    // （以前は かしたれ・seed27 で見ていたが、main でも10〜18日目は かしたれ 8・seed27 0 で、コボルトのスリングを足した版では
+    //  展開が分かれただけで かしたれ も0回になった。15シードの合計は main 286回・12シード、スリングを足した版 215回・11シード）
+    name: 'オークが強い一行に威嚇して退く（15シードの合計で20回以上・4シード以上）',
+    ...RUN_WIDE,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 13 && x.ev === 'bluff').length);
-      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+      const seeds = n.filter((v) => v > 0).length;
+      return { ok: sum(n) >= 20 && seeds >= 4, value: `${sum(n)}回（${seeds}シード）` };
     },
   },
   {
