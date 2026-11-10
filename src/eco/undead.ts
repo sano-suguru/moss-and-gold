@@ -33,7 +33,7 @@ export const RISE_N = 30;
  */
 export const LICH_SOIL = 14;
 export const LICH_SIP_EVERY = 10;
-export const LICH_MANA = 60;
+export const LICH_MANA = 40;
 export const LICH_RISE = 40;
 
 /** いる人型のゾンビの数 */
