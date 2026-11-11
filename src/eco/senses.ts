@@ -406,7 +406,7 @@ export function lurk(this: Ecology, c: Cr): boolean {
  * 弱い生き物が冒険者やドワーフに与える害（通常速度で数秒ごとに）：
  * 大ネズミは眠っている者の荷をあさって食料をかじる、コウモリは眠っている者の血を吸う（小さな傷）、
  * アリは巣に近づいた者に群れで噛みつく、ウィスプは冒険者を誘って一行の行き先を暗がりへ逸らす、
- * マイコニドは胞子で近くの者の足を鈍らせる、サラマンダーは近づいた者に火傷を負わせる。true なら今は害をなしている
+ * サラマンダーは近づいた者に火傷を負わせる。true なら今は害をなしている
  */
 export function pester(this: Ecology, c: Cr): boolean {
   if (this.step % 6 !== c.id % 6 || c.sleep > 0 || c.flee > 0) return false;
@@ -464,13 +464,6 @@ export function pester(this: Ecology, c: Cr): boolean {
         this.tryMove(c, (dx / L) * SPEC[c.k].speed * 2, (dy / L) * SPEC[c.k].speed * 2);
       }
       return true;
-    case Kind.Myconid:
-      // 胞子：近くの冒険者の足を鈍らせる（通常速度で1分ほど。ドワーフは眠気として効く）
-      o.drowsy = Math.max(o.drowsy, o.k === Kind.Adventurer ? 300 : o.drowsy + 200);
-      c.act = 2;
-      c.actT = 0;
-      c.foe = o.id;
-      return false;
     case Kind.Salamander:
       if (!near) return false;
       if (this.strike(c, o, 0.6) && o.hp <= 0) this.die(o, 'burned', c.k);

@@ -1,11 +1,12 @@
 import type { Atlas } from './atlas';
-import { BLOOD, Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
+import { BLOOD, CR_EVERY, Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
 import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
 import { CRUMBLING, KIN_STOP, RANK_AT, packLook, unpackLook } from './eco/roster';
 import { SKILL_WIZARD_MISSILE } from './eco/skill';
 import { SKILL_VAMP_MIST } from './eco/vampskill';
 import { SKILL_KOBOLD_SLING } from './eco/koboldskill';
+import { SKILL_MYC_SPORE } from './eco/myconidskill';
 import { SKILL_GHOST_WAIL } from './eco/ghostskill';
 import { SKILL_ORC_ROAR } from './eco/orcskill';
 import { BONE_KINDS, BONE_SP, LICH_RISE, RISE_N } from './eco/undead';
@@ -889,6 +890,33 @@ export class CreatureView {
             }
           }
           if (age < 8) dyn.push({ x: r.ax, y: r.ay - 12, r: 56 + age * 6, i: 0.5 * damp * (1 - age / 8), c: 7 });
+          break;
+        }
+        case 'sporecloud': {
+          // マイコニドの眠りの胞子（src/eco/myconidskill.ts）：傘から藤色の胞子の塊（src/sprites.ts の fxSporeCloud）がふくらみ、
+          // そのまわりへ小さな塊（fxSporePuff）が輪になって広がって、届く所（半径 rad）で漂ってから薄れる。光る粒（fxSporeMote）が雲の中をゆっくり舞い上がる。
+          // 倒れて弾けたとき（col 1）は、地面の近くからぱっと散る。まわりがほのかに藤色に照らされる
+          const R = r.rad ?? 32;
+          const burst = r.col === 1;
+          const z0 = burst ? 3 : 10;
+          if (age < 30) push(r.ax, r.ay + 0.05, z0, false, A.fx(`sporecloud:${Math.min(7, Math.floor(age / (burst ? 3 : 4)))}`), 0, 4);
+          const g = Math.min(1, age / (burst ? 6 : 10));
+          const rr = 6 + (R * 0.82 - 6) * (1 - (1 - g) * (1 - g));
+          const pf = age < 3 ? 0 : age < 8 ? 1 : age < 21 ? 2 : 3;
+          if (age < 28)
+            for (let i = 0; i < 8; i++) {
+              const a = (i / 8) * Math.PI * 2 + (r.t % 5) * 0.4 + age * 0.012;
+              const k = 0.85 + ((i * 29 + r.t) % 7) / 20;
+              push(r.ax + Math.cos(a) * rr * k, r.ay + Math.sin(a) * rr * k * 0.72 + 0.04, z0 * 0.4 + 2 + age * 0.12, i % 2 === 1, A.fx(`sporepuff:${pf}`), 0, 4);
+            }
+          for (let i = 0; i < 12; i++) {
+            const q = (age + ((i * 7) % 12)) / 30;
+            if (q >= 1 || age < 2) continue;
+            const a = i * 2.4 + (r.t % 3);
+            const d = R * (0.2 + 0.7 * (((i * 41 + r.t) % 10) / 10)) * Math.min(1, age / 8);
+            push(r.ax + Math.cos(a) * d + Math.sin(age * 0.2 + i) * 2, r.ay + Math.sin(a) * d * 0.72 + 0.06, 4 + q * 22, false, A.fx(`sporemote:${(Math.floor(age / 3) + i) & 3}`), 0, 4);
+          }
+          if (age < 24) dyn.push({ x: r.ax, y: r.ay - 8, r: R + 10, i: 0.32 * damp * (1 - age / 24), c: 2 });
           break;
         }
         case 'phase': {
@@ -2009,6 +2037,30 @@ export class CreatureView {
         for (let i = 0; i < 3; i++) {
           const a = t * 0.35 + (i * Math.PI * 2) / 3;
           pushSprite(x + Math.cos(a) * 6, yy + Math.sin(a) * 2 + 0.07, lift + bh + Math.sin(a) * 1.5, false, A.fx(`stunstar:${Math.floor(t / 2 + i) % 4}`), 0, 2);
+        }
+      }
+      // 眠りの胞子を溜めるマイコニド（src/eco/myconidskill.ts）：まわりから光る胞子の粒が渦を巻いて傘へ吸い寄せられ、傘がほのかに藤色に光る（描画専用）
+      if (!c.dead && sp === Kind.Myconid && c.act === 2 && c.actT < 0) {
+        const t = eco.w.tick + alpha;
+        const p = Math.max(0, Math.min(1, (c.actT + SKILL_MYC_SPORE.windup + alpha / CR_EVERY) / SKILL_MYC_SPORE.windup));
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 + t * 0.3;
+          const d = 4 + (1 - p) * 14;
+          pushSprite(x + Math.cos(a) * d, yy + Math.sin(a) * d * 0.6 + 0.07, lift + 12 + Math.sin(a) * 2, false, A.fx(`sporemote:${(Math.floor(t / 2) + i) & 3}`), 0, 2);
+        }
+        dyn.push({ x, y: yy - 12, r: 20 + p * 14, i: 0.2 + p * 0.3, c: 2 });
+      }
+      // マイコニドの胞子でうたた寝している人（src/eco/myconidskill.ts）：頭の上に小さな z が立ちのぼり、藤色の胞子の粒が二つ、頭のまわりをゆっくり回る（描画専用）
+      if (!c.dead && c.doze > 0) {
+        const t = eco.w.tick + alpha;
+        const bh = Ecology.bodySize(sp) * 0.9 + 6;
+        for (let i = 0; i < 2; i++) {
+          const ph = ((t + (c.id % 7) * 0.31) / 16 + i * 0.5) % 1;
+          pushSprite(x + (flip ? -1 : 1) * (3 + ph * 6) + Math.sin(ph * 6) * 1.5, yy, lift + bh + ph * 12, false, A.sleep('z', Math.floor(ph * 4)), 0, 2);
+        }
+        for (let i = 0; i < 2; i++) {
+          const a = t * 0.12 + i * Math.PI;
+          pushSprite(x + Math.cos(a) * 7, yy + Math.sin(a) * 2 + 0.07, lift + bh - 3 + Math.sin(a) * 1.5, false, A.fx(`sporemote:${(Math.floor(t / 3) + i) & 3}`), 0, 2);
         }
       }
       // 毒の者（src/eco/attack.ts の poisonTick）：体のまわりから緑の泡が立ちのぼる（描画専用）

@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-const K = { Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5, Ghost: 7 };
+const K = { Myconid: 8, Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5, Ghost: 7 };
 
 export interface Moment {
   key: string;
@@ -134,6 +134,9 @@ export const MOMENTS: Moment[] = [
   { key: 'koboldStone', label: 'コボルト：スリングの小石が冒険者に当たった' },
   { key: 'koboldCampStoned', label: 'コボルト：野営の一行にスリングの小石を何度も当て、焚き火を消して発たせた' },
   { key: 'koboldStoneBreak', label: 'コボルト：スリングの小石で、冒険者の技の溜めを止めた' },
+  { key: 'mycSpore', label: 'マイコニド：傘を膨らませて眠りの胞子を吐き、人をうたた寝させた' },
+  { key: 'mycSporeAdv', label: 'マイコニド：眠りの胞子で冒険者をうたた寝させた' },
+  { key: 'mycBurst', label: 'マイコニド：倒れて弾けた胞子で、すぐそばの人がうたた寝した' },
   { key: 'armorRise', label: 'リビングアーマー：武具が寄り集まって立ち上がった' },
   { key: 'armorAbsorb', label: 'リビングアーマー：武具を取り込んだ（床の物と奪った物）' },
   { key: 'armorRob', label: 'リビングアーマー：倒した相手の武具を奪って取り込んだ' },
@@ -283,6 +286,9 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     koboldStone: ev(K.Kobold, 'stoneHit').length,
     koboldCampStoned: ev(K.Adventurer, 'campBreak').filter((x) => x.how === 'stoned').length,
     koboldStoneBreak: ev(K.Kobold, 'stoneHit').filter((x) => x.how > 0).length,
+    mycSpore: ev(K.Myconid, 'spore').filter((x) => x.how === 0 && x.n > 0).length,
+    mycSporeAdv: ev(K.Myconid, 'spore').filter((x) => x.how === 0 && x.adv > 0).length,
+    mycBurst: ev(K.Myconid, 'spore').filter((x) => x.how === 1 && x.n > 0).length,
     ghostWail: ev(K.Ghost, 'ghostWail').filter((x) => x.n > 0 || x.to > 0).length,
     ghostScare: ev(K.Ghost, 'ghostWail').filter((x) => x.to > 0).length + ev(K.Ghost, 'ghostScare').length,
     ghostWailAdv: ev(K.Ghost, 'ghostWail').filter((x) => x.how > 0).length,

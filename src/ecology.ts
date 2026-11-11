@@ -564,6 +564,10 @@ export interface Cr {
   aim: number;
   /** 大グモの糸に縛られている残り（生き物の更新の回数。src/eco/spiderskill.ts）：その場から動けずにもがくが、隣の相手は打てる */
   bind: number;
+  /** うたた寝の残り（生き物の更新の回数。src/eco/myconidskill.ts）：マイコニドの眠りの胞子を浴びた人が、立ったまま眠って動かない。打たれたら目を覚ます */
+  doze: number;
+  /** 最後にマイコニドの胞子でうたた寝した時刻（tick。src/eco/myconidskill.ts）：そのあとしばらくは胞子に慣れて眠らない */
+  sporeAt: number;
   /** 死骸ができたときの養分（腐り具合の目安） */
   init: number;
 }
@@ -745,7 +749,7 @@ export class Ecology {
    */
   static WISP_EVERY = 4;
   /** 弱い生き物の害（pester）をなす種 */
-  static PESTERS = new Set<number>([Kind.Rat, Kind.Bat, Kind.Ant, Kind.Wisp, Kind.Myconid, Kind.Salamander]);
+  static PESTERS = new Set<number>([Kind.Rat, Kind.Bat, Kind.Ant, Kind.Wisp, Kind.Salamander]);
   /** 苔を食べたなどで苔の場が変わった */
   mossTouched = false;
   lastPhase = 0;
