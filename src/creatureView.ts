@@ -754,6 +754,18 @@ export class CreatureView {
           break;
         }
         case 'drain': {
+          // コウモリの噛みつき（src/eco/view.ts の attackStyle。演出の長さ fly を持たない）：噛んだ所に爪あとが走り、
+          // 小さな血のしずくが三つ、弧を描いてコウモリの方へ戻っていく
+          if (r.fly === undefined) {
+            if (age < 6) push(r.dx, r.dy, lift, flip, A.fx(`claw2:${r.col}:${f6(age)}`), 0, 4);
+            if (age >= 2 && age < 14)
+              for (let i = 0; i < 3; i++) {
+                const p = Math.min(1, (age - 2 - i * 2) / 8);
+                if (p < 0) continue;
+                push(r.dx - vx * p, r.dy - vy * p, lift + Math.sin(p * Math.PI) * 4, false, A.fx(`bit:2:5:0`), 0, 4);
+              }
+            break;
+          }
           // ヴァンパイアの血吸い（src/eco/vampskill.ts）：相手からヴァンパイアの手もとへ、つやのある赤い血の玉（src/sprites.ts の fxBloodOrb）が、
           // 細くなっていく赤い尾（fxBloodDisc を密に重ねたもの）を引いて、ゆるい弧を描きながら次々に流れていく。吸っているあいだだけ（切れたら消える）
           const v = eco.byId.get(r.aid);
@@ -1135,15 +1147,6 @@ export class CreatureView {
             if (age >= 2) push(r.dx, r.dy, lift, false, A.fx(`ring:1:6:${f6(age - 2)}`), 0, 4);
           }
           if (once) spray(1, 0, 3, 0.5, 0.6);
-          break;
-        case 'drain':
-          if (age < 6) push(r.dx, r.dy, lift, flip, A.fx(`claw2:${r.col}:${f6(age)}`), 0, 4);
-          if (age >= 2 && age < 14)
-            for (let i = 0; i < 3; i++) {
-              const p = Math.min(1, (age - 2 - i * 2) / 8);
-              if (p < 0) continue;
-              push(r.dx - vx * p, r.dy - vy * p, lift + Math.sin(p * Math.PI) * 4, false, A.fx(`bit:2:5:0`), 0, 4);
-            }
           break;
         case 'chill':
           // ゴーストの冷たい手（src/eco/ghostskill.ts）など：触れた所に霜の結晶が弾け（src/sprites.ts の fxFrost）、氷のかけらが散る
