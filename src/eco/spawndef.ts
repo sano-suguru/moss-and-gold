@@ -42,8 +42,6 @@ export interface SpawnDef {
   /** 養分を集める半径（既定4）と、マナを集める半径（既定3） */
   nutrR?: number;
   manaR?: number;
-  /** マナ側：場所のまわりのマナ（manaAround）がこれ以上でないと湧かない */
-  manaNeed?: number;
   /** 湧く前の準備（住処・集落・巣・巣穴を作る）。extra で取った養分を第3引数で受け取る。戻り値は setup に渡す */
   before?(e: Ecology, site: number, extra: number): unknown;
   /** i 匹目を置くピクセル座標（既定は spotNear） */
@@ -56,23 +54,29 @@ export interface SpawnDef {
   log?: string;
 }
 
-/** 種 kind が、マス k から R マスの内（縦と横の和）にいるか */
-function near(e: Ecology, k: number, kind: Kind, R: number): boolean {
+/** マナから湧く大物どうしが離れて湧くために見る、生きているトロール・バジリスク・ドラゴンの種と位置（ピクセル） */
+type Big = { k: Kind; x: number; y: number };
+
+/** 一覧 bigs の中に、種 kind が、マス k から R マスの内（縦と横の和）にいるか */
+function near(e: Ecology, bigs: Big[], k: number, kind: Kind, R: number): boolean {
   const W = e.w.map.w;
-  return e.list.some((c) => c.k === kind && !c.dead && Math.abs(c.x / TILE - (k % W)) + Math.abs(c.y / TILE - Math.floor(k / W)) < R);
+  return bigs.some((c) => c.k === kind && Math.abs(c.x / TILE - (k % W)) + Math.abs(c.y / TILE - Math.floor(k / W)) < R);
 }
 
 /**
  * マナから湧く大物の場所：開いた床を40か所見て（どの種も同じ順に見る）、まわりのマナが2以上で want を満たし、
- * 4つに1つのくじに当たった最初のマス（以前の manaBirths と同じ見方と同じくじ）
+ * 4つに1つのくじに当たった最初のマス（以前の manaBirths と同じ見方と同じくじ）。
+ * 生きているトロール・バジリスク・ドラゴンの位置は、候補のマスごとに生き物の一覧を見ずに済むよう、先に一度だけ集めて want に渡す
  */
-function manaSite(e: Ecology, want: (k: number, mn: number) => boolean): number {
+function manaSite(e: Ecology, want: (k: number, mn: number, bigs: Big[]) => boolean): number {
   const m = e.w.map;
+  const bigs: Big[] = [];
+  for (const c of e.list) if (!c.dead && (c.k === Kind.Troll || c.k === Kind.Basilisk || c.k === Kind.Dragon)) bigs.push({ k: c.k, x: c.x, y: c.y });
   for (let i = 0; i < 40; i++) {
     const k = ih(e.step, i, 230) % (m.w * m.h);
     if (m.solid[k] || m.sealed[k] || m.lava[k] || e.w.water[k] > 40) continue;
     const mn = e.manaAround(k);
-    if (mn < 2 || !want(k, mn)) continue;
+    if (mn < 2 || !want(k, mn, bigs)) continue;
     if (ih(k, e.step, 232) % 4 !== 0) continue;
     return k;
   }
@@ -98,8 +102,12 @@ function forageFrom(e: Ecology, salt: number): [number, number] | null {
   return [tileX(e, a), tileY(e, a)];
 }
 
-/** ゴブリンの湧く場所が、食べ物の乏しい所だったか（site で決め、同じ回の band と before で使う。セーブしない一時の値） */
-let gobPoor = false;
+/**
+ * ゴブリンの湧く場所が、食べ物の乏しい所か。site は、まず食べ物の足りる所（campFood が GOBLIN_MIN_FOOD 以上）から選び、
+ * なければ乏しい所から選ぶので、選んだ所の campFood が GOBLIN_MIN_FOOD 未満なら乏しい所（campFood は苔・キノコ・大ネズミ・死骸を数え、
+ * 湧くときに土から取る養分では変わらない）
+ */
+const gobPoorAt = (e: Ecology, site: number) => e.campFood(site) < Ecology.GOBLIN_MIN_FOOD;
 
 /** ゴブリンの集落（住みかの番号が0以上）と、コボルトの住処 */
 const goblinCamps = (e: Ecology) => e.camps.filter((o) => o.kind === 0 && o.id >= 0);
@@ -291,20 +299,15 @@ export const SPAWN_DEFS: SpawnDef[] = [
     cap: () => 15,
     chance: (e) => ih(e.step, 6, 71) % 14 === 0,
     site: (e) => {
-      gobPoor = false;
       const from = forageFrom(e, 815);
       if (!from) return -1;
-      let k = e.pickGoblinCamp(undefined, from, Ecology.GOBLIN_MIN_FOOD);
-      if (k < 0) {
-        k = e.pickGoblinCamp(undefined, from, Ecology.GOBLIN_POOR_FOOD);
-        gobPoor = k >= 0;
-      }
-      return k;
+      const k = e.pickGoblinCamp(undefined, from, Ecology.GOBLIN_MIN_FOOD);
+      return k >= 0 ? k : e.pickGoblinCamp(undefined, from, Ecology.GOBLIN_POOR_FOOD);
     },
-    band: () => (gobPoor ? Ecology.GOBLIN_POOR_BAND : 5),
+    band: (e, site) => (gobPoorAt(e, site) ? Ecology.GOBLIN_POOR_BAND : 5),
     body: 20, food: 30, mana: 0,
     extra: (_e, n) => 15 * n,
-    before: (e, site, ex) => e.newCamp(site, 'soil', ex, gobPoor),
+    before: (e, site, ex) => e.newCamp(site, 'soil', ex, gobPoorAt(e, site)),
     setup: (e, c, _site, _i, ctx) => {
       c.ref = (ctx as Camp).id;
       // 湧いたゴブリンは、生まれて1日たった大人として扱う（集落の頭になる条件に関わる）
@@ -381,7 +384,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
       return lair >= 0 ? lair : e.pickDark(1, 80);
     },
     band: () => 1,
-    body: 50, food: 80, mana: 120, manaNeed: 0,
+    body: 50, food: 80, mana: 120,
     extra: () => 5 * (10 + 20),
     before: (e) => bigRoost(e),
     setup: (e, v, site, _i, ctx) => {
@@ -476,11 +479,11 @@ export const SPAWN_DEFS: SpawnDef[] = [
     k: Kind.Basilisk, side: 'mana', tier: 2, every: 50, phase: 13, cool: 0, minDay: 0,
     cap: () => 2,
     site: (e) =>
-      manaSite(e, (k, mn) => {
+      manaSite(e, (k, mn, bigs) => {
         if (mn < BASILISK_MANA || !darkDeep(e, k)) return false;
         const m = e.w.map;
         if (e.presenceAt((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8) >= 0.15) return false;
-        return !near(e, k, Kind.Basilisk, 30) && !near(e, k, Kind.Troll, 12) && !near(e, k, Kind.Dragon, 25);
+        return !near(e, bigs, k, Kind.Basilisk, 30) && !near(e, bigs, k, Kind.Troll, 12) && !near(e, bigs, k, Kind.Dragon, 25);
       }),
     band: () => 1,
     body: 60, food: 30, mana: 240, nutrR: 3, manaR: 3,
@@ -491,7 +494,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
   {
     k: Kind.Troll, side: 'mana', tier: 2, every: 50, phase: 13, cool: 0, minDay: 4,
     cap: () => 2,
-    site: (e) => manaSite(e, (k, mn) => mn >= 18 && darkDeep(e, k) && !near(e, k, Kind.Troll, 25) && !near(e, k, Kind.Basilisk, 12) && !near(e, k, Kind.Dragon, 25)),
+    site: (e) => manaSite(e, (k, mn, bigs) => mn >= 18 && darkDeep(e, k) && !near(e, bigs, k, Kind.Troll, 25) && !near(e, bigs, k, Kind.Basilisk, 12) && !near(e, bigs, k, Kind.Dragon, 25)),
     band: () => 1,
     body: 150, food: 40, mana: 160, nutrR: 3, manaR: 3,
     log: `濃いマナの暗がりから、{k:${Kind.Troll}}が湧いた`,

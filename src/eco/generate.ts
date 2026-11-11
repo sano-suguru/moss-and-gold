@@ -21,7 +21,6 @@ export function generateOne(this: Ecology, d: SpawnDef, at = -1): boolean {
   if (d.chance && !d.chance(this)) return false;
   const site = at >= 0 ? at : d.site(this);
   if (site < 0) return false;
-  if (d.side === 'mana' && this.manaAround(site) < (d.manaNeed ?? 0)) return false;
   if (this.starveBlocks(d, site)) return false;
   const n = d.band(this, site);
   const ex = d.extra?.(this, n) ?? 0;
