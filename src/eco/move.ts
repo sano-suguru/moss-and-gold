@@ -754,6 +754,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
   if (!quick) {
     this.record('deaths', { t: this.w.tick, id: prey.id, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(slain ? { slain: 1 } : {}), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(this.inCamp(prey) ? { camp: 1 } : {}) } as never);
     this.noteDeath(prey, 'eaten', pred.k, pred);
+    this.heroDeathMana(prey);
     this.raiseAlarm(prey, pred);
     this.paths.delete(prey.id);
     if (prey.k === Kind.Dwarf && this.hold && pred.k === Kind.Golem && this.list.some((o) => o.k === Kind.Dwarf && !o.dead && o !== prey)) this.hold.golem = 1;
@@ -782,6 +783,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
     this.record('deaths', { t: this.w.tick, id: prey.id, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(slain ? { slain: 1 } : {}), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(this.inCamp(prey) ? { camp: 1 } : {}) } as never);
     // 仲間が食べられたら、群れに警戒が伝わる
     this.raiseAlarm(prey, pred);
+    this.heroDeathMana(prey);
   }
   this.paths.delete(prey.id);
   if (prey.k === Kind.Dwarf && this.hold && pred.k === Kind.Golem && this.list.some((o) => o.k === Kind.Dwarf && !o.dead && o !== prey)) this.hold.golem = 1;
@@ -825,6 +827,8 @@ export function die(this: Ecology, c: Cr, cause = '', by = -1): void {
     }
     this.record('deaths', { t: this.w.tick, id: c.id, k: c.k, cause, by, x: Math.round(c.x), y: Math.round(c.y), ...(near !== undefined ? { near } : {}), ...(c.k === Kind.Rat && c.st === 11 ? { march: 1 } : {}), ...(this.inCamp(c) ? { camp: 1 } : {}) } as never);
     this.noteDeath(c, cause, by);
+    // 冒険者が倒れた所では、マナが立ちのぼる（src/eco/salamander.ts の heroDeathMana）
+    this.heroDeathMana(c);
     // 住処の仲間が襲われて倒れたら、群れは覚えている（何度も続けば住処を捨てる）
     if (c.k === Kind.Kobold && by >= 0 && by !== Kind.Kobold && cause !== 'starve') {
       const wr = this.warrenOf(c);

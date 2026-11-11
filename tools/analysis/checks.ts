@@ -406,6 +406,16 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 冒険者が倒れた所で、マナが立ちのぼる（src/eco/salamander.ts の heroDeathMana）。外で死んだ者と、石になった者（死の記録を別の所でする）は除かれるので、8割以上で見る
+    name: '冒険者が倒れた所でマナが立ちのぼる（15シードの合計で、冒険者の死の8割以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const dead = sum(rs.map((r) => r.deaths.filter((x) => x.k === 25).length));
+      const rise = sum(rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'heroMana').length));
+      return { ok: rise >= 1 && rise >= dead * 0.8, value: `マナが立ちのぼった ${rise} / 冒険者の死 ${dead}` };
+    },
+  },
+  {
     // マイコニドの眠りの胞子（src/eco/myconidskill.ts）：3マス以内に来た人へ胞子の雲を吐き、うたた寝させる。15シードの合計で見る
     name: 'マイコニドが眠りの胞子を吐き、人をうたた寝させる（15シードの合計で20回以上・8シード以上）',
     ...RUN_WIDE,

@@ -82,7 +82,9 @@ function manaSite(e: Ecology, want: (k: number, mn: number) => boolean): number 
 const darkDeep = (e: Ecology, k: number) => e.w.lightBase[k] === 0 && e.lit(k, e.day) < 0.12;
 
 export const SPAWN_DEFS: SpawnDef[] = [
-  // ドラゴンの幼子：ダンジョンにドラゴンがいなければ、6日目以降、深部のまわり（20マス）でいちばんマナの濃い所が70以上なら、卵が孵る（通常速度で1分ごとに見る）
+  // ドラゴンの幼子：ダンジョンにドラゴンがいなければ、6日目以降、深部のまわり（20マス）でいちばんマナの濃い所が32以上なら、卵が孵る（通常速度で1分ごとに見る）。
+  // （マナの湧き口を半分にしたとき、しきい値を決め直した：深部のまわりの最大の中央値が 197 → 91 になったので、70 → 32。
+  //  ほかのしきい値も、開いた床のうち満たすマスの割合が以前と同じになる値にした。8シード×10〜25日目で測った）
   {
     k: Kind.Dragon, side: 'mana', tier: 3, every: 600, phase: 113, cool: 14400, minDay: 6,
     ok: (e) => !e.list.some((c) => c.k === Kind.Dragon && !c.dead),
@@ -104,7 +106,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
             bk = k;
           }
         }
-      return bk >= 0 && bv >= 70 ? bk : -1;
+      return bk >= 0 && bv >= 32 ? bk : -1;
     },
     band: () => 1,
     body: Math.round(SPEC[Kind.Dragon].body * 0.2), food: 60, mana: 600, nutrR: 5, manaR: 4,
@@ -121,13 +123,13 @@ export const SPAWN_DEFS: SpawnDef[] = [
     },
     log: `深部の濃いマナから、{k:${Kind.Dragon}}の幼子が生まれた`,
   },
-  // バジリスク：マナがとても濃く（60〜）、暗く、人の気配の薄い所。ほかのバジリスク（30マス）・トロール（12マス）・竜（25マス）のそばには湧かない
+  // バジリスク：マナがとても濃く（30〜。以前は60）、暗く、人の気配の薄い所。ほかのバジリスク（30マス）・トロール（12マス）・竜（25マス）のそばには湧かない
   {
     k: Kind.Basilisk, side: 'mana', tier: 2, every: 50, phase: 13, cool: 0, minDay: 0,
     cap: () => 2,
     site: (e) =>
       manaSite(e, (k, mn) => {
-        if (mn < 60 || !darkDeep(e, k)) return false;
+        if (mn < 30 || !darkDeep(e, k)) return false;
         const m = e.w.map;
         if (e.presenceAt((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8) >= 0.15) return false;
         return !near(e, k, Kind.Basilisk, 30) && !near(e, k, Kind.Troll, 12) && !near(e, k, Kind.Dragon, 25);
@@ -136,11 +138,11 @@ export const SPAWN_DEFS: SpawnDef[] = [
     body: 60, food: 30, mana: 240, nutrR: 3, manaR: 3,
     log: `濃いマナの暗がりから、{k:${Kind.Basilisk}}が湧いた`,
   },
-  // トロール：マナが濃く（40〜）、暗い所。ほかのトロール（25マス）・バジリスク（12マス）・竜（25マス）のそばには湧かない
+  // トロール：マナが濃く（18〜。以前は40）、暗い所。ほかのトロール（25マス）・バジリスク（12マス）・竜（25マス）のそばには湧かない
   {
     k: Kind.Troll, side: 'mana', tier: 2, every: 50, phase: 13, cool: 0, minDay: 0,
     cap: () => 2,
-    site: (e) => manaSite(e, (k, mn) => mn >= 40 && darkDeep(e, k) && !near(e, k, Kind.Troll, 25) && !near(e, k, Kind.Basilisk, 12) && !near(e, k, Kind.Dragon, 25)),
+    site: (e) => manaSite(e, (k, mn) => mn >= 18 && darkDeep(e, k) && !near(e, k, Kind.Troll, 25) && !near(e, k, Kind.Basilisk, 12) && !near(e, k, Kind.Dragon, 25)),
     band: () => 1,
     body: 150, food: 40, mana: 160, nutrR: 3, manaR: 3,
     log: `濃いマナの暗がりから、{k:${Kind.Troll}}が湧いた`,

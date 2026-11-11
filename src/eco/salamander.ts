@@ -14,13 +14,13 @@ export function spawnSalamanders(this: Ecology): void {
   if (this.counts[Kind.Salamander] >= want) return;
   for (let i = 0; i < 60; i++) {
     const k = ih(this.step, i, 76) % (m.w * m.h);
-    if (m.solid[k] || m.lava[k] || this.w.heat[k] < 150 || this.w.nutr[k] < 12 || this.manaAround(k) < 8) continue;
+    if (m.solid[k] || m.lava[k] || this.w.heat[k] < 150 || this.w.nutr[k] < 12 || this.manaAround(k) < 5) continue;
     this.w.nutr[k] -= 12;
     this.originNext = 'mana';
     const sal = this.spawn(Kind.Salamander, (k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8, 12, 0);
     this.takeMana(sal, k, 30);
     // 溶岩の熱と濃いマナが重なると、火の精になる（ダンジョンに一体だけ）
-    if (this.manaAround(k) >= 12 && this.w.heat[k] >= 170 && !this.list.some((o) => o.elite === 1 && !o.dead) && this.w.tick - (this.lastElite[1] ?? -1e9) > DAY_TICKS_ECO * 2) {
+    if (this.manaAround(k) >= 6 && this.w.heat[k] >= 170 && !this.list.some((o) => o.elite === 1 && !o.dead) && this.w.tick - (this.lastElite[1] ?? -1e9) > DAY_TICKS_ECO * 2) {
       this.lastElite[1] = this.w.tick;
       sal.elite = 1;
       this.takeMana(sal, k, 60);
@@ -291,6 +291,68 @@ export function takeMana(this: Ecology, c: Cr, k: number, want: number, r = 2): 
   c.mana += got;
 }
 
+/**
+ * 冒険者の活動から生まれるマナ（勇者のくせになまいきだ シリーズの魔分と同じく、ダンジョンに外から入ってくる者の魔法や技、倒れた所で生まれる）。
+ * 職業ごとの、技を一度放つたびのマナ（Job の順：戦士・魔法使い・盗賊・僧侶・吟遊詩人・狩人・竜殺し）と、冒険者が倒れた所に生まれるマナ。
+ * 技は1シードで1日に10〜50回ほどなので、ダンジョン全体のマナ（深部や裂け目から湧く分）に比べれば少ない。冒険者が倒れた所に濃いマナが残る、という場所の偏りを作る。
+ * 技のマナを多くすると（以前は1回15〜40を1マスに）、マナに寄るウィスプ（src/eco/move.ts の litW）が冒険者のまわりに群がり、
+ * 技に巻き込まれて倒され、一行が狭い通路で足踏みした（8シードの10〜18日目で、冒険者に倒されたウィスプが27から176匹に）。技のマナは少なくし、まわりに散らす
+ */
+export const HERO_SKILL_MANA = [2, 6, 2, 5, 2, 2, 2];
+export const HERO_DEATH_MANA = 300;
+/** 生まれたマナを散らす半径（マス）：技は1（3×3マス）、倒れた所は2（5×5マス） */
+export const HERO_SKILL_R = 1;
+export const HERO_DEATH_R = 2;
+const AROUND8: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+
+/**
+ * 活動から生まれたマナ n を、その場所（ピクセル）のまわり半径 r マスの床に、なるべく等しく散らして足す（割り切れない分は真ん中のマスへ）。
+ * 真ん中のマスが岩なら、まわり8マスの最初の床を真ん中にする。足した量を返す（足せなければ0）
+ */
+export function deedMana(this: Ecology, x: number, y: number, n: number, r = 0): number {
+  const m = this.w.map;
+  let k = this.tileOf(x, y);
+  if (k < 0 || n <= 0) return 0;
+  if (m.solid[k]) {
+    const tx = k % m.w;
+    const ty = Math.floor(k / m.w);
+    k = -1;
+    for (const [dx, dy] of AROUND8) {
+      const xx = tx + dx;
+      const yy = ty + dy;
+      if (xx < 0 || yy < 0 || xx >= m.w || yy >= m.h || m.solid[yy * m.w + xx]) continue;
+      k = yy * m.w + xx;
+      break;
+    }
+    if (k < 0) return 0;
+  }
+  const cx = k % m.w;
+  const cy = Math.floor(k / m.w);
+  const tiles: number[] = [];
+  for (let dy = -r; dy <= r; dy++)
+    for (let dx = -r; dx <= r; dx++) {
+      const xx = cx + dx;
+      const yy = cy + dy;
+      if (xx < 0 || yy < 0 || xx >= m.w || yy >= m.h || m.solid[yy * m.w + xx]) continue;
+      tiles.push(yy * m.w + xx);
+    }
+  const each = Math.floor(n / tiles.length);
+  for (const q of tiles) this.w.mana[q] += each;
+  this.w.mana[k] += n - each * tiles.length;
+  this.w.manaBorn += n;
+  return n;
+}
+
+/** 冒険者が倒れた所でマナが立ちのぼる（記録と、描画専用の演出も残す） */
+export function heroDeathMana(this: Ecology, c: Cr): void {
+  if (c.k !== Kind.Adventurer || c.away) return;
+  const n = this.deedMana(c.x, c.y, HERO_DEATH_MANA, HERO_DEATH_R);
+  if (!n) return;
+  this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: c.id, ev: 'heroMana', n, x: Math.round(c.x), y: Math.round(c.y) } as never);
+  this.fxManaRise = this.fxManaRise.filter((e) => this.w.tick - e.t < 200);
+  this.fxManaRise.push({ t: this.w.tick, x: Math.round(c.x), y: Math.round(c.y) });
+}
+
 /** まわり（半径 r マス）の土から養分を集める（体を作るため）。集められた量を返す。足りなければ何も取らない */
 export function takeNutrients(this: Ecology, k: number, want: number, r = 3): number {
   const m = this.w.map;
@@ -323,7 +385,7 @@ export function manaBirths(this: Ecology, day: number): void {
   if (this.step % 600 === 213 && !this.list.some((o) => o.elite === 6 && !o.dead) && this.w.tick - (this.lastElite[6] ?? -1e9) > DAY_TICKS_ECO * 2) {
     for (let i = 0; i < 80; i++) {
       const k = ih(this.step, i, 306) % (m.w * m.h);
-      if (m.solid[k] || m.sealed[k] || this.w.water[k] < 150 || this.manaAround(k) < 12) continue;
+      if (m.solid[k] || m.sealed[k] || this.w.water[k] < 150 || this.manaAround(k) < 6) continue;
       const got = this.takeNutrients(k, 20, 3);
       if (!got) continue;
       this.originNext = 'mana';
@@ -381,6 +443,8 @@ export function heldNutrients(this: Ecology, openOnly = false): number {
 
 declare module '../ecology' {
   interface Ecology {
+    deedMana: typeof deedMana;
+    heroDeathMana: typeof heroDeathMana;
     spawnSalamanders: typeof spawnSalamanders;
     salamander: typeof salamander;
     pickBurrow: typeof pickBurrow;
@@ -399,4 +463,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { spawnSalamanders, salamander, pickBurrow, onDayEvents, homeBat, seed, maybeSpawnWisp, totalGold, manaAround, takeMana, takeNutrients, manaBirths, heldMana, releaseMana, heldNutrients });
+Object.assign(Ecology.prototype, { deedMana, heroDeathMana, spawnSalamanders, salamander, pickBurrow, onDayEvents, homeBat, seed, maybeSpawnWisp, totalGold, manaAround, takeMana, takeNutrients, manaBirths, heldMana, releaseMana, heldNutrients });

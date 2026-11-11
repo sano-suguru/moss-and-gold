@@ -338,7 +338,7 @@ export function decay(this: Ecology, c: Cr): void {
     const deaths = this.deathsAt(c.x, c.y);
     const lichNear = this.lichNear(c.x, c.y);
     if (k >= 0 && this.lit(k, this.day) < 0.15 && this.manaAround(k) >= 6 && (deaths >= 300 || lichNear) && ih(c.id, this.step, 140) % (lichNear ? 6 : 30) === 0) {
-      this.raiseUndead(c, deaths >= 600 && this.manaAround(k) >= 20);
+      this.raiseUndead(c, deaths >= 600 && this.manaAround(k) >= 10);
       return;
     }
   }
@@ -357,7 +357,7 @@ export function decay(this: Ecology, c: Cr): void {
   // 骨の竜：成竜の亡骸が、マナの濃い暗がりでゲーム内の半日ほど眠ったあと、骨の竜として起き上がる
   if (c.k === Kind.Dragon && c.sp >= 2 && c.elite !== 8 && c.actT > DAY_TICKS_ECO / 4 && this.step % 50 === c.id % 50) {
     const k = this.tileOf(c.x, c.y);
-    if (k >= 0 && this.manaAround(k) >= 25 && this.lit(k, this.day) < 0.2) {
+    if (k >= 0 && this.manaAround(k) >= 12 && this.lit(k, this.day) < 0.2) {
       c.dead = 0;
       c.elite = 8;
       c.body = c.units;
@@ -379,7 +379,7 @@ export function decay(this: Ecology, c: Cr): void {
   if (ZOMBIE_KINDS.includes(c.k) && !blessed && stage < 2 && c.actT > 500 && c.ref === 0 && (!kin || this.kinZombies() < KIN_ZOMBIE_CAP)) {
     const k = this.tileOf(c.x, c.y);
     const boost = this.step % 50 === c.id % 50 && this.lichNear(c.x, c.y);
-    if (k >= 0 && this.lit(k, this.day) < 0.15 && this.manaAround(k) >= (kin ? KIN_RISE_MANA : 10) && (this.w.moist[k] >= 70 || boost) && ih(c.id, this.step, 51) % (boost ? 8 : 800) === 0) {
+    if (k >= 0 && this.lit(k, this.day) < 0.15 && this.manaAround(k) >= (kin ? KIN_RISE_MANA : 5) && (this.w.moist[k] >= 70 || boost) && ih(c.id, this.step, 51) % (boost ? 8 : 800) === 0) {
       c.sp = c.k;
       c.k = Kind.Zombie;
       c.body = c.units;
