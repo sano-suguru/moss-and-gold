@@ -221,6 +221,9 @@ export function troll(this: Ecology, c: Cr, day: number): void {
     let best: Cr | null = null;
     let bd = 10 * TILE * 10 * TILE;
     for (const o of this.corpses) {
+      // この更新の頭で作った死骸の一覧なので、同じ更新の中で食べ尽くされた死骸と、ゾンビとして起き上がった者を除く
+      // （起き上がった者の units は0なので、食べる量0で dead = 2 にして、体の養分ごと消していた）
+      if (o.dead !== 1 || o.units <= 0) continue;
       const d = sq(o.x - c.x) + sq(o.y - c.y);
       if (d < bd) {
         bd = d;
