@@ -30,74 +30,6 @@ export function mouthSpot(this: Ecology, i: number): [number, number] {
   return [x * TILE + 8, y * TILE + 8];
 }
 
-/**
- * 外から来る生き物の入り口：種に合う口のうち、開いているものから選ぶ。
- * 地表の生き物は正面の入口か地表の横穴、深い所の生き物は地底の裂け目、水辺の生き物は川の口（開いていなければ正面の入口）
- */
-/**
- * 入り口：正面の入口は人の道（冒険者とドワーフだけ）。野の生き物は自然の口から来る：
- * 地表の生き物は開いた地表の横穴、深い所の生き物は地底の裂け目、リザードマンは川の口。
- * 地表の横穴がまだ開いていなければ、小さな生き物（大ネズミ、トカゲ、クモ、アリ）は天井の裂け目の割れ目から入り込む。
- * 戻り値：mouths の番号、-2 天井の割れ目、-3 入れる所がない
- * reach：コボルトが住処に加わりに来るとき、その住処の領域（regionOf の番号）。渡されたら、そこへ歩いて行ける口（口のマスが同じ領域にある口）だけから選ぶ
- */
-export function pickDoor(this: Ecology, k: Kind, salt: number, reach?: number): number {
-  const m = this.w.map;
-  const want = k === Kind.Basilisk || k === Kind.Minotaur ? 1 : k === Kind.Lizardman ? 2 : 0;
-  let open = m.mouths.map((mo, i) => (mo.kind === want && this.mouthOpen(i) ? i : -1)).filter((i) => i >= 0);
-  // 狡猾なコボルトは、竜の寝床のそば（20マス以内）の口からは入ってこない
-  if (k === Kind.Kobold) {
-    // 竜の寝床のそばの口、まわりに住めて食べ物の足りる場所のない口からは来ない
-    // （住処がまだないとき。すでにあれば、来る者はその住処に加わるので、口のまわりに新しい場所は要らない）
-    const founding = !this.warrens.some((o) => o.id >= 0);
-    open = open.filter((i) => !this.dragonNearMouth(i) && (!founding || this.kobMouthOk[i] === 1));
-    // 住処に加わりに来る者は、その住処へ歩いて行ける口からだけ来る（歩いて行けない口から入ると、住処を目指してさまよい、飢えてしまう）
-    if (reach !== undefined) open = open.filter((i) => this.regionOf(this.tileOf(...this.mouthSpot(i))) === reach);
-    // 人の気配の薄い口があれば、そちらを選ぶ
-    const quiet = open.filter((i) => this.presenceAt(...this.mouthSpot(i)) < 0.5);
-    if (quiet.length) open = quiet;
-  }
-  // ゴブリンも、集落がまだないときは、歩いて行ける範囲に集落の条件を満たし食べ物の足りる場所のある口からだけ来る
-  // オークは、歩いて行ける範囲に従えられるゴブリンの集落か十分な獲物のある口からだけ来る（七巡目）
-  if (k === Kind.Orc) {
-    open = open.filter((i) => this.orcMouthOk[i] === 1);
-    return open.length ? open[ih(this.step, salt, 196) % open.length] : -3;
-  }
-  if (k === Kind.Goblin) {
-    const founding = !this.camps.some((o) => o.id >= 0 && o.kind === 0);
-    open = open.filter((i) => !this.dragonNearMouth(i) && (!founding || this.gobMouthOk[i] >= 1));
-    // 食べ物の足りる場所のある口があれば、貧しい場所しかない口より先に選ぶ
-    const rich = open.filter((i) => !founding || this.gobMouthOk[i] === 1);
-    if (rich.length) open = rich;
-  }
-  // 大ネズミは、まわり（道のり RAT_DOOR_REACH マス）で養える数に余裕のある口か天井の裂け目からだけ来る（裂け目からは、地表の横穴が一つも開いていない間だけ）
-  if (k === Kind.Rat) {
-    // 天井の割れ目は、地表の横穴が開くまでの序盤の入口（六巡目に戻した。四・五巡目は横穴が開いたあとも割れ目から来て、割れ目のそばで飢えていた）
-    // 七巡目：ただし中の大ネズミが絶えかけたら（ratReentry）、割れ目からまた入り直せる
-    const opts = [...open.filter((i) => this.ratMouthOk[i] === 1), ...((!open.length || this.ratReentry) && this.ratShaftOk.some((v) => v === 1) && this.crackSpot(Kind.Rat) ? [-2] : [])];
-    return opts.length ? opts[ih(this.step, salt, 196) % opts.length] : -3;
-  }
-  if (open.length) return open[ih(this.step, salt, 196) % open.length];
-  if (k === Kind.Kobold || k === Kind.Goblin) return -3;
-  const small = k === Kind.Lizard || k === Kind.Spider || k === Kind.Ant;
-  return small && want === 0 ? -2 : -3;
-}
-
-/** 口 i のそば（20マス以内）に竜の寝床（または卵の殻）があるか */
-export function dragonNearMouth(this: Ecology, i: number): boolean {
-  const [mx, my] = this.mouthSpot(i);
-  const R2 = 20 * TILE * 20 * TILE;
-  if (this.dragonShell && sq(this.dragonShell.x - mx) + sq(this.dragonShell.y - my) < R2) return true;
-  for (const o of this.list) if (o.k === Kind.Dragon && !o.dead && sq((o.hx || o.x) - mx) + sq((o.hy || o.y) - my) < R2) return true;
-  return false;
-}
-
-/** その種が、いま入ってこられる所があるか */
-export function canEnter(this: Ecology, k: Kind): boolean {
-  const d = this.pickDoor(k, k);
-  return d >= 0 || (d === -2 && this.crackSpot(k) !== null);
-}
-
 /** 口のまわり（道のり RAT_DOOR_REACH マス）で、大ネズミをあと2匹以上養えるか（食べられる苔を、一匹がゲーム内の1日に食べる量で割った数と、いまいる数を比べる） */
 export function ratRoomAt(this: Ecology, x: number, y: number): boolean {
   const d = this.walkDist(this.tileOf(x, y), Ecology.RAT_DOOR_REACH);
@@ -110,12 +42,6 @@ export function ratRoomAt(this: Ecology, x: number, y: number): boolean {
   let rats = 0;
   for (const c of this.list) if (c.k === Kind.Rat && !c.dead && !c.away) { const k = this.tileOf(c.x, c.y); if (k >= 0 && d[k] >= 0) rats++; }
   return rats + 2 <= Math.floor(food / 600);
-}
-
-export function checkRatDoors(this: Ecology): void {
-  const m = this.w.map;
-  this.ratMouthOk = m.mouths.map((mo, i) => (mo.kind === 0 && this.mouthOpen(i) && this.ratRoomAt(...this.mouthSpot(i)) ? 1 : 0));
-  this.ratShaftOk = m.shafts.map((q) => (!m.sealed[q.y * m.w + q.x] && !m.solid[q.y * m.w + q.x] && this.ratRoomAt(q.x * TILE + 8, q.y * TILE + 8) ? 1 : 0));
 }
 
 /** 入ってきた所から道のり RAT_DOOR_REACH マス以内の巣穴（空きのあるもの）か、その範囲の新しい巣穴 */
@@ -155,78 +81,18 @@ export function pickBurrowNear(this: Ecology, spot: [number, number]): Burrow {
   return b;
 }
 
-/** 天井の裂け目のうち、開いた洞窟にあるもの（小さな生き物が入り込む場所） */
-export function crackSpot(this: Ecology, salt: number): [number, number] | null {
-  const m = this.w.map;
-  let sh = m.shafts.filter((q) => !m.sealed[q.y * m.w + q.x] && !m.solid[q.y * m.w + q.x]);
-  // 大ネズミは、まわりで養える数に余裕のある裂け目からだけ入り込む
-  if (salt === Kind.Rat) sh = sh.filter((q) => this.ratShaftOk[m.shafts.indexOf(q)] === 1);
-  if (!sh.length) return null;
-  const q = sh[ih(this.step, salt, 199) % sh.length];
-  return [q.x * TILE + 8, q.y * TILE + 8];
-}
-
+/**
+ * 外から来るもの（生き物の更新50回ごと）：冒険者の一行、ドワーフの一団、空から狩りに来るワイバーンだけ。
+ * 野の生き物は外から来ず、ダンジョンの中の土の養分とマナから湧く（src/eco/spawndef.ts の表と、src/eco/generate.ts）
+ */
 export function arrivals(this: Ecology, day: number): void {
+  void day;
   const m = this.w.map;
   const n = this.counts;
-  const moss = this.openMoss;
-  // 同じ回の更新で来る群れは同じ口から
-  let door = -9;
-  const enter = (k: Kind, body: number, food: number): Cr => {
-    this.imported += body + food;
-    if (door === -9) door = this.pickDoor(k, k);
-    // 呼ぶ側は canEnter で入れる所があることを確かめてから呼ぶ（念のため、なければ正面の入口）
-    const spot: [number, number] = (door >= 0 ? this.mouthSpot(door) : door === -2 ? this.forcedCrack ?? this.crackSpot(k) : null) ?? [m.entrance.x * TILE + 16, 1 * TILE + 8];
-    const [x, y] = spot;
-    const kind = door < 0 ? -1 : m.mouths[door].kind;
-    this.originNext = door === -2 ? 'shaft' : ['mouth', 'fissure', 'river'][kind];
-    const c = this.spawn(k, x + (this.list.length % 5) - 2, y, body, food);
-    // 外から来た大ネズミとゴブリンは、来たときにはもう1日たっていた大人として、生まれた時刻を入れる。
-    // こうしないと生まれた時刻が初期値（−1e9）のままで、群れの王や集落の頭になる条件（生まれて5日以上）を、来たその日に満たしてしまう。
-    // 1日にしておけば、殖えられる（生まれて半日以上）のも、名前に「（子）」が付かないのも、これまでどおり
-    if (k === Kind.Rat || k === Kind.Goblin) c.bornAt = this.w.tick - DAY_TICKS_ECO;
-    if ([Kind.Minotaur, Kind.Troll, Kind.Basilisk, Kind.Vampire].includes(k) && this.step - (this.lastLogged[k] ?? -99999) > 3000) {
-      this.lastLogged[k] = this.step;
-      this.log(c.x, c.y, kind < 0 ? `{k:${k}}が天井の割れ目から入り込んだ` : kind === 0 ? `{k:${k}}が地表の横穴から入ってきた` : kind === 1 ? `{k:${k}}が地底の裂け目から現れた` : `{k:${k}}が川の口から上がってきた`);
-    }
-    return c;
-  };
-  const next = () => {
-    door = -9;
-  };
   // 大ネズミ・大トカゲ・大グモ・ジャイアントアントは外から来ない（土の養分から湧く：src/eco/spawndef.ts）
   // ゴブリン・オーク・リザードマン・コボルトは外から来ない（土の養分から湧く：src/eco/spawndef.ts）。トロールとバジリスクはマナから湧く
   const cool = (k: Kind) => this.step - (this.lastArrival[k] ?? -1e9) > 3600;
-  // ヴァンパイア：コウモリが十分に増えると、1体だけ、コウモリの群れ（5匹）を連れて夜に入ってくる。来る時刻はマップごとにずらす（シードが違っても同じ時刻に来ていた）。
-  // 住処は、いちばん大きなコウモリのねぐらに近い、歩いて行ける暗がりの壁ぎわ（src/eco/vampire.ts の vampLair）。昼は従うコウモリがその天井にぶら下がり、ヴァンパイアはその下で眠る。
-  // （コウモリの群れの多くは、縦穴の下の閉じた空洞をねぐらにしていて、歩くヴァンパイアはそこへ行けない）
-  if (this.canEnter(Kind.Vampire) && n[Kind.Bat] >= 18 && n[Kind.Vampire] === 0 && this.dayNow <= 0.05 && cool(Kind.Vampire) && ih(this.step, 15 + m.entrance.x * 131 + (m.shafts[0]?.y ?? 0), 71) % 40 === 0) {
-    const roosts = new Map<number, number>();
-    for (const b of this.list) if (b.k === Kind.Bat && !b.dead && b.tx > 0 && !b.ref2) roosts.set(b.ty * 4096 + b.tx, (roosts.get(b.ty * 4096 + b.tx) ?? 0) + 1);
-    let best = -1;
-    let bn = 0;
-    for (const [key, cnt] of roosts) if (cnt > bn || (cnt === bn && key < best)) [best, bn] = [key, cnt];
-    next();
-    this.lastArrival[Kind.Vampire] = this.step;
-    const v = enter(Kind.Vampire, 50, 80);
-    const lair = best >= 0 ? this.vampLair(best % 4096, Math.floor(best / 4096)) : -1;
-    const home = lair >= 0 ? lair : this.pickDark(1, 80);
-    if (home >= 0) {
-      v.hx = (home % m.w) * TILE + 8;
-      v.hy = Math.floor(home / m.w) * TILE + 8;
-    }
-    for (let i = 0; i < 5; i++) {
-      this.imported += 10 + 20;
-      this.originNext = 'mouth';
-      const b = this.spawn(Kind.Bat, v.x + ((i % 3) - 1) * 6, v.y - 12 - (i % 2) * 6, 10, 20);
-      b.ref2 = v.id;
-      b.st = 1;
-      if (best >= 0) {
-        b.tx = best % 4096;
-        b.ty = Math.floor(best / 4096);
-      }
-    }
-  }
+  // ヴァンパイアは外から来ない（マナから湧く：src/eco/spawndef.ts）
   // ワイバーン：コウモリやガーゴイルが増えると、夕暮れに裂け目から降りてくる
   const dusk = this.phaseNow > 0.74 && this.phaseNow < 0.86;
   if (dusk && (n[Kind.Bat] >= 20 || n[Kind.Gargoyle] >= 2) && n[Kind.Wyvern] === 0 && m.shafts.length && cool(Kind.Wyvern) && ih(this.step, 16, 71) % 20 === 0) {
@@ -252,15 +118,10 @@ declare module '../ecology' {
     mouthOpen: typeof mouthOpen;
     mouthTile: typeof mouthTile;
     mouthSpot: typeof mouthSpot;
-    pickDoor: typeof pickDoor;
-    dragonNearMouth: typeof dragonNearMouth;
-    canEnter: typeof canEnter;
     ratRoomAt: typeof ratRoomAt;
-    checkRatDoors: typeof checkRatDoors;
     pickBurrowNear: typeof pickBurrowNear;
-    crackSpot: typeof crackSpot;
     arrivals: typeof arrivals;
   }
 }
 
-Object.assign(Ecology.prototype, { mouthOpen, mouthTile, mouthSpot, pickDoor, dragonNearMouth, canEnter, ratRoomAt, checkRatDoors, pickBurrowNear, crackSpot, arrivals });
+Object.assign(Ecology.prototype, { mouthOpen, mouthTile, mouthSpot, ratRoomAt, pickBurrowNear, arrivals });

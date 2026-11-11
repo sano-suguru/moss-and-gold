@@ -127,21 +127,6 @@ export function routeDist(this: Ecology, max: number): Int32Array {
   return dist;
 }
 
-/**
- * ゴブリンが新しく集落を作りにその横穴から入ってこられるかを、生き物の更新600回ごとに判定し直す（`gobMouthOk`）。
- * 1：横穴から歩いて行ける範囲に、食べ物の足りる（`GOBLIN_MIN_FOOD` 以上）集落の場所がある。
- * 2：足りる場所は無いが、貧しい場所（`GOBLIN_POOR_FOOD` 以上）ならある。少ない群れ（`GOBLIN_POOR_BAND` 匹）が住みつき、蓄えが乏しいので焚き火へ盗みに出やすい。
- * 0：開いていない、竜の寝床が近い、または住める場所が無い。
- */
-export function checkGoblinMouths(this: Ecology): void {
-  const m = this.w.map;
-  this.gobMouthOk = m.mouths.map((mo, i) => {
-    if (mo.kind !== 0 || !this.mouthOpen(i) || this.dragonNearMouth(i)) return 0;
-    if (this.pickGoblinCamp(undefined, this.mouthSpot(i), Ecology.GOBLIN_MIN_FOOD) >= 0) return 1;
-    return this.pickGoblinCamp(undefined, this.mouthSpot(i), Ecology.GOBLIN_POOR_FOOD) >= 0 ? 2 : 0;
-  });
-}
-
 export function newCamp(this: Ecology, k: number, how: string, store = 0, poor = false): Camp {
   const m = this.w.map;
   const x = (k % m.w) * TILE + 8;
@@ -728,7 +713,6 @@ declare module '../ecology' {
     campFood: typeof campFood;
     pickGoblinCamp: typeof pickGoblinCamp;
     routeDist: typeof routeDist;
-    checkGoblinMouths: typeof checkGoblinMouths;
     newCamp: typeof newCamp;
     campMembers: typeof campMembers;
     campChief: typeof campChief;
@@ -747,4 +731,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { campFood, pickGoblinCamp, routeDist, checkGoblinMouths, newCamp, campMembers, campChief, campStoreGoal, goblinHidden, hideSpot, abandonCamp, watchCamps, scatterCamp, inKoboldLand, goblinCarrion, goblinForage, campOf, goblin, updateCamps });
+Object.assign(Ecology.prototype, { campFood, pickGoblinCamp, routeDist, newCamp, campMembers, campChief, campStoreGoal, goblinHidden, hideSpot, abandonCamp, watchCamps, scatterCamp, inKoboldLand, goblinCarrion, goblinForage, campOf, goblin, updateCamps });

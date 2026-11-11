@@ -115,11 +115,6 @@ export function warrenFood(this: Ecology, k: number): number {
   return f;
 }
 
-export function checkKoboldMouths(this: Ecology): void {
-  const m = this.w.map;
-  this.kobMouthOk = m.mouths.map((mo, i) => (mo.kind === 0 && this.mouthOpen(i) && !this.dragonNearMouth(i) && this.pickWarren(undefined, this.mouthSpot(i), Ecology.KOBOLD_MIN_FOOD) >= 0 ? 1 : 0));
-}
-
 /** 床のマス k から、岩壁へまっすぐ4マス掘り込める向き（なければ -1） */
 export function tunnelDir(this: Ecology, k: number): number {
   const m = this.w.map;
@@ -895,7 +890,6 @@ declare module '../ecology' {
     pickWarren: typeof pickWarren;
     walkDist: typeof walkDist;
     warrenFood: typeof warrenFood;
-    checkKoboldMouths: typeof checkKoboldMouths;
     tunnelDir: typeof tunnelDir;
     newWarren: typeof newWarren;
     warrenMembers: typeof warrenMembers;
@@ -921,4 +915,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { pickWarren, walkDist, warrenFood, checkKoboldMouths, tunnelDir, newWarren, warrenMembers, isHidden, atDoorOf, warrenOf, kobold, floorNear, tunnelNext, storeGoal, inWarrenTunnel, leaveWithGroup, exitCreature, abandonWarren, updateWarrens, farmTiles, farmFungus, koboldTransit, underground, placeTrap, checkTraps, watchWarrens });
+Object.assign(Ecology.prototype, { pickWarren, walkDist, warrenFood, tunnelDir, newWarren, warrenMembers, isHidden, atDoorOf, warrenOf, kobold, floorNear, tunnelNext, storeGoal, inWarrenTunnel, leaveWithGroup, exitCreature, abandonWarren, updateWarrens, farmTiles, farmFungus, koboldTransit, underground, placeTrap, checkTraps, watchWarrens });

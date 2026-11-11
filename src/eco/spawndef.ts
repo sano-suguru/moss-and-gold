@@ -103,6 +103,16 @@ let gobPoor = false;
 /** ゴブリンの集落（住みかの番号が0以上）と、コボルトの住処 */
 const goblinCamps = (e: Ecology) => e.camps.filter((o) => o.kind === 0 && o.id >= 0);
 
+/** いちばん大きなコウモリのねぐら（従っていないコウモリの、ねぐらの位置 tx, ty ごとの数。キーは ty*4096+tx、なければ -1） */
+function bigRoost(e: Ecology): number {
+  const roosts = new Map<number, number>();
+  for (const b of e.list) if (b.k === Kind.Bat && !b.dead && b.tx > 0 && !b.ref2) roosts.set(b.ty * 4096 + b.tx, (roosts.get(b.ty * 4096 + b.tx) ?? 0) + 1);
+  let best = -1;
+  let bn = 0;
+  for (const [key, cnt] of roosts) if (cnt > bn || (cnt === bn && key < best)) [best, bn] = [key, cnt];
+  return best;
+}
+
 /** 大ネズミの湧く場所：苔やキノコの豊かな群落（forage）から最大6か所を見て、まわりで大ネズミをあと2匹以上養えるマス */
 function ratSite(e: Ecology): number {
   const f = e.forage;
@@ -341,6 +351,44 @@ export const SPAWN_DEFS: SpawnDef[] = [
       c.ref = (ctx as Camp).id;
     },
     log: `水辺の土から{k:${Kind.Lizardman}}の一族が湧き、村を作った`,
+  },
+  // ---- マナから湧く種 ----
+  // ヴァンパイア：コウモリが18匹以上いれば、夜、いちばん大きなコウモリのねぐらに近い暗がりの壁ぎわ（vampLair）に、従うコウモリ5匹を連れて1体だけ湧く
+  // （以前は地表の横穴から入ってきた。湧く時刻はマップごとにずらす）。従うコウモリの体も土の養分から
+  {
+    k: Kind.Vampire, side: 'mana', tier: 2, every: 50, phase: 0, cool: 3600, minDay: 4,
+    ok: (e) => e.counts[Kind.Bat] >= 18 && e.dayNow <= 0.05,
+    cap: () => 1,
+    chance: (e) => {
+      const m = e.w.map;
+      return ih(e.step, 15 + m.entrance.x * 131 + (m.shafts[0]?.y ?? 0), 71) % 40 === 0;
+    },
+    site: (e) => {
+      const best = bigRoost(e);
+      const lair = best >= 0 ? e.vampLair(best % 4096, Math.floor(best / 4096)) : -1;
+      return lair >= 0 ? lair : e.pickDark(1, 80);
+    },
+    band: () => 1,
+    body: 50, food: 80, mana: 120, manaNeed: 0,
+    extra: () => 5 * (10 + 20),
+    before: (e) => bigRoost(e),
+    setup: (e, v, site, _i, ctx) => {
+      v.hx = tileX(e, site);
+      v.hy = tileY(e, site);
+      const best = ctx as number;
+      for (let i = 0; i < 5; i++) {
+        e.originNext = 'soil';
+        const b = e.spawn(Kind.Bat, v.x + ((i % 3) - 1) * 6, v.y - 12 - (i % 2) * 6, 10, 20);
+        b.ref2 = v.id;
+        b.st = 1;
+        if (best >= 0) {
+          b.tx = best % 4096;
+          b.ty = Math.floor(best / 4096);
+        }
+        e.counts[Kind.Bat]++;
+      }
+    },
+    log: `コウモリの群れを従えて、{k:${Kind.Vampire}}が暗がりのマナから現れた`,
   },
   // ドラゴンの幼子：ダンジョンにドラゴンがいなければ、6日目以降、深部のまわり（20マス）でいちばんマナの濃い所が32以上なら、卵が孵る（通常速度で1分ごとに見る）。
   // （マナの湧き口を半分にしたとき、しきい値を決め直した：深部のまわりの最大の中央値が 197 → 91 になったので、70 → 32。

@@ -205,14 +205,10 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   if (this.step % 50 === 25) this.spawnGhosts(day);
   if (this.step % 40 === 20) this.spawnSlimes();
   if (this.step % 10 === 5) this.updateColonies();
-  if (this.step % 600 === 85) this.checkKoboldMouths();
-  if (this.step % 600 === 95) this.checkRatDoors();
   if (this.step % 50 === 35) this.updateWarrens();
   if (this.step % 10 === 3) this.watchWarrens();
   if (this.step % 10 === 7) this.watchCamps();
   if (this.step % 600 === 115) this.updateVassals();
-  if (this.step % 600 === 125) this.checkOrcMouths();
-  if (this.step % 600 === 105) this.checkGoblinMouths();
   this.checkTraps();
   if (this.step % 200 === 100) this.spawnSalamanders();
   if (this.step % 50 === 15) this.updateCamps();

@@ -357,7 +357,7 @@ export interface Camp {
   snatchT?: number;
   /** 次に物資の置き場へ食料を取りに出られる tick（src/eco/cache.ts の planCacheRaids） */
   cacheT?: number;
-  /** 1 なら、食べ物の足りる場所が無く、貧しい場所に少ない群れで住みついた集落（`checkGoblinMouths`） */
+  /** 1 なら、食べ物の足りる場所が無く、貧しい場所に少ない群れで住みついた集落（src/eco/spawndef.ts のゴブリンの行） */
   poor?: number;
 }
 
@@ -818,12 +818,8 @@ export class Ecology {
   /** 食べ物の足りる場所がどの横穴の先にも無いとき、貧しい集落として住みつける場所の食べ物のしきい値（`campFood`）と、そのとき来る群れの数 */
   static GOBLIN_POOR_FOOD = 600;
   static GOBLIN_POOR_BAND = 3;
-  /** オークが来る口：歩いて行ける範囲（ORC_REACH マス）に、従えられるゴブリンの集落がなければ、獲物（大ネズミ・大トカゲ・コボルト。いるオーク1匹あたり4匹を差し引く）がこの数以上いること（七巡目） */
+  /** オークが湧くには：従えられるゴブリンの集落がなければ、獲物（大ネズミ・大トカゲ・コボルト。いるオーク1匹あたり4匹を差し引く）がこの数以上いること（src/eco/spawndef.ts） */
   static ORC_MIN_PREY = 12;
-  static ORC_REACH = 100;
-
-  /** 口ごとに、そこからゴブリンが来られるか（コボルトの kobMouthOk と同じ。ゲーム内の約2時間ごとに調べ直し、セーブに入れる） */
-  gobMouthOk: number[] = [];
 
   pendingDigs: number[] = [];
 
@@ -1019,15 +1015,6 @@ export class Ecology {
   /** 職業ごとの道具 */
   static JOB_ITEMS: number[][] = [[ItemKind.Sword, ItemKind.Shield], [ItemKind.Staff], [ItemKind.Dagger], [ItemKind.Mace, ItemKind.Symbol], [ItemKind.Lute], [ItemKind.Bow], [ItemKind.Greatsword]];
 
-  /** 大ネズミが来られる口と天井の裂け目（1 なら来られる。生き物の更新600回ごとに、決まった回で調べ直し、セーブに入れる） */
-  ratMouthOk: number[] = [];
-  ratShaftOk: number[] = [];
-  /** 大ネズミの入り直し（七巡目）：地表の横穴が開いたあとでも、中の大ネズミが2匹以下になったら 1（天井の割れ目をまた使える）、3匹を超えたら 0。セーブに入れる */
-  ratReentry = 0;
-  /** オークが来られる口（1 なら来られる。歩いて行ける範囲に従えられるゴブリンの集落か十分な獲物がある。生き物の更新600回ごとに調べ直し、セーブに入れる） */
-  orcMouthOk: number[] = [];
-  /** 大ネズミが入り込む裂け目を、その回の更新の間だけ決めておく（来る群れが同じ裂け目から入るように。セーブしない） */
-  forcedCrack: [number, number] | null = null;
   /**
    * 大ネズミが来るかどうかを決める範囲（道のり）。大ネズミが食べずに歩けるのは約20マスなので、それより内側にする
    * （四巡目は40マスで、天井の裂け目から来た大ネズミが苔にたどり着く前に飢えていた）
@@ -1044,10 +1031,5 @@ export class Ecology {
    */
   static KOBOLD_MIN_FOOD = 1500;
 
-  /**
-   * 口ごとに、そこからコボルトが来られるか（歩いて行ける範囲に、住処の条件を満たし食べ物も足りる場所があるか）。
-   * ゲーム内の約2時間（生き物の更新600回）ごとに、決まった回で調べ直し、セーブに入れる
-   */
-  kobMouthOk: number[] = [];
 
 }
