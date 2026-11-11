@@ -827,6 +827,7 @@ export function die(this: Ecology, c: Cr, cause = '', by = -1): void {
     }
     this.record('deaths', { t: this.w.tick, id: c.id, k: c.k, cause, by, x: Math.round(c.x), y: Math.round(c.y), ...(near !== undefined ? { near } : {}), ...(c.k === Kind.Rat && c.st === 11 ? { march: 1 } : {}), ...(this.inCamp(c) ? { camp: 1 } : {}) } as never);
     this.noteDeath(c, cause, by);
+    if (cause === 'starve') this.noteStarve(c);
     // 冒険者が倒れた所では、マナが立ちのぼる（src/eco/salamander.ts の heroDeathMana）
     this.heroDeathMana(c);
     // 住処の仲間が襲われて倒れたら、群れは覚えている（何度も続けば住処を捨てる）

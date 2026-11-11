@@ -90,6 +90,7 @@ export function leaveIfStarving(this: Ecology, c: Cr): boolean {
   if (this.goTo(c, ex, ey, s.speed) || sq(ex - c.x) + sq(ey - c.y) < 30 * 30) {
     if (c.k === Kind.Adventurer) this.heroHome(c, false);
     this.record('exits', { t: this.w.tick, k: c.k, reason: 'starving', x: Math.round(c.x), y: Math.round(c.y) } as never);
+    this.noteStarve(c);
     this.w.manaLeaked += c.mana;
     c.mana = 0;
     this.exported += c.body + c.food + c.units;

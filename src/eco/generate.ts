@@ -3,7 +3,7 @@
  * 種ごとの湧き方は src/eco/spawndef.ts の表 SPAWN_DEFS。ここは表を見て、条件・場所・資源を確かめ、生き物を生む。
  * 体と胃の養分はすべて場所のまわりの土から取る（takeNutrients。全部取れなければ湧かない）ので、養分の保存則は自動で守られる。
  */
-import { Cr, DAY_TICKS_ECO, Ecology, ih } from '../ecology';
+import { CELL, Cr, DAY_TICKS_ECO, Ecology, SPEC, ih } from '../ecology';
 import { TILE } from '../mapgen';
 import { SPAWN_DEFS, SpawnDef } from './spawndef';
 
@@ -78,12 +78,44 @@ export function spotNear(this: Ecology, site: number, i: number): [number, numbe
   return [cx * TILE + 8, cy * TILE + 8];
 }
 
-/** 飢え死にが続いた場所では湧きにくくする（結果を見て合わせる）。true なら、この回は湧かない */
+/** 湧く種（表にある種） */
+const SPAWNED = new Set(SPAWN_DEFS.map((d) => d.k));
+
+/** 飢え死にの記憶に足す：湧く種が飢え死にするか飢えて去ったら、その区画に体の大きさを足す（勇者のくせになまいきだ or2 の、飢え死にが多い所に合わせる考え方） */
+export function noteStarve(this: Ecology, c: Cr): void {
+  if (!SPAWNED.has(c.k)) return;
+  const i = this.starveCell(c.x, c.y);
+  if (i >= 0) this.starveMap[i] += SPEC[c.k].body;
+}
+
+/** ピクセルの位置の、飢え死にの記憶の区画（CELL タイル四方。24×18） */
+export function starveCell(this: Ecology, x: number, y: number): number {
+  const cx = Math.floor(x / TILE / CELL);
+  const cy = Math.floor(y / TILE / CELL);
+  return cx >= 0 && cy >= 0 && cx < 24 && cy < 18 ? cy * 24 + cx : -1;
+}
+
+/**
+ * 飢え死にが続いた場所では湧きにくくする（結果を見て合わせる）。true なら、この回は湧かない。
+ * 場所の区画とまわり8区画の記憶の合計を s、W = 4 × 体の大きさ × 段 として、W / (s + W) の割合でしか湧かない
+ * （s が0なら必ず湧く。体の大きい上の段の種ほど、少しの飢え死にでは止まらない）
+ */
 export function starveBlocks(this: Ecology, d: SpawnDef, site: number): boolean {
-  void d;
-  void site;
-  void ih;
-  return false;
+  const m = this.w.map;
+  const i = this.starveCell((site % m.w) * TILE + 8, Math.floor(site / m.w) * TILE + 8);
+  if (i < 0) return false;
+  const cx = i % 24;
+  const cy = Math.floor(i / 24);
+  let s = 0;
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++) {
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x >= 0 && y >= 0 && x < 24 && y < 18) s += this.starveMap[y * 24 + x];
+    }
+  if (s <= 0) return false;
+  const W = 4 * SPEC[d.k].body * d.tier;
+  return ih(site, this.step, 811) % (s + W) >= W;
 }
 
 declare module '../ecology' {
@@ -92,7 +124,9 @@ declare module '../ecology' {
     generateOne: typeof generateOne;
     spotNear: typeof spotNear;
     starveBlocks: typeof starveBlocks;
+    noteStarve: typeof noteStarve;
+    starveCell: typeof starveCell;
   }
 }
 
-Object.assign(Ecology.prototype, { generate, generateOne, spotNear, starveBlocks });
+Object.assign(Ecology.prototype, { generate, generateOne, spotNear, starveBlocks, noteStarve, starveCell });
