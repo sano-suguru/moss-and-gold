@@ -1508,15 +1508,18 @@ export class CreatureView {
         pushSprite(sb.x + Math.cos(a) * r, sb.y + 4 + Math.sin(a) * r * 0.5, Math.sin(Math.min(1, p * 1.6) * Math.PI) * (6 + (i % 4) * 3), false, A.dust(Math.min(3, Math.floor(p * 4 + (i & 1)))), 0, 2);
       }
     }
-    // 冒険者が倒れた所でマナが立ちのぼる（描画専用。fxManaRise）：紫の粒が揺れながら昇って消える
+    // 冒険者が倒れた所でマナが立ちのぼる（描画専用。fxManaRise）：光る紫の粒が、倒れた所のまわりから揺れながら高く昇って消える
+    // （粒は大きさ 3 ほど白に近いので、紫に見える 1〜2 を使い、終わりに向けて小さくする）
     for (const mr of eco.fxManaRise) {
       const age = eco.w.tick - mr.t;
-      if (age < 0 || age > 50 || !inView(mr.x, mr.y, 48)) continue;
-      for (let i = 0; i < 12; i++) {
-        const ph = (age / 30 + i / 12) % 1;
-        const lift = 2 + ph * 26;
-        const fade = age > 38 ? Math.max(0, 3 - Math.floor((age - 38) / 4)) : Math.min(3, 1 + (i % 3));
-        pushSprite(mr.x + Math.sin(age * 0.2 + i * 1.7) * (3 + (i % 3) * 2), mr.y + (i % 4) - 1, lift, false, A.manaMote(fade), 0, 2);
+      if (age < 0 || age > 60 || !inView(mr.x, mr.y, 56)) continue;
+      for (let i = 0; i < 18; i++) {
+        const ph = (age / 34 + i / 18) % 1;
+        const lift = 2 + ph * 36;
+        const fade = age > 44 ? Math.max(0, 2 - Math.floor((age - 44) / 6)) : 1 + (i % 2);
+        const a = i * 2.399;
+        const r = 4 + (i % 4) * 3;
+        pushSprite(mr.x + Math.cos(a) * r + Math.sin(age * 0.2 + i * 1.7) * 2, mr.y + Math.sin(a) * r * 0.5, lift, false, A.manaMote(fade), 0.5, 2);
       }
     }
     for (const c of eco.colonies) if (inView(c.x, c.y, 24)) pushSprite(c.x, c.y + 4, 0, false, A.anthill, 0, 2);
