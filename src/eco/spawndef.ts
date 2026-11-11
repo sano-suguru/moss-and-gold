@@ -145,18 +145,28 @@ function lizardSite(e: Ecology): number {
   return best;
 }
 
-/** 大グモの湧く場所：開いた床を60か所見て、上下左右に岩があり（巣を張れる壁ぎわ）、8マスの内に飛ぶ獲物（ウィスプかコウモリ）がいる最初のマス */
+/**
+ * 大グモの湧く場所：飛ぶ獲物（ウィスプかコウモリ）を8匹まで選び、それぞれのまわり6マスの内を12か所見て、
+ * 上下左右に岩がある（巣を張れる壁ぎわの）開いた床の最初のマス。
+ * （地図全体から60か所を見るやり方では、獲物の近くに当たることが少なく、大グモが初めて現れるのが main より3日ほど遅れた）
+ */
 function spiderSite(e: Ecology): number {
   const m = e.w.map;
   const fly = e.list.filter((c) => (c.k === Kind.Wisp || c.k === Kind.Bat) && !c.dead && !c.away);
   if (!fly.length) return -1;
-  for (let i = 0; i < 60; i++) {
-    const k = ih(e.step, i, 817) % (m.w * m.h);
-    if (!openDry(e, k)) continue;
-    if (!(m.solid[k + 1] || m.solid[k - 1] || m.solid[k + m.w] || m.solid[k - m.w])) continue;
-    const x = tileX(e, k);
-    const y = tileY(e, k);
-    if (fly.some((o) => (o.x - x) ** 2 + (o.y - y) ** 2 < (8 * TILE) ** 2)) return k;
+  for (let i = 0; i < 8; i++) {
+    const o = fly[ih(e.step, i, 817) % fly.length];
+    const ox = Math.floor(o.x / TILE);
+    const oy = Math.floor(o.y / TILE);
+    for (let j = 0; j < 12; j++) {
+      const h = ih(e.step, i * 16 + j, 818);
+      const x = ox + (h % 13) - 6;
+      const y = oy + ((h >>> 8) % 13) - 6;
+      if (x < 1 || y < 1 || x >= m.w - 1 || y >= m.h - 1) continue;
+      const k = y * m.w + x;
+      if (!openDry(e, k)) continue;
+      if (m.solid[k + 1] || m.solid[k - 1] || m.solid[k + m.w] || m.solid[k - m.w]) return k;
+    }
   }
   return -1;
 }
@@ -446,9 +456,10 @@ export const SPAWN_DEFS: SpawnDef[] = [
     body: 60, food: 30, mana: 240, nutrR: 3, manaR: 3,
     log: `濃いマナの暗がりから、{k:${Kind.Basilisk}}が湧いた`,
   },
-  // トロール：マナが濃く（18〜。以前は40）、暗い所。ほかのトロール（25マス）・バジリスク（12マス）・竜（25マス）のそばには湧かない
+  // トロール：マナが濃く（18〜。以前は40）、暗い所。ほかのトロール（25マス）・バジリスク（12マス）・竜（25マス）のそばには湧かない。
+  // 4日目より前は湧かない（しきい値を決め直したら、序盤のマナでも届き、main より4日ほど早く現れたので、main の初めて現れる日に合わせる）
   {
-    k: Kind.Troll, side: 'mana', tier: 2, every: 50, phase: 13, cool: 0, minDay: 0,
+    k: Kind.Troll, side: 'mana', tier: 2, every: 50, phase: 13, cool: 0, minDay: 4,
     cap: () => 2,
     site: (e) => manaSite(e, (k, mn) => mn >= 18 && darkDeep(e, k) && !near(e, k, Kind.Troll, 25) && !near(e, k, Kind.Basilisk, 12) && !near(e, k, Kind.Dragon, 25)),
     band: () => 1,
