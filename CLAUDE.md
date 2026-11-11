@@ -48,7 +48,7 @@ npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 
 
 分析ツールはすべて `node tools/analysis/launch.mjs <ツール名>` から起動する（npm run も同じ）。**各ツールの使い方は、そのファイルの先頭のコメント**（tools/analysis/*.ts）にある。
 実行結果と日次スナップショットは、シミュレーションのソースのハッシュごとのキャッシュ `runs/.cache/` に残り、ソースとシードが同じならどのツールからも再利用される（しくみは docs/rework-tools.md。大きくなったら消してよい）。クラウドのセッションでは、SessionStart フックが main のキャッシュを GitHub Release「sim-cache」からバックグラウンドで取得する（ログは runs/.cache/fetched/log.txt）。
-- **main のキャッシュは手元で作らずに待つ**：マージ直後で Release に無ければ（ログの「Release にまだない」はフックが動いた時点の話）、Actions の simcache の実行が終わるのを待ち、`node tools/analysis/simcache.mjs fetch --ref origin/main` で取得し直す（手元で作るよりずっと速く、中身は同じ）。
+- **main のキャッシュは手元で作らず、Release を待つ**：マージ直後で Release に無いとき（ログの「Release にまだない」は、フックが動いた時点の話）は、Actions の simcache の実行が終わってから `node tools/analysis/simcache.mjs fetch --ref origin/main` で取得し直す。手元で作るよりずっと速く、中身は同じ。待つ間に、main のコードで batch や probe を実行しない。キャッシュの同じフォルダに書きかけのログが残り、あとで取得したものと混ざって、ログが二重になる。待つ間は、コードを読めば分かる直しを実装し、typecheck と test まで進めておく。
 - **Node の版は `.node-version` の1か所だけに書く**：CI（setup-node）も、手元（mise や fnm なら、リポジトリに入ると自動でこの版になる）も、クラウドの環境のセットアップスクリプトも、このファイルを読む。`.nvmrc` など別のファイルに版を書き足さない。
 
 ```bash
