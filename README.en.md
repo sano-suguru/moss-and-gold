@@ -14,6 +14,8 @@ Rats, goblins and adventurers go about their lives in a cave full of glowing mos
 
 Moss and mushrooms grow in an underground dungeon. Creatures move in to eat them, and adventurers come down from the surface. They also fight over food and drive each other off.
 
+The monsters don't come from outside: they spring up from the nutrients and mana gathered in the dungeon's soil. Mana wells up from the depths, and also gathers where adventurers use their skills or fall.
+
 Each creature follows simple rules, but together they do things I didn't expect.
 
 ## What you can see right now

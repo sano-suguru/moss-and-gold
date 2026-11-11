@@ -28,6 +28,7 @@ import './groups';
 import './sleep';
 import './view';
 import './senses';
+import './generate';
 import './islands';
 import './log';
 import './fire';

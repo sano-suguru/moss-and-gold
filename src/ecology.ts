@@ -357,7 +357,7 @@ export interface Camp {
   snatchT?: number;
   /** 次に物資の置き場へ食料を取りに出られる tick（src/eco/cache.ts の planCacheRaids） */
   cacheT?: number;
-  /** 1 なら、食べ物の足りる場所が無く、貧しい場所に少ない群れで住みついた集落（`checkGoblinMouths`） */
+  /** 1 なら、食べ物の足りる場所が無く、貧しい場所に少ない群れで住みついた集落（src/eco/spawndef.ts のゴブリンの行） */
   poor?: number;
 }
 
@@ -807,6 +807,11 @@ export class Ecology {
   graveMap = new Int32Array(24 * 18);
   /** 冒険者の亡骸の墓（区画ごと。ゲーム内の約6日残る） */
   advGrave = new Int32Array(24 * 18);
+  /**
+   * 飢え死にの記憶（区画ごと）：湧く種（src/eco/spawndef.ts の表にある種）が飢え死にするか飢えて去ると、その区画に体の大きさを足し、
+   * 生き物の更新200回ごとに4ずつ薄れる（ゲーム内の1日で約144）。濃い所とそのまわりには、魔物が湧きにくい（src/eco/generate.ts の starveBlocks）。セーブに入れる
+   */
+  starveMap = new Int32Array(24 * 18);
 
   /**
    * ゴブリンの集落の場所：暗く、人の気配が薄く、冒険者の通り道（気配の濃いマス）から歩いて15マス以上（40マスまでが望ましい：
@@ -818,12 +823,8 @@ export class Ecology {
   /** 食べ物の足りる場所がどの横穴の先にも無いとき、貧しい集落として住みつける場所の食べ物のしきい値（`campFood`）と、そのとき来る群れの数 */
   static GOBLIN_POOR_FOOD = 600;
   static GOBLIN_POOR_BAND = 3;
-  /** オークが来る口：歩いて行ける範囲（ORC_REACH マス）に、従えられるゴブリンの集落がなければ、獲物（大ネズミ・大トカゲ・コボルト。いるオーク1匹あたり4匹を差し引く）がこの数以上いること（七巡目） */
+  /** オークが湧くには：従えられるゴブリンの集落がなければ、獲物（大ネズミ・大トカゲ・コボルト。いるオーク1匹あたり4匹を差し引く）がこの数以上いること（src/eco/spawndef.ts） */
   static ORC_MIN_PREY = 12;
-  static ORC_REACH = 100;
-
-  /** 口ごとに、そこからゴブリンが来られるか（コボルトの kobMouthOk と同じ。ゲーム内の約2時間ごとに調べ直し、セーブに入れる） */
-  gobMouthOk: number[] = [];
 
   pendingDigs: number[] = [];
 
@@ -917,6 +918,22 @@ export class Ecology {
   /** クモの巣の大きさ（半径 px。2×2マスほど。通路をまたいでふさぐ） */
   static WEB_R = 32;
   static FEARS_FIRE = new Set<number>([Kind.Rat, Kind.Lizard, Kind.Spider, Kind.Bat, Kind.Ant, Kind.Troll, Kind.Basilisk, Kind.Minotaur]);
+  /**
+   * マナで命をつなぐ大物（マナから湧く種）。体は養分の側の獲物を食べて保つが、胃が空のまま飢えの猶予（SPEC.starve）を過ぎても、
+   * 体のマナを燃やして生き延びる（MANA_BURN_EVERY 回ごとに1。src/eco/step.ts の metabolism）。マナは、休んでいる間に足もとの土から吸い（MANA_REST_EVERY 回ごとに1）、
+   * 減ってくると近くのウィスプを吸って補う（src/eco/monsters.ts の sipWisp）。マナが尽きると、ほかの種と同じく飢え死にする
+   */
+  // ヴァンパイアもマナから湧くので、同じく体のマナで命をつなぐ（外から来ていたころは、横穴から住処へ歩く道中で獲物に出会えたが、
+  // 住処の場に湧くようになって、飢えて去るのが増えた：8シード×25日で 8 → 16）
+  static MANA_FED = new Set<number>([Kind.Troll, Kind.Basilisk, Kind.Minotaur, Kind.Gargoyle, Kind.Vampire]);
+  static MANA_BURN_EVERY = 20;
+  /** これより少ないと「マナが尽きかけている」（ウィスプを探し、飢えて去るのをやめない） */
+  static MANA_LOW = 60;
+  static MANA_REST_EVERY = 8;
+  /** 体に溜められるマナ */
+  static manaMax(k: number): number {
+    return k === Kind.Gargoyle ? 120 : 300;
+  }
 
   fireList: [number, number, number][] = [];
   fireStep = -1;
@@ -968,6 +985,10 @@ export class Ecology {
   fxMarks: { t: number; id: number; m: string }[] = [];
   /** マナから生まれた者（描画専用：生まれる場所にマナが集まって姿が現れる演出。セーブしない。シミュレーションの判断に使わない） */
   fxManaBorn: { id: number; t: number; k: number; x: number; y: number }[] = [];
+  /** 土の養分から魔物が湧いた所（描画専用：床から土ぼこりが舞い上がる。シミュレーションの判断に使わない。セーブには直前の10秒分だけ残す。src/eco/generate.ts） */
+  fxSoilBirths: { t: number; x: number; y: number }[] = [];
+  /** 冒険者が倒れた所でマナが立ちのぼる演出（描画専用。シミュレーションの判断に使わない。セーブには直前の6秒分だけ残す） */
+  fxManaRise: { t: number; x: number; y: number }[] = [];
   /** リビングアーマーの組み上がり（描画専用：体になった武具の種類と、床にあった位置の、甲冑からのずれ px。セーブしない。シミュレーションの判断に使わない） */
   fxArmorRise: { id: number; t: number; parts: [number, number, number][] }[] = [];
   /**
@@ -1001,15 +1022,6 @@ export class Ecology {
   /** 職業ごとの道具 */
   static JOB_ITEMS: number[][] = [[ItemKind.Sword, ItemKind.Shield], [ItemKind.Staff], [ItemKind.Dagger], [ItemKind.Mace, ItemKind.Symbol], [ItemKind.Lute], [ItemKind.Bow], [ItemKind.Greatsword]];
 
-  /** 大ネズミが来られる口と天井の裂け目（1 なら来られる。生き物の更新600回ごとに、決まった回で調べ直し、セーブに入れる） */
-  ratMouthOk: number[] = [];
-  ratShaftOk: number[] = [];
-  /** 大ネズミの入り直し（七巡目）：地表の横穴が開いたあとでも、中の大ネズミが2匹以下になったら 1（天井の割れ目をまた使える）、3匹を超えたら 0。セーブに入れる */
-  ratReentry = 0;
-  /** オークが来られる口（1 なら来られる。歩いて行ける範囲に従えられるゴブリンの集落か十分な獲物がある。生き物の更新600回ごとに調べ直し、セーブに入れる） */
-  orcMouthOk: number[] = [];
-  /** 大ネズミが入り込む裂け目を、その回の更新の間だけ決めておく（来る群れが同じ裂け目から入るように。セーブしない） */
-  forcedCrack: [number, number] | null = null;
   /**
    * 大ネズミが来るかどうかを決める範囲（道のり）。大ネズミが食べずに歩けるのは約20マスなので、それより内側にする
    * （四巡目は40マスで、天井の裂け目から来た大ネズミが苔にたどり着く前に飢えていた）
@@ -1026,10 +1038,5 @@ export class Ecology {
    */
   static KOBOLD_MIN_FOOD = 1500;
 
-  /**
-   * 口ごとに、そこからコボルトが来られるか（歩いて行ける範囲に、住処の条件を満たし食べ物も足りる場所があるか）。
-   * ゲーム内の約2時間（生き物の更新600回）ごとに、決まった回で調べ直し、セーブに入れる
-   */
-  kobMouthOk: number[] = [];
 
 }

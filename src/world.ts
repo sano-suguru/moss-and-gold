@@ -261,6 +261,9 @@ export class World {
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) out.push([(m.deep.y + dy) * m.w + m.deep.x + dx, 1]);
     // 地底の裂け目
     for (const mo of m.mouths) if (mo.kind === 1) out.push([mo.y * m.w + mo.x, 6]);
+    // ミノタウロスの寝床（古い呪いの場所）：寝床のまわり3×3マスに、わずかずつ湧く。縄張りは深部の行き止まりにあり、マナが薄いことが多いので、
+    // 主が眠っている間に吸えるように（マナで命をつなぐ大物。src/eco/step.ts）
+    if (m.lair.x >= 0) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) out.push([(m.lair.y + dy) * m.w + m.lair.x + dx, 1]);
     // 宝物庫（古い魔法）
     let vk = -1;
     for (let k = 0; k < m.vault.length; k++) if (m.vault[k] && !m.solid[k]) { vk = k; break; }
@@ -280,9 +283,11 @@ export class World {
     const m = this.map;
     const M = this.mana;
     const T = this.manaTmp;
+    // 湧き口（深部・地底の裂け目・宝物庫・溶岩のそば）。マナは冒険者の技や死からも生まれるようになったので（src/eco/salamander.ts の deedMana）、
+    // 湧き口と岩盤からのしみ出しは以前の半分にする（以前はマナが多すぎて、マナを条件にする判定の多くが、ほぼどこでも満たされていた）
     for (const [k, n] of this.manaSources()) {
-      M[k] += n * 2;
-      this.manaBorn += n * 2;
+      M[k] += n;
+      this.manaBorn += n;
     }
     // 岩盤からのしみ出し：深い所（地図の下のほう）ほど、あちこちからわずかずつ湧く
     {
@@ -293,8 +298,8 @@ export class World {
         const y = Math.min(m.h - 2, 1 + Math.floor(m.h * (0.25 + 0.75 * Math.sqrt(r1))));
         const x = 1 + Math.floor(r2 * (m.w - 2));
         const k = y * m.w + x;
-        M[k] += 2;
-        this.manaBorn += 2;
+        M[k] += 1;
+        this.manaBorn += 1;
       }
     }
     // 広がる：隣のマスへ、差に応じて少しずつ。開いた床どうしは速く（差の6分の1）、岩を通るときはゆっくり（差の16分の1）。

@@ -66,9 +66,11 @@ const median = (a: number[]) => {
   const s = [...a].sort((x, y) => x - y);
   return s[Math.floor(s.length / 2)];
 };
-/** 自然の口から来る種 */
-const NATURAL = [2, 3, 4, 9, 10, 12, 13, 14, 19, 23];
+/** 野の生き物（自然の口から来ていた種。土の養分とマナから湧くようになったものを含む） */
+const NATURAL = [1, 2, 3, 4, 9, 10, 12, 13, 14, 15, 16, 17, 19, 23];
 const ARRIVE = new Set(['mouth', 'fissure', 'river', 'shaft']);
+/** 土の養分かマナから湧いた */
+const SPRUNG = new Set(['soil', 'mana']);
 const ELITE_NAMES: Record<number, string> = { 1: '火の精', 2: '亡霊の騎士', 4: '大ネズミの王', 5: 'ゴブリンの頭', 6: '水の精', 7: '光の精', 8: '骨の竜', 9: 'キノコの主' };
 const SETTLE_NAMES: [string, string][] = [['burrow', '大ネズミの巣穴'], ['warren', 'コボルトの住処'], ['colony', 'アリの巣'], ['camp', 'ゴブリンの集落'], ['village', 'リザードマンの村'], ['orc', 'オークの縄張り']];
 const MOUTH_NAMES = ['地表の横穴', '地底の裂け目', '川の口'];
@@ -78,6 +80,7 @@ interface SeedSum {
   days: number;
   alive: number;
   arrived: Map<number, number>;
+  sprung: Map<number, number>;
   born: Map<number, number>;
   exits: Map<number, Map<string, number>>;
   deaths: Map<number, Map<string, number>>;
@@ -107,12 +110,13 @@ function summarizeSeed(i: number): SeedSum | null {
     return m.get(k) as Map<K, number>;
   };
   const s: SeedSum = {
-    seed: cfg.seeds[i], days: samples[samples.length - 1].day, alive: 0, arrived: new Map(), born: new Map(), exits: new Map(), deaths: new Map(), byAdv: new Map(), byDragonFire: new Map(),
+    seed: cfg.seeds[i], days: samples[samples.length - 1].day, alive: 0, arrived: new Map(), sprung: new Map(), born: new Map(), exits: new Map(), deaths: new Map(), byAdv: new Map(), byDragonFire: new Map(),
     series: new Map(), sampleDays: samples.map((x) => x.day), settle: new Map(), mouths: [], dragon: [null, null, null], elites: new Map(),
     drift: { nutr: 0, gold: 0, rock: 0, mana: 0 }, anomalies: [],
   };
   for (const b of births) {
     if (ARRIVE.has(b.origin)) inc(s.arrived, b.k);
+    else if (SPRUNG.has(b.origin)) inc(s.sprung, b.k);
     else if (b.origin === 'born') inc(s.born, b.k);
   }
   for (const e of exits) inc(sub(s.exits, e.k), e.reason);
@@ -207,9 +211,9 @@ function writeSummary() {
   if (!elKinds.length) L.push(row('特別な個体', () => 0));
   L.push('', '（日付はゲーム内の1/4日ごとのサンプルで最初に見えた日。特別な個体は、サンプルに一度でも生きて現れた数）', '');
 
-  L.push('## 自然の口から来た種', '', '来た＝地表の横穴・地底の裂け目・川の口・天井の裂け目から現れた数。去った・死んだはその種のすべて（中で生まれた個体を含む）。', '');
+  L.push('## 野の生き物', '', '来た＝地表の横穴・地底の裂け目・川の口・天井の裂け目から現れた数。湧いた＝土の養分かマナから湧いた数。去った・死んだはその種のすべて（中で生まれた個体を含む）。', '');
   for (const k of NATURAL) {
-    if (!sums.some((s) => (s.arrived.get(k) ?? 0) + (s.born.get(k) ?? 0) > 0 || (s.series.get(k) ?? []).some((v) => v > 0))) {
+    if (!sums.some((s) => (s.arrived.get(k) ?? 0) + (s.sprung.get(k) ?? 0) + (s.born.get(k) ?? 0) > 0 || (s.series.get(k) ?? []).some((v) => v > 0))) {
       L.push(`### ${name(k)}`, '', '（どのシードにも現れなかった）', '');
       continue;
     }
@@ -219,6 +223,7 @@ function writeSummary() {
     const ser = (s: SeedSum) => s.series.get(k) ?? [0];
     L.push(`### ${name(k)}`, '', ...head('項目'));
     L.push(row('来た', (s) => s.arrived.get(k) ?? 0));
+    L.push(row('湧いた', (s) => s.sprung.get(k) ?? 0));
     L.push(row('中で生まれた', (s) => s.born.get(k) ?? 0));
     L.push(row('去った：飢えて', (s) => ex(s, 'starving')));
     const otherReasons = [...new Set(sums.flatMap((s) => [...(s.exits.get(k)?.keys() ?? [])]))].filter((r) => r !== 'starving');
@@ -272,7 +277,7 @@ function writeSummary() {
   console.log(`比較の表を書きました：${join(out, 'summary.md')}`);
 }
 const EXIT_NAMES: Record<string, string> = { returned: '生還', home: '満ちて帰った', abandoned: '住処を捨てて群れで', dispersed: '群れで出ていった' };
-const CAUSE_SHORT: Record<string, string> = { crumbled: '朽', burned: '焼', crushed: '崩', petrified: '石', killed: '襲', dried: '乾', faded: '消', planted: '茸', other: '他' };
+const CAUSE_SHORT: Record<string, string> = { sipped: '吸', crumbled: '朽', burned: '焼', crushed: '崩', petrified: '石', killed: '襲', dried: '乾', faded: '消', planted: '茸', other: '他' };
 
 async function main() {
   if (!args.summary) await runAll();

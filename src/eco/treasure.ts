@@ -35,10 +35,11 @@ export function updateTreasure(this: Ecology, day: number): void {
     // 山の隣の空いた床
     let spot = -1;
     for (const q of [k + 1, k - 1, k + m.w, k - m.w, k + m.w + 1, k + m.w - 1]) if (q >= 0 && q < m.solid.length && !m.solid[q] && !m.lava[q] && !this.statueAt.has(q)) spot = q;
-    if (spot < 0 || this.manaAround(spot) < 8) continue;
+    if (spot < 0 || this.manaAround(spot) < 5) continue;
     // 体は、まわり（7×7マス）の土の養分から作る
     const body = this.takeNutrients(spot, 10, 3);
     if (body < 10) continue;
+    this.originNext = 'mana';
     const c = this.spawn(Kind.Mimic, (spot % m.w) * TILE + 8, Math.floor(spot / m.w) * TILE + 8, body, 0);
     this.takeMana(c, spot, 50);
     // 宝の山から取り込むのは、山にある分まで（40枚まで）

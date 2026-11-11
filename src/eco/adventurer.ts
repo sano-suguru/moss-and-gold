@@ -9,6 +9,7 @@ import { BONE_SP } from './undead';
 import type { World } from '../world';
 import { SKILL_HUNTER_RAIN, SKILL_PRIEST_HAMMER, SKILL_SLAYER_CLEAVE, SKILL_THIEF_THROW, SKILL_WARRIOR_SLASH, SKILL_WIZARD_MISSILE, type Skill } from './skill';
 import { HP_PER_STR } from './combat';
+import { HERO_SKILL_MANA, HERO_SKILL_R } from './salamander';
 
 /** 一行の撤退で下がる生き物の更新の回数（およそ12秒） */
 const RETREAT_N = 60;
@@ -616,6 +617,8 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       if (ready) {
         c.act = 2;
         c.actT = 0;
+        // 技を放つと、その場にマナが生まれる（冒険者の活動がダンジョンにマナを持ち込む。src/eco/salamander.ts の deedMana）
+        if (!c.away) this.deedMana(c.x, c.y, HERO_SKILL_MANA[c.sp] ?? 2, HERO_SKILL_R);
         // 関係のない小物（大ネズミ・スライムなど）は、狙った相手か自分を襲ってきた相手でなければ巻き込まない（src/eco/attack.ts の advMinorOk）
         const who = (o: Cr) => o.k !== Kind.Adventurer && o.k !== Kind.Dwarf && (o === f || o.foe === c.id || (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)));
         const fl = Math.sqrt(fd2) || 1;

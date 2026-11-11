@@ -381,6 +381,52 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 野の生き物は外から来ず、ダンジョンの中の土の養分とマナから湧く（src/eco/spawndef.ts）。外から来るのは冒険者・ドワーフと、空から狩りに来るワイバーンだけ
+    name: '外から来る野の生き物がいない（15シードで、ワイバーン・冒険者・ドワーフのほかに、口や裂け目から現れた生き物が0）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.births.filter((b) => ![23, 25, 28].includes(b.k) && ['mouth', 'shaft', 'river', 'fissure'].includes(b.origin)).length);
+      return { ok: sum(n) === 0, value: `${sum(n)}匹` + (sum(n) ? `（${rs.filter((_, i) => n[i]).map((r) => r.seed).join('、')}）` : '') };
+    },
+  },
+  {
+    // マナで命をつなぐ大物（Ecology.MANA_FED。src/eco/step.ts の metabolism）：飢えの猶予を過ぎても体のマナを燃やして生き延び、休んで土から吸い、ウィスプを吸って補う。
+    // main ではミノタウロス・トロール・バジリスク・ガーゴイルの死と飢えて去った数の半分以上が飢えだった（16シード×25日でミノタウロス49％・トロール64％）。
+    // 入れた版で main の10日目から始めると 39 / 157（25％）。ヴァンパイア（19）も数える（コードレビューで、数えていないと指摘された）
+    name: 'マナで命をつなぐ大物（ミノタウロス・トロール・バジリスク・ガーゴイル・ヴァンパイア）の、飢えで失った割合が3割以下（15シードの合計）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const FED = [15, 16, 17, 18, 19];
+      const st = rs.map((r) => r.deaths.filter((x) => FED.includes(x.k) && x.cause === 'starve').length + r.exits.filter((x) => FED.includes(x.k) && x.reason === 'starving').length);
+      const all = rs.map((r) => r.deaths.filter((x) => FED.includes(x.k)).length + r.exits.filter((x) => FED.includes(x.k) && x.reason === 'starving').length);
+      return { ok: sum(st) <= sum(all) * 0.3, value: `飢えで失った ${sum(st)} / 死んだ・飢えて去った ${sum(all)}` };
+    },
+  },
+  {
+    // マナの減った大物が、近くのウィスプへ寄って吸う（src/eco/monsters.ts の sipWisp）。大物は暗い深部に、ウィスプは苔のある明るい所に多く、
+    // 近くにいることは少ない（main の8シード×10〜18日目の深夜で、大物の1割ほどが8マス以内にウィスプがいた）。15シードの合計で見る。
+    // 入れた版で main の10日目から始めると218回（seed4 101・seed41 60・seed8 34 など7シード）。野の生き物を外から来させないようにした版では39回（7シード）。
+    // 狩りの後に吸い、見通しの通るウィスプだけを狙い、ヴァンパイアも吸うようにした版では143回（9シード）。死骸の一覧の古い者を除いた版では54回（6シード。展開が分かれただけで大きく変わる）。
+    // 1〜2シードの出来事に大きく偏るので、目安は少なめにし、起きたシードの数で見る
+    name: 'マナの減った大物がウィスプを吸う（15シードの合計で20回以上・4シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.deaths.filter((x) => x.cause === 'sipped').length);
+      const seeds = n.filter((v) => v > 0).length;
+      return { ok: sum(n) >= 20 && seeds >= 4, value: rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、') + `（${seeds}シード）` };
+    },
+  },
+  {
+    // 冒険者が倒れた所で、マナが立ちのぼる（src/eco/salamander.ts の heroDeathMana）。外で死んだ者と、石になった者（死の記録を別の所でする）は除かれるので、8割以上で見る
+    name: '冒険者が倒れた所でマナが立ちのぼる（15シードの合計で、冒険者の死の8割以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const dead = sum(rs.map((r) => r.deaths.filter((x) => x.k === 25).length));
+      const rise = sum(rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'heroMana').length));
+      return { ok: rise >= 1 && rise >= dead * 0.8, value: `マナが立ちのぼった ${rise} / 冒険者の死 ${dead}` };
+    },
+  },
+  {
     // マイコニドの眠りの胞子（src/eco/myconidskill.ts）：3マス以内に来た人へ胞子の雲を吐き、うたた寝させる。15シードの合計で見る
     name: 'マイコニドが眠りの胞子を吐き、人をうたた寝させる（15シードの合計で20回以上・8シード以上）',
     ...RUN_WIDE,
@@ -422,12 +468,13 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 大ネズミは天井の裂け目や横穴から少しずつ来ては去るので、ある tick に0匹でも絶えたとは限らない（変更前のコードでも abc は0匹と数匹を行き来する）。来つづけるかで見る
-    name: '大ネズミが来つづける（4シードの合計で10匹以上来た）',
+    // 大ネズミは、苔の豊かな群落のそばの土から少しずつ湧く（src/eco/spawndef.ts）。ある tick に0匹でも絶えたとは限らないので、湧きつづけるかで見る。
+    // （以前は天井の裂け目や横穴から来ていて、「来つづける（10匹以上）」で見ていた）。入れた版で main の10日目から始めると52回（かしたれ 11・seed8 14・abc 17・seed7 10）
+    name: '大ネズミが土から湧きつづける（4シードの合計で、湧いた群れが25回以上）',
     ...RUN_A,
     test: (rs) => {
-      const n = rs.map((r) => r.births.filter((b) => b.k === 2 && b.origin !== 'born').length);
-      return { ok: sum(n) >= 10, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 2 && x.ev === 'gen').length);
+      return { ok: sum(n) >= 25, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },
   {
@@ -443,12 +490,58 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 七巡目：地表の横穴が開いたあとでも、絶えかけたら天井の割れ目から入り直す（abc と seed7 は変更前のコードで0匹の日が続く）
-    name: '大ネズミが割れ目から入り直す（4シードで1回以上）',
+    // 大ネズミが絶えかけても、土からまた湧く（以前は天井の割れ目から入り直していた。abc と seed7 は、入り直しを入れる前のコードで0匹の日が続いた）。
+    // 0匹になったサンプルの後、1日の内に大ネズミが湧いた回数を、0匹になった回数（続く0匹は1回と数える）の8割以上で見る。0匹にならなければ通す。
+    // その1日が実行の終わりを越える0匹は数えない（湧く前に実行が終わるので）
+    name: '大ネズミが絶えても、また土から湧く（4シードで、0匹になった後1日の内に湧いた回数が8割以上）',
     ...RUN_A,
     test: (rs) => {
-      const n = rs.map((r) => r.settle.filter((x) => x.k === 2 && x.ev === 'reenter').length);
-      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+      let gone = 0;
+      let back = 0;
+      for (const r of rs) {
+        const gens = r.settle.filter((x) => x.k === 2 && x.ev === 'gen').map((x) => x.t);
+        const S = r.samples.filter((x) => x.t > r.from * 14400);
+        for (let i = 0; i < S.length; i++) {
+          if ((S[i].counts[2] ?? 0) > 0 || (i > 0 && (S[i - 1].counts[2] ?? 0) === 0)) continue;
+          if (S[i].t + 14400 > r.to * 14400) continue;
+          gone++;
+          if (gens.some((t) => t >= S[i].t - 3600 && t <= S[i].t + 14400)) back++;
+        }
+      }
+      return { ok: gone === 0 || back >= gone * 0.8, value: `0匹になった ${gone} 回、そのうち1日の内に湧いた ${back} 回` };
+    },
+  },
+  {
+    // 倒されたワームは、また深部から湧く（src/eco/spawndef.ts のワームの行。前に湧いてから2日＝生き物の更新14400回あける）。
+    // ワームの死はまれ（16シード×25日で5回。5回とも、死んでから 2,000〜9,500 tick で湧き直した）なので、該当する死が無ければ通す
+    // （0回を落とすと、ほかの変更で展開が分かれただけで落ちる）。死んでから2日が実行の終わりを越える死は数えない
+    name: '倒されたワームが、また深部から湧く（15シードで、死んでから2日の内に湧き直した回数が8割以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      let dead = 0;
+      let back = 0;
+      for (const r of rs) {
+        const gens = r.settle.filter((x) => x.k === 22 && x.ev === 'gen').map((x) => x.t);
+        for (const d of r.deaths.filter((x) => x.k === 22 && x.t + 2 * 14400 <= r.to * 14400)) {
+          dead++;
+          if (gens.some((t) => t > d.t && t <= d.t + 2 * 14400)) back++;
+        }
+      }
+      return { ok: dead === 0 || back >= dead * 0.8, value: `倒された ${dead} 回、そのうち2日の内に湧き直した ${back} 回` };
+    },
+  },
+  {
+    // 湧く種が飢え死にした区画では、しばらく湧きにくい（src/eco/generate.ts の starveBlocks。止まると settle に starveBlock を記録する）。
+    // 入れた版で main の10日目から始めると43回（13シード。大ネズミ 26・大グモ 6・コボルト 6 など）。目安はその半分ほど
+    name: '飢え死にの記憶で湧きが止まる（15シードの合計で20回以上・6シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.ev === 'starveBlock').length);
+      const seeds = n.filter((v) => v > 0).length;
+      const byK = new Map<number, number>();
+      for (const r of rs) for (const x of r.settle) if (x.ev === 'starveBlock') byK.set(x.k, (byK.get(x.k) ?? 0) + 1);
+      const ks = [...byK].sort((a, b) => b[1] - a[1]).map(([k, v]) => `種${k} ${v}`).join('、');
+      return { ok: sum(n) >= 20 && seeds >= 6, value: `${sum(n)}回（${seeds}シード。${ks}）` };
     },
   },
   {
@@ -662,12 +755,14 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 掘り出した土の瓦礫を生き物のいるマスに置かない。それでも壁や瓦礫に埋まった生き物は、安全策で床へ出る（その回数が少ないこと）
-    name: '壁や瓦礫に埋まる生き物がほとんどいない（4シードの合計で床へ出たのが10回以下）',
+    // 掘り出した土の瓦礫を生き物のいるマスに置かない。それでも壁や瓦礫に埋まった生き物は、安全策で床へ出る（その回数が少ないこと）。
+    // 野の生き物を土から湧かせるようにした版では11回（seed8 で住処の通路を掘るコボルト4匹が一度に、ほかにガーゴイル・ドワーフ）で、
+    // 瓦礫の置き方ではなく、群れの数と住処の場所が変わったことによるので、目安を15回にする
+    name: '壁や瓦礫に埋まる生き物がほとんどいない（4シードの合計で床へ出たのが15回以下）',
     ...RUN_A,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.ev === 'unbury').length);
-      return { ok: sum(n) <= 10, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+      return { ok: sum(n) <= 15, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },
   {
@@ -676,7 +771,7 @@ export const CHECKS: Check[] = [
     name: '死骸と落とし物のいきさつがセーブに残る（各シードで死骸10件以上、合計で持ち主のわかる物10件以上）',
     ...RUN_A,
     test: (rs) => {
-      const DEATH = ['eaten', 'fight', 'killed', 'starve', 'burned', 'crushed', 'dried', 'other', 'petrified'];
+      const DEATH = ['eaten', 'fight', 'killed', 'starve', 'burned', 'crushed', 'dried', 'other', 'petrified', 'sipped'];
       const nt = rs.map((r) => ((r.state(r.to)?.eco?.NT ?? []) as (number | string)[][]).filter((a) => (a[1] as number) > r.from * 14400));
       const dead = nt.map((a) => a.filter((x) => DEATH.includes(x[2] as string)).length);
       const own = nt.map((a) => a.filter((x) => ['fell', 'spent', 'stash'].includes(x[2] as string) || (x[2] === '' && (x[5] as number) >= 0)).length);
@@ -704,15 +799,17 @@ export const CHECKS: Check[] = [
   },
   {
     // ミノタウロス（src/eco/monsters.ts）：深部の行き止まりの縄張りで暮らし、仕留めた獲物を寝床まで引きずる（settle の drag）。
-    // 迷路をなくした変更のコードで0日目から実行すると、abc・seed30・seed5 は25日のうちに何度も引きずる（16シード×25日で14シード）
-    name: 'ミノタウロスが獲物を仕留めて寝床まで引きずる（abc・seed30・seed5 の合計で仕留める3回・引きずる1回以上）',
+    // 迷路をなくした変更のコードで0日目から実行すると、abc・seed30・seed5 は25日のうちに何度も引きずる（16シード×25日で14シード）。
+    // 斧の薙ぎ払いで離れた所に倒した獲物へ歩み寄るようにしてから（src/eco/senses.ts の feeding）、main の10日目から始めて
+    // 仕留めた43・引きずった23（abc 14・6、seed30 27・17、seed5 2・0）。目安はその半分ほど
+    name: 'ミノタウロスが獲物を仕留めて寝床まで引きずる（abc・seed30・seed5 の合計で仕留める3回・引きずる10回以上）',
     seeds: ['abc', 'seed30', 'seed5'],
     from: 10,
     to: 18,
     test: (rs) => {
       const kill = rs.map((r) => r.deaths.filter((x) => x.by === 15 && (x.cause === 'eaten' || x.cause === 'fight')).length);
       const drag = rs.map((r) => r.settle.filter((x) => x.k === 15 && x.ev === 'drag').length);
-      return { ok: sum(kill) >= 3 && sum(drag) >= 1, value: rs.map((r, i) => `${r.seed} 仕留めた${kill[i]}・引きずった${drag[i]}`).join('、') };
+      return { ok: sum(kill) >= 3 && sum(drag) >= 10, value: rs.map((r, i) => `${r.seed} 仕留めた${kill[i]}・引きずった${drag[i]}`).join('、') };
     },
   },
   {
@@ -817,8 +914,9 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // コボルトが住処に加わりに来るとき（src/eco/arrivals.ts）は、その住処へ歩いて行ける地表の横穴からだけ入る（pickDoor の reach）。
-    // 歩いて行けない横穴から入ると、住処を目指してさまよい、飢えていた。main の10〜18日目では seed30 で23匹、かしたれで14匹が飢え死にした
+    // 以前、コボルトが住処に加わりに外から来るとき、歩いて行けない横穴から入ると、住処を目指してさまよい、飢えていた（その住処へ歩いて行ける横穴だけから入るように直した）。
+    // いまはコボルトは外から来ず、住処の場で土から湧く（src/eco/spawndef.ts）。住処を目指して飢えることが起きないかを、そのまま見る。
+    // main の10〜18日目では seed30 で23匹、かしたれで14匹が飢え死にした
     // （#45 のあとの main。直したコードで0日目から通しで実行すると、この間の飢え死にはどちらも0匹。
     // main の10日目から始めると、10日目より前に行けない住処へ加わっていた者が seed30 で5匹ほど飢える）
     name: 'コボルトが行けない住処を目指して飢えない（seed30・かしたれ の10〜18日目で、コボルトの飢え死にが合計10匹以下。main は37匹）',

@@ -71,6 +71,8 @@ export function minotaur(this: Ecology, c: Cr): void {
   const far = prowl ? MINO_FAR : 16;
   const nearHome = home || sq(c.x - c.hx) + sq(c.y - c.hy) < far * TILE * far * TILE;
   if (nearHome && this.hunt(c, prowl ? 8 : home ? 5 : 3, HUNT3, s.speed * 1.3)) return;
+  // 狩れる獲物がいなければ、マナが減っているとき、近くのウィスプを吸う
+  if (this.sipWisp(c)) return;
   // 縄張りの中を徘徊する（狩りに出ているときは、寝床から MINO_FAR マスの内の、人の気配の薄い床を。
   // 気配の濃い所へ向かうと、強い魔物が気配から離れる shyOfPeople に押し戻されて行き来し続けるので避け、
   // 生き物の更新400回たっても着かなければ選び直す）
@@ -145,6 +147,56 @@ export function dragToLair(this: Ecology, c: Cr, d: Cr): boolean {
   return true;
 }
 
+/** ウィスプのマナを感じ取れる距離（マス）。見る・嗅ぐの気づき方ではなく、マナの気配で気づく */
+export const SIP_R = 8;
+
+/**
+ * マナで命をつなぐ大物（Ecology.MANA_FED）が、体のマナが減ったとき（MANA_LOW 未満）か、飢えが半ばを過ぎたとき、近くのウィスプへ寄って吸う。
+ * 吸うとウィスプのマナが体に移り（manaMax まで）、ウィスプは消える（死因 sipped。残りのマナと体は、その場の土へ戻る）。
+ * 胃には入れない（胃に入れると飢えが振り出しに戻り、マナで命をつなぐ意味がなくなる）。true なら今はこれをしている。
+ * 狙うのは、マナを持ち、見通しが通り（壁の向こうのウィスプに張り付かない）、溶岩や深い水の上にいないウィスプだけ。ok を渡すと、さらに絞る（ヴァンパイアが明るい所を避けるなど）。
+ * 狩りより後に呼ぶ（狩れる獲物がいれば、胃を満たして飢えを戻す方が先。獲物がいないときにウィスプを吸ってつなぐ）
+ */
+export function sipWisp(this: Ecology, c: Cr, ok?: (o: Cr) => boolean): boolean {
+  const s = SPEC[c.k];
+  const max = Ecology.manaMax(c.k);
+  if (!Ecology.MANA_FED.has(c.k) || c.mana >= max) return false;
+  if (c.mana >= Ecology.MANA_LOW && c.hungry <= s.starve * 0.5) return false;
+  const m = this.w.map;
+  let best: Cr | null = null;
+  let bd = SIP_R * TILE * SIP_R * TILE;
+  this.nearby(c.x, c.y, SIP_R, (o) => {
+    if (o.k !== Kind.Wisp || o.dead || o.away || o.caught || o.elite === 7 || o.mana <= 0) return;
+    const q = this.tileOf(o.x, o.y);
+    if (q < 0 || m.lava[q] || this.w.water[q] > 40) return;
+    if (!lineOfSight(m, c.x, c.y, o.x, o.y)) return;
+    if (ok && !ok(o)) return;
+    const d = sq(o.x - c.x) + sq(o.y - c.y);
+    if (d < bd) {
+      bd = d;
+      best = o;
+    }
+  });
+  if (!best) return false;
+  const w = best as Cr;
+  c.dir = Math.abs(w.x - c.x) > Math.abs(w.y - c.y) ? (w.x > c.x ? 2 : 3) : w.y > c.y ? 0 : 1;
+  if (bd < 10 * 10) {
+    const t = Math.min(w.mana, max - c.mana);
+    c.mana += t;
+    w.mana -= t;
+    // 吸い込まれる演出（描画専用。ウィスプは光の粒になって散る）
+    this.fxEats.push({ t: this.w.tick, id: w.id, k: w.k, sp: w.sp, by: c.id, bk: c.k, x: w.x, y: w.y, slain: false });
+    if (this.fxEats.length > 80) this.fxEats.splice(0, 20);
+    this.die(w, 'sipped', c.k);
+    c.act = 2;
+    c.actT = 0;
+    return true;
+  }
+  c.act = 1;
+  this.goTo(c, w.x, w.y, s.speed * 1.1);
+  return true;
+}
+
 export function troll(this: Ecology, c: Cr, day: number): void {
   const s = SPEC[Kind.Troll];
   const k = this.tileOf(c.x, c.y);
@@ -163,12 +215,15 @@ export function troll(this: Ecology, c: Cr, day: number): void {
     } else c.act = 0;
     return;
   }
-  // 夜は何でも食う
+  // 夜は何でも食う（獲物も死骸もなければ、マナが減っているとき、近くのウィスプを吸う）
   if (c.food < s.cap * 0.8) {
     if (this.hunt(c, 10, HUNT4, s.speed * 1.15)) return;
     let best: Cr | null = null;
     let bd = 10 * TILE * 10 * TILE;
     for (const o of this.corpses) {
+      // この更新の頭で作った死骸の一覧なので、同じ更新の中で食べ尽くされた死骸と、ゾンビとして起き上がった者を除く
+      // （起き上がった者の units は0なので、食べる量0で dead = 2 にして、体の養分ごと消していた）
+      if (o.dead !== 1 || o.units <= 0) continue;
       const d = sq(o.x - c.x) + sq(o.y - c.y);
       if (d < bd) {
         bd = d;
@@ -190,6 +245,7 @@ export function troll(this: Ecology, c: Cr, day: number): void {
       return;
     }
   }
+  if (this.sipWisp(c)) return;
   // 夜のぶらつき：生き物の更新32回ごとに、立ち止まる番（その始めに一度向きを変える）と、大股で歩く番を交互に。
   // （以前はふつうの速さの0.6倍で歩き続け、脚を動かしながら3秒で半タイルも進まず、足踏みして見えていた）
   const seg = this.step >> 5;
@@ -202,6 +258,9 @@ export function troll(this: Ecology, c: Cr, day: number): void {
   const j = DIR16[ih(c.id, seg, 112) & 15];
   this.tryMove(c, j[0] * s.speed * 0.9, j[1] * s.speed * 0.9);
 }
+
+/** バジリスクが湧いた所をそのまま住みかにする、まわりのマナの濃さ（湧くときのしきい値と同じ。src/eco/spawndef.ts） */
+export const BASILISK_MANA = 30;
 
 export function basilisk(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Basilisk];
@@ -228,19 +287,33 @@ export function basilisk(this: Ecology, c: Cr): void {
       return;
     }
   }
-  if (c.hungry && this.hunt(c, 8, HUNT5, s.speed * 1.2)) return;
-  // 入口から離れた暗がりを住みかにする
+  // マナが尽きかけて飢えていれば、住みかから遠く（24マスの内）まで出て、広く（14マス）獲物を探す（マナで命をつなぐ大物の遠出）
+  const roam = c.hungry > 0 && c.mana < Ecology.MANA_LOW;
+  if (c.hungry && this.hunt(c, roam ? 14 : 8, HUNT5, s.speed * 1.2)) return;
+  // 狩れる獲物がいなければ、マナが減っているとき、近くのウィスプを吸う
+  if (this.sipWisp(c)) return;
+  // 入口から離れた暗がりを住みかにする。マナの濃い暗がりに湧いた者は、そこを住みかにする（休んでいる間に足もとのマナを吸えるように。
+  // 湧いた所から離れた暗がりへ移ると、マナが薄くて吸えず、16シード×25日でバジリスクの3割が飢えで失われていた）
   const m = this.w.map;
-  if (c.hx === c.x && c.hy === c.y) {
+  const hk = this.tileOf(c.hx, c.hy);
+  if (c.hx === c.x && c.hy === c.y && !(hk >= 0 && this.manaAround(hk) >= BASILISK_MANA && this.w.lightBase[hk] === 0)) {
     const lair = this.pickDark(2, 80);
     if (lair >= 0) {
       c.hx = (lair % m.w) * TILE + 8;
       c.hy = Math.floor(lair / m.w) * TILE + 8;
     }
   }
-  if (sq(c.hx - c.x) + sq(c.hy - c.y) > 10 * TILE * 10 * TILE) {
+  const leash = roam ? 24 : 10;
+  if (sq(c.hx - c.x) + sq(c.hy - c.y) > leash * TILE * leash * TILE) {
     c.act = 1;
     this.goTo(c, c.hx, c.hy, s.speed);
+    return;
+  }
+  // 遠出のあいだは、立ち止まらずに歩き回る
+  if (roam) {
+    c.act = 1;
+    const j = DIR16[ih(c.id, this.step >> 6, 114) & 15];
+    this.tryMove(c, j[0] * s.speed, j[1] * s.speed);
     return;
   }
   // 住みかのそばで、たいてい立ち止まり、ときどき、ふつうに近い速さで歩く（もともと足の遅い種なので、それでもゆっくり）。
@@ -275,6 +348,8 @@ export function gargoyle(this: Ecology, c: Cr): void {
     else this.moveToward(c, p.x, p.y, s.speed);
     return;
   }
+  // 狩れるコウモリがいなければ、マナが減っているとき、近くのウィスプを吸う
+  if (this.sipWisp(c)) return;
   // 止まり木（壁際）に戻って、石像のふりをしてうずくまる
   if (sq(c.hx - c.x) + sq(c.hy - c.y) > 4 * 4) {
     c.act = 1;
@@ -476,6 +551,7 @@ declare module '../ecology' {
     lairTiles: typeof lairTiles;
     dragToLair: typeof dragToLair;
     minotaur: typeof minotaur;
+    sipWisp: typeof sipWisp;
     troll: typeof troll;
     basilisk: typeof basilisk;
     gargoyle: typeof gargoyle;
@@ -485,4 +561,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { inLair, lairTiles, dragToLair, minotaur, troll, basilisk, gargoyle, mimic, golem, worm });
+Object.assign(Ecology.prototype, { inLair, lairTiles, dragToLair, minotaur, sipWisp, troll, basilisk, gargoyle, mimic, golem, worm });

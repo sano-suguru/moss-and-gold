@@ -478,9 +478,21 @@ export function feeding(this: Ecology, c: Cr): boolean {
   if (!c.feed) return false;
   const d = this.byId.get(c.feed);
   const s = SPEC[c.k];
-  if (!d || d.dead !== 1 || d.units <= 0 || c.food >= s.cap || (this.w.tick - c.hitAt < 30 && c.foe !== d.id) || sq(d.x - c.x) + sq(d.y - c.y) > 18 * 18) {
+  const d2 = d ? sq(d.x - c.x) + sq(d.y - c.y) : 0;
+  // 斧の薙ぎ払い（4マス）や突進で倒した獲物は、離れた所に倒れる。ミノタウロスは、まだ新しい死骸（骨にも腐りかけにもなっていない）なら、
+  // 6マスの内まで歩み寄ってから寝床へ引きずる（以前は18pxより遠いと食べるのをやめ、薙ぎ払いで仕留めた獲物の8割を一口も食べずに離れていた）。
+  // 死骸は倒れてから生き物の更新900回で腐りかけになる（corpseStage）ので、行き着けなくても歩き続けはしない
+  const walkTo = !!d && d.dead === 1 && d2 > 18 * 18 && c.k === Kind.Minotaur && this.corpseStage(d) === 0 && d2 < 6 * TILE * 6 * TILE;
+  if (!d || d.dead !== 1 || d.units <= 0 || c.food >= s.cap || (this.w.tick - c.hitAt < 30 && c.foe !== d.id) || (d2 > 18 * 18 && !walkTo)) {
     c.feed = 0;
     return false;
+  }
+  if (walkTo) {
+    // 突進の溜めや走りの最中なら、走り終えてから歩み寄る（食べる相手の印は残す）
+    if (c.run !== 0) return false;
+    c.act = 1;
+    this.goTo(c, d.x, d.y, s.speed);
+    return true;
   }
   // ミノタウロスは、まず寝床まで引きずっていく。食べるのは骨になるところまでで、骨は寝床に残す（src/eco/monsters.ts）
   if (this.dragToLair(c, d)) return true;

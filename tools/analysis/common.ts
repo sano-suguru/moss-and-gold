@@ -12,9 +12,9 @@ export const KIND_NAMES = NAMES;
 export const countsAsStuck = (x: { k: number; web?: number }): boolean => x.k !== 0 && x.k !== 7 && !((x.web ?? 0) >= 0.5);
 export const CAUSE_NAMES: Record<string, string> = {
   eaten: '食べられた', fight: '打ち合いで倒れた', starve: '飢えた', burned: '焼けた', crushed: '押しつぶされた',
-  petrified: '石になった', killed: '襲われた', dried: '干からびた', faded: '消えた', planted: 'キノコになった', crumbled: '崩れて消えた', other: 'その他',
+  petrified: '石になった', killed: '襲われた', dried: '干からびた', faded: '消えた', planted: 'キノコになった', crumbled: '崩れて消えた', crumble: '崩れて消えた', sipped: '吸われた', other: 'その他',
 };
-export const ORIGIN_NAMES: Record<string, string> = { entrance: '正面の入口から来た', mouth: '地表の横穴から来た', fissure: '地底の裂け目から来た', river: '川の口から来た', shaft: '天井の裂け目から来た', born: '中で生まれた' };
+export const ORIGIN_NAMES: Record<string, string> = { entrance: '正面の入口から来た', mouth: '地表の横穴から来た', fissure: '地底の裂け目から来た', river: '川の口から来た', shaft: '天井の裂け目から来た', soil: '土の養分から湧いた', mana: 'マナから湧いた', raised: '亡骸から起き上がった', gear: '床の武具から立ち上がった', born: '中で生まれた' };
 
 export function parseArgs(argv: string[]): Record<string, string> {
   const o: Record<string, string> = {};

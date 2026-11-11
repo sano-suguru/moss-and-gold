@@ -31,7 +31,7 @@ export const RISE_N = 30;
  * リッチへの変化：足もとの土のマナがこれ以上の所にいるスケルトンは、生き物の更新 LICH_SIP_EVERY 回ごとにマナを1吸い、
  * 体のマナが LICH_MANA に達したら、紫の光の柱に包まれて（LICH_RISE 回の更新。st 11）リッチに変わる（リッチは同時に1体まで）
  */
-export const LICH_SOIL = 14;
+export const LICH_SOIL = 7;
 export const LICH_SIP_EVERY = 10;
 export const LICH_MANA = 40;
 export const LICH_RISE = 40;
@@ -181,6 +181,7 @@ export function spawnGhosts(this: Ecology, day: number): void {
       const k = y * m.w + x;
       // ゴーストは死者の多さから生まれる（マナがあれば少し使う）
       if (m.solid[k] || m.lava[k] || this.lit(k, day) > 0.2) continue;
+      this.originNext = 'mana';
       const g = this.spawn(Kind.Ghost, x * TILE + 8, y * TILE + 8, 0, 0);
       this.takeMana(g, k, 20);
       g.st = 0;

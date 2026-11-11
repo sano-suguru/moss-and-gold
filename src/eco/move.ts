@@ -299,8 +299,9 @@ export function lit(this: Ecology, k: number, day: number): number {
 
 export function spawn(this: Ecology, k: Kind, x: number, y: number, body: number, food: number): Cr {
   this.record('births', { t: this.w ? this.w.tick : 0, k, origin: this.originNext || 'born', x: Math.round(x), y: Math.round(y) } as never);
-  // マナから生まれた者は、描画で出現の演出をする（描画専用の印）
-  const fromMana = this.originNext === 'mana';
+  // マナから生まれた者は、描画で出現の演出をする（描画専用の印）。
+  // ミミックは除く（宝箱のふりをして待つ種なので、現れる瞬間を光の柱で目立たせると、宝箱でないことが一目でわかってしまう）
+  const fromMana = this.originNext === 'mana' && k !== Kind.Mimic;
   // 中で生まれた者（来た場所の指定がない、または 'born'）は、いまを生まれた時刻にする。
   // 外から来た者とマナから生まれた者は −1e9 のまま（外から来た大ネズミとゴブリンは、arrivals.ts で来たときの年を入れる）
   const bornHere = !this.originNext || this.originNext === 'born';
@@ -754,6 +755,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
   if (!quick) {
     this.record('deaths', { t: this.w.tick, id: prey.id, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(slain ? { slain: 1 } : {}), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(this.inCamp(prey) ? { camp: 1 } : {}) } as never);
     this.noteDeath(prey, 'eaten', pred.k, pred);
+    this.heroDeathMana(prey);
     this.raiseAlarm(prey, pred);
     this.paths.delete(prey.id);
     if (prey.k === Kind.Dwarf && this.hold && pred.k === Kind.Golem && this.list.some((o) => o.k === Kind.Dwarf && !o.dead && o !== prey)) this.hold.golem = 1;
@@ -782,6 +784,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
     this.record('deaths', { t: this.w.tick, id: prey.id, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(slain ? { slain: 1 } : {}), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(this.inCamp(prey) ? { camp: 1 } : {}) } as never);
     // 仲間が食べられたら、群れに警戒が伝わる
     this.raiseAlarm(prey, pred);
+    this.heroDeathMana(prey);
   }
   this.paths.delete(prey.id);
   if (prey.k === Kind.Dwarf && this.hold && pred.k === Kind.Golem && this.list.some((o) => o.k === Kind.Dwarf && !o.dead && o !== prey)) this.hold.golem = 1;
@@ -825,6 +828,9 @@ export function die(this: Ecology, c: Cr, cause = '', by = -1): void {
     }
     this.record('deaths', { t: this.w.tick, id: c.id, k: c.k, cause, by, x: Math.round(c.x), y: Math.round(c.y), ...(near !== undefined ? { near } : {}), ...(c.k === Kind.Rat && c.st === 11 ? { march: 1 } : {}), ...(this.inCamp(c) ? { camp: 1 } : {}) } as never);
     this.noteDeath(c, cause, by);
+    if (cause === 'starve') this.noteStarve(c);
+    // 冒険者が倒れた所では、マナが立ちのぼる（src/eco/salamander.ts の heroDeathMana）
+    this.heroDeathMana(c);
     // 住処の仲間が襲われて倒れたら、群れは覚えている（何度も続けば住処を捨てる）
     if (c.k === Kind.Kobold && by >= 0 && by !== Kind.Kobold && cause !== 'starve') {
       const wr = this.warrenOf(c);

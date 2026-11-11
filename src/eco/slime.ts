@@ -60,6 +60,8 @@ export function slime(this: Ecology, c: Cr): void {
     target = null;
     let bd = 160 * 160;
     for (const o of this.corpses) {
+      // 同じ更新の中で食べ尽くされた死骸と、ゾンビとして起き上がった者を除く（src/eco/monsters.ts の troll と同じ）
+      if (o.dead !== 1 || o.units <= 0) continue;
       const ok = this.tileOf(o.x, o.y);
       if (ok < 0 || this.w.moist[ok] < 60) continue;
       const d = sq(o.x - c.x) + sq(o.y - c.y);
@@ -170,6 +172,7 @@ export function spawnSlimes(this: Ecology): void {
   if (!cands.length) return;
   const k = cands[ih(this.step, 2, 54) % cands.length];
   this.w.nutr[k] -= 12;
+  this.originNext = 'soil';
   this.spawn(Kind.Slime, (k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8, 12, 0);
 }
 

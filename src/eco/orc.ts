@@ -439,40 +439,6 @@ export function goCollect(this: Ecology, c: Cr): boolean {
   return true;
 }
 
-/**
- * オークが来られる口（七巡目）：開いた地表の横穴から歩いて ORC_REACH マス以内に、まだ誰にも従っていないゴブリンの集落があるか、
- * 獲物（大ネズミ・大トカゲ・コボルト。いるオーク1匹あたり4匹を差し引く）が ORC_MIN_PREY 以上いれば 1
- */
-export function checkOrcMouths(this: Ecology): void {
-  const m = this.w.map;
-  this.orcMouthOk = m.mouths.map((mo, i) => {
-    if (mo.kind !== 0 || !this.mouthOpen(i)) return 0;
-    const d = this.walkDist(this.tileOf(...this.mouthSpot(i)), Ecology.ORC_REACH);
-    if (this.camps.some((o) => o.id >= 0 && o.kind === 0 && !(o.lx || o.ly) && d[this.tileOf(o.x, o.y)] >= 0)) return 1;
-    // 獲物は、オークが実際に食べてゆける大ネズミ・大トカゲ・コボルト（アリ、冒険者、ドワーフは数えない）。すでにいるオーク1匹あたり4匹を差し引く
-    let prey = 0;
-    let orcs = 0;
-    for (const o of this.list) {
-      if (o.dead || o.away || d[this.tileOf(o.x, o.y)] < 0) continue;
-      if (o.k === Kind.Rat || o.k === Kind.Lizard || o.k === Kind.Kobold) prey++;
-      else if (o.k === Kind.Orc) orcs++;
-    }
-    return prey - 4 * orcs >= Ecology.ORC_MIN_PREY ? 1 : 0;
-  });
-}
-
-/** 口 door から歩いて行ける、まだ従っていないゴブリンの集落（なければ歩いて行ける集落か住処。なければ null）：来たオークが縄張りを持つ目当て */
-export function orcTargetFrom(this: Ecology, door: number): { x: number; y: number } | null {
-  if (door < 0) return null;
-  const d = this.walkDist(this.tileOf(...this.mouthSpot(door)), Ecology.ORC_REACH);
-  const ok = (o: { x: number; y: number }) => d[this.tileOf(o.x, o.y)] >= 0;
-  const free = this.camps.filter((o) => o.id >= 0 && o.kind === 0 && !(o.lx || o.ly) && ok(o));
-  if (free.length) return free[ih(this.step, 3, 95) % free.length];
-  const any = [...this.camps.filter((o) => o.id >= 0 && o.kind === 0 && ok(o)), ...this.warrens.filter((o) => o.id >= 0 && ok(o))];
-  if (any.length) return any[ih(this.step, 4, 95) % any.length];
-  return null;
-}
-
 declare module '../ecology' {
   interface Ecology {
     pickLair: typeof pickLair;
@@ -484,12 +450,10 @@ declare module '../ecology' {
     collectTribute: typeof collectTribute;
     updateVassals: typeof updateVassals;
     goCollect: typeof goCollect;
-    checkOrcMouths: typeof checkOrcMouths;
-    orcTargetFrom: typeof orcTargetFrom;
     orcWary: typeof orcWary;
     partyMight: typeof partyMight;
     orcYields: typeof orcYields;
   }
 }
 
-Object.assign(Ecology.prototype, { pickLair, orc, vassalsOf, guardVassals, meetParty, orcYieldsTo, collectTribute, updateVassals, goCollect, checkOrcMouths, orcTargetFrom, orcWary, partyMight, orcYields });
+Object.assign(Ecology.prototype, { pickLair, orc, vassalsOf, guardVassals, meetParty, orcYieldsTo, collectTribute, updateVassals, goCollect, orcWary, partyMight, orcYields });

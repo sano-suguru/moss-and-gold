@@ -9,11 +9,12 @@ export function maybeSpawnMyconid(this: Ecology, k: number, step: number): void 
   if (this.counts[Kind.Myconid] >= 6 || ih(k, step, 61) % 800 >= MOSS_R) return;
   const m = this.w.map;
   this.w.fungus[k] -= 20;
+  this.originNext = 'soil';
   const c = this.spawn(Kind.Myconid, (k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8, 20, 0);
   c.tx = -1;
   this.counts[Kind.Myconid]++;
   // 養分とキノコとマナがどれも極めて濃い所では、キノコの主になる（二つの系統を併せ持つ）
-  if (this.w.fungus[k] >= 200 && this.w.nutr[k] >= 40 && this.manaAround(k) >= 12 && !this.list.some((o) => o.elite === 9 && !o.dead) && this.w.tick - (this.lastElite[9] ?? -1e9) > DAY_TICKS_ECO * 2) {
+  if (this.w.fungus[k] >= 200 && this.w.nutr[k] >= 40 && this.manaAround(k) >= 6 && !this.list.some((o) => o.elite === 9 && !o.dead) && this.w.tick - (this.lastElite[9] ?? -1e9) > DAY_TICKS_ECO * 2) {
     c.elite = 9;
     this.lastElite[9] = this.w.tick;
     this.takeMana(c, k, 40);
