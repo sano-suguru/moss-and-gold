@@ -766,16 +766,14 @@ export class CreatureView {
               }
             break;
           }
-          // ヴァンパイアの血吸い（src/eco/vampskill.ts）。吸っているあいだだけ描く（切れたら消える）。
-          // ・出どころ：相手の体から小さな血のしずくがにじみ出て、ヴァンパイアの方へ立ちのぼる。相手のまわりは赤くゆらぐ
-          // ・流れ：小さなしずく（src/sprites.ts の fxBloodDisc）を細く連ねた一本の帯が、ゆるい弧を描いて流れる。相手の近くでは
-          //   ゆっくり、ヴァンパイアに近づくほど速く吸い寄せられ、しずくも細くなる。GULP tick ごとに太い波が流れて、ごくりと脈打つ
-          // ・受け手：波が届くたびに、ヴァンパイアの手もとに血の玉がたまり、赤い輪が縮んで吸い込まれ、胸もとが赤く光る
-          // ・始まり：最初の数 tick で、帯が相手からヴァンパイアへ伸びていく
+          // ヴァンパイアの血吸い（src/eco/vampskill.ts）。吸っているあいだ（20 tick）だけ描き、切れたら消える。
+          // アクション RPG のライフスティールの形：相手の体から、つやのある血の玉（src/sprites.ts の fxBloodOrb）が不規則な間隔で
+          // にじみ出て、最初はゆっくり、ヴァンパイアに近づくほど速く吸い寄せられる（速くなるほど、うしろの尾 fxBloodDisc が長く伸びる）。
+          // 弧のふくらむ向きと大きさは玉ごとに変える（等間隔・左右対称だと、撃っているように見えるため）。
+          // 玉が届くたびに、ヴァンパイアの手もとへ赤い輪が縮んで吸い込まれ、胸もとの赤い明かりが強まる
           const v = eco.byId.get(r.aid);
           const d = eco.byId.get(r.did);
           if (!v || v.dead || !d || d.dead || v.run <= 0 || v.aim !== r.did || age > (r.fly ?? 20)) break;
-          const GULP = 12;
           const sx = d.x;
           const sy = d.y;
           const fx = v.x + (v.dir === 2 ? 5 : v.dir === 3 ? -5 : 0);
@@ -783,43 +781,43 @@ export class CreatureView {
           const L = Math.hypot(fx - sx, fy - sy) || 1;
           const nx = (fx - sx) / L;
           const ny = (fy - sy) / L;
-          // 弧のふくらむ側は、技ごとに決める（毎回同じ側だと単調なので）
-          const bendMax = Math.min(8, L * 0.15) * (r.t % 2 ? 1 : -1);
-          const at = (e: number) => {
-            const bend = Math.sin(e * Math.PI) * bendMax;
-            return [sx + (fx - sx) * e - ny * bend, sy + (fy - sy) * e + nx * bend];
-          };
-          // 帯の先がどこまで伸びたか（0 相手 〜 1 ヴァンパイア）
-          const reach = Math.min(1, (age + 1) / 6);
-          // 脈の波の位置（帯の外から入って、ヴァンパイアの先へ抜ける）
-          const g = age % GULP;
-          const wave = (g / GULP) * 1.3 - 0.15;
-          // 出どころ：相手の体からにじみ出るしずく
-          for (let i = 0; i < 4; i++) {
-            const p = ((age + i * 2.5) % 10) / 10;
-            const ox = (((r.t * 7 + i * 13) % 9) - 4) * (1 - p);
-            push(sx + ox + nx * p * 4, sy + ny * p * 4, lift - 3 + p * 7, false, A.fx(`bdisc:${p < 0.4 ? 3 : 2}`), 0, 4);
+          // 玉が相手からヴァンパイアへ届くまでの tick（遠いほど長く）
+          const T = Math.max(8, Math.min(12, Math.round(L / 6)));
+          const hh = (j: number, salt: number) => (((r.t * 73856093) ^ (j * 19349663) ^ (salt * 83492791)) >>> 0) % 1000;
+          let gulp = 99;
+          for (let j = 0, s0 = 0; s0 <= (r.fly ?? 20) - T; j++, s0 += 3 + (hh(j, 1) % 3)) {
+            const a0 = age - s0;
+            if (a0 < 0) break;
+            // 届いてから何 tick たったか（いちばん近いものを、受け手の光に使う）
+            if (a0 >= T) {
+              gulp = Math.min(gulp, a0 - T);
+              continue;
+            }
+            const side = hh(j, 2) % 2 ? 1 : -1;
+            const bendMax = Math.min(L * 0.3, 3 + (hh(j, 3) % 7)) * side;
+            const arcH = 3 + (hh(j, 4) % 4);
+            const pos = (p: number) => {
+              const e = Math.pow(Math.max(0, p), 1.7);
+              const bend = Math.sin(e * Math.PI) * bendMax;
+              return [sx + (fx - sx) * e - ny * bend, sy + (fy - sy) * e + nx * bend, lift - 2 + e * 3 + Math.sin(e * Math.PI) * arcH];
+            };
+            const p = a0 / T;
+            // にじみ出る最初の2 tick は、小さなしずくからふくらむ
+            if (a0 < 2) {
+              const [x, y, z] = pos(p);
+              push(x, y, z, false, A.fx(`bdisc:${a0 === 0 ? 3 : 1}`), 0, 4);
+              continue;
+            }
+            for (let k = 4; k >= 1; k--) {
+              const [x, y, z] = pos(p - k * 0.05);
+              push(x, y, z, false, A.fx(`bdisc:${k}`), 0, 4);
+            }
+            const [x, y, z] = pos(p);
+            push(x, y, z, false, A.fx(`borb:${(Math.floor(age / 2) + j) & 3}`), 0, 4);
           }
-          // 流れ：一本の帯。q は流れの通し位置、e は道のりの上の位置（q の1.6乗にして、ヴァンパイアに近いほど速く）
-          const N = 22;
-          for (let i = 0; i < N; i++) {
-            const q = (i / N + age * 0.05) % 1;
-            const e = Math.pow(q, 1.6);
-            if (e > reach) continue;
-            const bump = Math.max(0, 1 - Math.abs(e - wave) / 0.12);
-            const k = Math.max(0, Math.min(5, Math.round(2 + e * 2 - bump * 2.5)));
-            const [tx, ty] = at(e);
-            const wob = Math.sin(age * 0.5 + i * 1.9) * 0.6;
-            push(tx, ty, lift + 1 + Math.sin(e * Math.PI) * 5 + wob, false, A.fx(`bdisc:${k}`), 0, 4);
-          }
-          // 受け手：波が届いた（wave が 1 を越えた）tick から6 tick、赤い輪が手もとへ縮んで吸い込まれる
-          const tArrive = Math.ceil(((1 + 0.15) / 1.3) * GULP);
-          const sinceGulp = (g - tArrive + GULP) % GULP;
-          const gulping = age >= tArrive && sinceGulp < 6;
-          if (gulping) push(fx, fy, lift, false, A.fx(`ring:0:5:${5 - sinceGulp}`), 0, 4);
-          // 届いた直後の3 tick は、手もとに血の玉がたまって見える（src/sprites.ts の fxBloodOrb）
-          if (gulping && sinceGulp < 3) push(fx, fy, lift + 1, false, A.fx(`borb:${sinceGulp}`), 0, 4);
-          dyn.push({ x: fx, y: fy - 10, r: 26, i: (0.3 + (gulping ? 0.35 * (1 - sinceGulp / 6) : 0)) * damp, c: 6 });
+          // 受け手：玉が届いてから4 tick、赤い輪が手もとへ縮んで吸い込まれる
+          if (gulp < 4) push(fx, fy, lift, false, A.fx(`ring:0:5:${4 - gulp}`), 0, 4);
+          dyn.push({ x: fx, y: fy - 10, r: 26, i: (0.3 + (gulp < 6 ? 0.35 * (1 - gulp / 6) : 0)) * damp, c: 6 });
           dyn.push({ x: sx, y: sy - 8, r: 18, i: (0.18 + 0.1 * Math.sin(age * 0.5)) * damp, c: 6 });
           break;
         }
