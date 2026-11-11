@@ -400,6 +400,34 @@ export const SPAWN_DEFS: SpawnDef[] = [
     },
     log: `コウモリの群れを従えて、{k:${Kind.Vampire}}が暗がりのマナから現れた`,
   },
+  // ワーム：深部で眠る大物。最初からいて（src/eco/salamander.ts の seed）、倒されると、深部のまわりの土の養分からまた湧く
+  // （生き物の更新600回ごとに4つに1つのくじ。前に湧いてから2日はあける）。
+  // 以前は一度倒されると二度と現れず、冒険者が深部へ行く回数が増えると、ワームが画面から消える日が増えた
+  {
+    k: Kind.Worm, side: 'nutr', tier: 3, every: 600, phase: 413, cool: DAY_TICKS_ECO, minDay: 2,
+    ok: (e) => e.w.map.deep.x >= 0,
+    cap: () => 1,
+    site: (e) => {
+      const m = e.w.map;
+      const k = m.deep.y * m.w + m.deep.x;
+      return ih(e.step, 0, 819) % 4 === 0 ? k : -1;
+    },
+    band: () => 1,
+    body: 200, food: 0, mana: 0, nutrR: 6,
+    spot: (e) => [e.w.map.deep.x * TILE + 8 + 30, e.w.map.deep.y * TILE + 8 + 20],
+    setup: (e, c) => {
+      c.st = 0;
+      c.dir = 0;
+      // 眠っている体：頭の後ろにとぐろを巻くように（はじめのワームと同じ）
+      const tr: number[] = [];
+      for (let i = 0; i < 10; i++) {
+        const a = i * 0.7;
+        tr.push(Math.round(c.x + Math.sin(a) * (6 + i * 1.6)), Math.round(c.y - 6 - i * 5 + Math.cos(a) * 4));
+      }
+      e.trails.set(c.id, tr);
+    },
+    log: `深部の土が盛り上がり、{k:${Kind.Worm}}が目を覚ました`,
+  },
   // ドラゴンの幼子：ダンジョンにドラゴンがいなければ、6日目以降、深部のまわり（20マス）でいちばんマナの濃い所が32以上なら、卵が孵る（通常速度で1分ごとに見る）。
   // （マナの湧き口を半分にしたとき、しきい値を決め直した：深部のまわりの最大の中央値が 197 → 91 になったので、70 → 32。
   //  ほかのしきい値も、開いた床のうち満たすマスの割合が以前と同じになる値にした。8シード×10〜25日目で測った）

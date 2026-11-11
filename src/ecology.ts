@@ -923,7 +923,9 @@ export class Ecology {
    * 体のマナを燃やして生き延びる（MANA_BURN_EVERY 回ごとに1。src/eco/step.ts の metabolism）。マナは、休んでいる間に足もとの土から吸い（MANA_REST_EVERY 回ごとに1）、
    * 減ってくると近くのウィスプを吸って補う（src/eco/monsters.ts の sipWisp）。マナが尽きると、ほかの種と同じく飢え死にする
    */
-  static MANA_FED = new Set<number>([Kind.Troll, Kind.Basilisk, Kind.Minotaur, Kind.Gargoyle]);
+  // ヴァンパイアもマナから湧くので、同じく体のマナで命をつなぐ（外から来ていたころは、横穴から住処へ歩く道中で獲物に出会えたが、
+  // 住処の場に湧くようになって、飢えて去るのが増えた：8シード×25日で 8 → 16）
+  static MANA_FED = new Set<number>([Kind.Troll, Kind.Basilisk, Kind.Minotaur, Kind.Gargoyle, Kind.Vampire]);
   static MANA_BURN_EVERY = 20;
   /** これより少ないと「マナが尽きかけている」（ウィスプを探し、飢えて去るのをやめない） */
   static MANA_LOW = 60;
