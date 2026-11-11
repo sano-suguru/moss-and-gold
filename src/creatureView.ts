@@ -892,7 +892,7 @@ export class CreatureView {
           if (age < 8) dyn.push({ x: r.ax, y: r.ay - 12, r: 56 + age * 6, i: 0.5 * damp * (1 - age / 8), c: 7 });
           break;
         }
-        case 'spore': {
+        case 'sporecloud': {
           // マイコニドの眠りの胞子（src/eco/myconidskill.ts）：傘から藤色の胞子の塊（src/sprites.ts の fxSporeCloud）がふくらみ、
           // そのまわりへ小さな塊（fxSporePuff）が輪になって広がって、届く所（半径 rad）で漂ってから薄れる。光る粒（fxSporeMote）が雲の中をゆっくり舞い上がる。
           // 倒れて弾けたとき（col 1）は、地面の近くからぱっと散る。まわりがほのかに藤色に照らされる

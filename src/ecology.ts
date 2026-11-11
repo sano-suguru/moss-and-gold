@@ -566,6 +566,8 @@ export interface Cr {
   bind: number;
   /** うたた寝の残り（生き物の更新の回数。src/eco/myconidskill.ts）：マイコニドの眠りの胞子を浴びた人が、立ったまま眠って動かない。打たれたら目を覚ます */
   doze: number;
+  /** 最後にマイコニドの胞子でうたた寝した時刻（tick。src/eco/myconidskill.ts）：そのあとしばらくは胞子に慣れて眠らない */
+  sporeAt: number;
   /** 死骸ができたときの養分（腐り具合の目安） */
   init: number;
 }

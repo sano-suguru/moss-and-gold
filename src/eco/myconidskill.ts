@@ -2,10 +2,12 @@
  * Ecology のメソッド：マイコニドの技（眠りの胞子）。
  *
  * マイコニドは、見通しの利く3マス以内に人（冒険者・ドワーフ）が来ると、そちらを向いて傘を膨らませ（およそ0.6秒）、
- * 半径2マスほどの胞子の雲を吐く。雲の中の人は、マイコニドの方を向いて頭の上に「!」が出たあと、その場でうたた寝をする
+ * 相手の方へ1マス寄った所に、半径2マスほどの胞子の雲を吐く（3マス先の相手まで届く）。雲の中の人は、マイコニドの方を向いて頭の上に「!」が出たあと、その場でうたた寝をする
  * （およそ4秒、立ったまま動かず、頭の上に小さな z が立ちのぼる。溜めていた技は止まる。打たれたら目を覚ます）。
  * 胞子を吐いたマイコニドは、浴びせた相手に「害をなした者」として覚えられ（foe）、目を覚ました冒険者に払われる（以前の見えない胞子と同じ。src/eco/adventurer.ts）。
- * 使ったあと10秒は吐かない。
+ * 使ったあと10秒は吐かない。胞子でうたた寝した人は、そのあと5分ほど胞子に慣れて、狙われもせず、雲を浴びても眠らない。
+ *   （はじめは慣れがなく、雲もマイコニドを中心に吐いていた。16シード×25日で、吐いたうちの46%が誰にも届かない空振りで、
+ *    そばで掘り続けるドワーフなどに、同じマイコニドが10秒おきに30回ほど続けて吐き、そのあいだ根を下ろす時計も進まなかった）
  * 払われて倒れたときも、体が弾けて胞子が散り、すぐそば（2マス）の人がうたた寝をする（src/eco/move.ts の die から）。
  * 胞子が効くのは人だけ（範囲の技は人に向けてだけ使う。モンスター同士は命を取らない関わりを中心にするため）。
  * 眠っている人（野営で眠っている一行など）は、もう眠っているので狙わない。
@@ -13,7 +15,8 @@
  * （以前は、2マス以内の人に生き物の更新6回ごとに見えない胞子を浴びせ、冒険者の足を1分ほど0.6倍に鈍らせ、ドワーフには眠気を足していた。
  *  マイコニドは攻撃の姿を取るだけで、画面には何も出ていなかった）
  *
- * 状態：溜めている間は act 2・actT が負の数（src/eco/skill.ts）、狙った相手は aim。うたた寝の残りは人の Cr.doze（生き物の更新の回数。セーブに入る）。
+ * 状態：溜めている間は act 2・actT が負の数（src/eco/skill.ts）、狙った相手は aim。うたた寝の残りは人の Cr.doze（生き物の更新の回数）、
+ * 胞子でうたた寝した時刻（tick）は人の Cr.sporeAt（どちらもセーブに入る）。
  * マイコニドの actT は根を下ろすまでの時計にも使う（src/eco/myconid.ts）。胞子を吐いた回に 0 に戻る（以前の見えない胞子と同じ）。
  */
 import { Cr, Ecology, Kind, sq } from '../ecology';
@@ -29,6 +32,13 @@ export const SPORE_R = 2 * TILE;
 export const BURST_R = 2 * TILE;
 /** うたた寝の長さ（生き物の更新の回数。およそ4秒） */
 export const DOZE_N = 20;
+/** 雲の中心を相手の方へ寄せる長さ（px） */
+const SPORE_LEAD = TILE;
+/** 胞子に慣れている長さ（tick。5分） */
+const SPORE_IMMUNE = 3000;
+
+/** 胞子に慣れていて、もう眠らない人か */
+const used = (e: Ecology, o: Cr) => e.w.tick - o.sporeAt < SPORE_IMMUNE;
 
 const isPerson = (o: Cr) => !o.dead && !o.away && !o.caught && (o.k === Kind.Adventurer || o.k === Kind.Dwarf);
 
@@ -44,7 +54,20 @@ export function myconidSkill(this: Ecology, c: Cr): boolean {
     c.aim = 0;
     c.act = 2;
     c.actT = 0;
-    this.sporeCloud(c, c.x, c.y, SPORE_R, 0);
+    // 雲は、狙った相手の方へ1マス寄った所に吐く（壁の向こうへは寄せない）
+    let cx = c.x;
+    let cy = c.y;
+    if (t && !t.dead && !t.away) {
+      const L = Math.hypot(t.x - c.x, t.y - c.y) || 1;
+      const lead = Math.min(L, SPORE_LEAD);
+      const nx = c.x + ((t.x - c.x) / L) * lead;
+      const ny = c.y + ((t.y - c.y) / L) * lead;
+      if (lineOfSight(this.w.map, c.x, c.y, nx, ny)) {
+        cx = nx;
+        cy = ny;
+      }
+    }
+    this.sporeCloud(c, cx, cy, SPORE_R, 0);
     return true;
   }
   if (sk === 'broken') {
@@ -55,7 +78,7 @@ export function myconidSkill(this: Ecology, c: Cr): boolean {
   let best: Cr | null = null;
   let bd = SPORE_TRIGGER * SPORE_TRIGGER;
   this.nearby(c.x, c.y, Math.ceil(SPORE_TRIGGER / TILE), (o) => {
-    if (!isPerson(o) || o.sleep > 0 || o.doze > 0) return;
+    if (!isPerson(o) || o.sleep > 0 || o.doze > 0 || used(this, o)) return;
     const d = sq(o.x - c.x) + sq(o.y - c.y);
     if (d >= bd || !lineOfSight(this.w.map, c.x, c.y, o.x, o.y)) return;
     bd = d;
@@ -70,18 +93,20 @@ export function myconidSkill(this: Ecology, c: Cr): boolean {
 }
 
 /**
- * 胞子の雲：(x, y) から半径 r の中の、見通しの利く人がうたた寝をする。how 0 吐いた、1 倒れて弾けた。
+ * 胞子の雲：(x, y) から半径 r の中の、見通しの利く人（胞子に慣れていない者）がうたた寝をする。how 0 吐いた、1 倒れて弾けた。
  * 浴びた人は、マイコニドの方を向いて「!」を出す。吐いたマイコニドは、いちばん近い浴びた相手に害をなした者として覚えられる
  */
 export function sporeCloud(this: Ecology, c: Cr, x: number, y: number, r: number, how: number): void {
   let n = 0;
+  let adv = 0;
   let near: Cr | null = null;
   let bd = 1e18;
   this.nearby(x, y, Math.ceil(r / TILE) + 1, (o) => {
-    if (!isPerson(o) || o.sleep > 0) return;
+    if (!isPerson(o) || o.sleep > 0 || used(this, o)) return;
     const d = sq(o.x - x) + sq(o.y - y);
     if (d > r * r || !lineOfSight(this.w.map, x, y, o.x, o.y)) return;
     o.doze = Math.max(o.doze, DOZE_N);
+    o.sporeAt = this.w.tick;
     this.setDir(o, c.x - o.x, c.y - o.y);
     // 胞子に気づいた「!」（同じ相手にもう気づいていても、浴びたときは出す）
     this.noticed.set(o.id, c.id);
@@ -91,15 +116,16 @@ export function sporeCloud(this: Ecology, c: Cr, x: number, y: number, r: number
     if (o.act === 2 && o.actT < 0) o.actT = 0;
     o.act = 0;
     n++;
+    if (o.k === Kind.Adventurer) adv++;
     if (d < bd) {
       bd = d;
       near = o;
     }
   });
   if (near && how === 0) c.foe = (near as Cr).id;
-  this.fxAttacks.push({ t: this.w.tick, style: 'spore', col: how, size: 1, ax: x, ay: y, dx: x, dy: y, did: near ? (near as Cr).id : -1, aid: c.id, big: false, kill: false, rad: r, fly: 6 });
+  this.fxAttacks.push({ t: this.w.tick, style: 'sporecloud', col: how, size: 1, ax: x, ay: y, dx: x, dy: y, did: near ? (near as Cr).id : -1, aid: c.id, big: false, kill: false, rad: r, fly: 6 });
   if (this.fxAttacks.length > 160) this.fxAttacks.splice(0, 60);
-  this.record('settle', { t: this.w.tick, k: Kind.Myconid, ev: 'spore', id: c.id, n, how, x: Math.round(x), y: Math.round(y) } as never);
+  this.record('settle', { t: this.w.tick, k: Kind.Myconid, ev: 'spore', id: c.id, n, adv, how, x: Math.round(x), y: Math.round(y) } as never);
 }
 
 /**
