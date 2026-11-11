@@ -64,6 +64,8 @@ export class CreatureView {
   private wormBulge = new Map<number, number>();
   /** ワームの頭が岩の中にいたか（岩から床へ出た瞬間に土ぼこりを上げるため） */
   private wormInRock = new Map<number, boolean>();
+  /** 土から魔物が湧いた所のうち、土くれを飛ばし終えたもの（描画専用。同じ湧きで二度飛ばさないように） */
+  private soilBurst = new Set<string>();
 
   /**
    * 起きているワーム（描画専用）：頭の跡（eco.trails、14px ごとの点）をなぞって4px ごとに胴の節を重ね、頭の側を太く尾へ細くする。
@@ -1484,15 +1486,26 @@ export class CreatureView {
           pushSprite(tw.x + Math.cos(a) * r, tw.y + Math.sin(a) * r * 0.6, 6 + Math.sin(age * 0.3 + i) * 3 - age * 0.3, false, A.fx('bit:3:7:0'), 0, 4);
         }
     }
-    // 土の養分から魔物が湧いた所（描画専用。fxSoilBirths）：床から土ぼこりが輪になって舞い上がり、ゆっくり沈む
+    // 土の養分から魔物が湧いた所（描画専用。fxSoilBirths）：床が弾けて土くれが四方へ飛び（ワームが岩から出るときと同じ粒）、
+    // 土ぼこりが大きな輪になって舞い上がり、ゆっくり沈む。湧いた魔物の体に隠れないよう、輪は体より広く広げる
     for (const sb of eco.fxSoilBirths) {
       const age = eco.w.tick - sb.t;
-      if (age < 0 || age > 40 || !inView(sb.x, sb.y, 32)) continue;
-      const p = age / 40;
-      for (let i = 0; i < 12; i++) {
-        const a = i * 0.524 + (sb.t % 7);
-        const r = 3 + p * (12 + (i % 3) * 4);
-        pushSprite(sb.x + Math.cos(a) * r, sb.y + 4 + Math.sin(a) * r * 0.5, Math.sin(p * Math.PI) * (5 + (i % 4) * 2), false, A.dust(Math.min(3, Math.floor(p * 4 + (i & 1)))), 0, 2);
+      if (age < 0 || age > 50 || !inView(sb.x, sb.y, 40)) continue;
+      const key = `${sb.t},${sb.x},${sb.y}`;
+      if (age < 20 && !this.soilBurst.has(key)) {
+        if (this.soilBurst.size > 200) this.soilBurst.clear();
+        this.soilBurst.add(key);
+        for (let i = 0; i < 14; i++) {
+          const a = (i / 14) * 6.283;
+          const sp = 1 + (i % 3) * 0.35;
+          this.bits.push({ x: sb.x, y: sb.y + 4, z: 3, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.55, vz: 1.4 + (i % 4) * 0.6, kind: i & 1 ? 1 : 0, col: 0, t0: eco.w.tick, life: 18 + (i % 3) * 4 });
+        }
+      }
+      const p = age / 50;
+      for (let i = 0; i < 16; i++) {
+        const a = i * 0.393 + (sb.t % 7);
+        const r = 6 + p * (18 + (i % 3) * 5);
+        pushSprite(sb.x + Math.cos(a) * r, sb.y + 4 + Math.sin(a) * r * 0.5, Math.sin(Math.min(1, p * 1.6) * Math.PI) * (6 + (i % 4) * 3), false, A.dust(Math.min(3, Math.floor(p * 4 + (i & 1)))), 0, 2);
       }
     }
     // 冒険者が倒れた所でマナが立ちのぼる（描画専用。fxManaRise）：紫の粒が揺れながら昇って消える
