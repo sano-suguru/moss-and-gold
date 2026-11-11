@@ -403,6 +403,19 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // バジリスク（src/eco/monsters.ts の basilisk）：飢えの猶予を過ぎると住みかを出て、同じ洞窟の領域の獲物（大ネズミ・大トカゲ・アリ）のいる所まで遠出して狩り、
+    // 自分より大きな者を睨んで石に変える（石化の記録の by が17）。1〜2シードの出来事に偏るので、15シードの合計と、起きたシードの数で見る。
+    // 入れた版で main の10日目から始めると、仕留めた69回（8シード）・睨み59回（10シード）。展開が分かれただけで大きく変わるので、目安はその半分ほどにする
+    name: 'バジリスクが獲物を仕留め、睨みで石に変える（15シードの合計で、仕留めた30回以上・睨み25回以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const kill = rs.map((r) => r.deaths.filter((x) => x.by === 17 && (x.cause === 'eaten' || x.cause === 'fight')).length);
+      const gaze = rs.map((r) => r.deaths.filter((x) => x.by === 17 && x.cause === 'petrified').length);
+      const seeds = (a: number[]) => a.filter((v) => v > 0).length;
+      return { ok: sum(kill) >= 30 && sum(gaze) >= 25, value: `仕留めた ${sum(kill)}（${seeds(kill)}シード）、睨み ${sum(gaze)}（${seeds(gaze)}シード）` };
+    },
+  },
+  {
     // マナの減った大物が、近くのウィスプへ寄って吸う（src/eco/monsters.ts の sipWisp）。大物は暗い深部に、ウィスプは苔のある明るい所に多く、
     // 近くにいることは少ない（main の8シード×10〜18日目の深夜で、大物の1割ほどが8マス以内にウィスプがいた）。15シードの合計で見る。
     // 入れた版で main の10日目から始めると218回（seed4 101・seed41 60・seed8 34 など7シード）。野の生き物を外から来させないようにした版では39回（7シード）。

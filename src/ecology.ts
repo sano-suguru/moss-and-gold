@@ -900,7 +900,9 @@ export class Ecology {
    * 書かれていない種は夜目と同じ
    */
   static SENSE: Record<number, string> = {
-    [Kind.Adventurer]: 'eye', [Kind.Lizard]: 'eye', [Kind.Lizardman]: 'eye', [Kind.Basilisk]: 'eye', [Kind.Wyvern]: 'eye',
+    [Kind.Adventurer]: 'eye', [Kind.Lizard]: 'eye', [Kind.Lizardman]: 'eye', [Kind.Wyvern]: 'eye',
+    // バジリスクは、濃いマナの暗がりに住むので夜目（以前は光に頼る目で、暗がりの獲物には1.5マスまで近づかないと気づかず、ほとんど狩れなかった）
+    [Kind.Basilisk]: 'night',
     [Kind.Goblin]: 'night', [Kind.Kobold]: 'night', [Kind.Orc]: 'night', [Kind.Dwarf]: 'night', [Kind.Vampire]: 'night', [Kind.Dragon]: 'night',
     [Kind.Rat]: 'smell', [Kind.Ant]: 'smell', [Kind.Troll]: 'smell', [Kind.Zombie]: 'smell', [Kind.Minotaur]: 'smell', [Kind.Slime]: 'smell',
     [Kind.Spider]: 'vib', [Kind.Worm]: 'vib', [Kind.Mimic]: 'vib',

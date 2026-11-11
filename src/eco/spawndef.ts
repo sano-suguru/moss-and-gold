@@ -8,7 +8,7 @@
  */
 import { Burrow, Camp, Colony, Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, Warren, ih } from '../ecology';
 import { TILE } from '../mapgen';
-import { BASILISK_MANA } from './monsters';
+import { BASILISK_MANA, BASILISK_ROAM_PREY } from './monsters';
 
 export interface SpawnDef {
   k: Kind;
@@ -480,17 +480,23 @@ export const SPAWN_DEFS: SpawnDef[] = [
     },
     log: `深部の濃いマナから、{k:${Kind.Dragon}}の幼子が生まれた`,
   },
-  // バジリスク：マナがとても濃く（30〜。以前は60）、暗く、人の気配の薄い所。ほかのバジリスク（30マス）・トロール（12マス）・竜（25マス）のそばには湧かない
+  // バジリスク：マナがとても濃く（30〜。以前は60）、暗く、人の気配の薄い所で、遠出で追う獲物のいる洞窟の領域。
+  // ほかのバジリスク（30マス）・トロール（12マス）・竜（25マス）のそばには湧かない
   {
     k: Kind.Basilisk, side: 'mana', tier: 2, every: 50, phase: 13, cool: 0, minDay: 0,
     cap: () => 2,
-    site: (e) =>
-      manaSite(e, (k, mn, bigs) => {
-        if (mn < BASILISK_MANA || !darkDeep(e, k)) return false;
+    site: (e) => {
+      // 遠出で追う獲物（大ネズミ・大トカゲ・アリ）が1匹もいない洞窟の領域には湧かない（つながっていない袋小路に湧くと、遠出しても獲物に届かず、
+      // この条件を入れる前は、16シード×25日で飢えで失った15頭の多くがそれだった。seed27 では同じ袋小路に3頭続けて湧き、どれも飢えて去った）
+      const preyRegions = new Set<number>();
+      for (const c of e.list) if (!c.dead && !c.away && BASILISK_ROAM_PREY.includes(c.k)) preyRegions.add(e.regionOf(e.tileOf(c.x, c.y)));
+      return manaSite(e, (k, mn, bigs) => {
+        if (mn < BASILISK_MANA || !darkDeep(e, k) || !preyRegions.has(e.regionOf(k))) return false;
         const m = e.w.map;
         if (e.presenceAt((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8) >= 0.15) return false;
         return !near(e, bigs, k, Kind.Basilisk, 30) && !near(e, bigs, k, Kind.Troll, 12) && !near(e, bigs, k, Kind.Dragon, 25);
-      }),
+      });
+    },
     band: () => 1,
     body: 60, food: 30, mana: 240, nutrR: 3, manaR: 3,
     log: `濃いマナの暗がりから、{k:${Kind.Basilisk}}が湧いた`,

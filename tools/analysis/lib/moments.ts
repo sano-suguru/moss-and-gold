@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-const K = { Myconid: 8, Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5, Ghost: 7 };
+const K = { Myconid: 8, Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5, Ghost: 7, Basilisk: 17 };
 
 export interface Moment {
   key: string;
@@ -89,6 +89,8 @@ export const MOMENTS: Moment[] = [
   { key: 'minoBirth', label: 'ミノタウロス：縄張りでマナから生まれた' },
   { key: 'minoKill', label: 'ミノタウロス：縄張りのそばで獲物を仕留めた（寝床から16マスの内でしか狩らない）' },
   { key: 'minoDrag', label: 'ミノタウロス：仕留めた獲物を寝床まで引きずった' },
+  { key: 'bsGaze', label: 'バジリスク：睨みで相手を石に変えた' },
+  { key: 'bsKill', label: 'バジリスク：獲物を仕留めた（ウィスプを吸ったのは除く）' },
   { key: 'soilBirth', label: '土の養分から魔物の群れが湧いた（コウモリを除く）' },
   { key: 'heroMana', label: '冒険者が倒れた所でマナが立ちのぼった' },
   { key: 'wispSip', label: 'マナの減った大物がウィスプを吸った' },
@@ -325,6 +327,8 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     hatch: b.filter((x) => x.origin === 'mana' && x.k === K.Dragon).length,
     minoBirth: b.filter((x) => x.origin === 'mana' && x.k === K.Minotaur).length,
     minoKill: d.filter((x) => x.by === K.Minotaur && (x.cause === 'eaten' || x.cause === 'fight')).length,
+    bsGaze: d.filter((x) => x.by === K.Basilisk && x.cause === 'petrified').length,
+    bsKill: d.filter((x) => x.by === K.Basilisk && (x.cause === 'eaten' || x.cause === 'fight')).length,
     minoDrag: ev(K.Minotaur, 'drag').length,
     // 湧きの記録（src/eco/generate.ts の settle 'gen'。群れごとに1回）
     soilBirth: s.filter((x) => x.ev === 'gen' && x.how === 'nutr' && x.k !== K.Bat).length,

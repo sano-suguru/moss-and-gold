@@ -6,7 +6,7 @@ import { JOB_NAMES } from '../names';
 import type { World } from '../world';
 
 /** 生き物を、その瞬間の姿のまま石像に変える */
-export function petrify(this: Ecology, c: Cr): void {
+export function petrify(this: Ecology, c: Cr, by = -1): void {
   this.dropBelongings(c);
   if (c.gold > 0) {
     this.dropGold(c.x, c.y, c.gold, this.ownerNote(c, 'fell'));
@@ -18,10 +18,10 @@ export function petrify(this: Ecology, c: Cr): void {
   // 入口のそばでは石像にならない（入口をふさがないように）
   const nearGate = Math.abs((k % m.w) - m.entrance.x) + Math.floor(k / m.w) < 10;
   if (k < 0 || this.statueAt.has(k) || nearGate) {
-    this.die(c, 'petrified');
+    this.die(c, 'petrified', by);
     return;
   }
-  this.record('deaths', { t: this.w.tick, id: c.id, k: c.k, cause: 'petrified', by: -1, x: Math.round(c.x), y: Math.round(c.y) } as never);
+  this.record('deaths', { t: this.w.tick, id: c.id, k: c.k, cause: 'petrified', by, x: Math.round(c.x), y: Math.round(c.y) } as never);
   this.releaseMana(c);
   const st: Statue = { id: this.nextId++, x: Math.round(c.x), y: Math.round(c.y), k: c.k, sp: c.sp, dir: c.dir, act: c.act === 3 ? 0 : c.act, f: (this.step >> 2) & 3, units: c.body + c.food + c.units, age: 0 };
   this.statues.push(st);
