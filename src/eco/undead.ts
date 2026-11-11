@@ -181,6 +181,7 @@ export function spawnGhosts(this: Ecology, day: number): void {
       const k = y * m.w + x;
       // ゴーストは死者の多さから生まれる（マナがあれば少し使う）
       if (m.solid[k] || m.lava[k] || this.lit(k, day) > 0.2) continue;
+      this.originNext = 'mana';
       const g = this.spawn(Kind.Ghost, x * TILE + 8, y * TILE + 8, 0, 0);
       this.takeMana(g, k, 20);
       g.st = 0;

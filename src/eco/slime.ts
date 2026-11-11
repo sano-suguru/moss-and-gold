@@ -170,6 +170,7 @@ export function spawnSlimes(this: Ecology): void {
   if (!cands.length) return;
   const k = cands[ih(this.step, 2, 54) % cands.length];
   this.w.nutr[k] -= 12;
+  this.originNext = 'soil';
   this.spawn(Kind.Slime, (k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8, 12, 0);
 }
 

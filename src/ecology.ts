@@ -968,6 +968,10 @@ export class Ecology {
   fxMarks: { t: number; id: number; m: string }[] = [];
   /** マナから生まれた者（描画専用：生まれる場所にマナが集まって姿が現れる演出。セーブしない。シミュレーションの判断に使わない） */
   fxManaBorn: { id: number; t: number; k: number; x: number; y: number }[] = [];
+  /** 土の養分から魔物が湧いた所（描画専用：床から土ぼこりが舞い上がる。シミュレーションの判断に使わない。セーブには直前の10秒分だけ残す。src/eco/generate.ts） */
+  fxSoilBirths: { t: number; x: number; y: number }[] = [];
+  /** 冒険者が倒れた所でマナが立ちのぼる演出（描画専用。シミュレーションの判断に使わない。セーブには直前の6秒分だけ残す） */
+  fxManaRise: { t: number; x: number; y: number }[] = [];
   /** リビングアーマーの組み上がり（描画専用：体になった武具の種類と、床にあった位置の、甲冑からのずれ px。セーブしない。シミュレーションの判断に使わない） */
   fxArmorRise: { id: number; t: number; parts: [number, number, number][] }[] = [];
   /**

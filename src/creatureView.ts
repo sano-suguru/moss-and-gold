@@ -1484,6 +1484,28 @@ export class CreatureView {
           pushSprite(tw.x + Math.cos(a) * r, tw.y + Math.sin(a) * r * 0.6, 6 + Math.sin(age * 0.3 + i) * 3 - age * 0.3, false, A.fx('bit:3:7:0'), 0, 4);
         }
     }
+    // 土の養分から魔物が湧いた所（描画専用。fxSoilBirths）：床から土ぼこりが輪になって舞い上がり、ゆっくり沈む
+    for (const sb of eco.fxSoilBirths) {
+      const age = eco.w.tick - sb.t;
+      if (age < 0 || age > 40 || !inView(sb.x, sb.y, 32)) continue;
+      const p = age / 40;
+      for (let i = 0; i < 12; i++) {
+        const a = i * 0.524 + (sb.t % 7);
+        const r = 3 + p * (12 + (i % 3) * 4);
+        pushSprite(sb.x + Math.cos(a) * r, sb.y + 4 + Math.sin(a) * r * 0.5, Math.sin(p * Math.PI) * (5 + (i % 4) * 2), false, A.dust(Math.min(3, Math.floor(p * 4 + (i & 1)))), 0, 2);
+      }
+    }
+    // 冒険者が倒れた所でマナが立ちのぼる（描画専用。fxManaRise）：紫の粒が揺れながら昇って消える
+    for (const mr of eco.fxManaRise) {
+      const age = eco.w.tick - mr.t;
+      if (age < 0 || age > 50 || !inView(mr.x, mr.y, 48)) continue;
+      for (let i = 0; i < 12; i++) {
+        const ph = (age / 30 + i / 12) % 1;
+        const lift = 2 + ph * 26;
+        const fade = age > 38 ? Math.max(0, 3 - Math.floor((age - 38) / 4)) : Math.min(3, 1 + (i % 3));
+        pushSprite(mr.x + Math.sin(age * 0.2 + i * 1.7) * (3 + (i % 3) * 2), mr.y + (i % 4) - 1, lift, false, A.manaMote(fade), 0, 2);
+      }
+    }
     for (const c of eco.colonies) if (inView(c.x, c.y, 24)) pushSprite(c.x, c.y + 4, 0, false, A.anthill, 0, 2);
     for (const c of eco.camps) {
       if (!inView(c.x, c.y, 32)) continue;

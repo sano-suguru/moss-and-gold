@@ -67,6 +67,7 @@ export function updateStatues(this: Ecology, day: number): void {
     const k = this.tileOf(st.x, st.y);
     if (st.units > 8 && st.age > 4000 && k >= 0 && this.lit(k, day) < 0.15 && this.manaAround(k) >= 20 && this.counts[Kind.Gargoyle] < 6 && ih(st.id, this.step, 110) % 120 === 0) {
       const body = Math.min(30, st.units);
+      this.originNext = 'mana';
       const g = this.spawn(Kind.Gargoyle, st.x, st.y, body, 0);
       this.takeMana(g, k, 70);
       this.deposit(st.x, st.y, st.units - body);

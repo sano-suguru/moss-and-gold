@@ -217,6 +217,8 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   this.updateFire();
   this.updateDigging();
   if (this.step % 100 === 41) this.checkJoined();
+  // 魔物が土の養分とマナから湧く（src/eco/generate.ts。表の各行が自分の判定の回を持つので、毎回呼ぶ）
+  this.generate();
   if (this.step % 50 === 13) this.manaBirths(this.day);
   if (this.step % 300 === 77) this.riseLeaders();
   if (this.step % 100 === 43) this.breakTopWall();

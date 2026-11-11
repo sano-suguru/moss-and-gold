@@ -16,6 +16,7 @@ export function spawnSalamanders(this: Ecology): void {
     const k = ih(this.step, i, 76) % (m.w * m.h);
     if (m.solid[k] || m.lava[k] || this.w.heat[k] < 150 || this.w.nutr[k] < 12 || this.manaAround(k) < 8) continue;
     this.w.nutr[k] -= 12;
+    this.originNext = 'mana';
     const sal = this.spawn(Kind.Salamander, (k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8, 12, 0);
     this.takeMana(sal, k, 30);
     // 溶岩の熱と濃いマナが重なると、火の精になる（ダンジョンに一体だけ）
@@ -237,6 +238,7 @@ export function maybeSpawnWisp(this: Ecology, k: number, step: number): void {
   this.w.moss[k] -= 4;
   this.counts[Kind.Wisp]++;
   const m = this.w.map;
+  this.originNext = 'soil';
   const wi = this.spawn(Kind.Wisp, (k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8, 4, 0);
   this.takeMana(wi, k, 2, 0);
   // 光の筋の日の光とマナが重なる所では、光の精になる
@@ -310,16 +312,15 @@ export function takeNutrients(this: Ecology, k: number, want: number, r = 3): nu
 }
 
 /**
- * マナから上位の魔物が生まれる（通常速度で5秒ごと）：開いた床を数十か所見て、まわりのマナが濃く、条件の揃った所から、
- * トロール（40〜、暗がり）、ミノタウロス（縄張りの中なら、マナが薄くても）、バジリスク（60〜、暗がり、人の気配が薄い）、
- * ドラゴンの幼子（120〜、ダンジョンにドラゴンがいない）が生まれる。生まれるとき、まわりのマナと土の養分を使う
+ * マナから生まれる特別な者（通常速度で5秒ごと）：深い水とマナが重なる所の水の精。
+ * トロール・バジリスク・ミノタウロス・ドラゴンの幼子は、湧きの表（src/eco/spawndef.ts）から generate が湧かせる
  */
 export function manaBirths(this: Ecology, day: number): void {
+  void day;
   const m = this.w.map;
-  const n = this.counts;
-  const dragons = this.list.some((c) => c.k === Kind.Dragon && !c.dead);
-  // 水の精：深い水とマナが重なる所から（通常速度で1分ごとに数か所を見る。ダンジョンに一体まで）
-  if (this.step % 600 === 223 && !this.list.some((o) => o.elite === 6 && !o.dead) && this.w.tick - (this.lastElite[6] ?? -1e9) > DAY_TICKS_ECO * 2) {
+  // 水の精：深い水とマナが重なる所から（通常速度で1分ごとに数か所を見る。ダンジョンに一体まで）。
+  // （判定の回は、呼ぶ側の step % 50 === 13 と重なる 213。以前は 223 で、一度も生まれていなかった）
+  if (this.step % 600 === 213 && !this.list.some((o) => o.elite === 6 && !o.dead) && this.w.tick - (this.lastElite[6] ?? -1e9) > DAY_TICKS_ECO * 2) {
     for (let i = 0; i < 80; i++) {
       const k = ih(this.step, i, 306) % (m.w * m.h);
       if (m.solid[k] || m.sealed[k] || this.w.water[k] < 150 || this.manaAround(k) < 12) continue;
@@ -336,93 +337,6 @@ export function manaBirths(this: Ecology, day: number): void {
       this.log(c.x, c.y, `深い水と濃いマナから、水の精「${this.names.get(c.id)}」が生まれた`);
       break;
     }
-  }
-  // ドラゴンの幼子：ダンジョンにドラゴンがいなければ、6日目以降、深部のまわり（20マス）でいちばん濃い所を探し、70以上なら生まれる（通常速度で1分ごと）
-  if (!dragons && this.step % 600 === 113 && this.w.tick > DAY_TICKS_ECO * 6 && this.w.tick - (this.lastArrival[Kind.Dragon] ?? -1e9) * 2 > DAY_TICKS_ECO * 2) {
-    let bk = -1;
-    let bv = 0;
-    for (let dy = -20; dy <= 20; dy++)
-      for (let dx = -20; dx <= 20; dx++) {
-        const x = m.deep.x + dx;
-        const y = m.deep.y + dy;
-        if (x < 2 || y < 2 || x >= m.w - 2 || y >= m.h - 2) continue;
-        const k = y * m.w + x;
-        if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.lightBase[k] > 0 || this.w.water[k] > 40) continue;
-        const v = this.manaAround(k);
-        if (v > bv) {
-          bv = v;
-          bk = k;
-        }
-      }
-    if (bk >= 0 && bv >= 70) {
-      const got = this.takeNutrients(bk, Math.round(SPEC[Kind.Dragon].body * 0.2), 5);
-      if (got) {
-        const x = (bk % m.w) * TILE + 8;
-        const y = Math.floor(bk / m.w) * TILE + 8;
-        this.originNext = 'mana';
-        const c = this.spawn(Kind.Dragon, x, y, got, 60);
-        this.imported += 60;
-        // 幼竜が卵を割って出てくると、地の底の揺れと咆哮が町にも伝わる（竜の噂。竜殺しが深部を探りに来る）
-        this.rumors.dragon += 0.6;
-        this.takeMana(c, bk, 600, 4);
-        c.sp = 0;
-        c.st = 0;
-        c.hx = x;
-        c.hy = y;
-        c.bornAt = this.w.tick;
-        c.lureAt = this.step;
-        this.lastArrival[Kind.Dragon] = this.step;
-        this.dragonShell = { x, y: y + 4, t: this.w.tick };
-        this.log(x, y, `深部の濃いマナから、{k:${Kind.Dragon}}の幼子が生まれた`);
-      }
-    }
-  }
-  const near = (k: number, kind: Kind, R: number) => this.list.some((c) => c.k === kind && !c.dead && Math.abs(c.x / TILE - (k % m.w)) + Math.abs(c.y / TILE - Math.floor(k / m.w)) < R);
-  // ミノタウロスは、ダンジョンに一頭もいなくて、2日目以降、前の一頭が生まれてから1日（生き物の更新 DAY_TICKS_ECO / CR_EVERY 回）たっていれば生まれる。
-  // そのときは、見る場所の一つめを縄張りの床にする（縄張りはせまく、ばらばらに見るだけではめったに当たらない）
-  const minoOk = n[Kind.Minotaur] === 0 && this.w.tick > DAY_TICKS_ECO * 2 && this.step - (this.lastArrival[Kind.Minotaur] ?? -1e9) > DAY_TICKS_ECO / CR_EVERY;
-  const lt = minoOk ? this.lairTiles() : [];
-  for (let i = 0; i < 40; i++) {
-    const k = i === 0 && lt.length ? lt[ih(this.step, 0, 233) % lt.length] : ih(this.step, i, 230) % (m.w * m.h);
-    if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 40) continue;
-    const mn = this.manaAround(k);
-    const lair = this.inLair((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8);
-    if (mn < 2 && !lair) continue;
-    const noSun = this.w.lightBase[k] === 0;
-    const dark = this.lit(k, day) < 0.12;
-    const x = (k % m.w) * TILE + 8;
-    const y = Math.floor(k / m.w) * TILE + 8;
-    let kind: Kind | -1 = -1;
-    let cost = 0;
-    let body = 0;
-    if (mn >= 60 && dark && noSun && n[Kind.Basilisk] < 2 && this.presenceAt(x, y) < 0.15 && !near(k, Kind.Basilisk, 30) && !near(k, Kind.Troll, 12) && !near(k, Kind.Dragon, 25)) {
-      kind = Kind.Basilisk;
-      cost = 240;
-      body = 60;
-    } else if (mn >= 40 && dark && noSun && n[Kind.Troll] < 2 && !near(k, Kind.Troll, 25) && !near(k, Kind.Basilisk, 12) && !near(k, Kind.Dragon, 25)) {
-      kind = Kind.Troll;
-      cost = 160;
-      body = 150;
-    } else if (lair && minoOk) {
-      // 縄張りは古い呪いの場所：マナが薄くても、縄張りの中なら主が生まれる（寝床を住みかにする）
-      kind = Kind.Minotaur;
-      cost = 20;
-      body = 120;
-    }
-    if (kind === -1 || ih(k, this.step, 232) % 4 !== 0) continue;
-    const got = this.takeNutrients(k, body, 3);
-    if (!got) continue;
-    this.originNext = 'mana';
-    const c = this.spawn(kind, x, y, got, 0);
-    this.takeMana(c, k, cost, 3);
-    c.hx = x;
-    c.hy = y;
-    if (kind === Kind.Minotaur) {
-      c.hx = m.lair.x * TILE + 8;
-      c.hy = m.lair.y * TILE + 8;
-      this.lastArrival[Kind.Minotaur] = this.step;
-    }
-    return;
   }
 }
 
