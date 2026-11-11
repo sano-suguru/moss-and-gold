@@ -110,7 +110,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--torch); out
 .card .t button { min-height: 32px; min-width: 32px; padding: 2px 6px; font-size: 14px; color: var(--ink-dim); }
 /* カーソルを重ねているだけのとき：パネルはクリックを通し、閉じるボタンは出さない */
 .card.peek { pointer-events: none; }
-.card.peek .t button { visibility: hidden; }
+.card.peek .t button { display: none; }
 .card ul { list-style: none; margin: 4px 0 0; padding: 0; color: var(--ink-dim); }
 .card::after { content: ''; position: absolute; left: var(--tail, 50%); bottom: -9px; margin-left: -7px; border: 7px solid transparent; border-top-color: var(--edge); border-bottom: 0; }
 .hint { font-size: 13px; line-height: 1.5; color: var(--ink-dim); padding: 8px 10px; max-width: calc(100vw - 190px); transition: opacity 0.8s; }
