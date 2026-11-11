@@ -754,8 +754,23 @@ export class CreatureView {
           break;
         }
         case 'drain': {
-          // ヴァンパイアの血吸い（src/eco/vampskill.ts）：相手からヴァンパイアの手もとへ、つやのある赤い血の玉（src/sprites.ts の fxBloodOrb）が、
-          // 細くなっていく赤い尾（fxBloodDisc を密に重ねたもの）を引いて、ゆるい弧を描きながら次々に流れていく。吸っているあいだだけ（切れたら消える）
+          // コウモリの噛みつき（src/eco/view.ts の attackStyle。演出の長さ fly を持たない）：噛んだ所に爪あとが走り、
+          // 小さな血のしずくが三つ、弧を描いてコウモリの方へ戻っていく
+          if (r.fly === undefined) {
+            if (age < 6) push(r.dx, r.dy, lift, flip, A.fx(`claw2:${r.col}:${f6(age)}`), 0, 4);
+            if (age >= 2 && age < 14)
+              for (let i = 0; i < 3; i++) {
+                const p = Math.min(1, (age - 2 - i * 2) / 8);
+                if (p < 0) continue;
+                push(r.dx - vx * p, r.dy - vy * p, lift + Math.sin(p * Math.PI) * 4, false, A.fx(`bit:2:5:0`), 0, 4);
+              }
+            break;
+          }
+          // ヴァンパイアの血吸い（src/eco/vampskill.ts）。吸っているあいだ（20 tick）だけ描き、切れたら消える。
+          // アクション RPG のライフスティールの形：相手の体から、つやのある血の玉（src/sprites.ts の fxBloodOrb）が不規則な間隔で
+          // にじみ出て、最初はゆっくり、ヴァンパイアに近づくほど速く吸い寄せられる（速くなるほど、うしろの尾 fxBloodDisc が長く伸びる）。
+          // 弧のふくらむ向きと大きさは玉ごとに変える（等間隔・左右対称だと、撃っているように見えるため）。
+          // 玉が届くたびに、ヴァンパイアの手もとへ赤い輪が縮んで吸い込まれ、胸もとの赤い明かりが強まる
           const v = eco.byId.get(r.aid);
           const d = eco.byId.get(r.did);
           if (!v || v.dead || !d || d.dead || v.run <= 0 || v.aim !== r.did || age > (r.fly ?? 20)) break;
@@ -764,27 +779,46 @@ export class CreatureView {
           const fx = v.x + (v.dir === 2 ? 5 : v.dir === 3 ? -5 : 0);
           const fy = v.y + (v.dir === 0 ? 3 : v.dir === 1 ? -3 : 0);
           const L = Math.hypot(fx - sx, fy - sy) || 1;
-          const px = -(fy - sy) / L;
-          const py = (fx - sx) / L;
-          const at = (q: number, side: number) => {
-            const bend = Math.sin(q * Math.PI) * Math.min(10, L * 0.18) * side;
-            return [sx + (fx - sx) * q + px * bend, sy + (fy - sy) * q + py * bend];
-          };
-          for (let i = 0; i < 4; i++) {
-            const q = (age * 0.07 + i / 4) % 1;
-            const side = i % 2 ? 1 : -1;
-            const steps = 6;
-            for (let j = steps; j >= 1; j--) {
-              const qq = q - j * 0.035;
-              if (qq < 0) continue;
-              const [tx, ty] = at(qq, side);
-              push(tx, ty, lift + 1 + Math.sin(qq * Math.PI) * 4, false, A.fx(`bdisc:${Math.min(5, j - 1)}`), 0, 4);
+          const nx = (fx - sx) / L;
+          const ny = (fy - sy) / L;
+          // 玉が相手からヴァンパイアへ届くまでの tick（遠いほど長く）
+          const T = Math.max(8, Math.min(12, Math.round(L / 6)));
+          const hh = (j: number, salt: number) => (((r.t * 73856093) ^ (j * 19349663) ^ (salt * 83492791)) >>> 0) % 1000;
+          let gulp = 99;
+          for (let j = 0, s0 = 0; s0 <= (r.fly ?? 20) - T; j++, s0 += 3 + (hh(j, 1) % 3)) {
+            const a0 = age - s0;
+            if (a0 < 0) break;
+            // 届いてから何 tick たったか（いちばん近いものを、受け手の光に使う）
+            if (a0 >= T) {
+              gulp = Math.min(gulp, a0 - T);
+              continue;
             }
-            const [hx, hy] = at(q, side);
-            push(hx, hy, lift + 1 + Math.sin(q * Math.PI) * 4, false, A.fx(`borb:${(Math.floor(age / 2) + i) & 3}`), 0, 4);
+            const side = hh(j, 2) % 2 ? 1 : -1;
+            const bendMax = Math.min(L * 0.3, 3 + (hh(j, 3) % 7)) * side;
+            const arcH = 3 + (hh(j, 4) % 4);
+            const pos = (p: number) => {
+              const e = Math.pow(Math.max(0, p), 1.7);
+              const bend = Math.sin(e * Math.PI) * bendMax;
+              return [sx + (fx - sx) * e - ny * bend, sy + (fy - sy) * e + nx * bend, lift - 2 + e * 3 + Math.sin(e * Math.PI) * arcH];
+            };
+            const p = a0 / T;
+            // にじみ出る最初の2 tick は、小さなしずくからふくらむ
+            if (a0 < 2) {
+              const [x, y, z] = pos(p);
+              push(x, y, z, false, A.fx(`bdisc:${a0 === 0 ? 3 : 1}`), 0, 4);
+              continue;
+            }
+            for (let k = 4; k >= 1; k--) {
+              const [x, y, z] = pos(p - k * 0.05);
+              push(x, y, z, false, A.fx(`bdisc:${k}`), 0, 4);
+            }
+            const [x, y, z] = pos(p);
+            push(x, y, z, false, A.fx(`borb:${(Math.floor(age / 2) + j) & 3}`), 0, 4);
           }
-          dyn.push({ x: fx, y: fy - 10, r: 26, i: 0.4 * damp, c: 6 });
-          dyn.push({ x: sx, y: sy - 8, r: 18, i: 0.25 * damp, c: 6 });
+          // 受け手：玉が届いてから4 tick、赤い輪が手もとへ縮んで吸い込まれる
+          if (gulp < 4) push(fx, fy, lift, false, A.fx(`ring:0:5:${4 - gulp}`), 0, 4);
+          dyn.push({ x: fx, y: fy - 10, r: 26, i: (0.3 + (gulp < 6 ? 0.35 * (1 - gulp / 6) : 0)) * damp, c: 6 });
+          dyn.push({ x: sx, y: sy - 8, r: 18, i: (0.18 + 0.1 * Math.sin(age * 0.5)) * damp, c: 6 });
           break;
         }
         case 'batswarm': {
@@ -1135,15 +1169,6 @@ export class CreatureView {
             if (age >= 2) push(r.dx, r.dy, lift, false, A.fx(`ring:1:6:${f6(age - 2)}`), 0, 4);
           }
           if (once) spray(1, 0, 3, 0.5, 0.6);
-          break;
-        case 'drain':
-          if (age < 6) push(r.dx, r.dy, lift, flip, A.fx(`claw2:${r.col}:${f6(age)}`), 0, 4);
-          if (age >= 2 && age < 14)
-            for (let i = 0; i < 3; i++) {
-              const p = Math.min(1, (age - 2 - i * 2) / 8);
-              if (p < 0) continue;
-              push(r.dx - vx * p, r.dy - vy * p, lift + Math.sin(p * Math.PI) * 4, false, A.fx(`bit:2:5:0`), 0, 4);
-            }
           break;
         case 'chill':
           // ゴーストの冷たい手（src/eco/ghostskill.ts）など：触れた所に霜の結晶が弾け（src/sprites.ts の fxFrost）、氷のかけらが散る
