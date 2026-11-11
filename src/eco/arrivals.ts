@@ -195,87 +195,8 @@ export function arrivals(this: Ecology, day: number): void {
     door = -9;
   };
   // 大ネズミ・大トカゲ・大グモ・ジャイアントアントは外から来ない（土の養分から湧く：src/eco/spawndef.ts）
-  // ゴブリン：口ごとに、歩いて行ける範囲に集落の条件を満たし食べ物（苔・キノコとネズミ）の足りる場所があれば、群れで集落を作りに来る。
-  // 集落がすでにあれば、新しく来た者はいちばん小さな集落に加わる。集落が襲われて捨てられた直後は、外の噂でしばらく来ない
-  const gcamps = this.camps.filter((o) => o.kind === 0 && o.id >= 0);
+  // ゴブリン・オーク・リザードマン・コボルトは外から来ない（土の養分から湧く：src/eco/spawndef.ts）。トロールとバジリスクはマナから湧く
   const cool = (k: Kind) => this.step - (this.lastArrival[k] ?? -1e9) > 3600;
-  if (this.canEnter(Kind.Goblin) && this.w.tick >= this.goblinShun && n[Kind.Goblin] < 15 && cool(Kind.Goblin) && ih(this.step, 6, 71) % 14 === 0) {
-    if (!gcamps.length) {
-      next();
-      door = this.pickDoor(Kind.Goblin, Kind.Goblin);
-      // 食べ物の足りる場所が無ければ、貧しい場所に少ない群れで住みつく（その口の判定が 2 のとき）
-      let site = door >= 0 ? this.pickGoblinCamp(undefined, this.mouthSpot(door), Ecology.GOBLIN_MIN_FOOD) : -1;
-      const poor = site < 0 && door >= 0 && this.gobMouthOk[door] === 2;
-      if (poor) site = this.pickGoblinCamp(undefined, this.mouthSpot(door), Ecology.GOBLIN_POOR_FOOD);
-      if (site >= 0) {
-        this.lastArrival[Kind.Goblin] = this.step;
-        const cp = this.newCamp(site, 'arrive', 0, poor);
-        for (let i = 0; i < (poor ? Ecology.GOBLIN_POOR_BAND : 5); i++) {
-          const g = enter(Kind.Goblin, 20, 45);
-          g.ref = cp.id;
-          // 持ってきた食べ物の一部を、集落の蓄えにする
-          g.food -= 15;
-          cp.store = (cp.store ?? 0) + 15;
-        }
-      }
-    } else if (ih(this.step, 6, 72) % 3 === 0) {
-      const sizes = gcamps.map((o) => [o, this.campMembers(o).length] as [Camp, number]).sort((a, b) => a[1] - b[1] || a[0].id - b[0].id);
-      const [cp, sz] = sizes[0];
-      if (sz < 10) {
-        next();
-        this.lastArrival[Kind.Goblin] = this.step;
-        for (let i = 0; i < 2; i++) enter(Kind.Goblin, 20, 45).ref = cp.id;
-      }
-    }
-  }
-  // オーク：ゴブリンかコボルトの集落があると、縄張りを持ちに来る
-  const settlements = gcamps.length + this.warrens.length;
-  if (this.canEnter(Kind.Orc) && settlements > 0 && n[Kind.Goblin] + n[Kind.Kobold] >= 8 && n[Kind.Orc] < Math.min(6, settlements * 3) && cool(Kind.Orc) && ih(this.step, 7, 71) % 30 === 0) {
-    next();
-    this.lastArrival[Kind.Orc] = this.step;
-    door = this.pickDoor(Kind.Orc, Kind.Orc);
-    const tgt = this.orcTargetFrom(door);
-    const home = tgt ? this.pickLair(tgt) : -1;
-    if (home >= 0) {
-      const k = 2 + (ih(this.step, 8, 71) & 1);
-      for (let i = 0; i < k; i++) {
-        const o = enter(Kind.Orc, 60, 80);
-        o.hx = (home % m.w) * TILE + 8;
-        o.hy = Math.floor(home / m.w) * TILE + 8;
-      }
-    }
-  }
-  // リザードマン：大きな水たまりがあり、獲物がいると、水辺に村を作りに来る
-  if (this.canEnter(Kind.Lizardman) && n[Kind.Rat] >= 10 && !this.camps.some((o) => o.kind === 1) && n[Kind.Lizardman] < 8 && cool(Kind.Lizardman) && ih(this.step, 9, 71) % 20 === 0) {
-    next();
-    this.lastArrival[Kind.Lizardman] = this.step;
-    const site = this.pickWaterSite(-1);
-    if (site >= 0) {
-      const v: Camp = { id: this.nextId++, kind: 1, x: (site % m.w) * TILE + 8, y: Math.floor(site / m.w) * TILE + 8, dry: 0 };
-      this.camps.push(v);
-      const k = 3 + (ih(this.step, 10, 71) & 1);
-      for (let i = 0; i < k; i++) enter(Kind.Lizardman, 40, 80).ref = v.id;
-    }
-  }
-  // トロール：食べ物が豊富になると、夜に迷い込む
-  const night = this.dayNow < 0.05;
-  const food = n[Kind.Rat] + n[Kind.Goblin] + n[Kind.Kobold] + this.corpses.length;
-  if (false && this.canEnter(Kind.Troll) && night && food >= 20 && n[Kind.Troll] < 2 && cool(Kind.Troll) && ih(this.step, 13, 71) % 40 === 0) {
-    next();
-    this.lastArrival[Kind.Troll] = this.step;
-    const t = enter(Kind.Troll, 150, 200);
-    const lair = this.pickDark(0, 60);
-    if (lair >= 0) {
-      t.hx = (lair % m.w) * TILE + 8;
-      t.hy = Math.floor(lair / m.w) * TILE + 8;
-    }
-  }
-  // バジリスク：ネズミや大トカゲが十分いると
-  if (false && this.canEnter(Kind.Basilisk) && (n[Kind.Rat] >= 10 || n[Kind.Lizard] >= 3) && n[Kind.Basilisk] < 2 && cool(Kind.Basilisk) && ih(this.step, 14, 71) % 40 === 0) {
-    next();
-    this.lastArrival[Kind.Basilisk] = this.step;
-    enter(Kind.Basilisk, 60, 60);
-  }
   // ヴァンパイア：コウモリが十分に増えると、1体だけ、コウモリの群れ（5匹）を連れて夜に入ってくる。来る時刻はマップごとにずらす（シードが違っても同じ時刻に来ていた）。
   // 住処は、いちばん大きなコウモリのねぐらに近い、歩いて行ける暗がりの壁ぎわ（src/eco/vampire.ts の vampLair）。昼は従うコウモリがその天井にぶら下がり、ヴァンパイアはその下で眠る。
   // （コウモリの群れの多くは、縦穴の下の閉じた空洞をねぐらにしていて、歩くヴァンパイアはそこへ行けない）
@@ -324,44 +245,6 @@ export function arrivals(this: Ecology, day: number): void {
   if (this.step % 600 === 300 && !this.hold && this.w.tick > DAY_TICKS_ECO * 2 && (this.lastDwarves < 0 || this.w.tick - this.lastDwarves > DAY_TICKS_ECO)) this.maybeDwarves();
   // 冒険者：噂（明るさ、金貨、アンデッド、大物、竜）に惹かれて一行がやって来る
   if (this.step % 300 === 150 && this.parties.length < Ecology.ADV_MAX_PARTIES) this.maybeParty();
-  // コボルト：キノコかネズミが十分いると、群れで住処を掘りに来る。住処がすでにあれば、新しく来た者はそこに加わる。
-  // 住処が襲われて捨てられた直後は、外の噂でしばらく来ない
-  if (this.canEnter(Kind.Kobold) && this.w.tick >= this.koboldShun && (n[Kind.Rat] >= 6 || this.openFungus > 2500) && n[Kind.Kobold] < 13 && ih(this.step, 5, 71) % 14 === 0) {
-    const live = this.warrens.filter((o) => o.id >= 0);
-    if (!live.length) {
-      next();
-      door = this.pickDoor(Kind.Kobold, Kind.Kobold);
-      const home = door >= 0 ? this.pickWarren(undefined, this.mouthSpot(door), Ecology.KOBOLD_MIN_FOOD) : -1;
-      if (home >= 0) {
-        const wr = this.newWarren(home);
-        // 4〜6匹の群れで来る。住処に着くまでは「道中」（冒険者が近ければ隠れて待つ）
-        const size = 4 + (ih(this.step, 5, 73) % 3);
-        for (let i = 0; i < size; i++) {
-          const k = enter(Kind.Kobold, 20, 50);
-          k.ref = wr.id;
-          k.st = 11;
-          // 持ってきた食べ物の一部を、住処の蓄えにする
-          k.food -= 20;
-          wr.store = (wr.store ?? 0) + 20;
-        }
-      }
-    } else if (ih(this.step, 5, 72) % 3 === 0) {
-      const sizes = live.map((o) => [o, this.warrenMembers(o).length] as [Warren, number]).sort((a, b) => a[1] - b[1] || a[0].id - b[0].id);
-      const [wr, sz] = sizes[0];
-      // 住処へ歩いて行ける口が無ければ、この回は来ない
-      const reach = sz < 8 ? this.regionOf(this.tileOf(wr.x, wr.y)) : -1;
-      const jd = reach >= 0 ? this.pickDoor(Kind.Kobold, Kind.Kobold, reach) : -3;
-      if (jd >= 0) {
-        next();
-        door = jd;
-        for (let i = 0; i < 2; i++) {
-          const k = enter(Kind.Kobold, 20, 50);
-          k.ref = wr.id;
-          k.st = 11;
-        }
-      }
-    }
-  }
 }
 
 declare module '../ecology' {

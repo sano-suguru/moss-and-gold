@@ -6,7 +6,7 @@
  * 湧ける条件（ok・cap・chance）、どこに（site）、何匹（band）、体と胃とマナの量（body・food・mana。体と胃はすべて土の養分から取る）。
  * 種を足すときは、ここに一行足す。湧くかどうかは、資源の量と場所の条件（食べ物があるか）で決まる。
  */
-import { Burrow, Colony, Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, ih } from '../ecology';
+import { Burrow, Camp, Colony, Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, Warren, ih } from '../ecology';
 import { TILE } from '../mapgen';
 
 export interface SpawnDef {
@@ -88,6 +88,20 @@ const openDry = (e: Ecology, k: number) => {
 };
 const tileX = (e: Ecology, k: number) => (k % e.w.map.w) * TILE + 8;
 const tileY = (e: Ecology, k: number) => Math.floor(k / e.w.map.w) * TILE + 8;
+
+/** 群れが住みつく場所を探す出発点：苔やキノコの豊かな群落（forage）から一つ（塩 salt でくじを分ける）。歩いて100マスの内から住処を選ぶ */
+function forageFrom(e: Ecology, salt: number): [number, number] | null {
+  const f = e.forage;
+  if (!f.length) return null;
+  const a = f[ih(e.step, 5, salt) % f.length];
+  return [tileX(e, a), tileY(e, a)];
+}
+
+/** ゴブリンの湧く場所が、食べ物の乏しい所だったか（site で決め、同じ回の band と before で使う。セーブしない一時の値） */
+let gobPoor = false;
+
+/** ゴブリンの集落（住みかの番号が0以上）と、コボルトの住処 */
+const goblinCamps = (e: Ecology) => e.camps.filter((o) => o.kind === 0 && o.id >= 0);
 
 /** 大ネズミの湧く場所：苔やキノコの豊かな群落（forage）から最大6か所を見て、まわりで大ネズミをあと2匹以上養えるマス */
 function ratSite(e: Ecology): number {
@@ -222,6 +236,111 @@ export const SPAWN_DEFS: SpawnDef[] = [
       c.st = 1;
     },
     log: `キノコの茂る洞窟の土から、{k:${Kind.Ant}}の巣が湧いた`,
+  },
+  // コボルト：大ネズミが6匹以上いるかキノコが増えたら、苔やキノコの豊かな所から歩いて行ける、食べ物の足りる壁ぎわに、4〜6匹の群れが住処ごと湧く
+  // （住処の蓄えも土の養分から）。住処がすでにあれば湧かず、住処で生まれる子に任せる。住処が襲われて捨てられた直後はしばらく湧かない（koboldShun）
+  {
+    k: Kind.Kobold, side: 'nutr', tier: 2, every: 50, phase: 0, cool: 0, minDay: 4,
+    ok: (e) => e.w.tick >= e.koboldShun && (e.counts[Kind.Rat] >= 6 || e.openFungus > 2500) && !e.warrens.some((o) => o.id >= 0),
+    cap: () => 13,
+    chance: (e) => ih(e.step, 5, 71) % 14 === 0,
+    site: (e) => {
+      const from = forageFrom(e, 813);
+      return from ? e.pickWarren(undefined, from, Ecology.KOBOLD_MIN_FOOD) : -1;
+    },
+    band: (e) => 4 + (ih(e.step, 5, 73) % 3),
+    body: 20, food: 30, mana: 0,
+    extra: (_e, n) => 20 * n,
+    before: (e, site, ex) => {
+      const wr = e.newWarren(site, 'soil');
+      wr.store = (wr.store ?? 0) + ex;
+      return wr;
+    },
+    setup: (_e, c, _site, _i, ctx) => {
+      c.ref = (ctx as Warren).id;
+      c.st = 0;
+    },
+    log: `{k:${Kind.Kobold}}の群れが土から湧き、住処を掘りはじめた`,
+  },
+  // ゴブリン：集落がなければ、苔やキノコの豊かな所から歩いて行ける、集落の条件を満たし食べ物の足りる所に、5匹の群れが集落ごと湧く。
+  // 食べ物の足りる所がなければ、貧しい所に3匹で（集落の蓄えも土の養分から）。集落が襲われて捨てられた直後はしばらく湧かない（goblinShun）
+  {
+    k: Kind.Goblin, side: 'nutr', tier: 2, every: 50, phase: 0, cool: 3600, minDay: 4,
+    ok: (e) => e.w.tick >= e.goblinShun && !goblinCamps(e).length,
+    cap: () => 15,
+    chance: (e) => ih(e.step, 6, 71) % 14 === 0,
+    site: (e) => {
+      gobPoor = false;
+      const from = forageFrom(e, 815);
+      if (!from) return -1;
+      let k = e.pickGoblinCamp(undefined, from, Ecology.GOBLIN_MIN_FOOD);
+      if (k < 0) {
+        k = e.pickGoblinCamp(undefined, from, Ecology.GOBLIN_POOR_FOOD);
+        gobPoor = k >= 0;
+      }
+      return k;
+    },
+    band: () => (gobPoor ? Ecology.GOBLIN_POOR_BAND : 5),
+    body: 20, food: 30, mana: 0,
+    extra: (_e, n) => 15 * n,
+    before: (e, site, ex) => e.newCamp(site, 'soil', ex, gobPoor),
+    setup: (e, c, _site, _i, ctx) => {
+      c.ref = (ctx as Camp).id;
+      // 湧いたゴブリンは、生まれて1日たった大人として扱う（集落の頭になる条件に関わる）
+      c.bornAt = e.w.tick - DAY_TICKS_ECO;
+    },
+    log: `{k:${Kind.Goblin}}の群れが土から湧き、集落を作った`,
+  },
+  // オーク：ゴブリンかコボルトの集落があり、両方で8匹以上いれば、まだ誰にも従っていないゴブリンの集落（なければ、いちばん古い集落か住処）の
+  // 12〜20マス先に、2〜3頭が縄張りごと湧く。従えられる集落がなければ、まわりの獲物（大ネズミ・大トカゲ・コボルト。オーク1頭あたり4匹を差し引く）が足りるときだけ
+  {
+    k: Kind.Orc, side: 'nutr', tier: 3, every: 50, phase: 0, cool: 3600, minDay: 4,
+    ok: (e) => {
+      const camps = goblinCamps(e);
+      if (!(camps.length + e.warrens.length) || e.counts[Kind.Goblin] + e.counts[Kind.Kobold] < 8) return false;
+      if (camps.some((o) => !(o.lx || o.ly))) return true;
+      let prey = 0;
+      let orcs = 0;
+      for (const o of e.list) {
+        if (o.dead || o.away) continue;
+        if (o.k === Kind.Rat || o.k === Kind.Lizard || o.k === Kind.Kobold) prey++;
+        else if (o.k === Kind.Orc) orcs++;
+      }
+      return prey - 4 * orcs >= Ecology.ORC_MIN_PREY;
+    },
+    cap: (e) => Math.min(6, (goblinCamps(e).length + e.warrens.length) * 3),
+    chance: (e) => ih(e.step, 7, 71) % 30 === 0,
+    site: (e) => {
+      const camps = goblinCamps(e).sort((a, b) => a.id - b.id);
+      const tgt = camps.find((o) => !(o.lx || o.ly)) ?? [...camps, ...e.warrens.filter((o) => o.id >= 0)].sort((a, b) => a.id - b.id)[0];
+      return tgt ? e.pickLair(tgt) : -1;
+    },
+    band: (e) => 2 + (ih(e.step, 8, 71) & 1),
+    body: 60, food: 80, mana: 0,
+    setup: (e, c, site) => {
+      c.hx = tileX(e, site);
+      c.hy = tileY(e, site);
+    },
+    log: `{k:${Kind.Orc}}が土から湧き、縄張りを持った`,
+  },
+  // リザードマン：大ネズミが10匹以上いて、村がまだなければ、大きな水たまりのそばに3〜4匹が村ごと湧く
+  {
+    k: Kind.Lizardman, side: 'nutr', tier: 3, every: 50, phase: 0, cool: 3600, minDay: 9,
+    ok: (e) => e.counts[Kind.Rat] >= 10 && !e.camps.some((o) => o.kind === 1),
+    cap: () => 8,
+    chance: (e) => ih(e.step, 9, 71) % 20 === 0,
+    site: (e) => e.pickWaterSite(-1),
+    band: (e) => 3 + (ih(e.step, 10, 71) & 1),
+    body: 40, food: 80, mana: 0,
+    before: (e, site) => {
+      const v: Camp = { id: e.nextId++, kind: 1, x: tileX(e, site), y: tileY(e, site), dry: 0 };
+      e.camps.push(v);
+      return v;
+    },
+    setup: (_e, c, _site, _i, ctx) => {
+      c.ref = (ctx as Camp).id;
+    },
+    log: `水辺の土から{k:${Kind.Lizardman}}の一族が湧き、村を作った`,
   },
   // ドラゴンの幼子：ダンジョンにドラゴンがいなければ、6日目以降、深部のまわり（20マス）でいちばんマナの濃い所が32以上なら、卵が孵る（通常速度で1分ごとに見る）。
   // （マナの湧き口を半分にしたとき、しきい値を決め直した：深部のまわりの最大の中央値が 197 → 91 になったので、70 → 32。
