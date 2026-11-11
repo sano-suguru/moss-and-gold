@@ -160,16 +160,19 @@ function boot(): void {
   });
 
   // ---- 触れる：一回で生き物や物（死骸、金貨、道具、墓標など）の情報パネル、二回続けて触れると UI を隠して絵だけ（もう一度で戻る） ----
+  // マウスでは、カーソルを重ねるだけでも同じ情報パネルをのぞける（クリックすると固定して、カメラが追いかける）
   let tapTimer = 0;
   let lastTap = { t: -1e9, x: 0, y: 0 };
   let selected: Thing | null = null;
+  let hovered: Thing | null = null;
+  let shown: Thing | null = null;
   const card = $('card');
   const cardTitle = $('cardTitle');
   const cardLines = $('cardLines');
   let cardAt = 0;
   const closeCard = () => {
     selected = null;
-    card.hidden = true;
+    if (!hovered) card.hidden = true;
   };
   $('cardClose').addEventListener('click', closeCard);
   function onTap(wx: number, wy: number) {
@@ -197,23 +200,58 @@ function boot(): void {
   canvas.addEventListener('pointerdown', (e) => {
     downAt = { x: e.clientX, y: e.clientY };
   });
+  // カーソルの位置（マウスのボタンを押していない間だけ。指やペンでは使わない）
+  let hoverAt: { x: number; y: number } | null = null;
+  let hoverPickAt = 0;
   canvas.addEventListener('pointermove', (e) => {
     if (selected && e.buttons && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 10) closeCard();
+    hoverAt = e.pointerType === 'mouse' && !e.buttons ? { x: e.clientX, y: e.clientY } : null;
   });
+  canvas.addEventListener('pointerleave', () => {
+    hoverAt = null;
+  });
+  const sameThing = (a: Thing | null, b: Thing | null) => !!a && !!b && a.t === b.t && a.id === b.id;
+  /** カーソルの下の生き物や物を探し直す（生き物は動くので、カーソルが止まっていても少しずつ探し直す） */
+  function updateHover(now: number) {
+    if (!hoverAt) {
+      hovered = null;
+    } else if (now - hoverPickAt > 80) {
+      hoverPickAt = now;
+      const r = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const k = dpr / deviceScale(cam.zoom, dpr);
+      hovered = world.eco.pickThing(cam.x + (hoverAt.x - r.left - r.width / 2) * k, cam.y + (hoverAt.y - r.top - r.height / 2) * k);
+    }
+    canvas.classList.toggle('over', !!hovered);
+  }
   function updateCard(now: number) {
-    if (!selected) return;
+    updateHover(now);
     // 選んだ物が無くなったら（死んだ、去った、朽ちた、拾われた）閉じる
-    const c = world.eco.thingPos(selected);
-    if (!c) {
-      closeCard();
+    const sc = selected ? world.eco.thingPos(selected) : null;
+    if (selected && !sc) selected = null;
+    // カーソルを重ねている物があればそれを、なければクリックで選んだ物を見せる
+    const show = hovered ?? selected;
+    const c = show === selected ? sc : show ? world.eco.thingPos(show) : null;
+    if (!show || !c) {
+      shown = null;
+      card.hidden = true;
       return;
     }
-    // カメラが生き物（物ならその場所）を追いかける（なめらかに）
-    cam.x += (c.x - cam.x) * 0.12;
-    cam.y += (c.y - 10 - cam.y) * 0.12;
+    // カメラが選んだ生き物（物ならその場所）を追いかける（なめらかに）。重ねているだけの物は追わない
+    if (sc) {
+      cam.x += (sc.x - cam.x) * 0.12;
+      cam.y += (sc.y - 10 - cam.y) * 0.12;
+    }
+    const pinned = sameThing(show, selected);
+    card.classList.toggle('peek', !pinned);
+    card.hidden = false;
+    if (!sameThing(show, shown)) {
+      shown = show;
+      cardAt = 0;
+    }
     if (now - cardAt > 300) {
       cardAt = now;
-      const d = selected.t === 'cr' ? world.eco.describe(c as Parameters<typeof world.eco.describe>[0], NAMES, JOB_NAMES) : world.eco.describeThing(selected);
+      const d = show.t === 'cr' ? world.eco.describe(c as Parameters<typeof world.eco.describe>[0], NAMES, JOB_NAMES) : world.eco.describeThing(show);
       cardTitle.textContent = d.title;
       cardLines.textContent = '';
       for (const l of d.lines) {

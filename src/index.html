@@ -69,6 +69,8 @@ body {
 #game { position: relative; width: 100%; height: 100%; overflow: hidden; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
 #cv:active { cursor: grabbing; }
+#cv.over { cursor: pointer; }
+#cv.over:active { cursor: grabbing; }
 .hud { position: absolute; z-index: 2; }
 .top-left { top: calc(10px + env(safe-area-inset-top, 0px)); left: calc(10px + env(safe-area-inset-left, 0px)); }
 .top-right { top: calc(10px + env(safe-area-inset-top, 0px)); right: calc(10px + env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
@@ -106,6 +108,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--torch); out
 .card { position: absolute; z-index: 3; pointer-events: auto; background: var(--plaque-card); max-width: min(260px, calc(100vw - 24px)); padding: 8px 10px 8px 12px; font-size: 13px; line-height: 1.5; color: var(--ink); }
 .card .t { font-size: 15px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .card .t button { min-height: 32px; min-width: 32px; padding: 2px 6px; font-size: 14px; color: var(--ink-dim); }
+/* カーソルを重ねているだけのとき：パネルはクリックを通し、閉じるボタンは出さない */
+.card.peek { pointer-events: none; }
+.card.peek .t button { display: none; }
 .card ul { list-style: none; margin: 4px 0 0; padding: 0; color: var(--ink-dim); }
 .card::after { content: ''; position: absolute; left: var(--tail, 50%); bottom: -9px; margin-left: -7px; border: 7px solid transparent; border-top-color: var(--edge); border-bottom: 0; }
 .hint { font-size: 13px; line-height: 1.5; color: var(--ink-dim); padding: 8px 10px; max-width: calc(100vw - 190px); transition: opacity 0.8s; }
