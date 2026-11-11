@@ -381,6 +381,17 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // マイコニドの眠りの胞子（src/eco/myconidskill.ts）：3マス以内に来た人へ胞子の雲を吐き、うたた寝させる。15シードの合計で見る
+    name: 'マイコニドが眠りの胞子を吐き、人をうたた寝させる（15シードの合計で20回以上・8シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const doze = rs.map((r) => r.settle.filter((x) => x.k === 8 && x.ev === 'spore' && x.how === 0 && x.n > 0).length);
+      const burst = rs.map((r) => r.settle.filter((x) => x.k === 8 && x.ev === 'spore' && x.how === 1 && x.n > 0).length);
+      const seeds = doze.filter((v) => v > 0).length;
+      return { ok: sum(doze) >= 20 && seeds >= 8, value: `吐いて眠らせた ${sum(doze)}（${seeds}シード）、弾けて眠らせた ${sum(burst)}` };
+    },
+  },
+  {
     // アンデッド（src/eco/undead.ts）：冒険者のほかの人型の骨がスケルトンとして、まだ肉のある人型の亡骸がゾンビとして起き上がる。
     // どのシードで起きるかは展開で変わるので、15シードの合計で見る（main の10日目から実行した10〜18日目の8シードで、骨93回・ゾンビ23回）
     name: '人型の骨がスケルトンとして、肉のある亡骸がゾンビとして起き上がる（15シードの合計で骨10回・ゾンビ3回以上）',

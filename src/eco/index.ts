@@ -57,5 +57,6 @@ import './vampskill';
 import './orcskill';
 import './spiderskill';
 import './koboldskill';
+import './myconidskill';
 import './ghostskill';
 import './save';

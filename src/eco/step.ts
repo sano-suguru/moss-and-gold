@@ -73,6 +73,11 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       this.metabolism(c);
       continue;
     }
+    // マイコニドの眠りの胞子を浴びた人は、立ったまま少しのあいだ眠る（src/eco/myconidskill.ts）
+    if (c.doze > 0 && !c.away && this.dozeTick(c)) {
+      this.metabolism(c);
+      continue;
+    }
     // 大グモの糸に縛られている者は、その場でもがき、隣の相手だけを打つ（src/eco/spiderskill.ts）
     if (c.bind > 0 && !c.away && this.boundStep(c)) {
       this.metabolism(c);
@@ -108,6 +113,11 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
         this.w.mana[k] -= t;
         c.mana += t;
       }
+    }
+    // マイコニドの眠りの胞子の溜めと、吐く判断（src/eco/myconidskill.ts）
+    if (c.k === Kind.Myconid && this.myconidSkill(c)) {
+      this.metabolism(c);
+      continue;
     }
     if (Ecology.PESTERS.has(c.k) && this.pester(c)) {
       this.metabolism(c);
