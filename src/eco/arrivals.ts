@@ -194,61 +194,7 @@ export function arrivals(this: Ecology, day: number): void {
   const next = () => {
     door = -9;
   };
-  // 大ネズミ：苔が十分に広がったら
-  // 住み着いたあとは巣穴で殖える。外からは、いないかごく少ないとき（開拓者）と、ときどきの新顔だけ
-  // 中の食べ物に合わせる：食べられる苔（20以上の群落の、根元を除いた分）に対して大ネズミがすでに多いか、腹を空かせた者が多ければ来ない
-  // 来るかどうかは、口や裂け目ごとに、まわり（道のり40マス）の食べられる苔と、そこにいる大ネズミの数で決める（ratMouthOk / ratShaftOk）。
-  // ダンジョン全体の上限（ratCap）は越えない
-  // 入り直し（七巡目）：地表の横穴が開いたあとでも、中の大ネズミが2匹以下になったら割れ目をまた開き、3匹を超えたら閉じる
-  if (n[Kind.Rat] <= 2) this.ratReentry = 1;
-  else if (n[Kind.Rat] > 3) this.ratReentry = 0;
-  if (this.canEnter(Kind.Rat) && n[Kind.Rat] < this.ratCap() && ih(this.step, 1, 71) % (n[Kind.Rat] < 4 ? 5 : 80) === 0) {
-    next();
-    // 入ってきた口や裂け目のまわり（道のり40マス）に巣穴を決める
-    door = this.pickDoor(Kind.Rat, Kind.Rat);
-    const spot = door >= 0 ? this.mouthSpot(door) : this.crackSpot(Kind.Rat);
-    if (door === -2 && spot) this.forcedCrack = spot;
-    const home = spot ? this.pickBurrowNear(spot) : this.pickBurrow();
-    // 地表の横穴が開いたあとの割れ目からの入り直しは、一度に2〜3匹
-    const reenter = door === -2 && m.mouths.some((mo, i) => mo.kind === 0 && this.mouthOpen(i));
-    const nr = reenter ? 2 + (ih(this.step, 2, 71) & 1) : 2;
-    if (reenter && spot) this.record('settle', { t: this.w.tick, k: Kind.Rat, ev: 'reenter', n: nr, x: Math.round(spot[0]), y: Math.round(spot[1]) } as never);
-    for (let i = 0; i < nr; i++) {
-      const r = enter(Kind.Rat, 16, 20);
-      r.hx = home.x;
-      r.hy = home.y;
-    }
-    this.forcedCrack = null;
-  }
-  // 大トカゲ：ネズミが増えたら
-  if (this.canEnter(Kind.Lizard) && n[Kind.Rat] >= 10 && n[Kind.Lizard] < Math.min(24, Math.floor(n[Kind.Rat] / 6)) && ih(this.step, 2, 71) % (n[Kind.Lizard] < 2 ? 8 : 120) === 0) {
-    next();
-    enter(Kind.Lizard, 60, 40);
-  }
-  // 大グモ：飛ぶものが増えたら
-  const fly = n[Kind.Wisp] + n[Kind.Bat];
-  if (this.canEnter(Kind.Spider) && fly >= 30 && n[Kind.Spider] < Math.min(14, Math.floor(fly / 25)) && ih(this.step, 3, 71) % (n[Kind.Spider] < 2 ? 10 : 150) === 0) {
-    next();
-    enter(Kind.Spider, 30, 20);
-  }
-  // ジャイアントアント：キノコが増えたら、女王と働きアリが巣を作りに来る
-  if (this.canEnter(Kind.Ant) && this.openFungus > 2500 && this.colonies.length < 2 && ih(this.step, 4, 71) % 12 === 0) {
-    next();
-    const site = this.pickNest();
-    if (site >= 0) {
-      const col: Colony = { id: this.nextId++, x: (site % m.w) * TILE + 8, y: Math.floor(site / m.w) * TILE + 8, store: 16, queen: 30, starve: 0 };
-      this.imported += 46;
-      this.colonies.push(col);
-      for (let i = 0; i < 5; i++) {
-        const a = enter(Kind.Ant, 4, 12);
-        a.ref = col.id;
-        // 住みかの印は、入ってきた口ではなく巣にする（逃げるときに巣へ逃げ帰るように。src/eco/ant.ts の ant でも合わせ直す）
-        a.hx = col.x;
-        a.hy = col.y;
-        a.st = 1;
-      }
-    }
-  }
+  // 大ネズミ・大トカゲ・大グモ・ジャイアントアントは外から来ない（土の養分から湧く：src/eco/spawndef.ts）
   // ゴブリン：口ごとに、歩いて行ける範囲に集落の条件を満たし食べ物（苔・キノコとネズミ）の足りる場所があれば、群れで集落を作りに来る。
   // 集落がすでにあれば、新しく来た者はいちばん小さな集落に加わる。集落が襲われて捨てられた直後は、外の噂でしばらく来ない
   const gcamps = this.camps.filter((o) => o.kind === 0 && o.id >= 0);

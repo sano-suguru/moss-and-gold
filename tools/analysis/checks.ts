@@ -457,12 +457,13 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 大ネズミは天井の裂け目や横穴から少しずつ来ては去るので、ある tick に0匹でも絶えたとは限らない（変更前のコードでも abc は0匹と数匹を行き来する）。来つづけるかで見る
-    name: '大ネズミが来つづける（4シードの合計で10匹以上来た）',
+    // 大ネズミは、苔の豊かな群落のそばの土から少しずつ湧く（src/eco/spawndef.ts）。ある tick に0匹でも絶えたとは限らないので、湧きつづけるかで見る。
+    // （以前は天井の裂け目や横穴から来ていて、「来つづける（10匹以上）」で見ていた）。入れた版で main の10日目から始めると52回（かしたれ 11・seed8 14・abc 17・seed7 10）
+    name: '大ネズミが土から湧きつづける（4シードの合計で、湧いた群れが25回以上）',
     ...RUN_A,
     test: (rs) => {
-      const n = rs.map((r) => r.births.filter((b) => b.k === 2 && b.origin !== 'born').length);
-      return { ok: sum(n) >= 10, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 2 && x.ev === 'gen').length);
+      return { ok: sum(n) >= 25, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },
   {
@@ -478,12 +479,23 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 七巡目：地表の横穴が開いたあとでも、絶えかけたら天井の割れ目から入り直す（abc と seed7 は変更前のコードで0匹の日が続く）
-    name: '大ネズミが割れ目から入り直す（4シードで1回以上）',
+    // 大ネズミが絶えかけても、土からまた湧く（以前は天井の割れ目から入り直していた。abc と seed7 は、入り直しを入れる前のコードで0匹の日が続いた）。
+    // 0匹になったサンプルの後、1日の内に大ネズミが湧いた回数を、0匹になった回数（続く0匹は1回と数える）の8割以上で見る。0匹にならなければ通す
+    name: '大ネズミが絶えても、また土から湧く（4シードで、0匹になった後1日の内に湧いた回数が8割以上）',
     ...RUN_A,
     test: (rs) => {
-      const n = rs.map((r) => r.settle.filter((x) => x.k === 2 && x.ev === 'reenter').length);
-      return { ok: sum(n) >= 1, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+      let gone = 0;
+      let back = 0;
+      for (const r of rs) {
+        const gens = r.settle.filter((x) => x.k === 2 && x.ev === 'gen').map((x) => x.t);
+        const S = r.samples.filter((x) => x.t > r.from * 14400);
+        for (let i = 0; i < S.length; i++) {
+          if ((S[i].counts[2] ?? 0) > 0 || (i > 0 && (S[i - 1].counts[2] ?? 0) === 0)) continue;
+          gone++;
+          if (gens.some((t) => t >= S[i].t - 3600 && t <= S[i].t + 14400)) back++;
+        }
+      }
+      return { ok: gone === 0 || back >= gone * 0.8, value: `0匹になった ${gone} 回、そのうち1日の内に湧いた ${back} 回` };
     },
   },
   {

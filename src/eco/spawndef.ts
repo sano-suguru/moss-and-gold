@@ -6,7 +6,7 @@
  * 湧ける条件（ok・cap・chance）、どこに（site）、何匹（band）、体と胃とマナの量（body・food・mana。体と胃はすべて土の養分から取る）。
  * 種を足すときは、ここに一行足す。湧くかどうかは、資源の量と場所の条件（食べ物があるか）で決まる。
  */
-import { Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, ih } from '../ecology';
+import { Burrow, Colony, Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, ih } from '../ecology';
 import { TILE } from '../mapgen';
 
 export interface SpawnDef {
@@ -81,7 +81,127 @@ function manaSite(e: Ecology, want: (k: number, mn: number) => boolean): number 
 /** 暗く、日の光が差さないマス */
 const darkDeep = (e: Ecology, k: number) => e.w.lightBase[k] === 0 && e.lit(k, e.day) < 0.12;
 
+/** 開いた床（岩・溶岩・閉じた空洞・水たまりでない） */
+const openDry = (e: Ecology, k: number) => {
+  const m = e.w.map;
+  return !m.solid[k] && !m.sealed[k] && !m.lava[k] && e.w.water[k] <= 10;
+};
+const tileX = (e: Ecology, k: number) => (k % e.w.map.w) * TILE + 8;
+const tileY = (e: Ecology, k: number) => Math.floor(k / e.w.map.w) * TILE + 8;
+
+/** 大ネズミの湧く場所：苔やキノコの豊かな群落（forage）から最大6か所を見て、まわりで大ネズミをあと2匹以上養えるマス */
+function ratSite(e: Ecology): number {
+  const f = e.forage;
+  if (!f.length) return -1;
+  for (let i = 0; i < 6; i++) {
+    const k = f[ih(e.step, i, 814) % f.length];
+    if (e.ratRoomAt(tileX(e, k), tileY(e, k))) return k;
+  }
+  return -1;
+}
+
+/** 大トカゲの湧く場所：開いた床を60か所見て、12マスの内に大ネズミ（獲物）がいるマスのうち、いちばん暖かいマス */
+function lizardSite(e: Ecology): number {
+  const m = e.w.map;
+  const rats = e.list.filter((c) => c.k === Kind.Rat && !c.dead && !c.away);
+  if (!rats.length) return -1;
+  let best = -1;
+  let bh = -1;
+  for (let i = 0; i < 60; i++) {
+    const k = ih(e.step, i, 816) % (m.w * m.h);
+    if (!openDry(e, k)) continue;
+    const x = tileX(e, k);
+    const y = tileY(e, k);
+    if (!rats.some((r) => (r.x - x) ** 2 + (r.y - y) ** 2 < (12 * TILE) ** 2)) continue;
+    if (e.w.heat[k] > bh) {
+      bh = e.w.heat[k];
+      best = k;
+    }
+  }
+  return best;
+}
+
+/** 大グモの湧く場所：開いた床を60か所見て、上下左右に岩があり（巣を張れる壁ぎわ）、8マスの内に飛ぶ獲物（ウィスプかコウモリ）がいる最初のマス */
+function spiderSite(e: Ecology): number {
+  const m = e.w.map;
+  const fly = e.list.filter((c) => (c.k === Kind.Wisp || c.k === Kind.Bat) && !c.dead && !c.away);
+  if (!fly.length) return -1;
+  for (let i = 0; i < 60; i++) {
+    const k = ih(e.step, i, 817) % (m.w * m.h);
+    if (!openDry(e, k)) continue;
+    if (!(m.solid[k + 1] || m.solid[k - 1] || m.solid[k + m.w] || m.solid[k - m.w])) continue;
+    const x = tileX(e, k);
+    const y = tileY(e, k);
+    if (fly.some((o) => (o.x - x) ** 2 + (o.y - y) ** 2 < (8 * TILE) ** 2)) return k;
+  }
+  return -1;
+}
+
 export const SPAWN_DEFS: SpawnDef[] = [
+  // ---- 土の養分から湧く種（以前は外から来ていた） ----
+  // 大ネズミ：苔やキノコの豊かな群落のそばに、2匹ずつ湧く。まわりの巣穴に住みつく（いなければ巣穴を作る）。
+  // ダンジョン全体の上限（ratCap。食べられる苔の量で決まる）を越えない。少ないうちは湧きやすく、増えると巣穴で殖えるのに任せる
+  {
+    k: Kind.Rat, side: 'nutr', tier: 1, every: 50, phase: 0, cool: 0, minDay: 0,
+    cap: (e) => e.ratCap(),
+    chance: (e) => ih(e.step, 1, 71) % (e.counts[Kind.Rat] < 4 ? 5 : 80) === 0,
+    site: ratSite,
+    band: () => 2,
+    body: 16, food: 20, mana: 0,
+    before: (e, site) => e.pickBurrowNear([tileX(e, site), tileY(e, site)]),
+    setup: (e, c, _site, _i, ctx) => {
+      const b = ctx as Burrow;
+      c.hx = b.x;
+      c.hy = b.y;
+      // 湧いた大ネズミは、生まれて1日たった大人として扱う（群れの王になる条件や、殖えられる年に関わる）
+      c.bornAt = e.w.tick - DAY_TICKS_ECO;
+    },
+  },
+  // 大トカゲ：大ネズミが増えたら、獲物のいる所の、なるべく暖かい床に湧く
+  {
+    k: Kind.Lizard, side: 'nutr', tier: 2, every: 50, phase: 0, cool: 0, minDay: 3,
+    ok: (e) => e.counts[Kind.Rat] >= 10,
+    cap: (e) => Math.min(24, Math.floor(e.counts[Kind.Rat] / 6)),
+    chance: (e) => ih(e.step, 2, 71) % (e.counts[Kind.Lizard] < 2 ? 8 : 120) === 0,
+    site: lizardSite,
+    band: () => 1,
+    body: 60, food: 40, mana: 0,
+    log: `獲物の増えた洞窟の土から、{k:${Kind.Lizard}}が這い出した`,
+  },
+  // 大グモ：飛ぶもの（ウィスプ・コウモリ）が増えたら、その近くの壁ぎわに湧く（巣は自分で張る）
+  {
+    k: Kind.Spider, side: 'nutr', tier: 2, every: 50, phase: 0, cool: 0, minDay: 1,
+    ok: (e) => e.counts[Kind.Wisp] + e.counts[Kind.Bat] >= 30,
+    cap: (e) => Math.min(14, Math.floor((e.counts[Kind.Wisp] + e.counts[Kind.Bat]) / 25)),
+    chance: (e) => ih(e.step, 3, 71) % (e.counts[Kind.Spider] < 2 ? 10 : 150) === 0,
+    site: spiderSite,
+    band: () => 1,
+    body: 30, food: 20, mana: 0,
+  },
+  // ジャイアントアント：キノコが増えたら、キノコの多い壁ぎわに、巣と女王と働きアリ5匹が湧く（巣の蓄え16と女王の30も土の養分から）
+  {
+    k: Kind.Ant, side: 'nutr', tier: 1, every: 50, phase: 0, cool: 0, minDay: 5,
+    ok: (e) => e.openFungus > 2500 && e.colonies.length < 2,
+    cap: () => 999,
+    chance: (e) => ih(e.step, 4, 71) % 12 === 0,
+    site: (e) => e.pickNest(),
+    band: () => 5,
+    body: 4, food: 12, mana: 0,
+    extra: () => 46,
+    before: (e, site) => {
+      const col: Colony = { id: e.nextId++, x: tileX(e, site), y: tileY(e, site), store: 16, queen: 30, starve: 0 };
+      e.colonies.push(col);
+      return col;
+    },
+    setup: (e, c, _site, _i, ctx) => {
+      const col = ctx as Colony;
+      c.ref = col.id;
+      c.hx = col.x;
+      c.hy = col.y;
+      c.st = 1;
+    },
+    log: `キノコの茂る洞窟の土から、{k:${Kind.Ant}}の巣が湧いた`,
+  },
   // ドラゴンの幼子：ダンジョンにドラゴンがいなければ、6日目以降、深部のまわり（20マス）でいちばんマナの濃い所が32以上なら、卵が孵る（通常速度で1分ごとに見る）。
   // （マナの湧き口を半分にしたとき、しきい値を決め直した：深部のまわりの最大の中央値が 197 → 91 になったので、70 → 32。
   //  ほかのしきい値も、開いた床のうち満たすマスの割合が以前と同じになる値にした。8シード×10〜25日目で測った）
