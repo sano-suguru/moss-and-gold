@@ -917,6 +917,20 @@ export class Ecology {
   /** クモの巣の大きさ（半径 px。2×2マスほど。通路をまたいでふさぐ） */
   static WEB_R = 32;
   static FEARS_FIRE = new Set<number>([Kind.Rat, Kind.Lizard, Kind.Spider, Kind.Bat, Kind.Ant, Kind.Troll, Kind.Basilisk, Kind.Minotaur]);
+  /**
+   * マナで命をつなぐ大物（マナから湧く種）。体は養分の側の獲物を食べて保つが、胃が空のまま飢えの猶予（SPEC.starve）を過ぎても、
+   * 体のマナを燃やして生き延びる（MANA_BURN_EVERY 回ごとに1。src/eco/step.ts の metabolism）。マナは、休んでいる間に足もとの土から吸い（MANA_REST_EVERY 回ごとに1）、
+   * 減ってくると近くのウィスプを吸って補う（src/eco/monsters.ts の sipWisp）。マナが尽きると、ほかの種と同じく飢え死にする
+   */
+  static MANA_FED = new Set<number>([Kind.Troll, Kind.Basilisk, Kind.Minotaur, Kind.Gargoyle]);
+  static MANA_BURN_EVERY = 20;
+  /** これより少ないと「マナが尽きかけている」（ウィスプを探し、飢えて去るのをやめない） */
+  static MANA_LOW = 60;
+  static MANA_REST_EVERY = 8;
+  /** 体に溜められるマナ */
+  static manaMax(k: number): number {
+    return k === Kind.Gargoyle ? 120 : 300;
+  }
 
   fireList: [number, number, number][] = [];
   fireStep = -1;

@@ -151,6 +151,8 @@ function causeLine(e: Ecology, n: Note): string {
       return '干からびた';
     case 'petrified':
       return '石になりかけて、崩れ落ちた';
+    case 'sipped':
+      return by ? `${by}にマナを吸われた` : 'マナを吸われた';
     default:
       return by ? `${by}に倒された` : '力尽きた';
   }

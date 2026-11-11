@@ -59,6 +59,8 @@ export function defend(this: Ecology, c: Cr, hx: number, hy: number, enemies: Ki
 export function leaveIfStarving(this: Ecology, c: Cr): boolean {
   const s = SPEC[c.k];
   if (c.st !== 9 && c.sinceMeal < s.starve * 0.6) return false;
+  // マナで命をつなぐ大物は、マナが残っているあいだは去らない
+  if (c.st !== 9 && Ecology.MANA_FED.has(c.k) && c.mana >= Ecology.MANA_LOW) return false;
   c.st = 9;
   c.act = 1;
   const m = this.w.map;

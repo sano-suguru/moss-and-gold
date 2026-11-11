@@ -58,6 +58,8 @@ export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]):
   else if (party && (party.camp ?? -1) >= 0) state = party.members[0] === c.id ? '見張りをしている' : '';
   else if (party && party.goal === 1) state = '引き返している';
   else if (key && this.isSentry(c, key) && this.groups.get(key)!.members.some((o) => o.sleep > 0)) state = '群れの見張りをしている';
+  // マナで命をつなぐ大物：飢えの猶予を過ぎて、体のマナを燃やしているあいだ（src/eco/step.ts の metabolism）
+  else if (Ecology.MANA_FED.has(c.k) && c.hungry > SPEC[c.k].starve && c.mana > 0) state = c.mana < Ecology.MANA_LOW ? 'マナが尽きかけている' : '飢えて、体のマナで命をつないでいる';
   // 食べない種（腹に入る量が0：ゾンビ、ゴースト、マイコニド、ゴーレム、スケルトン、リッチ、リビングアーマー、眷属）は、
   // 代謝の処理で空腹のカウンタが増えても飢えないので、空腹の文を出さない。飢えが進んでいるときだけ出す
   else if (c.hungry > SPEC[c.k].starve * 0.3 && SPEC[c.k].cap > 0) state = '飢えている';

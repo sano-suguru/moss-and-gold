@@ -381,6 +381,31 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // マナで命をつなぐ大物（Ecology.MANA_FED。src/eco/step.ts の metabolism）：飢えの猶予を過ぎても体のマナを燃やして生き延び、休んで土から吸い、ウィスプを吸って補う。
+    // main ではミノタウロス・トロール・バジリスク・ガーゴイルの死と飢えて去った数の半分以上が飢えだった（16シード×25日でミノタウロス49％・トロール64％）。
+    // 入れた版で main の10日目から始めると 39 / 157（25％）
+    name: 'マナで命をつなぐ大物の、飢えで失った割合が3割以下（15シードの合計）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const FED = [15, 16, 17, 18];
+      const st = rs.map((r) => r.deaths.filter((x) => FED.includes(x.k) && x.cause === 'starve').length + r.exits.filter((x) => FED.includes(x.k) && x.reason === 'starving').length);
+      const all = rs.map((r) => r.deaths.filter((x) => FED.includes(x.k)).length + r.exits.filter((x) => FED.includes(x.k) && x.reason === 'starving').length);
+      return { ok: sum(st) <= sum(all) * 0.3, value: `飢えで失った ${sum(st)} / 死んだ・飢えて去った ${sum(all)}` };
+    },
+  },
+  {
+    // マナの減った大物が、近くのウィスプへ寄って吸う（src/eco/monsters.ts の sipWisp）。大物は暗い深部に、ウィスプは苔のある明るい所に多く、
+    // 近くにいることは少ない（main の8シード×10〜18日目の深夜で、大物の1割ほどが8マス以内にウィスプがいた）。15シードの合計で見る。
+    // 入れた版で main の10日目から始めると218回（seed4 101・seed41 60・seed8 34 など7シード）。偏りが大きいので、目安は合計の4分の1ほど
+    name: 'マナの減った大物がウィスプを吸う（15シードの合計で50回以上・4シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.deaths.filter((x) => x.cause === 'sipped').length);
+      const seeds = n.filter((v) => v > 0).length;
+      return { ok: sum(n) >= 50 && seeds >= 4, value: rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、') + `（${seeds}シード）` };
+    },
+  },
+  {
     // マイコニドの眠りの胞子（src/eco/myconidskill.ts）：3マス以内に来た人へ胞子の雲を吐き、うたた寝させる。15シードの合計で見る
     name: 'マイコニドが眠りの胞子を吐き、人をうたた寝させる（15シードの合計で20回以上・8シード以上）',
     ...RUN_WIDE,
@@ -676,7 +701,7 @@ export const CHECKS: Check[] = [
     name: '死骸と落とし物のいきさつがセーブに残る（各シードで死骸10件以上、合計で持ち主のわかる物10件以上）',
     ...RUN_A,
     test: (rs) => {
-      const DEATH = ['eaten', 'fight', 'killed', 'starve', 'burned', 'crushed', 'dried', 'other', 'petrified'];
+      const DEATH = ['eaten', 'fight', 'killed', 'starve', 'burned', 'crushed', 'dried', 'other', 'petrified', 'sipped'];
       const nt = rs.map((r) => ((r.state(r.to)?.eco?.NT ?? []) as (number | string)[][]).filter((a) => (a[1] as number) > r.from * 14400));
       const dead = nt.map((a) => a.filter((x) => DEATH.includes(x[2] as string)).length);
       const own = nt.map((a) => a.filter((x) => ['fell', 'spent', 'stash'].includes(x[2] as string) || (x[2] === '' && (x[5] as number) >= 0)).length);
