@@ -248,6 +248,9 @@ export function troll(this: Ecology, c: Cr, day: number): void {
   this.tryMove(c, j[0] * s.speed * 0.9, j[1] * s.speed * 0.9);
 }
 
+/** バジリスクが湧いた所をそのまま住みかにする、まわりのマナの濃さ（湧くときのしきい値と同じ。src/eco/spawndef.ts） */
+export const BASILISK_MANA = 30;
+
 export function basilisk(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Basilisk];
   if (this.leaveIfStarving(c)) return;
@@ -274,19 +277,31 @@ export function basilisk(this: Ecology, c: Cr): void {
     }
   }
   if (this.sipWisp(c)) return;
-  if (c.hungry && this.hunt(c, 8, HUNT5, s.speed * 1.2)) return;
-  // 入口から離れた暗がりを住みかにする
+  // マナが尽きかけて飢えていれば、住みかから遠く（24マスの内）まで出て、広く（14マス）獲物を探す（マナで命をつなぐ大物の遠出）
+  const roam = c.hungry > 0 && c.mana < Ecology.MANA_LOW;
+  if (c.hungry && this.hunt(c, roam ? 14 : 8, HUNT5, s.speed * 1.2)) return;
+  // 入口から離れた暗がりを住みかにする。マナの濃い暗がりに湧いた者は、そこを住みかにする（休んでいる間に足もとのマナを吸えるように。
+  // 湧いた所から離れた暗がりへ移ると、マナが薄くて吸えず、16シード×25日でバジリスクの3割が飢えで失われていた）
   const m = this.w.map;
-  if (c.hx === c.x && c.hy === c.y) {
+  const hk = this.tileOf(c.hx, c.hy);
+  if (c.hx === c.x && c.hy === c.y && !(hk >= 0 && this.manaAround(hk) >= BASILISK_MANA && this.w.lightBase[hk] === 0)) {
     const lair = this.pickDark(2, 80);
     if (lair >= 0) {
       c.hx = (lair % m.w) * TILE + 8;
       c.hy = Math.floor(lair / m.w) * TILE + 8;
     }
   }
-  if (sq(c.hx - c.x) + sq(c.hy - c.y) > 10 * TILE * 10 * TILE) {
+  const leash = roam ? 24 : 10;
+  if (sq(c.hx - c.x) + sq(c.hy - c.y) > leash * TILE * leash * TILE) {
     c.act = 1;
     this.goTo(c, c.hx, c.hy, s.speed);
+    return;
+  }
+  // 遠出のあいだは、立ち止まらずに歩き回る
+  if (roam) {
+    c.act = 1;
+    const j = DIR16[ih(c.id, this.step >> 6, 114) & 15];
+    this.tryMove(c, j[0] * s.speed, j[1] * s.speed);
     return;
   }
   // 住みかのそばで、たいてい立ち止まり、ときどき、ふつうに近い速さで歩く（もともと足の遅い種なので、それでもゆっくり）。

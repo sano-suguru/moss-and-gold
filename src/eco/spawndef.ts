@@ -8,6 +8,7 @@
  */
 import { Burrow, Camp, Colony, Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, Warren, ih } from '../ecology';
 import { TILE } from '../mapgen';
+import { BASILISK_MANA } from './monsters';
 
 export interface SpawnDef {
   k: Kind;
@@ -363,11 +364,12 @@ export const SPAWN_DEFS: SpawnDef[] = [
     log: `水辺の土から{k:${Kind.Lizardman}}の一族が湧き、村を作った`,
   },
   // ---- マナから湧く種 ----
-  // ヴァンパイア：コウモリが18匹以上いれば、夜、いちばん大きなコウモリのねぐらに近い暗がりの壁ぎわ（vampLair）に、従うコウモリ5匹を連れて1体だけ湧く
-  // （以前は地表の横穴から入ってきた。湧く時刻はマップごとにずらす）。従うコウモリの体も土の養分から
+  // ヴァンパイア：コウモリが15匹以上いれば、夜、いちばん大きなコウモリのねぐらに近い暗がりの壁ぎわ（vampLair）に、従うコウモリ5匹を連れて1体だけ湧く
+  // （以前は地表の横穴から入ってきた。湧く時刻はマップごとにずらす）。従うコウモリの体も土の養分から。
+  // （以前の来訪の条件は18匹以上。コウモリも縦穴のねぐらに湧くようになって少し減り、16シード×25日でヴァンパイアの湧く数が 64 → 51 に減ったので下げる）
   {
     k: Kind.Vampire, side: 'mana', tier: 2, every: 50, phase: 0, cool: 3600, minDay: 4,
-    ok: (e) => e.counts[Kind.Bat] >= 18 && e.dayNow <= 0.05,
+    ok: (e) => e.counts[Kind.Bat] >= 15 && e.dayNow <= 0.05,
     cap: () => 1,
     chance: (e) => {
       const m = e.w.map;
@@ -475,7 +477,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
     cap: () => 2,
     site: (e) =>
       manaSite(e, (k, mn) => {
-        if (mn < 30 || !darkDeep(e, k)) return false;
+        if (mn < BASILISK_MANA || !darkDeep(e, k)) return false;
         const m = e.w.map;
         if (e.presenceAt((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8) >= 0.15) return false;
         return !near(e, k, Kind.Basilisk, 30) && !near(e, k, Kind.Troll, 12) && !near(e, k, Kind.Dragon, 25);
