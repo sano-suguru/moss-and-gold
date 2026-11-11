@@ -5,6 +5,10 @@ import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
 import { isJobItem } from './armor';
+import { SPAWN_DEFS } from './spawndef';
+
+/** 湧きの表のコウモリの行 */
+const BAT_DEF = SPAWN_DEFS.find((d) => d.k === Kind.Bat)!;
 
 export function spawnSalamanders(this: Ecology): void {
   const m = this.w.map;
@@ -152,16 +156,9 @@ export function onDayEvents(this: Ecology, prevPhase: number, phase: number): vo
           const y = s.y + dy;
           if (x >= 0 && y >= 0 && x < m.w && y < m.h) moss += this.w.moss[y * m.w + x];
         }
-      if (col < 20 && moss > 2500) {
-        for (let i = 0; i < 2; i++) {
-          this.imported += 10 + 10;
-          this.originNext = "shaft";
-          // 縦穴の真上が岩や別の洞窟なら、縦穴のマスの中に現れる（roostSpot）
-          const [bx, by] = this.roostSpot(s.x * TILE + 8, s.y * TILE + 8, s.x * TILE + 8, s.y * TILE - 20);
-          const b = this.spawn(Kind.Bat, bx, by, 10, 10);
-          this.homeBat(b, s.x, s.y);
-        }
-      }
+      // 苔の豊かな縦穴のねぐらに、土の養分からコウモリが湧く（以前は外から来ていた。湧きの表 src/eco/spawndef.ts のコウモリの行）。
+      // 縦穴の真上が岩や別の洞窟なら、縦穴のマスの中に現れる（roostSpot）
+      if (col < 20 && moss > 2500) this.generateOne(BAT_DEF, s.y * m.w + s.x);
     }
   }
   if (crossed(0.24)) {

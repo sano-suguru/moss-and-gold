@@ -12,14 +12,14 @@ export function generate(this: Ecology): void {
   for (const d of SPAWN_DEFS) if (d.every > 0 && this.step % d.every === d.phase) this.generateOne(d);
 }
 
-/** 表の一行を見て、条件がそろえば湧かせる。湧いたら true */
-export function generateOne(this: Ecology, d: SpawnDef): boolean {
+/** 表の一行を見て、条件がそろえば湧かせる。湧いたら true。site を渡すと、表の site の代わりにその場所で湧かせる（コウモリの縦穴など） */
+export function generateOne(this: Ecology, d: SpawnDef, at = -1): boolean {
   if (this.w.tick < d.minDay * DAY_TICKS_ECO) return false;
   if (d.ok && !d.ok(this)) return false;
   if (this.counts[d.k] >= d.cap(this)) return false;
   if (d.cool && this.step - (this.lastArrival[d.k] ?? -1e9) <= d.cool) return false;
   if (d.chance && !d.chance(this)) return false;
-  const site = d.site(this);
+  const site = at >= 0 ? at : d.site(this);
   if (site < 0) return false;
   if (d.side === 'mana' && this.manaAround(site) < (d.manaNeed ?? 0)) return false;
   if (this.starveBlocks(d, site)) return false;

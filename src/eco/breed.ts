@@ -80,7 +80,10 @@ export function breed(this: Ecology): void {
     }
     for (let j = 0; j < e.n; j++) {
       this.originNext = 'born';
-      const c = this.spawn(e.k, e.x + (j ? 5 : -5), e.y, Math.floor(e.units / e.n), 0);
+      // 卵の左右5px に並べて孵す。そこが岩（卵が壁ぎわにある）なら、卵の所に（以前は壁の中に孵り、安全策で床へ出されていた）
+      const kx = this.tileOf(e.x + (j ? 5 : -5), e.y);
+      const hx = kx >= 0 && !m.solid[kx] ? e.x + (j ? 5 : -5) : e.x;
+      const c = this.spawn(e.k, hx, e.y, Math.floor(e.units / e.n), 0);
       c.bornAt = this.w.tick;
       const extra = e.units - Math.floor(e.units / e.n) * e.n;
       if (j === 0 && extra) c.food += extra;

@@ -139,6 +139,27 @@ function spiderSite(e: Ecology): number {
 
 export const SPAWN_DEFS: SpawnDef[] = [
   // ---- 土の養分から湧く種（以前は外から来ていた） ----
+  // コウモリ：夕暮れに、まわり（±10マス）に苔の豊かな縦穴のねぐらへ、2匹ずつ湧く（ねぐらごとに20匹まで）。生き物の更新ごとには見ず、
+  // 夕暮れの出来事（src/eco/salamander.ts の onDayEvents）から、縦穴ごとに generateOne で呼ぶ。土ぼこりは出さない（天井のねぐらに現れる）
+  {
+    k: Kind.Bat, side: 'nutr', tier: 1, every: 0, phase: 0, cool: 0, minDay: 0,
+    cap: () => 260,
+    site: () => -1,
+    band: () => 2,
+    body: 10, food: 10, mana: 0, nutrR: 6,
+    spot: (e, site, i) => {
+      const m = e.w.map;
+      const sx = site % m.w;
+      const sy = Math.floor(site / m.w);
+      void i;
+      return e.roostSpot(sx * TILE + 8, sy * TILE + 8, sx * TILE + 8, sy * TILE - 20);
+    },
+    setup: (e, c, site) => {
+      const m = e.w.map;
+      e.homeBat(c, site % m.w, Math.floor(site / m.w));
+    },
+    dust: false,
+  },
   // 大ネズミ：苔やキノコの豊かな群落のそばに、2匹ずつ湧く。まわりの巣穴に住みつく（いなければ巣穴を作る）。
   // ダンジョン全体の上限（ratCap。食べられる苔の量で決まる）を越えない。少ないうちは湧きやすく、増えると巣穴で殖えるのに任せる
   {
