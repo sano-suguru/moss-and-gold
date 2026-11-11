@@ -94,8 +94,8 @@ for (const b of births) {
   const mm = byOrigin.get(b.k) as Map<string, number>;
   mm.set(b.origin, (mm.get(b.origin) ?? 0) + 1);
 }
-L.push(`## 生き物の由来（全${births.length}件）`, '', '| 種 | 正面の入口 | 地表の横穴 | 地底の裂け目 | 川の口 | 天井の裂け目 | マナから | 中で生まれた |', '|---|---:|---:|---:|---:|---:|---:|---:|');
-for (const [k, mm] of [...byOrigin].sort((a, b) => a[0] - b[0])) L.push(`| ${name(k)} | ${mm.get('entrance') ?? 0} | ${mm.get('mouth') ?? 0} | ${mm.get('fissure') ?? 0} | ${mm.get('river') ?? 0} | ${mm.get('shaft') ?? 0} | ${mm.get('mana') ?? 0} | ${mm.get('born') ?? 0} |`);
+L.push(`## 生き物の由来（全${births.length}件）`, '', '| 種 | 正面の入口 | 地表の横穴 | 地底の裂け目 | 川の口 | 天井の裂け目 | 土の養分から | マナから | 起き上がった・武具から | 中で生まれた |', '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
+for (const [k, mm] of [...byOrigin].sort((a, b) => a[0] - b[0])) L.push(`| ${name(k)} | ${mm.get('entrance') ?? 0} | ${mm.get('mouth') ?? 0} | ${mm.get('fissure') ?? 0} | ${mm.get('river') ?? 0} | ${mm.get('shaft') ?? 0} | ${mm.get('soil') ?? 0} | ${mm.get('mana') ?? 0} | ${(mm.get('raised') ?? 0) + (mm.get('gear') ?? 0)} | ${mm.get('born') ?? 0} |`);
 const ent = births.filter((b) => b.origin === 'entrance').length;
 L.push('', `口が開いた日：${w.map.mouths.map((mo, i) => `${['地表の横穴', '地底の裂け目', '川の口'][mo.kind]}（${mo.x}, ${mo.y}）${w.eco.mouthOpen(i) ? '開いている' : '閉じたまま'}`).join('、')}`, '');
 L.push('', `正面の入口から来た割合：${((ent / Math.max(1, births.length)) * 100).toFixed(1)}％（ウィスプを除くと ${((ent / Math.max(1, births.filter((b) => b.k !== 0).length)) * 100).toFixed(1)}％）`, '');
