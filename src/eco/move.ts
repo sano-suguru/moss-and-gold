@@ -299,8 +299,9 @@ export function lit(this: Ecology, k: number, day: number): number {
 
 export function spawn(this: Ecology, k: Kind, x: number, y: number, body: number, food: number): Cr {
   this.record('births', { t: this.w ? this.w.tick : 0, k, origin: this.originNext || 'born', x: Math.round(x), y: Math.round(y) } as never);
-  // マナから生まれた者は、描画で出現の演出をする（描画専用の印）
-  const fromMana = this.originNext === 'mana';
+  // マナから生まれた者は、描画で出現の演出をする（描画専用の印）。
+  // ミミックは除く（宝箱のふりをして待つ種なので、現れる瞬間を光の柱で目立たせると、宝箱でないことが一目でわかってしまう）
+  const fromMana = this.originNext === 'mana' && k !== Kind.Mimic;
   // 中で生まれた者（来た場所の指定がない、または 'born'）は、いまを生まれた時刻にする。
   // 外から来た者とマナから生まれた者は −1e9 のまま（外から来た大ネズミとゴブリンは、arrivals.ts で来たときの年を入れる）
   const bornHere = !this.originNext || this.originNext === 'born';

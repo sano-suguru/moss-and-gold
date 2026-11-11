@@ -392,11 +392,11 @@ export const CHECKS: Check[] = [
   {
     // マナで命をつなぐ大物（Ecology.MANA_FED。src/eco/step.ts の metabolism）：飢えの猶予を過ぎても体のマナを燃やして生き延び、休んで土から吸い、ウィスプを吸って補う。
     // main ではミノタウロス・トロール・バジリスク・ガーゴイルの死と飢えて去った数の半分以上が飢えだった（16シード×25日でミノタウロス49％・トロール64％）。
-    // 入れた版で main の10日目から始めると 39 / 157（25％）
-    name: 'マナで命をつなぐ大物の、飢えで失った割合が3割以下（15シードの合計）',
+    // 入れた版で main の10日目から始めると 39 / 157（25％）。ヴァンパイア（19）も数える（コードレビューで、数えていないと指摘された）
+    name: 'マナで命をつなぐ大物（ミノタウロス・トロール・バジリスク・ガーゴイル・ヴァンパイア）の、飢えで失った割合が3割以下（15シードの合計）',
     ...RUN_WIDE,
     test: (rs) => {
-      const FED = [15, 16, 17, 18];
+      const FED = [15, 16, 17, 18, 19];
       const st = rs.map((r) => r.deaths.filter((x) => FED.includes(x.k) && x.cause === 'starve').length + r.exits.filter((x) => FED.includes(x.k) && x.reason === 'starving').length);
       const all = rs.map((r) => r.deaths.filter((x) => FED.includes(x.k)).length + r.exits.filter((x) => FED.includes(x.k) && x.reason === 'starving').length);
       return { ok: sum(st) <= sum(all) * 0.3, value: `飢えで失った ${sum(st)} / 死んだ・飢えて去った ${sum(all)}` };
@@ -406,6 +406,7 @@ export const CHECKS: Check[] = [
     // マナの減った大物が、近くのウィスプへ寄って吸う（src/eco/monsters.ts の sipWisp）。大物は暗い深部に、ウィスプは苔のある明るい所に多く、
     // 近くにいることは少ない（main の8シード×10〜18日目の深夜で、大物の1割ほどが8マス以内にウィスプがいた）。15シードの合計で見る。
     // 入れた版で main の10日目から始めると218回（seed4 101・seed41 60・seed8 34 など7シード）。野の生き物を外から来させないようにした版では39回（7シード）。
+    // 狩りの後に吸い、見通しの通るウィスプだけを狙い、ヴァンパイアも吸うようにした版では143回（9シード）。
     // 1〜2シードの出来事に大きく偏るので、目安は少なめにし、起きたシードの数で見る
     name: 'マナの減った大物がウィスプを吸う（15シードの合計で20回以上・4シード以上）',
     ...RUN_WIDE,
@@ -490,7 +491,8 @@ export const CHECKS: Check[] = [
   },
   {
     // 大ネズミが絶えかけても、土からまた湧く（以前は天井の割れ目から入り直していた。abc と seed7 は、入り直しを入れる前のコードで0匹の日が続いた）。
-    // 0匹になったサンプルの後、1日の内に大ネズミが湧いた回数を、0匹になった回数（続く0匹は1回と数える）の8割以上で見る。0匹にならなければ通す
+    // 0匹になったサンプルの後、1日の内に大ネズミが湧いた回数を、0匹になった回数（続く0匹は1回と数える）の8割以上で見る。0匹にならなければ通す。
+    // その1日が実行の終わりを越える0匹は数えない（湧く前に実行が終わるので）
     name: '大ネズミが絶えても、また土から湧く（4シードで、0匹になった後1日の内に湧いた回数が8割以上）',
     ...RUN_A,
     test: (rs) => {
@@ -501,11 +503,45 @@ export const CHECKS: Check[] = [
         const S = r.samples.filter((x) => x.t > r.from * 14400);
         for (let i = 0; i < S.length; i++) {
           if ((S[i].counts[2] ?? 0) > 0 || (i > 0 && (S[i - 1].counts[2] ?? 0) === 0)) continue;
+          if (S[i].t + 14400 > r.to * 14400) continue;
           gone++;
           if (gens.some((t) => t >= S[i].t - 3600 && t <= S[i].t + 14400)) back++;
         }
       }
       return { ok: gone === 0 || back >= gone * 0.8, value: `0匹になった ${gone} 回、そのうち1日の内に湧いた ${back} 回` };
+    },
+  },
+  {
+    // 倒されたワームは、また深部から湧く（src/eco/spawndef.ts のワームの行。前に湧いてから2日＝生き物の更新14400回あける）。
+    // ワームの死はまれ（16シード×25日で5回。5回とも、死んでから 2,000〜9,500 tick で湧き直した）なので、該当する死が無ければ通す
+    // （0回を落とすと、ほかの変更で展開が分かれただけで落ちる）。死んでから2日が実行の終わりを越える死は数えない
+    name: '倒されたワームが、また深部から湧く（15シードで、死んでから2日の内に湧き直した回数が8割以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      let dead = 0;
+      let back = 0;
+      for (const r of rs) {
+        const gens = r.settle.filter((x) => x.k === 22 && x.ev === 'gen').map((x) => x.t);
+        for (const d of r.deaths.filter((x) => x.k === 22 && x.t + 2 * 14400 <= r.to * 14400)) {
+          dead++;
+          if (gens.some((t) => t > d.t && t <= d.t + 2 * 14400)) back++;
+        }
+      }
+      return { ok: dead === 0 || back >= dead * 0.8, value: `倒された ${dead} 回、そのうち2日の内に湧き直した ${back} 回` };
+    },
+  },
+  {
+    // 湧く種が飢え死にした区画では、しばらく湧きにくい（src/eco/generate.ts の starveBlocks。止まると settle に starveBlock を記録する）。
+    // 入れた版で main の10日目から始めると43回（13シード。大ネズミ 26・大グモ 6・コボルト 6 など）。目安はその半分ほど
+    name: '飢え死にの記憶で湧きが止まる（15シードの合計で20回以上・6シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.ev === 'starveBlock').length);
+      const seeds = n.filter((v) => v > 0).length;
+      const byK = new Map<number, number>();
+      for (const r of rs) for (const x of r.settle) if (x.ev === 'starveBlock') byK.set(x.k, (byK.get(x.k) ?? 0) + 1);
+      const ks = [...byK].sort((a, b) => b[1] - a[1]).map(([k, v]) => `種${k} ${v}`).join('、');
+      return { ok: sum(n) >= 20 && seeds >= 6, value: `${sum(n)}回（${seeds}シード。${ks}）` };
     },
   },
   {

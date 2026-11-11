@@ -239,6 +239,14 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       }
       return;
     }
+    // 近くに獲物がいなければ、マナが減っているとき、近くのウィスプを吸う（マナで命をつなぐ大物の一つ。src/eco/monsters.ts の sipWisp）。
+    // ヴァンパイアは苔の豊かな所から離れた縦穴のねぐらのそばに湧き、湧くときも棺で眠るときも足もとのマナがほとんど無い（seed4・seed35 で0）ので、これが主なマナの取り方。
+    // 日の光か溶岩の照り返しの明るい所と、火の明かりの輪の3マス外までにいるウィスプは狙わない（近づくと光を嫌って離れ、行き来し続ける）
+    if (this.sipWisp(c, (o) => {
+      if (glare(this.tileOf(o.x, o.y)) > 60) return false;
+      for (const f of this.fires()) if (sq(o.x - f[0]) + sq(o.y - f[1]) < sq(f[2] + 3 * TILE) && !this.weakCampAt(f[0], f[1])) return false;
+      return true;
+    })) return;
     // 近くに獲物がいなければ、いちばん近い獲物の方へ遠出する（行き先は tx, ty。生き物の更新50回ごとに選び直す）
     if (this.step % 50 === c.id % 50 || !c.tx) {
       let bd = 1e18;

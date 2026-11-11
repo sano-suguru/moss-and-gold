@@ -70,8 +70,9 @@ export function minotaur(this: Ecology, c: Cr): void {
   // 縄張りの中か、寝床から16マス（狩りに出ているときは MINO_FAR マス）の内で、何でも襲う
   const far = prowl ? MINO_FAR : 16;
   const nearHome = home || sq(c.x - c.hx) + sq(c.y - c.hy) < far * TILE * far * TILE;
-  if (this.sipWisp(c)) return;
   if (nearHome && this.hunt(c, prowl ? 8 : home ? 5 : 3, HUNT3, s.speed * 1.3)) return;
+  // 狩れる獲物がいなければ、マナが減っているとき、近くのウィスプを吸う
+  if (this.sipWisp(c)) return;
   // 縄張りの中を徘徊する（狩りに出ているときは、寝床から MINO_FAR マスの内の、人の気配の薄い床を。
   // 気配の濃い所へ向かうと、強い魔物が気配から離れる shyOfPeople に押し戻されて行き来し続けるので避け、
   // 生き物の更新400回たっても着かなければ選び直す）
@@ -152,17 +153,24 @@ export const SIP_R = 8;
 /**
  * マナで命をつなぐ大物（Ecology.MANA_FED）が、体のマナが減ったとき（MANA_LOW 未満）か、飢えが半ばを過ぎたとき、近くのウィスプへ寄って吸う。
  * 吸うとウィスプのマナが体に移り（manaMax まで）、ウィスプは消える（死因 sipped。残りのマナと体は、その場の土へ戻る）。
- * 胃には入れない（胃に入れると飢えが振り出しに戻り、マナで命をつなぐ意味がなくなる）。true なら今はこれをしている
+ * 胃には入れない（胃に入れると飢えが振り出しに戻り、マナで命をつなぐ意味がなくなる）。true なら今はこれをしている。
+ * 狙うのは、マナを持ち、見通しが通り（壁の向こうのウィスプに張り付かない）、溶岩や深い水の上にいないウィスプだけ。ok を渡すと、さらに絞る（ヴァンパイアが明るい所を避けるなど）。
+ * 狩りより後に呼ぶ（狩れる獲物がいれば、胃を満たして飢えを戻す方が先。獲物がいないときにウィスプを吸ってつなぐ）
  */
-export function sipWisp(this: Ecology, c: Cr): boolean {
+export function sipWisp(this: Ecology, c: Cr, ok?: (o: Cr) => boolean): boolean {
   const s = SPEC[c.k];
   const max = Ecology.manaMax(c.k);
   if (!Ecology.MANA_FED.has(c.k) || c.mana >= max) return false;
   if (c.mana >= Ecology.MANA_LOW && c.hungry <= s.starve * 0.5) return false;
+  const m = this.w.map;
   let best: Cr | null = null;
   let bd = SIP_R * TILE * SIP_R * TILE;
   this.nearby(c.x, c.y, SIP_R, (o) => {
-    if (o.k !== Kind.Wisp || o.dead || o.away || o.caught || o.elite === 7) return;
+    if (o.k !== Kind.Wisp || o.dead || o.away || o.caught || o.elite === 7 || o.mana <= 0) return;
+    const q = this.tileOf(o.x, o.y);
+    if (q < 0 || m.lava[q] || this.w.water[q] > 40) return;
+    if (!lineOfSight(m, c.x, c.y, o.x, o.y)) return;
+    if (ok && !ok(o)) return;
     const d = sq(o.x - c.x) + sq(o.y - c.y);
     if (d < bd) {
       bd = d;
@@ -207,8 +215,7 @@ export function troll(this: Ecology, c: Cr, day: number): void {
     } else c.act = 0;
     return;
   }
-  // 夜は何でも食う（マナが減っていれば、先に近くのウィスプを吸う）
-  if (this.sipWisp(c)) return;
+  // 夜は何でも食う（獲物も死骸もなければ、マナが減っているとき、近くのウィスプを吸う）
   if (c.food < s.cap * 0.8) {
     if (this.hunt(c, 10, HUNT4, s.speed * 1.15)) return;
     let best: Cr | null = null;
@@ -235,6 +242,7 @@ export function troll(this: Ecology, c: Cr, day: number): void {
       return;
     }
   }
+  if (this.sipWisp(c)) return;
   // 夜のぶらつき：生き物の更新32回ごとに、立ち止まる番（その始めに一度向きを変える）と、大股で歩く番を交互に。
   // （以前はふつうの速さの0.6倍で歩き続け、脚を動かしながら3秒で半タイルも進まず、足踏みして見えていた）
   const seg = this.step >> 5;
@@ -276,10 +284,11 @@ export function basilisk(this: Ecology, c: Cr): void {
       return;
     }
   }
-  if (this.sipWisp(c)) return;
   // マナが尽きかけて飢えていれば、住みかから遠く（24マスの内）まで出て、広く（14マス）獲物を探す（マナで命をつなぐ大物の遠出）
   const roam = c.hungry > 0 && c.mana < Ecology.MANA_LOW;
   if (c.hungry && this.hunt(c, roam ? 14 : 8, HUNT5, s.speed * 1.2)) return;
+  // 狩れる獲物がいなければ、マナが減っているとき、近くのウィスプを吸う
+  if (this.sipWisp(c)) return;
   // 入口から離れた暗がりを住みかにする。マナの濃い暗がりに湧いた者は、そこを住みかにする（休んでいる間に足もとのマナを吸えるように。
   // 湧いた所から離れた暗がりへ移ると、マナが薄くて吸えず、16シード×25日でバジリスクの3割が飢えで失われていた）
   const m = this.w.map;
@@ -316,7 +325,6 @@ export function basilisk(this: Ecology, c: Cr): void {
 export function gargoyle(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Gargoyle];
   if (c.act === 2 && c.actT < 4) return;
-  if (this.sipWisp(c)) return;
   // 近くを飛ぶコウモリを狩る
   let prey: Cr | null = null;
   let bd = 6 * TILE * 6 * TILE;
@@ -337,6 +345,8 @@ export function gargoyle(this: Ecology, c: Cr): void {
     else this.moveToward(c, p.x, p.y, s.speed);
     return;
   }
+  // 狩れるコウモリがいなければ、マナが減っているとき、近くのウィスプを吸う
+  if (this.sipWisp(c)) return;
   // 止まり木（壁際）に戻って、石像のふりをしてうずくまる
   if (sq(c.hx - c.x) + sq(c.hy - c.y) > 4 * 4) {
     c.act = 1;

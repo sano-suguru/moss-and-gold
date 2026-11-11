@@ -52,6 +52,11 @@ export interface SpawnDef {
   dust?: boolean;
   /** ゲーム内ログの文（{k:番号} は種の名前になる）。同じ種の文は生き物の更新3000回あける */
   log?: string;
+  /**
+   * false なら、飢え死にの記憶（src/eco/generate.ts の noteStarve・starveBlocks）を使わない：この種の飢え死にを記憶に足さず、記憶で湧きを止めない。
+   * ねぐらで飢えて入れ替わるのがふつうの種（コウモリ）に付ける（その飢え死には場所の良し悪しの印にならず、同じ区画で湧く大物まで止めてしまう）
+   */
+  starveMemo?: false;
 }
 
 /** マナから湧く大物どうしが離れて湧くために見る、生きているトロール・バジリスク・ドラゴンの種と位置（ピクセル） */
@@ -183,9 +188,10 @@ function spiderSite(e: Ecology): number {
 export const SPAWN_DEFS: SpawnDef[] = [
   // ---- 土の養分から湧く種（以前は外から来ていた） ----
   // コウモリ：夕暮れに、まわり（±10マス）に苔の豊かな縦穴のねぐらへ、2匹ずつ湧く（ねぐらごとに20匹まで）。生き物の更新ごとには見ず、
-  // 夕暮れの出来事（src/eco/salamander.ts の onDayEvents）から、縦穴ごとに generateOne で呼ぶ。土ぼこりは出さない（天井のねぐらに現れる）
+  // 夕暮れの出来事（src/eco/salamander.ts の onDayEvents）から、縦穴ごとに generateOne で呼ぶ。土ぼこりは出さない（天井のねぐらに現れる）。
+  // コウモリは main でも死の8割が飢え死にで、ねぐらで飢えては湧いて入れ替わるので、飢え死にの記憶は使わない（starveMemo）
   {
-    k: Kind.Bat, side: 'nutr', tier: 1, every: 0, phase: 0, cool: 0, minDay: 0,
+    k: Kind.Bat, side: 'nutr', tier: 1, every: 0, phase: 0, cool: 0, minDay: 0, starveMemo: false,
     cap: () => 260,
     site: () => -1,
     band: () => 2,

@@ -50,6 +50,8 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
     }
     // ヴァンパイアは、昼は住処の棺の中で眠る（src/eco/vampire.ts の vampCoffin）
     if (c.k === Kind.Vampire && this.vampCoffin(c)) {
+      // 棺で眠っている間も、休んでいる間と同じく足もとの土からマナを吸う（下の restSoak より先に continue するので、ここで呼ぶ）
+      this.restSoak(c);
       this.metabolism(c);
       continue;
     }
@@ -105,14 +107,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
     }
     if (c.k === Kind.Minotaur && c.gait > 0) c.gait--;
     if (c.sleep > 0 && this.alarms.size && this.alarms.has(this.groupKey(c) ?? '')) c.sleep = 0;
-    // マナで命をつなぐ大物は、休んでいる間（眠っている間。眠らないガーゴイルは止まり木で石像のふりをしている間）、足もとの土からマナを吸う
-    if (Ecology.MANA_FED.has(c.k) && this.step % Ecology.MANA_REST_EVERY === c.id % Ecology.MANA_REST_EVERY && c.mana < Ecology.manaMax(c.k) && (c.sleep > 0 || (c.k === Kind.Gargoyle && c.act === 0 && c.x === c.hx && c.y === c.hy))) {
-      const k = this.tileOf(c.x, c.y);
-      if (k >= 0 && this.w.mana[k] >= 4) {
-        this.w.mana[k]--;
-        c.mana++;
-      }
-    }
+    this.restSoak(c);
     // ウィスプは土からマナを吸う（生き物の更新4回に1回、少しずつ。体に40まで）
     if (c.k === Kind.Wisp && this.step % 4 === c.id % 4 && c.mana < 40) {
       const k = this.tileOf(c.x, c.y);
@@ -259,6 +254,21 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   }
 }
 
+/**
+ * マナで命をつなぐ大物（Ecology.MANA_FED）は、休んでいる間（眠っている間。棺で眠るヴァンパイアも。眠らないガーゴイルは止まり木で石像のふりをしている間）、
+ * 生き物の更新 MANA_REST_EVERY 回に1回、足もとのタイルのマナが4以上なら1吸う（体に manaMax まで）。
+ * 糸に捕まった・群がられた・はね飛ばされたなどの間は吸わない（update の、それらの分岐より後で呼ぶ。棺の分岐だけは、その中で呼ぶ）
+ */
+export function restSoak(this: Ecology, c: Cr): void {
+  if (!Ecology.MANA_FED.has(c.k) || this.step % Ecology.MANA_REST_EVERY !== c.id % Ecology.MANA_REST_EVERY || c.mana >= Ecology.manaMax(c.k)) return;
+  if (!(c.sleep > 0 || (c.k === Kind.Gargoyle && c.act === 0 && c.x === c.hx && c.y === c.hy))) return;
+  const k = this.tileOf(c.x, c.y);
+  if (k >= 0 && this.w.mana[k] >= 4) {
+    this.w.mana[k]--;
+    c.mana++;
+  }
+}
+
 export function metabolism(this: Ecology, c: Cr): void {
   // 水の精と光の精は、マナで体を保つので腹が減らない（食べ物も体も減らない）
   if (c.elite === 6 || c.elite === 7) return;
@@ -291,9 +301,11 @@ export function metabolism(this: Ecology, c: Cr): void {
   }
   if (c.food === 0) c.hungry++;
   if (c.hungry > s.starve) {
-    // マナで命をつなぐ大物は、飢えの猶予を過ぎたら体のマナを燃やして生き延びる（hungry の値で間引く。step で間引くと、眠っている間の早戻りと重なって燃えない個体が出る）
-    if (Ecology.MANA_FED.has(c.k) && c.mana > 0) {
-      if ((c.hungry - s.starve) % Ecology.MANA_BURN_EVERY === 0) {
+    // マナで命をつなぐ大物は、飢えの猶予を過ぎたら体のマナを燃やして生き延びる（hungry の値で間引く。step で間引くと、眠っている間の早戻りと重なって燃えない個体が出る）。
+    // 胃に食べ物が入ったら、燃やすのも飢え死にもやめ、次の消化の回に hungry が0に戻るのを待つ
+    // （食べた直後は hungry が増えないので、そのまま燃やす判定をすると、燃やす回に当たった値のまま毎回燃やし、マナが0なら食べたのに飢え死にしていた）
+    if (Ecology.MANA_FED.has(c.k) && (c.food > 0 || c.mana > 0)) {
+      if (c.food === 0 && (c.hungry - s.starve) % Ecology.MANA_BURN_EVERY === 0) {
         c.mana--;
         this.w.manaFaded++;
         if (c.mana === Ecology.MANA_LOW - 1) this.record('settle', { t: this.w.tick, k: c.k, id: c.id, ev: 'manaLow', x: Math.round(c.x), y: Math.round(c.y) } as never);
@@ -397,6 +409,7 @@ export function decay(this: Ecology, c: Cr): void {
 
 declare module '../ecology' {
   interface Ecology {
+    restSoak: typeof restSoak;
     update: typeof update;
     metabolism: typeof metabolism;
     corpseStage: typeof corpseStage;
@@ -404,4 +417,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { update, metabolism, corpseStage, decay });
+Object.assign(Ecology.prototype, { update, restSoak, metabolism, corpseStage, decay });

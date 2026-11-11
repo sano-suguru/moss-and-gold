@@ -77,10 +77,13 @@ export function spotNear(this: Ecology, site: number, i: number): [number, numbe
   return [cx * TILE + 8, cy * TILE + 8];
 }
 
-/** 湧く種（表にある種） */
-const SPAWNED = new Set(SPAWN_DEFS.map((d) => d.k));
+/** 飢え死にを記憶に足す種（表にある種のうち、飢え死にの記憶を使わない行 starveMemo: false を除く） */
+const SPAWNED = new Set(SPAWN_DEFS.filter((d) => d.starveMemo !== false).map((d) => d.k));
 
-/** 飢え死にの記憶に足す：湧く種が飢え死にするか飢えて去ったら、その区画に体の大きさを足す（勇者のくせになまいきだ or2 の、飢え死にが多い所に合わせる考え方） */
+/**
+ * 飢え死にの記憶に足す：湧く種が飢え死にするか飢えて去りはじめたら、その区画に体の大きさを足す（勇者のくせになまいきだ or2 の、飢え死にが多い所に合わせる考え方）。
+ * 飢えて去る者は、出ていった口ではなく去りはじめた所で足す（src/eco/combat.ts の leaveIfStarving）
+ */
 export function noteStarve(this: Ecology, c: Cr): void {
   if (!SPAWNED.has(c.k)) return;
   const i = this.starveCell(c.x, c.y);
@@ -100,6 +103,7 @@ export function starveCell(this: Ecology, x: number, y: number): number {
  * （s が0なら必ず湧く。体の大きい上の段の種ほど、少しの飢え死にでは止まらない）
  */
 export function starveBlocks(this: Ecology, d: SpawnDef, site: number): boolean {
+  if (d.starveMemo === false) return false;
   const m = this.w.map;
   const i = this.starveCell((site % m.w) * TILE + 8, Math.floor(site / m.w) * TILE + 8);
   if (i < 0) return false;
@@ -114,7 +118,10 @@ export function starveBlocks(this: Ecology, d: SpawnDef, site: number): boolean 
     }
   if (s <= 0) return false;
   const W = 4 * SPEC[d.k].body * d.tier;
-  return ih(site, this.step, 811) % (s + W) >= W;
+  if (ih(site, this.step, 811) % (s + W) < W) return false;
+  // 分析用：飢え死にの記憶で湧きが止まった（n はまわりの記憶の合計）
+  this.record('settle', { t: this.w.tick, k: d.k, ev: 'starveBlock', n: s, x: (site % m.w) * TILE + 8, y: Math.floor(site / m.w) * TILE + 8 } as never);
+  return true;
 }
 
 declare module '../ecology' {
