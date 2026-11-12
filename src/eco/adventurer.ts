@@ -491,9 +491,12 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     this.nearby(c.x, c.y, 6, (o) => {
       if (o.dead || o === c || !this.seenBy(c, lights, o)) return;
       if (o.k === Kind.Zombie || o.k === Kind.Ghost) p.saw |= 2;
-      if (STR[o.k] >= 10 && o.k !== Kind.Adventurer && o.k !== Kind.Dragon && o.k !== Kind.Wyvern && o.k !== Kind.Worm && o.k !== Kind.Golem) {
+      // 噂の魔物：強さ10以上の大物と、バジリスク（強さ8だが、睨みで人を石にする魔物として噂になり、狩人のいる一行が「眼」を狙って狩りに来る。src/eco/aim.ts の aim 3）
+      if ((STR[o.k] >= 10 || o.k === Kind.Basilisk) && o.k !== Kind.Adventurer && o.k !== Kind.Dragon && o.k !== Kind.Wyvern && o.k !== Kind.Worm && o.k !== Kind.Golem) {
         p.saw |= 4;
-        if (STR[o.k] >= STR[p.bk] || !p.bk) {
+        // 一度の探索で見た中で、強いものほど噂の種になる。バジリスクは強さで負けても、2回に1回は（睨みで人を石にする魔物として）噂の種になる
+        // （強さだけで決めていたころは、トロールやミノタウロスと同じ探索で見られると負け、16シード×25日でバジリスクを狩りに来た一行は0だった）
+        if (STR[o.k] >= STR[p.bk] || !p.bk || (o.k === Kind.Basilisk && p.bk !== Kind.Basilisk && ih(p.id, o.id, 433) % 2 === 0)) {
           p.bk = o.k;
           p.bx = Math.round(o.x);
           p.by = Math.round(o.y);

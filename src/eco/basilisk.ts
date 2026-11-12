@@ -257,7 +257,7 @@ const PATROL_DROWSY = 1400;
 
 /**
  * 見回り先を選ぶ：寝床のまわり PATROL_R マス四方を16か所試し、最初に条件を満たすマスを返す（なければ −1）。
- * 条件：開いた床で、日の差さない暗がり、水たまりでない、寝床と同じ洞窟の領域、まわりのマナが10以上、人の気配が薄い（0.2未満）、
+ * 条件：開いた床で、日の差さない暗がり、水たまりでない、寝床と同じ洞窟の領域、まわりのマナが10以上、人の気配が濃すぎない（0.4未満。冒険者の通り道にも出ていく）、
  * 寝床から minD マス以上、ほかのバジリスクの寝床から10マス以上（縄張りの張り合いを避ける）
  */
 export function basiliskWaypoint(this: Ecology, c: Cr, minD: number): number {
@@ -274,7 +274,7 @@ export function basiliskWaypoint(this: Ecology, c: Cr, minD: number): number {
     if (x < 1 || y < 1 || x >= m.w - 1 || y >= m.h - 1 || Math.abs(x - bx) + Math.abs(y - by) < minD) continue;
     const k = y * m.w + x;
     if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 10 || this.w.lightBase[k] > 0 || this.regionOf(k) !== reg) continue;
-    if (this.manaAround(k) < 10 || this.presenceAt(x * TILE + 8, y * TILE + 8) >= 0.2) continue;
+    if (this.manaAround(k) < 10 || this.presenceAt(x * TILE + 8, y * TILE + 8) >= 0.4) continue;
     if (this.list.some((o) => o !== c && !o.dead && o.k === Kind.Basilisk && Math.abs(o.hx / TILE - x) + Math.abs(o.hy / TILE - y) < 10)) continue;
     return k;
   }

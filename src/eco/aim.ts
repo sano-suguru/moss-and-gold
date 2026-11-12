@@ -432,7 +432,9 @@ export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
       p.aimAt = this.step;
       this.brace(p, ax, ay, 1, BRACE_ARRIVE);
       this.partyMark(p, '!', true);
-      this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'arrive', how: p.aim, n: p.aimId ?? 0, x: Math.round(lead.x), y: Math.round(lead.y) } as never);
+      // 分析用：竜退治と噂の魔物の狩りでは、目標の種（to）も残す
+      const tk = p.aim === 2 || p.aim === 3 ? (this.byId.get(p.aimId ?? 0)?.k ?? -1) : -1;
+      this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'arrive', how: p.aim, n: p.aimId ?? 0, ...(tk >= 0 ? { to: tk } : {}), x: Math.round(lead.x), y: Math.round(lead.y) } as never);
     }
   }
   // 果たす・あきらめる

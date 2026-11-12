@@ -492,7 +492,8 @@ export const SPAWN_DEFS: SpawnDef[] = [
       manaSite(e, (k, mn, bigs) => {
         if (mn < BASILISK_MANA || !darkDeep(e, k)) return false;
         const m = e.w.map;
-        if (e.presenceAt((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8) >= 0.15) return false;
+        // 人の気配は0.3未満なら湧く（以前は0.15。冒険者の通り道から離れすぎて、16シード×25日で冒険者と出会ったのは9シードだけだった）
+        if (e.presenceAt((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8) >= 0.3) return false;
         return !near(e, bigs, k, Kind.Basilisk, 30) && !near(e, bigs, k, Kind.Troll, 12) && !near(e, bigs, k, Kind.Dragon, 12);
       }),
     band: () => 1,
