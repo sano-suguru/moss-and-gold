@@ -91,7 +91,7 @@ export function chooseAim(this: Ecology, p: Party, q: Quest): void {
       return;
     }
   }
-  if (q.a === 2) {
+  if (q.a === 2 || q.a === 6) {
     const dragon = this.list.find((o) => !o.dead && !o.away && o.k === Kind.Dragon);
     if (dragon) {
       // ドラゴン：寝床までの道が町で知られている（前の一行が見つけて持ち帰った）ときだけ、竜退治を目標にする
@@ -217,7 +217,7 @@ export function aimPhrase(this: Ecology, p: Party): string {
     case 2:
       return `{k:${dk}}退治の依頼を受けて、${p.aimWay ? '知られた道をたどって寝床を目指し' : p.aimKnown ? '寝床を目指して' : '深部を探しに'}`;
     case 6:
-      return `{k:${Kind.Dragon}}退治の依頼を受けて、寝床への道を探しに深部へ`;
+      return `${took}、深部へ`;
     case 3:
       return took;
     case 4:
@@ -235,7 +235,7 @@ export function aimLine(this: Ecology, p: Party): string {
   if (!a) return `目的：${AIM_NAMES[0]}`;
   const st = p.aimEnd === 1 ? '果たした' : p.aimEnd === 2 ? 'あきらめた' : p.aimAt ? '目標に着いた' : p.aimKnown ? '向かっている' : '場所を探している';
   if (!p.q) return `目的：${AIM_NAMES[a]}（${st}）`;
-  const nm = p.q === 3 ? `${NAMES[p.qk ?? 0]}狩り` : p.q === 2 ? `${NAMES[a === 2 && p.aimId ? this.byId.get(p.aimId)?.k ?? Kind.Dragon : Kind.Dragon]}退治${a === 6 ? '（寝床への道を探す）' : ''}` : AIM_NAMES[p.q];
+  const nm = p.q === 3 ? `${NAMES[p.qk ?? 0]}狩り` : p.q === 2 ? `${NAMES[p.aimId ? this.byId.get(p.aimId)?.k ?? Kind.Dragon : Kind.Dragon]}退治` : p.q === 6 ? `${NAMES[Kind.Dragon]}の寝床への道探し` : AIM_NAMES[p.q];
   return `依頼：${nm}（${st}）`;
 }
 

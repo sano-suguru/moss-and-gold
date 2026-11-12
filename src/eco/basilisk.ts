@@ -56,7 +56,7 @@ function avertChance(e: Ecology, o: Cr): number {
 function partyStoned(e: Ecology, c: Cr, o: Cr): void {
   if (o.k !== Kind.Adventurer || !o.party) return;
   const p = e.parties.find((q) => q.id === o.party);
-  if (p) e.partyHurt(p, c.k, c.x, c.y, c.id);
+  if (p) e.partyHurt(p, c.k, c.x, c.y, c.id, true);
 }
 
 /**

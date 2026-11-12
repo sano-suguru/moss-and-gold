@@ -65,7 +65,7 @@ export function maybeParty(this: Ecology): void {
   // 光がなければ進めない：魔法使いも僧侶もいなければ、戦士が一人松明を持つ。戦士もいなければ一人を戦士に
   if (!jobs.includes(Job.Wizard) && !jobs.includes(Job.Priest) && !jobs.includes(Job.Warrior)) jobs[jobs.length - 1] = Job.Warrior;
   // 顔ぶれは町の名簿から（中にいる者は選ばない。その職業がいなければ別の職業の者で埋める。src/eco/roster.ts）
-  const heroes = this.pickHeroes(jobs, this.step);
+  const heroes = this.pickHeroes(jobs, this.step, QUEST_LEAD[quest.a] >= 0);
   if (!heroes) return;
   jobs.length = heroes.length;
   heroes.forEach((h, i) => (jobs[i] = h.job));

@@ -192,7 +192,7 @@ export const CHECKS: Check[] = [
       const posted = sum(rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'quest').length));
       const kinds = new Map<number, number>();
       for (const r of rs) for (const x of r.settle) if (x.k === 25 && x.ev === 'enter' && x.q > 0) kinds.set(x.q, (kinds.get(x.q) ?? 0) + 1);
-      const NM = ['', '宝探し', '竜退治', '魔物の狩り', '祓い', 'ゴブリン退治'];
+      const NM = ['', '宝探し', '竜退治', '魔物の狩り', '祓い', 'ゴブリン退治', '道探し'];
       return { ok: posted >= 10 && kinds.size >= 4, value: `依頼が出た ${posted}、受けて入った ${[...kinds].sort((a, b) => a[0] - b[0]).map(([q, n]) => `${NM[q]} ${n}`).join('・')}` };
     },
   },

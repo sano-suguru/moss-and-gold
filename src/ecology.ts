@@ -93,7 +93,7 @@ export interface Party {
   id: number;
   members: number[];
   /**
-   * 魔物から受けた被害：[種, 回数, x, y, 個体の番号（分からなければ -1）]。仲間が見つめで石化しかけたとき（src/eco/basilisk.ts）と、
+   * 魔物から受けた被害：[種, 回数, x, y, 個体の番号（分からなければ -1）, そのうち石化の回数]。仲間が見つめで石化しかけたとき（src/eco/basilisk.ts）と、
    * 強さ6以上の魔物に倒されたとき（src/eco/move.ts の die）に足す。生きて帰れば、その種の噂が強まる（src/eco/quest.ts）
    */
   hurt?: number[][];
@@ -283,7 +283,7 @@ export interface Rumors {
   undead: number;
   dragon: number;
   /**
-   * 魔物の噂（種ごと）：[種, 強さ, x, y]。種の番号の順に並べる（くじで順にたどるので、ロードし直しても同じ順に）。
+   * 魔物の噂（種ごと）：[種, 強さ, x, y, 評判]（強さは依頼の重さ、評判は来訪の頻度に入る分。src/eco/quest.ts の beastTotal）。種の番号の順に並べる（くじで順にたどるので、ロードし直しても同じ順に）。
    * 生還者が見かけた大物と、受けた被害（石化・死者）から強まり、日ごとに薄れる（src/eco/quest.ts）
    */
   beasts: number[][];

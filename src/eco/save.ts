@@ -46,7 +46,7 @@ export function restore(this: Ecology, o: any): void {
   this.parties = o.PT2 ? JSON.parse(JSON.stringify(o.PT2)) : (o.PT || []).map((a: number[]) => ({ id: a[0], goal: a[1], tx: a[2], ty: a[3], since: a[4], tier: a[5], initial: a[6], saw: a[7], targetAt: a[8], waitT: a[9], bk: a[10], bx: a[11], by: a[12], members: a.slice(13) }));
   // 古いセーブの一行：見つめの被害（bsHit・bsId・bsX・bsY）と、見かけた大物（bk・bx・by）を、種ごとの形（hurt・seenB）に直す
   for (const q of this.parties as (Party & { bsHit?: number; bsId?: number; bsX?: number; bsY?: number; bk?: number; bx?: number; by?: number })[]) {
-    if (q.bsHit) q.hurt = [[Kind.Basilisk, q.bsHit, q.bsX ?? 0, q.bsY ?? 0, q.bsId ?? -1]];
+    if (q.bsHit) q.hurt = [[Kind.Basilisk, q.bsHit, q.bsX ?? 0, q.bsY ?? 0, q.bsId ?? -1, q.bsHit]];
     if (q.bk) q.seenB = [[q.bk, q.bx ?? 0, q.by ?? 0]];
     delete q.bsHit;
     delete q.bsId;
@@ -75,7 +75,7 @@ export function restore(this: Ecology, o: any): void {
   );
   const ru = o.RU || [0, 0, 0, 0, 0];
   // 魔物の噂は種ごと（RB）。RB の無い古いセーブは、1種類だけ覚えていた噂（強さ ru[3]、種 ru[5]、場所 ru[6], ru[7]）を1件に直す
-  const rb: number[][] = o.RB ? (o.RB as number[][]).map((b) => b.slice()) : ru[5] && ru[3] > 0 ? [[ru[5], ru[3], ru[6] ?? 0, ru[7] ?? 0]] : [];
+  const rb: number[][] = o.RB ? (o.RB as number[][]).map((b) => (b.length < 5 ? [...b, b[1]] : b.slice())) : ru[5] && ru[3] > 0 ? [[ru[5], ru[3], ru[6] ?? 0, ru[7] ?? 0, ru[3]]] : [];
   this.rumors = { light: ru[0], gold: ru[1], undead: ru[2], dragon: ru[4], beasts: rb.sort((a, b) => a[0] - b[0]), goblin: ru[8] ?? 0, goblinX: ru[9] ?? 0, goblinY: ru[10] ?? 0, dragonX: ru[11] ?? 0, dragonY: ru[12] ?? 0, goblinRobs: ru[13] ?? 0, goblinCamp: ru[14] ?? 0, goblinCampX: ru[15] ?? 0, goblinCampY: ru[16] ?? 0 };
   this.caches = (o.SC || []).map((a: number[]) => ({ id: a[0], x: a[1], y: a[2], food: a[3], d: a[4], at: a[5], by: a[6], rt: a[7] ?? -1e9 }));
   this.events = (o.EV || []).map((a: [number, number, number, string]) => ({ t: a[0], x: a[1], y: a[2], m: a[3] }));

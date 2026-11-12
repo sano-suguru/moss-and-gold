@@ -159,7 +159,7 @@ export function rankMul(this: Ecology, c: Cr): number {
  * その職業の、中にいない者から選ぶ。いなければ、名簿が12人に満たないときだけ新人を加え、満ちていれば中にいない別の職業の者で埋める。
  * 灯りを持つ職業（魔法使い・僧侶・戦士）が一人もいなければ、最後の一人を灯りを持つ職業の者に替える。組めなければ null
  */
-export function pickHeroes(this: Ecology, jobs: number[], salt: number): Hero[] | null {
+export function pickHeroes(this: Ecology, jobs: number[], salt: number, lead = false): Hero[] | null {
   this.fillRoster();
   const out: Hero[] = [];
   const tick = this.w.tick;
@@ -167,7 +167,8 @@ export function pickHeroes(this: Ecology, jobs: number[], salt: number): Hero[] 
   const choose = (cands: Hero[], i: number) => cands[ih(salt, i, 303) % cands.length];
   for (let i = 0; i < jobs.length; i++) {
     let c = this.roster.filter((h) => h.job === jobs[i] && free(h));
-    if (!c.length && this.roster.length < ROSTER_SIZE) {
+    // 依頼を率いる者（lead）は、その職業の者が空いていなければ新人を雇う（名簿は上限を2人まで超えてよい。超えた分は、倒れたり引退したりしても補わないので戻る）
+    if (!c.length && (this.roster.length < ROSTER_SIZE || (lead && i === 0 && this.roster.length < ROSTER_SIZE + 2))) {
       out.push(this.recruit(jobs[i]));
       continue;
     }
