@@ -160,11 +160,6 @@ export function rankMul(this: Ecology, c: Cr): number {
 }
 
 /**
- * 一行の顔ぶれを名簿から選ぶ（maybeParty から）。jobs は職業の決め方で決めた並び（先頭が率いる者）。
- * その職業の、中にいない者から選ぶ。いなければ、名簿が12人に満たないときだけ新人を加え、満ちていれば中にいない別の職業の者で埋める。
- * 灯りを持つ職業（魔法使い・僧侶・戦士）が一人もいなければ、最後の一人を灯りを持つ職業の者に替える。組めなければ null
- */
-/**
  * その職業の者が一行を率いられるか：名簿に空いている（中にいない、傷を癒やしていない）その職業の者がいるか、名簿に空きがあって新人を雇えるか。
  * 率いる者がいない依頼は、その一行のくじから外す（src/eco/quest.ts の pickQuest）。
  * （名簿の上限を超えて新人を雇うと、英雄の最後の遠征（名簿が上限以下のときだけ）が16シード×25日で106→51に減った）
@@ -174,6 +169,11 @@ export function canLead(this: Ecology, job: number): boolean {
   return this.roster.length < ROSTER_SIZE || this.roster.some((h) => h.job === job && h.cid === 0 && (h.rest ?? 0) <= tick);
 }
 
+/**
+ * 一行の顔ぶれを名簿から選ぶ（maybeParty から）。jobs は職業の決め方で決めた並び（先頭が率いる者）。
+ * その職業の、中にいない者から選ぶ。いなければ、名簿が12人に満たないときだけ新人を加え、満ちていれば中にいない別の職業の者で埋める。
+ * 灯りを持つ職業（魔法使い・僧侶・戦士）が一人もいなければ、最後の一人を灯りを持つ職業の者に替える。組めなければ null
+ */
 export function pickHeroes(this: Ecology, jobs: number[], salt: number): Hero[] | null {
   this.fillRoster();
   const out: Hero[] = [];

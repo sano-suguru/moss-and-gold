@@ -471,9 +471,8 @@ export const SPAWN_DEFS: SpawnDef[] = [
     body: Math.round(SPEC[Kind.Dragon].body * 0.2), food: 60, mana: 600, nutrR: 5, manaR: 4,
     setup: (e, c) => {
       // 幼竜が卵を割って出てくると、地の底の揺れと咆哮が町にも伝わる（竜の噂。竜殺しが深部を探りに来る）
-      const posted = e.questKeys();
       e.rumors.dragon += 0.6;
-      e.postNewQuests(posted);
+      e.syncQuests();
       c.sp = 0;
       c.st = 0;
       c.hx = c.x;

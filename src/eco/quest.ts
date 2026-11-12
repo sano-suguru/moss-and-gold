@@ -18,7 +18,9 @@
  * 噂の種になる魔物：冒険者が敵とみなす魔物のうち、アンデッド（祓いの噂）・ゴブリン（盗みの噂）・竜の仲間（竜の噂）を除いたもの。
  * 見かけただけで噂になるのは強さ10以上、仲間が石化しかけたり倒されたりすれば強さ6以上（どの種も同じ決まり）。
  */
-import { Ecology, Job, Kind, Party, STR, ih } from '../ecology';
+import { Cr, Ecology, Job, Kind, Party, STR, ih } from '../ecology';
+import { NAMES } from '../names';
+import { GOBLIN_HUNT_AT } from './aim';
 import { TILE } from '../mapgen';
 
 /** 魔物の噂になりうる種（アンデッド・ゴブリン・竜の仲間は、それぞれ別の噂になる） */
@@ -75,16 +77,18 @@ export function fadeBeastRumors(this: Ecology, mul: number): void {
   this.rumors.beasts = this.rumors.beasts.filter((b) => b[1] >= FORGET || b[4] >= FORGET);
 }
 
-/** 一行が受けた被害を覚える（同じ種の被害はまとめ、場所と個体は最後のものにする。stone は石化か） */
+/**
+ * 一行が受けた被害を覚える（被害を与えた個体ごとにまとめ、場所は最後のものにする。id はその個体の番号で、分からなければ -1。stone は石化か）。
+ * 個体ごとに分けるのは、帰ったときに、もう倒された個体の被害を噂にしないため（同じ種でまとめると、個体の番号が上書きされて確かめられなかった）
+ */
 export function partyHurt(this: Ecology, p: Party, k: number, x: number, y: number, id: number, stone = false): void {
   if (!beastHurtKind(k)) return;
   const h = (p.hurt ??= []);
-  const e = h.find((a) => a[0] === k);
+  const e = h.find((a) => a[0] === k && a[4] === id);
   if (e) {
     e[1]++;
     e[2] = Math.round(x);
     e[3] = Math.round(y);
-    e[4] = id;
     if (stone) e[5] = (e[5] ?? 0) + 1;
   } else h.push([k, 1, Math.round(x), Math.round(y), id, stone ? 1 : 0]);
 }
@@ -103,7 +107,8 @@ export function partySawBeast(this: Ecology, p: Party, k: number, x: number, y: 
 /**
  * 生きて帰った者が、魔物の噂を持ち帰る（mul は吟遊詩人の倍率）。
  * 見かけた大物は合計 SEEN_ADD を見た種で分け、被害は1件 HURT_ADD（一行で HURT_MAX 件まで）。
- * 被害を与えた個体が分かっていて、もう倒されていれば、その被害は噂にしない（目当てのいない狩りに出ないように）
+ * 被害を与えた個体が分かっていて、もう倒されていれば、その被害は噂にしない。個体が分からなければ、その種が1匹もいなければ噂にしない（目当てのいない狩りに出ないように）。
+ * 評判（来訪の頻度に入る分）は main と同じく、石化があれば帰還1回で HURT_ADD だけ
  */
 export function carryBeastRumors(this: Ecology, p: Party, mul: number): void {
   const seen = p.seenB ?? [];
@@ -115,12 +120,13 @@ export function carryBeastRumors(this: Ecology, p: Party, mul: number): void {
     e[3] = s[2];
   }
   let left = HURT_MAX;
+  let stoned: number[] | undefined;
   for (const h of p.hurt ?? []) {
     if (left <= 0) break;
     if (h[4] > 0) {
       const o = this.byId.get(h[4]);
       if (!o || o.dead || o.away || o.k !== h[0]) continue;
-    }
+    } else if (!this.list.some((o) => o.k === h[0] && !o.dead && !o.away)) continue;
     const n = Math.min(left, h[1]);
     left -= n;
     // 分析用：被害の噂を持ち帰った（一行で一度。tools/analysis/lib/moments.ts の petriQuest）
@@ -130,10 +136,11 @@ export function carryBeastRumors(this: Ecology, p: Party, mul: number): void {
     }
     const e = this.beastRumor(h[0]);
     e[1] += HURT_ADD * n * mul;
-    if (h[5]) e[4] += HURT_ADD * mul;
+    if (h[5] && !stoned) stoned = e;
     e[2] = h[2];
     e[3] = h[3];
   }
+  if (stoned) stoned[4] += HURT_ADD * mul;
 }
 
 /** 町に出る依頼：a は目標の種類（Party.aim と同じ番号：0 探索、1 宝探し、2 竜退治、3 魔物の狩り、4 アンデッド祓い、5 ゴブリン退治、6 竜の寝床への道探し）、k は狩る種、w は重さ */
@@ -151,13 +158,18 @@ const UNDEAD_AT = 0.4;
 const GOLD_AT = 0.3;
 /** 依頼を率いる職業（目標の種類の番号で引く。探索は決めない） */
 export const QUEST_LEAD = [-1, Job.Thief, Job.Slayer, Job.Hunter, Job.Priest, Job.Warrior, Job.Slayer];
-const UNDEAD = [Kind.Zombie, Kind.Skeleton, Kind.Lich, Kind.Ghost, Kind.Armor];
+/** アンデッドの種（祓いの依頼の相手。src/eco/aim.ts も使う） */
+export const UNDEAD = [Kind.Zombie, Kind.Skeleton, Kind.Lich, Kind.Ghost, Kind.Armor];
 
-/** 竜退治の相手になる竜：ドラゴン、ワイバーン、岩の中を動くワームは床にいるときだけ */
-export function questDragon(this: Ecology): number {
+/** 竜退治の相手になる竜：ドラゴン、ワイバーン、岩の中を動くワームは床にいるときだけ（この順に探す。src/eco/aim.ts の chooseAim も使う） */
+export function questDragonCr(this: Ecology): Cr | undefined {
   const m = this.w.map;
-  const d = this.list.find((o) => !o.dead && !o.away && o.k === Kind.Dragon) ?? this.list.find((o) => !o.dead && !o.away && o.k === Kind.Wyvern) ?? this.list.find((o) => !o.dead && !o.away && o.k === Kind.Worm && this.tileOf(o.x, o.y) >= 0 && !m.solid[this.tileOf(o.x, o.y)]);
-  return d ? d.k : 0;
+  return this.list.find((o) => !o.dead && !o.away && o.k === Kind.Dragon) ?? this.list.find((o) => !o.dead && !o.away && o.k === Kind.Wyvern) ?? this.list.find((o) => !o.dead && !o.away && o.k === Kind.Worm && this.tileOf(o.x, o.y) >= 0 && !m.solid[this.tileOf(o.x, o.y)]);
+}
+
+/** 竜退治の相手になる竜の種（いなければ 0） */
+export function questDragon(this: Ecology): number {
+  return this.questDragonCr()?.k ?? 0;
 }
 
 /** 竜の寝床への道が町に知られていて、その先のドラゴンが生きているか */
@@ -167,18 +179,22 @@ export function dragonWayKnown(this: Ecology): boolean {
   return !!wd && !wd.dead && !wd.away && wd.k === Kind.Dragon;
 }
 
-/** その依頼を受けた一行が中にいて、まだ目標を終えていないか、果たして帰る途中か（最後の一人が帰るまで、その依頼は掲示に戻らない） */
+/**
+ * その依頼を受けた一行が中にいて、まだ目標を終えていないか、果たして帰る途中か（くじから外す）。
+ * 果たした一行は、最後の一人が帰ったところで噂を鎮める（leaveDungeon）ので、それまでは外したままにする
+ */
 function questTaken(e: Ecology, a: number, k: number): boolean {
   return e.parties.some((p) => p.q === a && (p.qk ?? 0) === k && (!p.aimEnd || (p.aimEnd === 1 && !p.qCalm)) && p.members.some((id) => { const c = e.byId.get(id); return !!c && !c.dead; }));
 }
 
-/** いま町に出ている依頼の一覧（噂から毎回つくる。並びは決まった順） */
+/** 依頼の鍵（掲示の一覧 Rumors.posted に覚える） */
+const questKey = (a: number, k: number) => a * 100 + k;
+
+/** 噂から出ている依頼の一覧（受けた一行が中にいる依頼も含む。並びは決まった順） */
 export function questBoard(this: Ecology): Quest[] {
   const r = this.rumors;
   const out: Quest[] = [];
-  const add = (a: number, k: number, w: number) => {
-    if (!questTaken(this, a, k)) out.push({ a, k, w });
-  };
+  const add = (a: number, k: number, w: number) => out.push({ a, k, w });
   if (this.goblinHuntReady()) add(5, 0, r.goblin + 0.25 * r.goblinRobs);
   // 竜の噂：寝床への道が知られていれば竜退治、ドラゴンがいて道が知られていなければ、道を探して持ち帰る依頼（深部の探索）。
   // ドラゴンがいなければ、ワイバーンか床にいるワームの竜退治
@@ -191,9 +207,34 @@ export function questBoard(this: Ecology): Quest[] {
   return out;
 }
 
-/** 一行が引き受ける依頼を、重さに比例したくじで一つ引く（探索も一定の重さでくじに入る。率いる職業の者が名簿にいなければ、その依頼は引かない） */
+/**
+ * 掲示を作り直す：噂から出ている依頼の一覧を覚え（Rumors.posted。セーブに入る）、新しく加わった依頼を「町に〇〇の依頼が出た」と記録する。
+ * 受けた一行が中にいる依頼は、噂が薄れて境目を下回っても一覧に残す（あきらめて帰っても、果たして帰る途中に噂が薄れて戻っても、「出た」とはならない）。
+ * 鎮まったり薄れたりして消えた依頼が、また噂から出たときは出る。
+ * 作り直すのは、一行が依頼を引く直前（pickQuest）、依頼の一行の最後の一人が帰ったとき（leaveDungeon）、竜が生まれたとき、日ごとに噂が薄れたとき。
+ * 掲示を覚えていない古いセーブでは、最初の作り直しで、いま出ている依頼をそのまま覚える（ログは出さず、記録だけ init 1 で残す）
+ */
+export function syncQuests(this: Ecology): void {
+  const r = this.rumors;
+  const m = this.w.map;
+  const keys = this.questBoard().map((q) => questKey(q.a, q.k));
+  for (const key of r.posted ?? []) if (!keys.includes(key) && questTaken(this, Math.floor(key / 100), key % 100)) keys.push(key);
+  keys.sort((x, y) => x - y);
+  const init = !r.posted;
+  for (const key of keys) {
+    if (r.posted?.includes(key)) continue;
+    const a = Math.floor(key / 100);
+    const k = key % 100;
+    this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: 0, ev: 'quest', how: a, to: k, ...(init ? { init: 1 } : {}), x: 0, y: 0 } as never);
+    if (!init) this.log(m.entrance.x * TILE + 8, TILE + 8, `町に${this.questName(a, k)}の依頼が出た`);
+  }
+  r.posted = keys;
+}
+
+/** 一行が引き受ける依頼を、重さに比例したくじで一つ引く（探索も一定の重さでくじに入る。受けた一行が中にいる依頼と、率いる職業の者が名簿にいない依頼は引かない） */
 export function pickQuest(this: Ecology): Quest {
-  const qs = [...this.questBoard().filter((q) => this.canLead(QUEST_LEAD[q.a])), { a: 0, k: 0, w: EXPLORE_W }];
+  this.syncQuests();
+  const qs = [...this.questBoard().filter((q) => !questTaken(this, q.a, q.k) && this.canLead(QUEST_LEAD[q.a])), { a: 0, k: 0, w: EXPLORE_W }];
   const tot = qs.reduce((s, q) => s + q.w, 0);
   let v = ((ih(this.step, 220, 7) % 10000) / 10000) * tot;
   for (const q of qs) {
@@ -203,55 +244,50 @@ export function pickQuest(this: Ecology): Quest {
   return qs[qs.length - 1];
 }
 
-/** 依頼の呼び名（記録の文。{k:種} は照らされた種なら名前になる） */
-export function questName(this: Ecology, a: number, k: number): string {
+/**
+ * 依頼の呼び名。plain でなければ記録の文（{k:種} は照らされた種なら名前になる）、plain なら情報パネルの文（種の名前そのまま）。
+ * 竜退治の k は相手の竜の種（0 ならいまの竜退治の相手）
+ */
+export function questName(this: Ecology, a: number, k: number, plain = false): string {
+  const nm = (kind: number) => (plain ? NAMES[kind] : `{k:${kind}}`);
   switch (a) {
     case 1:
       return '宝探し';
     case 2:
-      return `{k:${this.questDragon() || Kind.Dragon}}退治`;
+      return `${nm(k || this.questDragon() || Kind.Dragon)}退治`;
     case 3:
-      return `{k:${k}}狩り`;
+      return `${nm(k)}狩り`;
     case 4:
       return 'アンデッド祓い';
     case 5:
-      return `{k:${Kind.Goblin}}退治`;
+      return `${nm(Kind.Goblin)}退治`;
     case 6:
-      return `{k:${Kind.Dragon}}の寝床への道探し`;
+      return `${nm(Kind.Dragon)}の寝床への道探し`;
     default:
       return '探索';
   }
 }
 
-/** 噂が強まったあと、新しく出た依頼を町の出来事として記録する（before は強まる前の一覧の鍵） */
-export function postNewQuests(this: Ecology, before: number[]): void {
-  const m = this.w.map;
-  for (const q of this.questBoard()) {
-    if (before.includes(q.a * 100 + q.k)) continue;
-    this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: 0, ev: 'quest', how: q.a, to: q.k, x: 0, y: 0 } as never);
-    this.log(m.entrance.x * TILE + 8, TILE + 8, `町に${this.questName(q.a, q.k)}の依頼が出た`);
-  }
-}
-
-/** いま出ている依頼の鍵（postNewQuests に渡す） */
-export function questKeys(this: Ecology): number[] {
-  return this.questBoard().map((q) => q.a * 100 + q.k);
-}
-
-/** 依頼を果たした一行が生きて帰ると、最後の一人が帰ったところで、その噂が鎮まる（一行で一度だけ。src/eco/adventurer.ts の updateParties） */
+/**
+ * 依頼を果たした一行の最後の一人が帰ったところで、その噂を、依頼が出る強さの半分まで下げる（一行で一度だけ。src/eco/adventurer.ts の leaveDungeon）。
+ * 次の目撃や被害があるまで、同じ依頼は出ない（以前は ×0.2〜0.3 で、帰る者が多いと鎮めたあとも依頼が残った）。宝探しと道探しは鎮めない
+ */
 export function calmQuest(this: Ecology, p: Party): void {
   if (p.aimEnd !== 1 || p.qCalm) return;
   p.qCalm = 1;
   const r = this.rumors;
   if (p.q === 5) {
-    r.goblin *= 0.3;
+    r.goblin = Math.min(r.goblin, GOBLIN_HUNT_AT / 2);
     r.goblinRobs = 0;
-  } else if (p.q === 2 && p.aim === 2) r.dragon *= 0.3;
+  } else if (p.q === 2 && p.aim === 2) r.dragon = Math.min(r.dragon, DRAGON_AT / 2);
   else if (p.q === 3) {
     const b = r.beasts.find((e) => e[0] === p.qk);
-    if (b) b[1] *= 0.2;
-    this.fadeBeastRumors(1);
-  } else if (p.q === 4) r.undead *= 0.3;
+    if (b) b[1] = Math.min(b[1], BEAST_AT / 2);
+  } else if (p.q === 4) r.undead = Math.min(r.undead, UNDEAD_AT / 2);
+  else return;
+  // 分析用：鎮めたあとも、同じ依頼が噂から出ているか（left。check で0を確かめる）
+  const left = this.questBoard().some((q) => q.a === p.q && q.k === (p.qk ?? 0)) ? 1 : 0;
+  this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'calm', how: p.q, to: p.qk ?? 0, left, x: 0, y: 0 } as never);
 }
 
 declare module '../ecology' {
@@ -262,15 +298,15 @@ declare module '../ecology' {
     partyHurt: typeof partyHurt;
     partySawBeast: typeof partySawBeast;
     carryBeastRumors: typeof carryBeastRumors;
+    questDragonCr: typeof questDragonCr;
     questDragon: typeof questDragon;
     dragonWayKnown: typeof dragonWayKnown;
     questBoard: typeof questBoard;
+    syncQuests: typeof syncQuests;
     pickQuest: typeof pickQuest;
     questName: typeof questName;
-    postNewQuests: typeof postNewQuests;
-    questKeys: typeof questKeys;
     calmQuest: typeof calmQuest;
   }
 }
 
-Object.assign(Ecology.prototype, { beastRumor, beastTotal, fadeBeastRumors, partyHurt, partySawBeast, carryBeastRumors, questDragon, dragonWayKnown, questBoard, pickQuest, questName, postNewQuests, questKeys, calmQuest });
+Object.assign(Ecology.prototype, { beastRumor, beastTotal, fadeBeastRumors, partyHurt, partySawBeast, carryBeastRumors, questDragonCr, questDragon, dragonWayKnown, questBoard, syncQuests, pickQuest, questName, calmQuest });

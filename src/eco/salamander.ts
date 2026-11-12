@@ -135,6 +135,8 @@ export function onDayEvents(this: Ecology, prevPhase: number, phase: number): vo
     r.gold *= 0.8;
     r.undead *= 0.8;
     this.fadeBeastRumors(0.8);
+    // 薄れて境目を下回った依頼は、町の掲示から消える（src/eco/quest.ts）
+    this.syncQuests();
     r.dragon *= 0.85;
     r.goblin *= 0.8;
     let glow = 0;

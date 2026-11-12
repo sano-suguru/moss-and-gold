@@ -99,7 +99,7 @@ export interface Party {
   hurt?: number[][];
   /** 一度の探索で見かけた大物（強さ10以上の魔物）：[種, x, y]（生きて帰れば、その種の噂になる） */
   seenB?: number[][];
-  /** 引き受けた依頼（src/eco/quest.ts）：目標の種類（0 探索、1 宝探し、2 竜退治、3 魔物の狩り、4 アンデッド祓い、5 ゴブリン退治）と狩る種。qCalm は、果たして帰り、噂を鎮めたか */
+  /** 引き受けた依頼（src/eco/quest.ts）：目標の種類（0 探索、1 宝探し、2 竜退治、3 魔物の狩り、4 アンデッド祓い、5 ゴブリン退治、6 竜の寝床への道探し）と狩る種。qCalm は、果たして帰り、噂を鎮めたか */
   q?: number;
   qk?: number;
   qCalm?: number;
@@ -289,6 +289,8 @@ export interface Rumors {
    * 生還者が見かけた大物と、受けた被害（石化・死者）から強まり、日ごとに薄れる（src/eco/quest.ts）
    */
   beasts: number[][];
+  /** 町の掲示に出ている依頼の鍵（目標の種類×100＋狩る種。src/eco/quest.ts の syncQuests）。古いセーブでは無い（最初の作り直しで覚える） */
+  posted?: number[];
   /** ゴブリンの盗み（生還者が持ち帰る。溜まるとゴブリン退治の一行が来る）と、最後に盗まれた場所 */
   goblin: number;
   goblinX: number;
@@ -733,7 +735,7 @@ export class Ecology {
   armorKit = new Map<number, number[]>();
   /** リビングアーマーが崩れた所（[x, y, 生き物の更新の通し番号] を並べたもの。直近の8件。アンデッド祓いの戦利品を決めるのに使う。セーブに入れる） */
   armorFalls: number[] = [];
-  rumors: Rumors = { light: 0, gold: 0, undead: 0, dragon: 0, beasts: [], goblin: 0, goblinX: 0, goblinY: 0, dragonX: 0, dragonY: 0, goblinRobs: 0, goblinCamp: 0, goblinCampX: 0, goblinCampY: 0 };
+  rumors: Rumors = { light: 0, gold: 0, undead: 0, dragon: 0, beasts: [], posted: [], goblin: 0, goblinX: 0, goblinY: 0, dragonX: 0, dragonY: 0, goblinRobs: 0, goblinCamp: 0, goblinCampX: 0, goblinCampY: 0 };
   /** 外との金貨の出入り */
   goldIn = 0;
   goldOut = 0;

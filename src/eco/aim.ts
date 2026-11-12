@@ -13,10 +13,9 @@ import { CELL, Camp, Cr, Ecology, Job, Kind, Party, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { ADV_NAMES, AIM_NAMES, JOB_NAMES, NAMES } from '../names';
 import { heroTitle } from './roster';
-import type { Quest } from './quest';
+import { UNDEAD, type Quest } from './quest';
 
 const DRAGONS = [Kind.Dragon, Kind.Wyvern, Kind.Worm];
-const UNDEAD = [Kind.Zombie, Kind.Skeleton, Kind.Lich, Kind.Ghost, Kind.Armor];
 /** ゴブリン退治の一行が来る噂の強さ */
 export const GOBLIN_HUNT_AT = 0.5;
 /** ゴブリン退治の一行が来る、生還者が伝えた盗みの回数 */
@@ -92,14 +91,14 @@ export function chooseAim(this: Ecology, p: Party, q: Quest): void {
     }
   }
   if (q.a === 2 || q.a === 6) {
-    const dragon = this.list.find((o) => !o.dead && !o.away && o.k === Kind.Dragon);
-    if (dragon) {
+    // 相手の竜と寝床への道は、依頼の一覧と同じ判定で決める（src/eco/quest.ts の questDragonCr・dragonWayKnown）
+    const d = this.questDragonCr();
+    if (d && d.k === Kind.Dragon) {
       // ドラゴン：寝床までの道が町で知られている（前の一行が見つけて持ち帰った）ときだけ、竜退治を目標にする
       const way = this.lore.dragonWay;
-      const wd = way ? this.byId.get(way[2]) : undefined;
-      if (way && wd && !wd.dead && !wd.away && wd.k === Kind.Dragon) {
+      if (way && this.dragonWayKnown()) {
         p.aim = 2;
-        p.aimId = wd.id;
+        p.aimId = way[2];
         p.aimX = way[0];
         p.aimY = way[1];
         p.aimKnown = 1;
@@ -113,7 +112,6 @@ export function chooseAim(this: Ecology, p: Party, q: Quest): void {
       return;
     }
     // ドラゴンがいなければ、ワイバーン、岩の中を動くワームは床にいるときだけ（場所は噂か深部で当て推量）
-    const d = this.list.find((o) => !o.dead && !o.away && o.k === Kind.Wyvern) ?? this.list.find((o) => !o.dead && !o.away && o.k === Kind.Worm && this.tileOf(o.x, o.y) >= 0 && !m.solid[this.tileOf(o.x, o.y)]);
     p.aim = 2;
     if (d) {
       p.aimId = d.id;
@@ -209,13 +207,12 @@ export function guessDeep(this: Ecology, p: Party): void {
 
 /** 入ってくるときの記録の言葉（「〇〇の依頼を受けて、〜」）。探索なら空 */
 export function aimPhrase(this: Ecology, p: Party): string {
-  const dk = p.aimId ? this.byId.get(p.aimId)?.k ?? Kind.Dragon : Kind.Dragon;
-  const took = p.q ? `${this.questName(p.q, p.qk ?? 0)}の依頼を受けて` : '';
+  const took = p.q ? `${this.questName(p.q, this.questTargetKind(p))}の依頼を受けて` : '';
   switch (p.aim) {
     case 1:
       return `${took}、知られた宝の山を目指して`;
     case 2:
-      return `{k:${dk}}退治の依頼を受けて、${p.aimWay ? '知られた道をたどって寝床を目指し' : p.aimKnown ? '寝床を目指して' : '深部を探しに'}`;
+      return `${took}、${p.aimWay ? '知られた道をたどって寝床を目指し' : p.aimKnown ? '寝床を目指して' : '深部を探しに'}`;
     case 6:
       return `${took}、深部へ`;
     case 3:
@@ -235,8 +232,13 @@ export function aimLine(this: Ecology, p: Party): string {
   if (!a) return `目的：${AIM_NAMES[0]}`;
   const st = p.aimEnd === 1 ? '果たした' : p.aimEnd === 2 ? 'あきらめた' : p.aimAt ? '目標に着いた' : p.aimKnown ? '向かっている' : '場所を探している';
   if (!p.q) return `目的：${AIM_NAMES[a]}（${st}）`;
-  const nm = p.q === 3 ? `${NAMES[p.qk ?? 0]}狩り` : p.q === 2 ? `${NAMES[p.aimId ? this.byId.get(p.aimId)?.k ?? Kind.Dragon : Kind.Dragon]}退治` : p.q === 6 ? `${NAMES[Kind.Dragon]}の寝床への道探し` : AIM_NAMES[p.q];
-  return `依頼：${nm}（${st}）`;
+  return `依頼：${this.questName(p.q, this.questTargetKind(p), true)}（${st}）`;
+}
+
+/** 依頼の呼び名に使う種：魔物の狩りなら狩る種、竜退治なら目指す竜の種（ログと情報パネルで同じ呼び名にする。src/eco/quest.ts の questName） */
+export function questTargetKind(this: Ecology, p: Party): number {
+  if (p.q === 2) return (p.aimId ? this.byId.get(p.aimId)?.k : undefined) ?? Kind.Dragon;
+  return p.qk ?? 0;
 }
 
 /** 目指す集落（ゴブリン退治のときだけ） */
@@ -658,6 +660,7 @@ declare module '../ecology' {
     chooseAim: typeof chooseAim;
     aimPhrase: typeof aimPhrase;
     aimLine: typeof aimLine;
+    questTargetKind: typeof questTargetKind;
     aimCamp: typeof aimCamp;
     homeKey: typeof homeKey;
     spareResident: typeof spareResident;
@@ -679,4 +682,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { goblinHuntReady, loreKnows, chooseAim, aimPhrase, aimLine, aimCamp, homeKey, spareResident, avoidZones, advPath, brace, partyMark, aimPoint, aimStep, endAim, passBrace, aimTarget, aimDeep, partyTitle, searchesCamp, guessDeep, huntsCamp, inPartyLight });
+Object.assign(Ecology.prototype, { goblinHuntReady, loreKnows, chooseAim, aimPhrase, aimLine, questTargetKind, aimCamp, homeKey, spareResident, avoidZones, advPath, brace, partyMark, aimPoint, aimStep, endAim, passBrace, aimTarget, aimDeep, partyTitle, searchesCamp, guessDeep, huntsCamp, inPartyLight });

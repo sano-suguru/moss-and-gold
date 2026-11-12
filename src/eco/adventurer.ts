@@ -156,9 +156,11 @@ export function updateParties(this: Ecology): void {
       if (!(p.saw & 16)) this.log(last?.x ?? 0, last?.y ?? 0, `${p.name ? p.name + 'の' : ''}冒険者の一行が全滅した`);
       // 担いでいた戦利品は、倒れた所に残る
       this.dropTrophy(p, last);
-      // 依頼を果たして生きて帰った一行は、最後の一人が帰ったところで、その噂を鎮める（果たせずに帰れば、そのまま残る。src/eco/quest.ts）。
-      // （帰る者が一人ずつ噂を足すので、最初の一人で鎮めると残りの仲間が足し直し、果たした152の一行のうち44で、帰る途中に同じ依頼がまた出ていた）
-      if (p.saw & 16) this.calmQuest(p);
+      // 依頼を果たした一行の一部が帰り、残りが中で倒れた：帰った者が知らせたので、噂を鎮める（ふつうは最後の一人が帰ったとき。leaveDungeon）
+      if (p.saw & 16 && p.aimEnd === 1 && !p.qCalm) {
+        this.calmQuest(p);
+        this.syncQuests();
+      }
       // 一行の終わり：目標、着いたか、果たしたか、生きて帰ったか
       this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'end', how: p.aim ?? 0, reason: p.saw & 16 ? 'returned' : 'wiped', to: p.aimEnd ?? 0, n: p.aimId ?? 0, arrived: p.aimAt ? 1 : 0, x: Math.round(last?.x ?? 0), y: Math.round(last?.y ?? 0) } as never);
     }
@@ -989,9 +991,8 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
   this.goldOut += c.gold;
   this.tellCaches(p);
   this.bringTrophy(c, p);
-  // 生きて帰った者が噂を持ち帰る（強まる前に出ていた依頼を覚えておき、新しく出た依頼を町の出来事にする）
+  // 生きて帰った者が噂を持ち帰る
   const r = this.rumors;
-  const posted = this.questKeys();
   // 吟遊詩人が生きて帰れば噂は何倍にも広まり、吟遊詩人を失った一行の噂は細る
   let bard = 1;
   for (const id of p.members) {
@@ -1033,12 +1034,18 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
       }
     }
   }
-  this.postNewQuests(posted);
   c.body = 0;
   c.food = 0;
   c.gold = 0;
   c.dead = 2;
   this.returned++;
+  // 最後の一人が帰ったところで：依頼を果たした一行ならその噂を鎮め、町の掲示を作り直す（src/eco/quest.ts）。
+  // （帰る者が一人ずつ噂を足すので、最初の一人で鎮めると残りの仲間が足し直し、果たした152の一行のうち44で、帰る途中に同じ依頼がまた出ていた。
+  //  次の一行の更新で鎮めると、それまでの間に次の一行が、果たしたばかりの依頼を引けた）
+  if (!p.members.some((id) => { const o = this.byId.get(id); return !!o && !o.dead; })) {
+    this.calmQuest(p);
+    this.syncQuests();
+  }
 }
 
 /** 倒れた者の持ち物を床に落とす（冒険者の道具） */

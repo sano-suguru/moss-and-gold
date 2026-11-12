@@ -189,7 +189,7 @@ export const CHECKS: Check[] = [
     name: '一行が依頼を受けて入ってくる（15シードの合計で、町に依頼が出る10回以上・依頼の種類が4種類以上混ざる）',
     ...RUN_WIDE,
     test: (rs) => {
-      const posted = sum(rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'quest').length));
+      const posted = sum(rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'quest' && !x.init).length));
       const kinds = new Map<number, number>();
       for (const r of rs) for (const x of r.settle) if (x.k === 25 && x.ev === 'enter' && x.q > 0) kinds.set(x.q, (kinds.get(x.q) ?? 0) + 1);
       const NM = ['', '宝探し', '竜退治', '魔物の狩り', '祓い', 'ゴブリン退治', '道探し'];
@@ -215,6 +215,33 @@ export const CHECKS: Check[] = [
         }
       }
       return { ok: n === 0, value: `果たして帰った一行 ${tot}、帰り道に同じ依頼が出た ${n}` };
+    },
+  },
+  {
+    // 依頼を受けて入った一行の依頼は、その前に必ず町の掲示に出ている（ログ「町に〇〇の依頼が出た」。掲示を覚えていないスナップショットから始めたときは、最初の作り直しの init の記録）
+    name: '依頼で入った一行の依頼は、その前に町に出ている（15シードの合計で例外0）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      let n = 0;
+      let tot = 0;
+      for (const r of rs) {
+        const a = r.settle.filter((x) => x.k === 25);
+        for (const e of a.filter((x) => x.ev === 'enter' && x.q > 0)) {
+          tot++;
+          if (!a.some((x) => x.ev === 'quest' && x.how === e.q && (x.to ?? 0) === (e.qk ?? 0) && x.t <= e.t)) n++;
+        }
+      }
+      return { ok: n === 0, value: `依頼で入った一行 ${tot}、その前に依頼が出ていなかった ${n}` };
+    },
+  },
+  {
+    // 依頼を果たして帰った一行の噂は、依頼が出る強さの半分まで下がる（帰った直後の掲示に同じ依頼が無い。settle の calm の left）
+    name: '果たして帰った直後に、同じ依頼が掲示に残らない（15シードの合計で例外0）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const c = rs.flatMap((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'calm'));
+      const n = c.filter((x) => x.left).length;
+      return { ok: c.length > 0 && n === 0, value: `噂を鎮めた一行 ${c.length}、同じ依頼が残った ${n}` };
     },
   },
   {

@@ -278,7 +278,7 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     campBreak: ev(K.Adventurer, 'campBreak').filter((x) => x.how !== 'stoned').length,
     campDeath: d.filter((x) => x.k === K.Adventurer && x.camp === 1).length,
     huntArrive: new Set(ev(K.Adventurer, 'arrive').filter((x) => x.how === 5).map((x) => x.id)).size,
-    questPost: ev(K.Adventurer, 'quest').length,
+    questPost: ev(K.Adventurer, 'quest').filter((x) => !x.init).length,
     questKinds: new Set(ev(K.Adventurer, 'enter').filter((x) => x.q > 0).map((x) => x.q)).size,
     questDragon: ev(K.Adventurer, 'enter').filter((x) => x.q === 2).length,
     questDeep: ev(K.Adventurer, 'enter').filter((x) => x.q === 6).length,
