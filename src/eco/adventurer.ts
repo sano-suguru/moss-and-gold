@@ -60,9 +60,6 @@ export function maybeParty(this: Ecology): void {
   }
   // 竜の噂があれば、竜殺しが一行を率いる
   if (r.dragon > 0.3 && !gobHunt) jobs[0] = Job.Slayer;
-  // 噂の魔物がバジリスクなら、2回に1回は狩人が一行を率いて、バジリスク狩りに来る（src/eco/aim.ts の aim 3）。
-  // （噂の魔物の狩りは、狩人がいて竜殺しのいない一行が、噂の魔物の種が決まっている日に出たときだけで、16シード×25日でバジリスクを狩りに来た一行は0だった）
-  else if (!gobHunt && r.beastKind === Kind.Basilisk && r.beast > 0.2 && this.list.some((o) => o.k === Kind.Basilisk && !o.dead && !o.away) && ih(this.step, 211, 7) % 2 === 0) jobs[0] = Job.Hunter;
   // 竜の寝床への道が町で知られていれば、3回に2回は竜殺しが一行を率いて竜退治に来る（src/eco/aim.ts。竜退治の場面を増やす）
   else if (!gobHunt && this.lore.dragonWay && this.list.some((o) => o.k === Kind.Dragon && !o.dead && !o.away) && ih(this.step, 209, 7) % 3 !== 0) jobs[0] = Job.Slayer;
   if (gobHunt) jobs[0] = Job.Warrior;
@@ -499,9 +496,8 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       // 噂の魔物：強さ10以上の大物と、バジリスク（強さ8だが、睨みで人を石にする魔物として噂になり、狩人のいる一行が「眼」を狙って狩りに来る。src/eco/aim.ts の aim 3）
       if ((STR[o.k] >= 10 || o.k === Kind.Basilisk) && o.k !== Kind.Adventurer && o.k !== Kind.Dragon && o.k !== Kind.Wyvern && o.k !== Kind.Worm && o.k !== Kind.Golem) {
         p.saw |= 4;
-        // 一度の探索で見た中で、強いものほど噂の種になる。バジリスクは強さで負けても、2回に1回は（睨みで人を石にする魔物として）噂の種になる
-        // （強さだけで決めていたころは、トロールやミノタウロスと同じ探索で見られると負け、16シード×25日でバジリスクを狩りに来た一行は0だった）
-        if (STR[o.k] >= STR[p.bk] || !p.bk || (o.k === Kind.Basilisk && p.bk !== Kind.Basilisk && ih(p.id, o.id, 433) % 2 === 0)) {
+        // 一度の探索で見た中で、強いものほど噂の種になる
+        if (STR[o.k] >= STR[p.bk] || !p.bk) {
           p.bk = o.k;
           p.bx = Math.round(o.x);
           p.by = Math.round(o.y);
