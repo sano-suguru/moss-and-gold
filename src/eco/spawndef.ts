@@ -8,7 +8,7 @@
  */
 import { Burrow, Camp, Colony, Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, Warren, ih } from '../ecology';
 import { TILE } from '../mapgen';
-import { BASILISK_MANA } from './monsters';
+import { BASILISK_MANA } from './basilisk';
 
 export interface SpawnDef {
   k: Kind;
