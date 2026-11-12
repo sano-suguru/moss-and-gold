@@ -197,7 +197,9 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1, fx = true): boolean
   if (d.k === Kind.Ghost && this.ghostPhase(a, d, fx)) return false;
   if (d.hp <= 0) d.hp = this.maxHp(d);
   const sa = this.str(a);
-  const dmg = sa * (1.2 + (ih(a.id, d.id ^ this.step, 161) % 1000) / 1000 * 1.2) * mul;
+  let dmg = sa * (1.2 + (ih(a.id, d.id ^ this.step, 161) % 1000) / 1000 * 1.2) * mul;
+  // バジリスクの見つめから目を背けている者は、相手を見ずに打つので、傷が半分（src/eco/basilisk.ts）
+  if (a.avert > this.w.tick) dmg *= 0.5;
   d.hp -= dmg;
   // 大物の溜め（突進など）は、体力の上限の2割を超える重い一撃を受けたときだけ止まる（src/eco/charge.ts の breakWindup）
   if (d.k !== Kind.Adventurer && d.act === 2 && d.actT < 0 && d.hp > 0 && dmg > this.maxHp(d) * 0.2) this.breakWindup(d);

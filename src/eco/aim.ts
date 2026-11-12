@@ -126,6 +126,7 @@ export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: bool
   }
   if (jobs.includes(Job.Hunter) && r.beastKind) {
     p.aim = 3;
+    p.aimK = r.beastKind;
     p.aimX = r.beastX;
     p.aimY = r.beastY;
     p.aimKnown = 1;
@@ -210,7 +211,7 @@ export function aimPhrase(this: Ecology, p: Party): string {
     case 6:
       return `{k:${Kind.Dragon}}の寝床への道を探しに、深部へ`;
     case 3:
-      return `噂の{k:${this.rumors.beastKind}}を狩りに`;
+      return `噂の{k:${p.aimK ?? this.rumors.beastKind}}を狩りに`;
     case 4:
       return p.aimKnown ? `{k:${Kind.Zombie}}たちの群れる所を祓いに` : `深部のアンデッドを祓いに`;
     case 5:
@@ -360,7 +361,7 @@ export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
       // 目指した相手がいなくなっても、同じ種（竜なら竜のなかま）が見えたらそれを目標にする
       this.nearby(lead.x, lead.y, 7, (o) => {
         if (t || o.dead || o.away) return;
-        if ((p.aim === 2 ? DRAGONS.includes(o.k) : o.k === this.rumors.beastKind) && sees(o, 7)) t = o;
+        if ((p.aim === 2 ? DRAGONS.includes(o.k) : o.k === (p.aimK ?? this.rumors.beastKind)) && sees(o, 7)) t = o;
       });
       if (t) p.aimId = (t as Cr).id;
     }
@@ -376,8 +377,26 @@ export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
       p.aimX = tt.x;
       p.aimY = tt.y;
     } else if (p.aimKnown && sq((p.aimX ?? 0) - lead.x) + sq((p.aimY ?? 0) - lead.y) < 2.5 * TILE * 2.5 * TILE) {
-      // 噂の場所に着いたのに見当たらない：見失って、まわりを探す（見えたらまた目標にする）
-      p.aimKnown = 0;
+      // 噂の場所に着いたのに見当たらない。噂の魔物の狩りなら、まわり（30マスの内、同じ洞窟の領域）で目当ての種を探し、足跡をたどってそこへ向かう
+      // （寝床を移した魔物も見つけられるように。以前は見失ったまま、16シード×25日でバジリスクを狩りに来た一行が目当てを見つけたのは1回だった）。
+      // いなければ見失って、まわりを探す（見えたらまた目標にする）
+      let tr: Cr | null = null;
+      if (p.aim === 3 && p.aimK) {
+        const reg = this.regionOf(this.tileOf(lead.x, lead.y));
+        let bd = 30 * TILE * 30 * TILE;
+        for (const o of this.list) {
+          if (o.dead || o.away || o.k !== p.aimK) continue;
+          const d = sq(o.x - lead.x) + sq(o.y - lead.y);
+          if (d >= bd || this.regionOf(this.tileOf(o.x, o.y)) !== reg) continue;
+          bd = d;
+          tr = o;
+        }
+      }
+      if (tr && tr.id !== p.aimId) {
+        p.aimId = tr.id;
+        p.aimX = tr.x;
+        p.aimY = tr.y;
+      } else p.aimKnown = 0;
     }
   } else if (p.aim === 6) {
     // 深部の探索：寝床のドラゴンを見通しの利く所から見たら、道を見つけたので、生きて持ち帰る

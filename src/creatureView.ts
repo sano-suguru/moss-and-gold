@@ -1934,8 +1934,10 @@ export class CreatureView {
       const sp = thrallOf ? c.sp : c.k;
       const csp = thrallOf ? (c.sp === Kind.Adventurer ? Math.max(0, c.lure - 1) : 0) : c.sp;
       // 隠れている者は、こちら（暗がりの外）を向いて潜む（目が見えるように）
-      let dir = c.dir === 0 || eco.isHidden(c) ? 0 : c.dir === 1 ? 1 : 2;
-      let flip = c.dir === 3;
+      // バジリスクの見つめから目を背けている者（src/eco/basilisk.ts）は、向いている向きと反対を向いた姿で描く（背中を向けて、目を合わせない）
+      const cdir = !c.dead && c.avert > eco.w.tick ? [1, 0, 3, 2][c.dir] ?? c.dir : c.dir;
+      let dir = cdir === 0 || eco.isHidden(c) ? 0 : cdir === 1 ? 1 : 2;
+      let flip = cdir === 3;
       // 幼竜と若い竜には横向きの絵しかない。上下へ動くときも、横にどちらへ動いているかで左右を決め、
       // 一時停止中やロード直後で動きが分からなければ、飛んでいる竜は行き先の側を向き、それ以外は直前の左右を保つ（以前は上下の向きのとき必ず右を向き、左上へ飛ぶと右を向いたまま後ろへ滑って見えた）
       const youngDragon = sp === Kind.Dragon && c.sp < 2 && c.elite !== 8;
@@ -2434,7 +2436,7 @@ export class CreatureView {
           yy += ph.sy * 3 * k;
         }
       }
-      // バジリスクの睨みで石化しかけている者（src/eco/basilisk.ts の gazeRelease）：進みに比例して、その姿のまま石の色へ寄せる（shaders.ts の kind 8）
+      // バジリスクの睨みで石化しかけている者（src/eco/basilisk.ts の basiliskGaze）：進みに比例して、その姿のまま石の色へ寄せる（shaders.ts の kind 8）
       const stoneT = !isCorpse && c.stone > 0 && !hidden && veil !== 2 && !thrallOf ? Math.min(1, c.stone / STONE_FULL) : 0;
       if (holy > 0) pushSprite(x, yy, lift, flip, frame, holy, 7, (c.id * 0.6180339) % 1);
       else if (stoneT > 0) pushSprite(x, yy, lift, flip, frame, stoneT, (veil === 3 ? 20 : flash) + 8, (c.id * 0.6180339) % 1);
@@ -2442,12 +2444,13 @@ export class CreatureView {
       if (armorGear) for (const g of armorGear) if (g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
       // バジリスクの睨みの溜め（src/eco/basilisk.ts の gazeStart）：目が黄緑に光り、溜めが進むほど強まって、放つ手前で目のまわりに光の輪が広がる（描画専用）。
       // 目のある向き（横向きは前の端の上、前向きは顔の左右）にだけ描く。後ろ向きは目が見えない
-      if (sp === Kind.Basilisk && !c.dead && c.run === -1 && c.act === 2 && c.actT < 0 && dir !== 1 && !hidden && veil !== 2) {
-        const p = Math.max(0, Math.min(1, (SKILL_BASILISK_GAZE.windup + c.actT + alpha) / SKILL_BASILISK_GAZE.windup));
-        const eyes: [number, number][] = dir === 0 ? [[-2, 4], [2, 4]] : [[dir === 2 ? -12 : 12, 7]];
+      // 見つめている間（c.run が −6）は、目のまわりの光の輪を出し続ける
+      if (sp === Kind.Basilisk && !c.dead && ((c.run === -1 && c.act === 2 && c.actT < 0) || c.run === -6) && dir !== 1 && !hidden && veil !== 2) {
+        const p = c.run === -6 ? 1 : Math.max(0, Math.min(1, (SKILL_BASILISK_GAZE.windup + c.actT + alpha) / SKILL_BASILISK_GAZE.windup));
+        const eyes: [number, number][] = dir === 0 ? [[-2, 4], [2, 4]] : [[flip ? -12 : 12, 7]];
         for (const [ex, el] of eyes) {
           if (p < 0.6) pushSprite(x + ex, yy + 0.06, lift + el, false, A.fx(`orb:3:${Math.floor((eco.w.tick + alpha) / 2) % 2}`), 0, 4);
-          else pushSprite(x + ex, yy + 0.06, lift + el, false, A.fx(`ring:0:3:${Math.min(5, Math.floor((p - 0.6) * 15))}`), 0, 4);
+          else pushSprite(x + ex, yy + 0.06, lift + el, false, A.fx(`ring:0:3:${c.run === -6 ? 2 + (Math.floor((eco.w.tick + alpha) / 3) % 4) : Math.min(5, Math.floor((p - 0.6) * 15))}`), 0, 4);
         }
       }
       // ゴーストの金切り声の溜め（src/eco/ghostskill.ts）：口もとに青白い冷気の玉が膨らみ、まわりから冷気の粒が渦を巻いて吸い寄せられる（体のあとに描く）

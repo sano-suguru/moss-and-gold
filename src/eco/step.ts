@@ -26,7 +26,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   for (const c of this.list) {
     if (c.dead === 2) continue;
     // バジリスクの睨みで進んだ石化は、睨まれ続けなければ少しずつ戻る（どの生き物も、ほかの処理で更新を飛ばす前に）
-    if (c.dead === 0 && c.stone > 0 && this.step % STONE_DECAY_EVERY === c.id % STONE_DECAY_EVERY) c.stone--;
+    if (c.dead === 0 && c.stone > 0 && this.step % STONE_DECAY_EVERY === c.id % STONE_DECAY_EVERY) c.stone = Math.max(0, c.stone - 1);
     // ウィスプ（光の精を除く）は WISP_EVERY 回に1回だけ判断して動く（Ecology.WISP_EVERY）。ほかの回は腹が減るだけ。
     // px は動いた回の前の位置のまま残す（描画が WISP_EVERY 回ぶんの時間をかけて補間する）
     if (c.dead === 0 && c.k === Kind.Wisp && c.elite !== 7 && !c.caught && this.wispIdle(c)) {

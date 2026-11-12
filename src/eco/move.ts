@@ -309,7 +309,7 @@ export function spawn(this: Ecology, k: Kind, x: number, y: number, body: number
   const c: Cr = {
     id: this.nextId++, k, x, y, px: x, py: y, vx: 0, vy: 0, dir: 0, act: 0, actT: 0,
     body, food, glow: 0, hungry: 0, sinceMeal: 0, st: 0, hx: x, hy: y, tx: x, ty: y,
-    dead: 0, units: 0, away: false, caught: false, ref: 0, sp: k, init: 0, ref2: 0, gold: 0, party: 0, torch: 0, hp: 0, hitAt: -99, foe: 0, flee: 0, gait: 0, bornAt: bornHere && this.w ? this.w.tick : -1e9, sleep: 0, drowsy: 0, lure: 0, lureAt: 0, feed: 0, mana: 0, elite: 0, cast: -1e9, poison: 0, poisonBy: -1, stun: 0, kb: 0, kbx: 0, kby: 0, run: 0, aim: 0, bind: 0, doze: 0, sporeAt: -1e9, stone: 0,
+    dead: 0, units: 0, away: false, caught: false, ref: 0, sp: k, init: 0, ref2: 0, gold: 0, party: 0, torch: 0, hp: 0, hitAt: -99, foe: 0, flee: 0, gait: 0, bornAt: bornHere && this.w ? this.w.tick : -1e9, sleep: 0, drowsy: 0, lure: 0, lureAt: 0, feed: 0, mana: 0, elite: 0, cast: -1e9, poison: 0, poisonBy: -1, stun: 0, kb: 0, kbx: 0, kby: 0, run: 0, aim: 0, bind: 0, doze: 0, sporeAt: -1e9, stone: 0, avert: 0,
   };
   this.list.push(c);
   this.byId.set(c.id, c);
@@ -894,6 +894,7 @@ export function die(this: Ecology, c: Cr, cause = '', by = -1): void {
   c.bind = 0;
   c.doze = 0;
   c.stone = 0;
+  c.avert = 0;
 }
 
 export function rebuildGrid(this: Ecology): void {

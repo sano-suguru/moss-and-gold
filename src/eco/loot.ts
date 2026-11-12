@@ -46,7 +46,7 @@ export function takeTrophy(this: Ecology, p: Party, lead: Cr): void {
   let k = 0;
   if (a === 2 || a === 3) {
     const t = this.byId.get(p.aimId ?? 0);
-    k = t ? t.k : a === 2 ? Kind.Dragon : this.rumors.beastKind || Kind.Troll;
+    k = t ? t.k : a === 2 ? Kind.Dragon : (p.aimK ?? this.rumors.beastKind) || Kind.Troll;
   } else if (a === 4) {
     // アンデッド祓い：リッチを倒していれば杖、リビングアーマーが崩れていれば冑（生き物の更新3000回の内に、目標の10マスの内で）、ほかは骨の冠
     k = Kind.Skeleton;

@@ -1,5 +1,5 @@
 /** Ecology のメソッド：バジリスク（濃いマナの暗がりに住み、睨みで相手を石に変え、飢えると獲物の所まで遠出する。src/ecology.ts のクラスに、prototype で足す） */
-import { Cr, DIR16, Ecology, HUNT5, Job, Kind, SPEC, STONE_FULL, STONE_GAZE, TIER, ih, sq } from '../ecology';
+import { Cr, DIR16, Ecology, HUNT5, Job, Kind, SPEC, STONE_FULL, STR, TIER, ih, sq } from '../ecology';
 import { Skill } from './skill';
 import { lineOfSight, TILE } from '../mapgen';
 
@@ -11,17 +11,16 @@ export const BASILISK_MANA = 30;
  */
 export const BASILISK_ROAM_PREY: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Ant];
 
-/** 睨みの届く距離（マス） */
-export const GAZE_R = 4;
-/**
- * 打ってきた相手を睨み返す距離（マス）と、打たれてから睨み返すまでの tick：打たれてから GAZE_FOE_T tick の内なら、生き物の更新2回に1回、
- * GAZE_FOE_R マスの内で見通しの通る、打ってきた相手を先に睨む。冒険者は魔法の矢・矢の雨・短剣投げで5マス前後から打ち、4マスの内に入る前に倒していた
- * （冒険者に倒された21頭の、傷を受けてから死ぬまでの更新のうち、389回は冒険者が4マスより遠かった）
- */
-const GAZE_FOE_R = 7;
+/** 睨み：およそ1.2秒、目を光らせて溜め、見つめ終わってから4秒は溜め直さない */
+export const SKILL_BASILISK_GAZE: Skill = { windup: 6, cool: 20 };
+/** 一度に見つめ続ける長さの上限（生き物の更新の回数） */
+export const STARE_MAX = 40;
+/** 目が合っている更新1回で進む石化の量の元。実際の量は STONE_RATE × 40 / (40 + 体 + マナ / 2)：体が大きいほど、体のマナが多いほど進みにくい */
+export const STONE_RATE = 10;
+/** 打たれてから、打ってきた相手を先に見つめ返すまでの tick */
 const GAZE_FOE_T = 60;
-/** 睨み：およそ1.6秒、目を光らせて溜め、放ったあと8秒は溜め直さない */
-export const SKILL_BASILISK_GAZE: Skill = { windup: 8, cool: 40 };
+/** 見つめる相手を探す範囲（マス。夜目は、明るい所の相手なら8マス先まで見える：src/eco/senses.ts の canSense） */
+const GAZE_LOOK_R = 8;
 /**
  * 睨まない種：同じバジリスク、体が石や土の者（ガーゴイル・ゴーレム・ワーム）、竜、体のない者（ウィスプ・ゴースト）、空を飛ぶ者（コウモリ・ワイバーン。
  * 床に降りないので、石像にすると宙に浮いた石像になってしまう）
@@ -30,70 +29,16 @@ const GAZE_IMMUNE = new Set<number>([Kind.Basilisk, Kind.Gargoyle, Kind.Golem, K
 /** 魔物が睨みの溜めに気づいて目を背ける割合（％。賢さの段階 TIER ごと：本能だけの者は背けない） */
 const AVERT_TIER = [0, 10, 25, 40];
 
-/** 睨み返す相手（打たれてから GAZE_FOE_T tick の内で、打ってきた相手が GAZE_FOE_R マスの内で見通しが通っていれば）。なければ null */
-function gazeFoe(e: Ecology, c: Cr): Cr | null {
-  if (e.w.tick - c.hitAt > GAZE_FOE_T || !c.foe) return null;
-  const f = e.byId.get(c.foe);
-  return f && gazeTarget(e, c, f, GAZE_FOE_R) ? f : null;
-}
-
-/** 睨める相手か（眠っている者は目を閉じているので睨まれない。腹の減っているバジリスクは、獲物を石にせず、噛んで仕留めて食べる） */
-function gazeTarget(e: Ecology, c: Cr, o: Cr, R = GAZE_R): boolean {
+/**
+ * 見つめられる相手か：バジリスクに見えている（canSense：夜目なので、5マスの内なら見通しが通れば、8マスの内なら相手が明るい所にいれば）。
+ * 眠っている者は目を閉じているので見つめられない。腹の減っているバジリスクは、獲物を石にせず、噛んで仕留めて食べる
+ */
+function gazeTarget(e: Ecology, c: Cr, o: Cr): boolean {
   if (o.dead || o.away || o.caught || o.sleep > 0 || GAZE_IMMUNE.has(o.k)) return false;
-  // 宝箱に化けているミミックは目を閉じている（襲いかかっている間だけ睨まれる）
+  // 宝箱に化けているミミックは目を閉じている（襲いかかっている間だけ見つめられる）
   if (o.k === Kind.Mimic && o.act === 0) return false;
   if (c.hungry > 0 && HUNT5.includes(o.k)) return false;
-  return sq(o.x - c.x) + sq(o.y - c.y) <= R * TILE * R * TILE && lineOfSight(e.w.map, c.x, c.y, o.x, o.y);
-}
-
-/**
- * 睨みの溜めを始める（生き物の更新10回に1回見る）：GAZE_R マスの内で見通しの通る、いちばん近い相手に向き直り、目を光らせて溜める。
- * 相手は溜めに気づいて「!」を出す（目を背けるかは、放つときに決める）
- */
-export function gazeStart(this: Ecology, c: Cr): boolean {
-  if (!this.skillCanStart(c, SKILL_BASILISK_GAZE)) return false;
-  // 打たれたばかりなら、打ってきた相手を先に睨み返す（生き物の更新2回に1回見る）
-  const foe = this.step % 2 === c.id % 2 ? gazeFoe(this, c) : null;
-  if (!foe && this.step % 10 !== c.id % 10) return false;
-  let target: Cr | null = foe;
-  let bd = Infinity;
-  if (!target) this.nearby(c.x, c.y, GAZE_R, (o) => {
-    if (!gazeTarget(this, c, o)) return;
-    const d = sq(o.x - c.x) + sq(o.y - c.y);
-    if (d < bd) {
-      bd = d;
-      target = o;
-    }
-  });
-  if (!target) return false;
-  const t = target as Cr;
-  c.run = -1;
-  c.aim = t.id;
-  this.setDir(c, t.x - c.x, t.y - c.y);
-  this.skillStart(c, SKILL_BASILISK_GAZE);
-  this.markNotice(t, c, '!');
-  return true;
-}
-
-/**
- * 睨みの溜めと、放つ判断（src/eco/step.ts から、深手で逃げる処理・火を怖がって離れる処理・縄張りの張り合いより先に呼ぶ）。
- * 逃げる処理より後だと、冒険者の一打ちで体力が半分を切ると逃げるばかりで睨めず、16シード×25日で冒険者を睨めたのは数回だった
- * （冒険者に倒された16頭の、傷を受けてから死ぬまでの更新のうち、166回が逃げていて睨めなかった）。逃げながらでも、追ってくる者を振り返って睨む。
- * 溜めの間はほかのことをせず、溜め終わったら放つ（溜めの間に打たれても止まらない）。この回に睨みのことをしたら true
- */
-export function basiliskGaze(this: Ecology, c: Cr): boolean {
-  // 眠っている間は目を閉じている
-  if (c.sleep > 0) return false;
-  const g = c.run === -1 ? this.skillStep(c, SKILL_BASILISK_GAZE, false) : '';
-  if (g === 'charging') return true;
-  if (g === 'ready') {
-    c.run = 0;
-    this.gazeRelease(c);
-    return true;
-  }
-  if (c.run === -1) c.run = 0;
-  // 噛みついた直後や打ち合いの最中でも、睨みは始められる（以前は、噛みついた直後の止まる間を待っていたので、冒険者と打ち合っている間は一度も睨めなかった）
-  return this.gazeStart(c);
+  return e.canSense(c, o);
 }
 
 /** 睨みの溜めに気づいた相手が目を背ける割合（％）。冒険者は職業と位で、魔物は賢さで決まる */
@@ -105,39 +50,132 @@ function avertChance(e: Ecology, o: Cr): number {
   return AVERT_TIER[TIER[o.k] ?? 0] ?? 0;
 }
 
+/** 見つめで石化しかけた冒険者の一行に、そのことを覚えさせる（町へ帰ると、バジリスクの噂が強まる。src/eco/adventurer.ts） */
+function partyStoned(e: Ecology, c: Cr, o: Cr): void {
+  if (o.k !== Kind.Adventurer || !o.party) return;
+  const p = e.parties.find((q) => q.id === o.party);
+  if (!p) return;
+  p.bsHit = (p.bsHit ?? 0) + 1;
+  p.bsX = Math.round(c.x);
+  p.bsY = Math.round(c.y);
+}
+
 /**
- * 睨みを放つ：溜めた相手がまだ GAZE_R マスの内で見通しが通っていれば、目を背けたか、受けたかを決める。
- * 受けた相手は石化が進み（体が大きいほど、体のマナが多いほど少ししか進まない）、STONE_FULL に達すると石像になる。
- * 石像にならなかった相手：冒険者は睨んだバジリスクに気づいて戦い（foe・hitAt）、本能か動物の賢さの魔物は逃げ、ほかの魔物は向き直るだけ（追わせない）
+ * 睨みを始める（生き物の更新5回に1回見る。打たれたばかりなら、打ってきた相手を先に）：見えている相手に向き直り、目を光らせて溜める。
+ * 相手から光る目が見えれば（見通しが通り、8マスの内）、相手は「!」と気づき、目を背けるかを決める（背けた者は、この見つめのあいだ背中を向ける）
  */
-export function gazeRelease(this: Ecology, c: Cr): void {
-  const o = this.byId.get(c.aim);
-  c.aim = 0;
-  if (!o || !gazeTarget(this, c, o, o.id === c.foe && this.w.tick - c.hitAt <= GAZE_FOE_T + SKILL_BASILISK_GAZE.windup * 2 ? GAZE_FOE_R : GAZE_R)) return;
-  const rec = (how: number) => this.record('settle', { t: this.w.tick, k: Kind.Basilisk, id: c.id, ev: 'gaze', n: o.k, how, x: Math.round(o.x), y: Math.round(o.y) } as never);
-  // 目を背ける：バジリスクに背を向けて、この一回を受けない
-  if (ih(o.id, c.cast, 431) % 100 < avertChance(this, o)) {
-    this.setDir(o, o.x - c.x, o.y - c.y);
-    rec(0);
-    return;
+export function gazeStart(this: Ecology, c: Cr): boolean {
+  if (this.step % 5 !== c.id % 5 || !this.skillCanStart(c, SKILL_BASILISK_GAZE)) return false;
+  let target: Cr | null = null;
+  if (this.w.tick - c.hitAt <= GAZE_FOE_T && c.foe) {
+    const f = this.byId.get(c.foe);
+    if (f && gazeTarget(this, c, f)) target = f;
   }
-  // 睨みの線（描画専用）
-  this.fxAttacks.push({ t: this.w.tick, style: 'beam', col: 6, size: 1, ax: c.x, ay: c.y, dx: o.x, dy: o.y, did: o.id, aid: c.id, big: false, kill: false });
-  if (this.fxAttacks.length > 160) this.fxAttacks.splice(0, 60);
-  o.stone += Math.max(1, Math.round((STONE_GAZE * 40) / (40 + o.body + o.mana / 2)));
+  if (!target) {
+    let bd = Infinity;
+    this.nearby(c.x, c.y, GAZE_LOOK_R, (o) => {
+      const d = sq(o.x - c.x) + sq(o.y - c.y);
+      if (d >= bd || !gazeTarget(this, c, o)) return;
+      bd = d;
+      target = o;
+    });
+  }
+  if (!target) return false;
+  const t = target as Cr;
+  c.run = -1;
+  c.aim = t.id;
+  c.lure = 0;
+  this.setDir(c, t.x - c.x, t.y - c.y);
+  this.skillStart(c, SKILL_BASILISK_GAZE);
+  if (sq(t.x - c.x) + sq(t.y - c.y) <= GAZE_LOOK_R * TILE * GAZE_LOOK_R * TILE && lineOfSight(this.w.map, t.x, t.y, c.x, c.y)) {
+    this.markNotice(t, c, '!');
+    if (ih(t.id, c.cast, 431) % 100 < avertChance(this, t)) {
+      t.avert = this.w.tick + (SKILL_BASILISK_GAZE.windup + STARE_MAX) * 2;
+      this.record('settle', { t: this.w.tick, k: Kind.Basilisk, id: c.id, ev: 'gaze', n: t.k, how: 0, x: Math.round(t.x), y: Math.round(t.y) } as never);
+    }
+  }
+  return true;
+}
+
+/** 見つめるのをやめる（ここから次の睨みまでの間を数える） */
+function stareEnd(e: Ecology, c: Cr): void {
+  c.run = 0;
+  c.aim = 0;
+  c.act = 0;
+  c.actT = 0;
+  c.cast = e.w.tick - SKILL_BASILISK_GAZE.windup * 2;
+}
+
+/**
+ * 睨みの溜めと、見つめる間（src/eco/step.ts から、深手で逃げる処理・火を怖がって離れる処理・縄張りの張り合いより先に呼ぶ。この回に睨みのことをしたら true）。
+ * 溜めの間はほかのことをしない（打たれても止まらない）。溜め終わったら、相手が見えている間（STARE_MAX 回まで）立ち止まって見つめ続け、
+ * 相手がバジリスクのほうを向いて目が合っている間、石化が進む（目を背けている者は進まない）。満ちたら石像になる。
+ * 深手で逃げる処理より先なので、追い詰められたバジリスクは逃げずに見つめ返す
+ * （以前は4マスの内の相手に8秒おきの一発で、冒険者は5マス前後から打って2〜3秒で倒し、16シード×25日で冒険者が石化しかけたのは13回、石像は0だった）
+ */
+export function basiliskGaze(this: Ecology, c: Cr): boolean {
+  // 眠っている間は目を閉じている
+  if (c.sleep > 0) {
+    if (c.run === -1 || c.run === -6) stareEnd(this, c);
+    return false;
+  }
+  if (c.run === -1) {
+    const g = this.skillStep(c, SKILL_BASILISK_GAZE, false);
+    if (g === 'charging') return true;
+    if (g !== 'ready') {
+      c.run = 0;
+      return this.gazeStart(c);
+    }
+    c.run = -6;
+  }
+  if (c.run !== -6) return this.gazeStart(c);
+  const o = this.byId.get(c.aim);
+  const staring = (this.w.tick - c.cast) / 2 - SKILL_BASILISK_GAZE.windup;
+  if (!o || staring > STARE_MAX || !gazeTarget(this, c, o)) {
+    stareEnd(this, c);
+    return false;
+  }
+  c.act = 2;
+  this.setDir(c, o.x - c.x, o.y - c.y);
+  // 目が合っているか：相手が背けておらず、バジリスクのほうを向いている
+  const fx = o.dir === 2 ? 1 : o.dir === 3 ? -1 : 0;
+  const fy = o.dir === 0 ? 1 : o.dir === 1 ? -1 : 0;
+  if (o.avert > this.w.tick || (c.x - o.x) * fx + (c.y - o.y) * fy <= 0) return true;
+  o.stone += (STONE_RATE * 40) / (40 + o.body + o.mana / 2);
+  if (staring % 6 === 0) {
+    // 睨みの線（描画専用）
+    this.fxAttacks.push({ t: this.w.tick, style: 'beam', col: 6, size: 1, ax: c.x, ay: c.y, dx: o.x, dy: o.y, did: o.id, aid: c.id, big: false, kill: false });
+    if (this.fxAttacks.length > 160) this.fxAttacks.splice(0, 60);
+  }
+  const rec = (how: number) => this.record('settle', { t: this.w.tick, k: Kind.Basilisk, id: c.id, ev: 'gaze', n: o.k, how, x: Math.round(o.x), y: Math.round(o.y) } as never);
   if (o.stone >= STONE_FULL) {
     rec(2);
+    partyStoned(this, c, o);
     this.petrify(o, Kind.Basilisk);
-    return;
+    stareEnd(this, c);
+    return true;
   }
-  rec(1);
-  if (o.k === Kind.Adventurer) {
-    o.foe = c.id;
-    o.hitAt = this.w.tick;
-  } else if ((TIER[o.k] ?? 0) <= 1) {
-    o.flee = Math.max(o.flee, 60 + (o.id % 20));
-    o.foe = c.id;
-  } else this.setDir(o, c.x - o.x, c.y - o.y);
+  // 最初に目が合ったとき：記録し、相手が反応する。冒険者は見つめるバジリスクに気づいて戦う。小さな魔物（強さ6未満：大ネズミ・コボルト・ゴブリンなど）は逃げる。
+  // 大物（強さ6以上：ミノタウロス・トロール・オークなど）は、目をそらして数歩下がる（追わない。打ち合うなら目を背けたままで、傷は半分）。
+  // （以前は大物を向き直らせていたので、見つめられ続けて、16シード×25日でミノタウロスの死の40％が石になっていた。
+  //  賢さの段階で分けたときは、コボルトとゴブリンまで目をそらして下がり、小さな魔物が石にならなくなった）
+  if (!c.lure) {
+    c.lure = 1;
+    rec(1);
+    partyStoned(this, c, o);
+    if (o.k === Kind.Adventurer) {
+      o.foe = c.id;
+      o.hitAt = this.w.tick;
+    } else if (STR[o.k] < 6) {
+      o.flee = Math.max(o.flee, 60 + (o.id % 20));
+      o.foe = c.id;
+    } else {
+      o.avert = Math.max(o.avert, this.w.tick + (STARE_MAX - staring) * 2 + 40);
+      o.flee = Math.max(o.flee, 20 + (o.id % 10));
+      o.foe = c.id;
+    }
+  }
+  return true;
 }
 
 export function basilisk(this: Ecology, c: Cr): void {
@@ -384,10 +422,9 @@ declare module '../ecology' {
     basiliskManaBed: typeof basiliskManaBed;
     gazeStart: typeof gazeStart;
     basiliskGaze: typeof basiliskGaze;
-    gazeRelease: typeof gazeRelease;
     basiliskWaypoint: typeof basiliskWaypoint;
     basiliskPatrol: typeof basiliskPatrol;
   }
 }
 
-Object.assign(Ecology.prototype, { basilisk, basiliskManaBed, gazeStart, basiliskGaze, gazeRelease, basiliskWaypoint, basiliskPatrol });
+Object.assign(Ecology.prototype, { basilisk, basiliskManaBed, gazeStart, basiliskGaze, basiliskWaypoint, basiliskPatrol });

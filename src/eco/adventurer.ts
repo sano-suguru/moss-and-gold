@@ -60,6 +60,9 @@ export function maybeParty(this: Ecology): void {
   }
   // 竜の噂があれば、竜殺しが一行を率いる
   if (r.dragon > 0.3 && !gobHunt) jobs[0] = Job.Slayer;
+  // 噂の魔物がバジリスクなら、2回に1回は狩人が一行を率いて、バジリスク狩りに来る（src/eco/aim.ts の aim 3）。
+  // （噂の魔物の狩りは、狩人がいて竜殺しのいない一行が、噂の魔物の種が決まっている日に出たときだけで、16シード×25日でバジリスクを狩りに来た一行は0だった）
+  else if (!gobHunt && r.beastKind === Kind.Basilisk && r.beast > 0.2 && this.list.some((o) => o.k === Kind.Basilisk && !o.dead && !o.away) && ih(this.step, 211, 7) % 2 === 0) jobs[0] = Job.Hunter;
   // 竜の寝床への道が町で知られていれば、3回に2回は竜殺しが一行を率いて竜退治に来る（src/eco/aim.ts。竜退治の場面を増やす）
   else if (!gobHunt && this.lore.dragonWay && this.list.some((o) => o.k === Kind.Dragon && !o.dead && !o.away) && ih(this.step, 209, 7) % 3 !== 0) jobs[0] = Job.Slayer;
   if (gobHunt) jobs[0] = Job.Warrior;
@@ -141,6 +144,8 @@ export function seenBy(this: Ecology, c: Cr, lights: Cr[], o: Cr): boolean {
   if ((o.st === 7 || o.st === 12) && this.isHidden(o) && !this.atDoorOf(c, o) && !this.searchesCamp(c, o)) return false;
   if (c.sp === Job.Thief && sq(o.x - c.x) + sq(o.y - c.y) < 3 * TILE * 3 * TILE) return true;
   for (const l of lights) if (sq(o.x - l.x) + sq(o.y - l.y) < 5.5 * TILE * 5.5 * TILE) return true;
+  // 睨みの溜めや見つめの間のバジリスクは、目が光っているので、暗がりでも8マスの内なら見通しが通れば見える（src/eco/basilisk.ts）
+  if (o.k === Kind.Basilisk && (o.run === -1 || o.run === -6) && sq(o.x - c.x) + sq(o.y - c.y) < 8 * TILE * 8 * TILE && lineOfSight(this.w.map, c.x, c.y, o.x, o.y)) return true;
   return this.isLit(o);
 }
 
@@ -573,7 +578,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       const attacked = o.id === c.foe && this.w.tick - c.hitAt < 150;
       // 目標でない住民（住処・集落・村・縄張りの者）には、自分たちから戦いを始めない
       // 威嚇して退くオーク（src/eco/orc.ts の orcWary）も追わない
-      const enemy = (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)) || (o.k === Kind.Gargoyle && o.act !== 0) || (o.k === Kind.Mimic && c.sp === Job.Thief) || (c.sp === Job.Hunter && o.k === this.rumors.beastKind);
+      const enemy = (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)) || (o.k === Kind.Gargoyle && o.act !== 0) || (o.k === Kind.Mimic && c.sp === Job.Thief) || (c.sp === Job.Hunter && o.k === (p.aim === 3 && p.aimK ? p.aimK : this.rumors.beastKind));
       const minor = MINOR.includes(o.k) && (o.k !== Kind.Bat || o.st === 0 || o.foe === c.id);
       if (!enemy && !minor && !attacked) return;
       if (!attacked && (c.sp === Job.Bard || (c.sp === Job.Thief && o.k !== Kind.Mimic))) return;
@@ -1009,6 +1014,13 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
       r.beastX = p.bx;
       r.beastY = p.by;
     }
+  }
+  // バジリスクの見つめで仲間が石化しかけた一行は、その噂を強く持ち帰る（次の一行が狩りに来る。上の見ただけの噂より優先する）
+  if (p.bsHit) {
+    r.beast += 0.3 * mul;
+    r.beastKind = Kind.Basilisk;
+    r.beastX = p.bsX ?? r.beastX;
+    r.beastY = p.bsY ?? r.beastY;
   }
   if (p.saw & 8) {
     r.dragon += 0.25 * mul;
