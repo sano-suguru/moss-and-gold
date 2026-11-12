@@ -245,7 +245,7 @@ export function partyMight(this: Ecology, p: Party): number {
 /** 威嚇して退いているオークを、一行は追わない（どの一行も。大物退治の目標がオークのときは除く） */
 export function orcYields(this: Ecology, p: Party, o: Cr): boolean {
   if (o.k !== Kind.Orc || (o.st !== 20 && o.st !== 21)) return false;
-  if (p.aim === 3 && !p.aimEnd && (p.aimK ?? this.rumors.beastKind) === Kind.Orc) return false;
+  if (p.aim === 3 && !p.aimEnd && p.aimK === Kind.Orc) return false;
   return true;
 }
 

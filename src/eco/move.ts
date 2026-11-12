@@ -837,6 +837,11 @@ export function die(this: Ecology, c: Cr, cause = '', by = -1): void {
     if (cause === 'starve') this.noteStarve(c);
     // 冒険者が倒れた所では、マナが立ちのぼる（src/eco/salamander.ts の heroDeathMana）
     this.heroDeathMana(c);
+    // 魔物に倒された冒険者は、一行の被害として覚えられる（生き残りが町へ帰れば、その種の噂になる。src/eco/quest.ts）
+    if (c.k === Kind.Adventurer && c.party && by >= 0) {
+      const p = this.parties.find((q) => q.id === c.party);
+      if (p) this.partyHurt(p, by, c.x, c.y, -1);
+    }
     // 住処の仲間が襲われて倒れたら、群れは覚えている（何度も続けば住処を捨てる）
     if (c.k === Kind.Kobold && by >= 0 && by !== Kind.Kobold && cause !== 'starve') {
       const wr = this.warrenOf(c);

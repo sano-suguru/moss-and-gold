@@ -92,16 +92,17 @@ export const enum Job {
 export interface Party {
   id: number;
   members: number[];
-  /** バジリスクの見つめで石化しかけた・石になった仲間の数と、そのバジリスクのいた所（町へ帰ると、バジリスクの噂が強まる。src/eco/basilisk.ts、src/eco/adventurer.ts） */
-  bsHit?: number;
-  bsX?: number;
-  bsY?: number;
+  /**
+   * 魔物から受けた被害：[種, 回数, x, y, 個体の番号（分からなければ -1）]。仲間が見つめで石化しかけたとき（src/eco/basilisk.ts）と、
+   * 強さ6以上の魔物に倒されたとき（src/eco/move.ts の die）に足す。生きて帰れば、その種の噂が強まる（src/eco/quest.ts）
+   */
+  hurt?: number[][];
+  /** 一度の探索で見かけた大物（強さ10以上の魔物）：[種, x, y]（生きて帰れば、その種の噂になる） */
+  seenB?: number[][];
   /** 噂の魔物の狩り（aim 3）で、一行が出たときに目当てにした種（src/eco/aim.ts）。出たあとで町の噂が別の魔物に変わっても、目当ては変えない */
   aimK?: number;
   /** 噂の魔物の狩りで、噂の場所にいなかった目当てを、まわりで探して足跡をたどったか（1回の狩りで1回まで。src/eco/aim.ts） */
   aimTracked?: number;
-  /** 見つめで仲間を石化しかけたバジリスクの番号（町へ帰ったとき、そのバジリスクが生きていれば噂を強める） */
-  bsId?: number;
   /** 皆で向かう相手に向かいはじめたときの、生きている仲間の数（src/eco/adventurer.ts の撤退） */
   engageN?: number;
   /** 撤退：下がり終える step 番号と、退く相手のいた所 */
@@ -120,10 +121,6 @@ export interface Party {
   targetAt: number;
   /** 先頭が仲間を待っている長さ（生き物の更新の回数） */
   waitT: number;
-  /** 見かけた大物（種と場所） */
-  bk: number;
-  bx: number;
-  by: number;
   /** 探した範囲（8×8マスの区画の番号）、知っている宝の区画、宝がなかった区画、危ない区画 [区画, 強さ] */
   explored?: number[];
   goldCells?: number[];
@@ -278,12 +275,12 @@ export interface Rumors {
   light: number;
   gold: number;
   undead: number;
-  beast: number;
   dragon: number;
-  /** 噂になった大物の種と、見かけた場所（狩人が狙う） */
-  beastKind: number;
-  beastX: number;
-  beastY: number;
+  /**
+   * 魔物の噂（種ごと）：[種, 強さ, x, y]。種の番号の順に並べる（くじで順にたどるので、ロードし直しても同じ順に）。
+   * 生還者が見かけた大物と、受けた被害（石化・死者）から強まり、日ごとに薄れる（src/eco/quest.ts）
+   */
+  beasts: number[][];
   /** ゴブリンの盗み（生還者が持ち帰る。溜まるとゴブリン退治の一行が来る）と、最後に盗まれた場所 */
   goblin: number;
   goblinX: number;
@@ -728,7 +725,7 @@ export class Ecology {
   armorKit = new Map<number, number[]>();
   /** リビングアーマーが崩れた所（[x, y, 生き物の更新の通し番号] を並べたもの。直近の8件。アンデッド祓いの戦利品を決めるのに使う。セーブに入れる） */
   armorFalls: number[] = [];
-  rumors: Rumors = { light: 0, gold: 0, undead: 0, beast: 0, dragon: 0, beastKind: 0, beastX: 0, beastY: 0, goblin: 0, goblinX: 0, goblinY: 0, dragonX: 0, dragonY: 0, goblinRobs: 0, goblinCamp: 0, goblinCampX: 0, goblinCampY: 0 };
+  rumors: Rumors = { light: 0, gold: 0, undead: 0, dragon: 0, beasts: [], goblin: 0, goblinX: 0, goblinY: 0, dragonX: 0, dragonY: 0, goblinRobs: 0, goblinCamp: 0, goblinCampX: 0, goblinCampY: 0 };
   /** 外との金貨の出入り */
   goldIn = 0;
   goldOut = 0;

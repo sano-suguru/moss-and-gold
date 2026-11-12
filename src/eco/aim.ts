@@ -124,16 +124,18 @@ export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: bool
     this.guessDeep(p);
     return;
   }
-  if (jobs.includes(Job.Hunter) && r.beastKind) {
+  // 狩人がいれば、いちばん強い魔物の噂の種を狩りに（その種が生きていれば）
+  const hb = jobs.includes(Job.Hunter) ? r.beasts.filter((b) => this.list.some((o) => o.k === b[0] && !o.dead && !o.away)).sort((a, b) => b[1] - a[1] || a[0] - b[0])[0] : undefined;
+  if (hb) {
     p.aim = 3;
-    p.aimK = r.beastKind;
-    p.aimX = r.beastX;
-    p.aimY = r.beastY;
+    p.aimK = hb[0];
+    p.aimX = hb[2];
+    p.aimY = hb[3];
     p.aimKnown = 1;
     let bd = 1e18;
     for (const o of this.list) {
-      if (o.dead || o.away || o.k !== r.beastKind) continue;
-      const d = sq(o.x - r.beastX) + sq(o.y - r.beastY);
+      if (o.dead || o.away || o.k !== hb[0]) continue;
+      const d = sq(o.x - hb[2]) + sq(o.y - hb[3]);
       if (d < bd) {
         bd = d;
         p.aimId = o.id;
@@ -211,7 +213,7 @@ export function aimPhrase(this: Ecology, p: Party): string {
     case 6:
       return `{k:${Kind.Dragon}}の寝床への道を探しに、深部へ`;
     case 3:
-      return `噂の{k:${p.aimK ?? this.rumors.beastKind}}を狩りに`;
+      return `噂の{k:${p.aimK ?? Kind.Troll}}を狩りに`;
     case 4:
       return p.aimKnown ? `{k:${Kind.Zombie}}たちの群れる所を祓いに` : `深部のアンデッドを祓いに`;
     case 5:
@@ -361,7 +363,7 @@ export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
       // 目指した相手がいなくなっても、同じ種（竜なら竜のなかま）が見えたらそれを目標にする
       this.nearby(lead.x, lead.y, 7, (o) => {
         if (t || o.dead || o.away) return;
-        if ((p.aim === 2 ? DRAGONS.includes(o.k) : o.k === (p.aimK ?? this.rumors.beastKind)) && sees(o, 7)) t = o;
+        if ((p.aim === 2 ? DRAGONS.includes(o.k) : o.k === p.aimK) && sees(o, 7)) t = o;
       });
       if (t) p.aimId = (t as Cr).id;
     }

@@ -52,15 +52,11 @@ function avertChance(e: Ecology, o: Cr): number {
   return AVERT_TIER[TIER[o.k] ?? 0] ?? 0;
 }
 
-/** 見つめで石化しかけた冒険者の一行に、そのことを覚えさせる（町へ帰ると、バジリスクの噂が強まる。src/eco/adventurer.ts） */
+/** 見つめで石化しかけた冒険者の一行に、そのことを被害として覚えさせる（町へ帰ると、バジリスクの噂が強まる。src/eco/quest.ts） */
 function partyStoned(e: Ecology, c: Cr, o: Cr): void {
   if (o.k !== Kind.Adventurer || !o.party) return;
   const p = e.parties.find((q) => q.id === o.party);
-  if (!p) return;
-  p.bsHit = (p.bsHit ?? 0) + 1;
-  p.bsId = c.id;
-  p.bsX = Math.round(c.x);
-  p.bsY = Math.round(c.y);
+  if (p) e.partyHurt(p, c.k, c.x, c.y, c.id);
 }
 
 /**
