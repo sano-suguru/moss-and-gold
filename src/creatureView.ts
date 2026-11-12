@@ -2444,7 +2444,7 @@ export class CreatureView {
       // 目のある向き（横向きは前の端の上、前向きは顔の左右）にだけ描く。後ろ向きは目が見えない
       if (sp === Kind.Basilisk && !c.dead && c.run === -1 && c.act === 2 && c.actT < 0 && dir !== 1 && !hidden && veil !== 2) {
         const p = Math.max(0, Math.min(1, (SKILL_BASILISK_GAZE.windup + c.actT + alpha) / SKILL_BASILISK_GAZE.windup));
-        const eyes: [number, number][] = dir === 0 ? [[-2, 4], [2, 4]] : [[dir === 2 ? 12 : -12, 7]];
+        const eyes: [number, number][] = dir === 0 ? [[-2, 4], [2, 4]] : [[dir === 2 ? -12 : 12, 7]];
         for (const [ex, el] of eyes) {
           if (p < 0.6) pushSprite(x + ex, yy + 0.06, lift + el, false, A.fx(`orb:3:${Math.floor((eco.w.tick + alpha) / 2) % 2}`), 0, 4);
           else pushSprite(x + ex, yy + 0.06, lift + el, false, A.fx(`ring:0:3:${Math.min(5, Math.floor((p - 0.6) * 15))}`), 0, 4);
