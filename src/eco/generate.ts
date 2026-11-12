@@ -2,6 +2,7 @@
  * Ecology のメソッド：魔物がダンジョンの中の資源（土の養分とマナ）から湧く共通の仕組み。
  * 種ごとの湧き方は src/eco/spawndef.ts の表 SPAWN_DEFS。ここは表を見て、条件・場所・資源を確かめ、生き物を生む。
  * 体と胃の養分はすべて場所のまわりの土から取る（takeNutrients。全部取れなければ湧かない）ので、養分の保存則は自動で守られる。
+ * 体のマナも場所のまわりの土から移す（takeMana）。表の行に manaAll があれば、マナも全部集められるときだけ湧く（いまはバジリスク）。
  */
 import { CELL, Cr, DAY_TICKS_ECO, Ecology, SPEC, ih } from '../ecology';
 import { TILE } from '../mapgen';
@@ -16,13 +17,18 @@ export function generate(this: Ecology): void {
 export function generateOne(this: Ecology, d: SpawnDef, at = -1): boolean {
   if (this.w.tick < d.minDay * DAY_TICKS_ECO) return false;
   if (d.ok && !d.ok(this)) return false;
-  if (this.counts[d.k] >= d.cap(this)) return false;
+  if (d.cap && this.counts[d.k] >= d.cap(this)) return false;
   if (d.cool && this.step - (this.lastArrival[d.k] ?? -1e9) <= d.cool) return false;
   if (d.chance && !d.chance(this)) return false;
   const site = at >= 0 ? at : d.site(this);
   if (site < 0) return false;
   if (this.starveBlocks(d, site)) return false;
   const n = d.band(this, site);
+  // 体のマナを全部か無しかで払う種（manaAll）は、土から集めきれなければ湧かない（湧くたびにその場のマナが減り、続けては湧きにくくなる）
+  if (d.manaAll && d.mana && !this.manaObtainable(site, n * d.mana, d.manaR ?? 3)) {
+    this.record('settle', { t: this.w.tick, k: d.k, ev: 'manaShort', x: (site % this.w.map.w) * TILE + 8, y: Math.floor(site / this.w.map.w) * TILE + 8 } as never);
+    return false;
+  }
   const ex = d.extra?.(this, n) ?? 0;
   // 体と胃と蓄えの養分を、一度にまとめて土から取る（全部か無し。片方だけ取れた状態を作らない）
   if (!this.takeNutrients(site, n * (d.body + d.food) + ex, d.nutrR ?? 4)) return false;

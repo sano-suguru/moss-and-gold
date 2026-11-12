@@ -271,6 +271,26 @@ export function manaAround(this: Ecology, k: number): number {
   return s2 / 9;
 }
 
+/** takeMana と同じ取り方で、まわり（半径 r マス）の土から want を集められるか（土は変えない。湧きの表の manaAll に使う） */
+export function manaObtainable(this: Ecology, k: number, want: number, r = 2): boolean {
+  const m = this.w.map;
+  const vals: number[] = [];
+  for (let dy = -r; dy <= r; dy++)
+    for (let dx = -r; dx <= r; dx++) {
+      const q = k + dy * m.w + dx;
+      vals.push(q >= 0 && q < this.w.mana.length ? this.w.mana[q] : 0);
+    }
+  let got = 0;
+  for (let pass = 0; pass < 4 && got < want; pass++)
+    for (let i = 0; i < vals.length && got < want; i++) {
+      const t = Math.min(vals[i] >> 1, want - got);
+      if (t <= 0) continue;
+      vals[i] -= t;
+      got += t;
+    }
+  return got >= want;
+}
+
 /** まわり（半径 r マス）の土からマナを集めて、生まれる者の体に移す（足りなければ集められた分だけ） */
 export function takeMana(this: Ecology, c: Cr, k: number, want: number, r = 2): void {
   const m = this.w.map;
@@ -452,6 +472,7 @@ declare module '../ecology' {
     totalGold: typeof totalGold;
     manaAround: typeof manaAround;
     takeMana: typeof takeMana;
+    manaObtainable: typeof manaObtainable;
     takeNutrients: typeof takeNutrients;
     manaBirths: typeof manaBirths;
     heldMana: typeof heldMana;
@@ -460,4 +481,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { deedMana, heroDeathMana, spawnSalamanders, salamander, pickBurrow, onDayEvents, homeBat, seed, maybeSpawnWisp, totalGold, manaAround, takeMana, takeNutrients, manaBirths, heldMana, releaseMana, heldNutrients });
+Object.assign(Ecology.prototype, { deedMana, heroDeathMana, spawnSalamanders, salamander, pickBurrow, onDayEvents, homeBat, seed, maybeSpawnWisp, totalGold, manaAround, takeMana, manaObtainable, takeNutrients, manaBirths, heldMana, releaseMana, heldNutrients });

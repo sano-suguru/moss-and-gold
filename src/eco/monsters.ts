@@ -314,7 +314,7 @@ export function basilisk(this: Ecology, c: Cr): void {
   }
   if (roam) {
     // 遠出：生き物の更新32回ごとに、同じ洞窟の領域の、40マスの内でいちばん近い獲物の居場所を選び直し（tx, ty）、そこへ歩く。
-    // 着いたら、その場で獲物を探す（上の hunt）。見つからなければ、住みかから32マスの内を歩き回る
+    // 着いたら、その場で獲物を探す（上の hunt）。着いても見つからなければ、住みかから32マスの内を歩き回る
     if (this.step % 32 === c.id % 32) {
       c.tx = 0;
       c.ty = 0;
@@ -328,20 +328,32 @@ export function basilisk(this: Ecology, c: Cr): void {
         c.tx = o.x;
         c.ty = o.y;
       }
+      // 獲物が見つからなければ、同じ洞窟の領域の、マナの濃い暗がりへ寝床を移す（そこで眠れば、足もとのマナを吸える：restSoak）
+      if (!c.tx && !c.ty) this.basiliskManaBed(c, reg);
     }
-    if ((c.tx || c.ty) && sq(c.tx - c.x) + sq(c.ty - c.y) > 2 * TILE * 2 * TILE) {
+    if (c.tx || c.ty) {
+      if (sq(c.tx - c.x) + sq(c.ty - c.y) > 2 * TILE * 2 * TILE) {
+        c.act = 1;
+        this.goTo(c, c.tx, c.ty, s.speed);
+        return;
+      }
+      if (sq(c.hx - c.x) + sq(c.hy - c.y) > 32 * TILE * 32 * TILE) {
+        c.act = 1;
+        this.goTo(c, c.hx, c.hy, s.speed);
+        return;
+      }
       c.act = 1;
-      this.goTo(c, c.tx, c.ty, s.speed);
+      const j = DIR16[ih(c.id, this.step >> 6, 114) & 15];
+      this.tryMove(c, j[0] * s.speed, j[1] * s.speed);
       return;
     }
-    if (sq(c.hx - c.x) + sq(c.hy - c.y) > 32 * TILE * 32 * TILE) {
+    // 獲物がいないあいだは、ぶらつかずに寝床へ戻って休む（歩き回るとマナを燃やすばかりで、眠って土から吸う間がなかった）
+    if (sq(c.hx - c.x) + sq(c.hy - c.y) > 2 * TILE * 2 * TILE) {
       c.act = 1;
       this.goTo(c, c.hx, c.hy, s.speed);
       return;
     }
-    c.act = 1;
-    const j = DIR16[ih(c.id, this.step >> 6, 114) & 15];
-    this.tryMove(c, j[0] * s.speed, j[1] * s.speed);
+    c.act = 0;
     return;
   }
   // 遠出していなければ、住みかのそば（10マスの内）へ帰る（狩って胃に食べ物が入ると、遠出から帰る）
@@ -357,6 +369,35 @@ export function basilisk(this: Ecology, c: Cr): void {
     const j = DIR16[ih(c.id, this.step >> 5, 113) & 15];
     this.tryMove(c, j[0] * s.speed * 0.9, j[1] * s.speed * 0.9);
   }
+}
+
+/**
+ * 獲物の見つからないバジリスクが、寝床を同じ洞窟の領域（reg）のマナの濃い暗がりへ移す。いまいる所から24マス四方を2マスおきに見て、
+ * 開いた床・日の差さない暗がり・水たまりでない所のうち、まわりのマナ（manaAround）がいちばん濃いマスを選び、
+ * いまの寝床より5以上濃ければ、そこを住みか（hx, hy）にする（同じくらいなら移らない。行ったり来たりしないように）
+ */
+export function basiliskManaBed(this: Ecology, c: Cr, reg: number): void {
+  const m = this.w.map;
+  const cx = Math.floor(c.x / TILE);
+  const cy = Math.floor(c.y / TILE);
+  const hk = this.tileOf(c.hx, c.hy);
+  let best = -1;
+  let bm = (hk >= 0 ? this.manaAround(hk) : 0) + 5;
+  for (let dy = -24; dy <= 24; dy += 2)
+    for (let dx = -24; dx <= 24; dx += 2) {
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 1 || y < 1 || x >= m.w - 1 || y >= m.h - 1) continue;
+      const k = y * m.w + x;
+      if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 10 || this.w.lightBase[k] > 0 || this.regionOf(k) !== reg) continue;
+      const mn = this.manaAround(k);
+      if (mn <= bm) continue;
+      bm = mn;
+      best = k;
+    }
+  if (best < 0) return;
+  c.hx = (best % m.w) * TILE + 8;
+  c.hy = Math.floor(best / m.w) * TILE + 8;
 }
 
 export function gargoyle(this: Ecology, c: Cr): void {
@@ -588,6 +629,7 @@ declare module '../ecology' {
     sipWisp: typeof sipWisp;
     troll: typeof troll;
     basilisk: typeof basilisk;
+    basiliskManaBed: typeof basiliskManaBed;
     gargoyle: typeof gargoyle;
     mimic: typeof mimic;
     golem: typeof golem;
@@ -595,4 +637,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { inLair, lairTiles, dragToLair, minotaur, sipWisp, troll, basilisk, gargoyle, mimic, golem, worm });
+Object.assign(Ecology.prototype, { inLair, lairTiles, dragToLair, minotaur, sipWisp, troll, basilisk, basiliskManaBed, gargoyle, mimic, golem, worm });
