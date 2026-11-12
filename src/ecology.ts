@@ -103,6 +103,8 @@ export interface Party {
   q?: number;
   qk?: number;
   qCalm?: number;
+  /** 深部へ向かう一行か（目指す所が深部の近く。荷を背負って入り、置き場をたどり、引き返す所に置き場を残す。src/eco/cache.ts） */
+  deepTrip?: number;
   /** 被害の噂を町に伝えた種（記録を一行で一度にするため） */
   hurtTold?: number[];
   /** 噂の魔物の狩り（aim 3）で、一行が出たときに目当てにした種（src/eco/aim.ts）。出たあとで町の噂が別の魔物に変わっても、目当ては変えない */
