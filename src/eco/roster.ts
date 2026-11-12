@@ -63,8 +63,12 @@ export const RANK_NAMES = ['見習い', '熟練', '歴戦', '英雄'];
 export const RANK_AT = [0, 2, 4, 7];
 /** 位ごとの強さの倍率（英雄で頭打ち。英雄でも竜には一行で挑む強さ） */
 export const RANK_MUL = [1, 1.07, 1.14, 1.2];
-/** はじめの名簿の職業（戦士3、魔法使い2、盗賊2、僧侶2、吟遊詩人、狩人、竜殺し） */
-const START_JOBS = [Job.Warrior, Job.Warrior, Job.Warrior, Job.Wizard, Job.Wizard, Job.Thief, Job.Thief, Job.Priest, Job.Priest, Job.Bard, Job.Hunter, Job.Slayer];
+/**
+ * はじめの名簿の職業（戦士2、魔法使い2、盗賊、僧侶2、吟遊詩人、狩人2、竜殺し2）。倒れた者・引退した者は同じ職業の新人で補うので、この顔ぶれが続く。
+ * 依頼を率いる職業（src/eco/quest.ts）の者が中にいる間は、その依頼は引かれないので、狩人と竜殺しを2人ずつにした
+ * （1人ずつのときは、16シード×25日で魔物の狩りの依頼の一行が225→151に減り、石化のあとにバジリスク狩りが来る場面が2シードだけだった）
+ */
+const START_JOBS = [Job.Warrior, Job.Warrior, Job.Wizard, Job.Wizard, Job.Thief, Job.Priest, Job.Priest, Job.Bard, Job.Hunter, Job.Hunter, Job.Slayer, Job.Slayer];
 /** 引退：英雄になってからこの回数の遠征を終えて帰ると引退する（帰還 RANK_AT[3] + RETIRE_AFTER 回）。最後の遠征は見習いを一人連れて入る */
 export const RETIRE_AFTER = 3;
 export const RETIRE_RET = RANK_AT[3] + RETIRE_AFTER;
