@@ -15,6 +15,8 @@ export const BASILISK_ROAM_PREY: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Ant];
 export const SKILL_BASILISK_GAZE: Skill = { windup: 6, cool: 20 };
 /** 一度に見つめ続ける長さの上限（生き物の更新の回数） */
 export const STARE_MAX = 40;
+/** 見つめていて、この回数（生き物の更新）のあいだ目が合わなければ、見つめるのをやめる */
+const STARE_LOST = 10;
 /** 目が合っている更新1回で進む石化の量の元。実際の量は STONE_RATE × 40 / (40 + 体 + マナ / 2)：体が大きいほど、体のマナが多いほど進みにくい */
 export const STONE_RATE = 10;
 /** 打たれてから、打ってきた相手を先に見つめ返すまでの tick */
@@ -56,6 +58,7 @@ function partyStoned(e: Ecology, c: Cr, o: Cr): void {
   const p = e.parties.find((q) => q.id === o.party);
   if (!p) return;
   p.bsHit = (p.bsHit ?? 0) + 1;
+  p.bsId = c.id;
   p.bsX = Math.round(c.x);
   p.bsY = Math.round(c.y);
 }
@@ -97,8 +100,10 @@ export function gazeStart(this: Ecology, c: Cr): boolean {
   return true;
 }
 
-/** 見つめるのをやめる（ここから次の睨みまでの間を数える） */
+/** 見つめるのをやめる（ここから次の睨みまでの間を数える）。見つめていた相手が目を背けていれば、背けるのをやめる（ほかの相手を打つ傷が半分のまま残らないように） */
 function stareEnd(e: Ecology, c: Cr): void {
+  const o = c.aim ? e.byId.get(c.aim) : undefined;
+  if (o && o.avert > e.w.tick) o.avert = e.w.tick;
   c.run = 0;
   c.aim = 0;
   c.act = 0;
@@ -121,12 +126,17 @@ export function basiliskGaze(this: Ecology, c: Cr): boolean {
   }
   if (c.run === -1) {
     const g = this.skillStep(c, SKILL_BASILISK_GAZE, false);
-    if (g === 'charging') return true;
+    // 溜めの間も目が光る
+    if (g === 'charging') {
+      c.glow = Math.max(c.glow, 30);
+      return true;
+    }
     if (g !== 'ready') {
       c.run = 0;
       return this.gazeStart(c);
     }
     c.run = -6;
+    c.ref = this.step;
   }
   if (c.run !== -6) return this.gazeStart(c);
   const o = this.byId.get(c.aim);
@@ -136,11 +146,21 @@ export function basiliskGaze(this: Ecology, c: Cr): boolean {
     return false;
   }
   c.act = 2;
+  // 見つめている間は目が光る（暗がりでも、8マスの内の冒険者から見える：src/eco/adventurer.ts の seenBy）
+  c.glow = Math.max(c.glow, 30);
   this.setDir(c, o.x - c.x, o.y - c.y);
-  // 目が合っているか：相手が背けておらず、バジリスクのほうを向いている
+  // 目が合っているか：相手が背けておらず、バジリスクのほうを向いている。生き物の更新 STARE_LOST 回のあいだ目が合わなければ、見つめるのをやめる
+  // （次の睨みで、目の合う別の相手に移れるように。以前は背けた相手を8秒見つめ続け、正面で打ち合う者の石化が進まなかった）
   const fx = o.dir === 2 ? 1 : o.dir === 3 ? -1 : 0;
   const fy = o.dir === 0 ? 1 : o.dir === 1 ? -1 : 0;
-  if (o.avert > this.w.tick || (c.x - o.x) * fx + (c.y - o.y) * fy <= 0) return true;
+  if (o.avert > this.w.tick || (c.x - o.x) * fx + (c.y - o.y) * fy <= 0) {
+    if (this.step - c.ref > STARE_LOST) {
+      stareEnd(this, c);
+      return false;
+    }
+    return true;
+  }
+  c.ref = this.step;
   o.stone += (STONE_RATE * 40) / (40 + o.body + o.mana / 2);
   if (staring % 6 === 0) {
     // 睨みの線（描画専用）
@@ -155,7 +175,7 @@ export function basiliskGaze(this: Ecology, c: Cr): boolean {
     stareEnd(this, c);
     return true;
   }
-  // 最初に目が合ったとき：記録し、相手が反応する。冒険者は見つめるバジリスクに気づいて戦う。小さな魔物（強さ6未満：大ネズミ・コボルト・ゴブリンなど）は逃げる。
+  // 最初に目が合ったとき：記録し、相手が反応する。冒険者は見つめるバジリスクに気づいて戦う（foe）。小さな魔物（強さ6未満：大ネズミ・コボルト・ゴブリンなど）は逃げる。
   // 大物（強さ6以上：ミノタウロス・トロール・オークなど）は、目をそらして数歩下がる（追わない。打ち合うなら目を背けたままで、傷は半分）。
   // （以前は大物を向き直らせていたので、見つめられ続けて、16シード×25日でミノタウロスの死の40％が石になっていた。
   //  賢さの段階で分けたときは、コボルトとゴブリンまで目をそらして下がり、小さな魔物が石にならなくなった）
@@ -164,8 +184,8 @@ export function basiliskGaze(this: Ecology, c: Cr): boolean {
     rec(1);
     partyStoned(this, c, o);
     if (o.k === Kind.Adventurer) {
+      // 見つめるバジリスクに気づかせて戦わせる（打たれた扱いにはしない：hitAt を入れると、打たれたように光り、溜めていた技も止まる）
       o.foe = c.id;
-      o.hitAt = this.w.tick;
     } else if (STR[o.k] < 6) {
       o.flee = Math.max(o.flee, 60 + (o.id % 20));
       o.foe = c.id;
@@ -181,7 +201,7 @@ export function basiliskGaze(this: Ecology, c: Cr): boolean {
 export function basilisk(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Basilisk];
   if (this.leaveIfStarving(c)) return;
-  // 噛みついた直後は、少しのあいだ動かない（睨みの溜めと放つのは、src/eco/step.ts から basiliskGaze が先に行う）
+  // 噛みついた直後は、少しのあいだ動かない（睨みの溜めと見つめは、src/eco/step.ts から basiliskGaze が先に行う）
   if (c.act === 2 && c.actT >= 0 && c.actT < 6) return;
   // 飢えの猶予を過ぎ、体のマナを燃やしはじめたら、住みかを出て、獲物のいる所まで遠出する（広く10マスで獲物を探す）。
   // 湧く濃いマナの暗がりには、たいてい獲物がいない（main の16シード×25日では、湧いた所の12マスの内に獲物がいたのは110頭中7頭）。
@@ -305,6 +325,9 @@ export function basiliskWaypoint(this: Ecology, c: Cr, minD: number): number {
   const reg = this.regionOf(hk);
   const bx = hk % m.w;
   const by = Math.floor(hk / m.w);
+  // ほかのバジリスクの寝床（マス）を、候補を調べる前に一度だけ集める
+  const beds: [number, number][] = [];
+  for (const o of this.list) if (o !== c && !o.dead && o.k === Kind.Basilisk) beds.push([o.hx / TILE, o.hy / TILE]);
   for (let i = 0; i < 16; i++) {
     const h = ih(c.id, this.step, 410 + i);
     const x = bx + (h % (PATROL_R * 2 + 1)) - PATROL_R;
@@ -313,7 +336,7 @@ export function basiliskWaypoint(this: Ecology, c: Cr, minD: number): number {
     const k = y * m.w + x;
     if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 10 || this.w.lightBase[k] > 0 || this.regionOf(k) !== reg) continue;
     if (this.manaAround(k) < 10 || this.presenceAt(x * TILE + 8, y * TILE + 8) >= 0.4) continue;
-    if (this.list.some((o) => o !== c && !o.dead && o.k === Kind.Basilisk && Math.abs(o.hx / TILE - x) + Math.abs(o.hy / TILE - y) < 10)) continue;
+    if (beds.some(([hx, hy]) => Math.abs(hx - x) + Math.abs(hy - y) < 10)) continue;
     return k;
   }
   return -1;

@@ -98,6 +98,10 @@ export interface Party {
   bsY?: number;
   /** 噂の魔物の狩り（aim 3）で、一行が出たときに目当てにした種（src/eco/aim.ts）。出たあとで町の噂が別の魔物に変わっても、目当ては変えない */
   aimK?: number;
+  /** 噂の魔物の狩りで、噂の場所にいなかった目当てを、まわりで探して足跡をたどったか（1回の狩りで1回まで。src/eco/aim.ts） */
+  aimTracked?: number;
+  /** 見つめで仲間を石化しかけたバジリスクの番号（町へ帰ったとき、そのバジリスクが生きていれば噂を強める） */
+  bsId?: number;
   /** 皆で向かう相手に向かいはじめたときの、生きている仲間の数（src/eco/adventurer.ts の撤退） */
   engageN?: number;
   /** 撤退：下がり終える step 番号と、退く相手のいた所 */

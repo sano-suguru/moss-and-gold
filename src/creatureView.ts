@@ -2442,7 +2442,7 @@ export class CreatureView {
       else if (stoneT > 0) pushSprite(x, yy, lift, flip, frame, stoneT, (veil === 3 ? 20 : flash) + 8, (c.id * 0.6180339) % 1);
       else pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0) + (thrallOf && !hidden && veil !== 2 ? 6 : 0), (c.id * 0.6180339) % 1);
       if (armorGear) for (const g of armorGear) if (g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
-      // バジリスクの睨みの溜め（src/eco/basilisk.ts の gazeStart）：目が黄緑に光り、溜めが進むほど強まって、放つ手前で目のまわりに光の輪が広がる（描画専用）。
+      // バジリスクの睨みの溜め（src/eco/basilisk.ts の gazeStart）：目が黄緑に光り、溜めが進むほど強まって、溜め終わる手前で目のまわりに光の輪が広がる（描画専用）。
       // 目のある向き（横向きは前の端の上、前向きは顔の左右）にだけ描く。後ろ向きは目が見えない
       // 見つめている間（c.run が −6）は、目のまわりの光の輪を出し続ける
       if (sp === Kind.Basilisk && !c.dead && ((c.run === -1 && c.act === 2 && c.actT < 0) || c.run === -6) && dir !== 1 && !hidden && veil !== 2) {

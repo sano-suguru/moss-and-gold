@@ -392,7 +392,9 @@ export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
           tr = o;
         }
       }
-      if (tr && tr.id !== p.aimId) {
+      // 足跡をたどるのは1回の狩りで1回まで（寝床を移した同じ個体も追う。何度も見つけ直して果てしなく追い続けないように）
+      if (tr && !p.aimTracked) {
+        p.aimTracked = 1;
         p.aimId = tr.id;
         p.aimX = tr.x;
         p.aimY = tr.y;

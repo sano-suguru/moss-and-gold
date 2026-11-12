@@ -141,8 +141,9 @@ export function seenBy(this: Ecology, c: Cr, lights: Cr[], o: Cr): boolean {
   if ((o.st === 7 || o.st === 12) && this.isHidden(o) && !this.atDoorOf(c, o) && !this.searchesCamp(c, o)) return false;
   if (c.sp === Job.Thief && sq(o.x - c.x) + sq(o.y - c.y) < 3 * TILE * 3 * TILE) return true;
   for (const l of lights) if (sq(o.x - l.x) + sq(o.y - l.y) < 5.5 * TILE * 5.5 * TILE) return true;
-  // 睨みの溜めや見つめの間のバジリスクは、目が光っているので、暗がりでも8マスの内なら見通しが通れば見える（src/eco/basilisk.ts）
-  if (o.k === Kind.Basilisk && (o.run === -1 || o.run === -6) && sq(o.x - c.x) + sq(o.y - c.y) < 8 * TILE * 8 * TILE && lineOfSight(this.w.map, c.x, c.y, o.x, o.y)) return true;
+  // 光っている者（glow が16を超える：光る苔やウィスプを食べた者、睨みの溜めや見つめで目を光らせるバジリスクなど。描画でもまわりを照らす）は、
+  // 暗がりでも8マスの内なら、見通しが通れば見える
+  if (o.glow > 16 && sq(o.x - c.x) + sq(o.y - c.y) < 8 * TILE * 8 * TILE && lineOfSight(this.w.map, c.x, c.y, o.x, o.y)) return true;
   return this.isLit(o);
 }
 
@@ -1011,8 +1012,10 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
       r.beastY = p.by;
     }
   }
-  // バジリスクの見つめで仲間が石化しかけた一行は、その噂を強く持ち帰る（次の一行が狩りに来る。上の見ただけの噂より優先する）
-  if (p.bsHit) {
+  // バジリスクの見つめで仲間が石化しかけた一行は、そのバジリスクがまだ生きていれば、その噂を強く持ち帰る（次の一行が狩りに来る。上の見ただけの噂より優先する。
+  // 倒したバジリスクの噂で、目当てのいない狩りに出ないように）
+  const bs = p.bsHit ? this.byId.get(p.bsId ?? 0) : undefined;
+  if (bs && !bs.dead && !bs.away && bs.k === Kind.Basilisk) {
     r.beast += 0.3 * mul;
     r.beastKind = Kind.Basilisk;
     r.beastX = p.bsX ?? r.beastX;
