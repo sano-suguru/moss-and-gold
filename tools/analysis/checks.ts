@@ -417,7 +417,7 @@ export const CHECKS: Check[] = [
   {
     // バジリスク（src/eco/monsters.ts の basilisk）：飢えの猶予を過ぎると住みかを出て、同じ洞窟の領域の獲物（大ネズミ・大トカゲ・アリ）のいる所まで遠出して狩り
     // （獲物がいなければ、マナの濃い暗がりへ寝床を移して休み）、自分より大きな者を睨んで石に変える（石化の記録の by が17）。1〜2シードの出来事に偏るので、15シードの合計と、起きたシードの数で見る。
-    // 入れた版で main の10日目から始めると、仕留めた69回（8シード）・睨み59回（10シード）。上限をやめ、獲物がいなければ寝床で休むようにした版では、仕留めた42回（6シード）・睨み78回（10シード）。
+    // 入れた版で main の10日目から始めると、仕留めた69回（8シード）・睨み59回（10シード）。上限をやめ、獲物がいなければ寝床で休むようにした版では、仕留めた42回（6シード）・睨み78回（10シード）。睨みを少しずつ進む石化にした版では、仕留めた47回（4シード）・石像84（6シード）。
     // 展開が分かれただけで大きく変わるので、目安は少なめにする
     name: 'バジリスクが獲物を仕留め、睨みで石に変える（15シードの合計で、仕留めた30回以上・睨み25回以上）',
     ...RUN_WIDE,
@@ -426,6 +426,18 @@ export const CHECKS: Check[] = [
       const gaze = rs.map((r) => r.deaths.filter((x) => x.by === 17 && x.cause === 'petrified').length);
       const seeds = (a: number[]) => a.filter((v) => v > 0).length;
       return { ok: sum(kill) >= 30 && sum(gaze) >= 25, value: `仕留めた ${sum(kill)}（${seeds(kill)}シード）、睨み ${sum(gaze)}（${seeds(gaze)}シード）` };
+    },
+  },
+  {
+    // バジリスクの睨みと見回り（src/eco/basilisk.ts）：睨みは目を光らせる溜めのあとに放ち、受けた者は石化が少しずつ進む（満ちたら石像。gaze の how 1 受けた / 2 石像）。
+    // 遠出していないときは、同じ洞窟の中のマナの濃い暗がりへ見回りに出る（patrol）。15シードの合計で見る。入れた版で main の10日目から始めると、睨みを受けた631回（12シード）・見回り132回（13シード）。目安はその半分ほどにする
+    name: 'バジリスクが睨みで石化を進め、縄張りを見回る（15シードの合計で、睨みを受けた300回以上・見回り60回以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const stone = rs.map((r) => r.settle.filter((x) => x.k === 17 && x.ev === 'gaze' && x.how >= 1).length);
+      const patrol = rs.map((r) => r.settle.filter((x) => x.k === 17 && x.ev === 'patrol').length);
+      const seeds = (a: number[]) => a.filter((v) => v > 0).length;
+      return { ok: sum(stone) >= 300 && sum(patrol) >= 60, value: `睨みを受けた ${sum(stone)}（${seeds(stone)}シード）、見回り ${sum(patrol)}（${seeds(patrol)}シード）` };
     },
   },
   {

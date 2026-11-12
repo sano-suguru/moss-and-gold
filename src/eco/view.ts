@@ -1,6 +1,6 @@
 /** Ecology のメソッド：生き物の様子（情報パネルのため。シミュレーションには関わらない）、見た目のための印（描画専用。シミュレーションの判断には使わない）、演出のデモ（#fxdemo。シミュレーションは実行しない）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq, STONE_FULL } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { heroTitle } from './roster';
@@ -65,6 +65,8 @@ export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]):
   else if (c.hungry > SPEC[c.k].starve * 0.3 && SPEC[c.k].cap > 0) state = '飢えている';
   if (state) lines.push(state);
   if (c.hp > 0 && c.hp / this.maxHp(c) < 0.35) lines.push('深手を負っている');
+  // バジリスクの睨みで石化しかけている（体の灰色がかりと、鈍った歩みで画面にも出る）
+  if (!c.dead && c.stone > 0) lines.push(c.stone >= STONE_FULL / 2 ? '半ば石になっている' : '石化しかけている');
   if (key) {
     const g = this.groups.get(key);
     const n = g ? g.members.length : 1;

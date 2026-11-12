@@ -1,5 +1,5 @@
 import type { Atlas } from './atlas';
-import { BLOOD, CR_EVERY, Ecology, GOLD_CAP, Kind, type Cr } from './ecology';
+import { BLOOD, CR_EVERY, Ecology, GOLD_CAP, Kind, STONE_FULL, type Cr } from './ecology';
 import { TROPHY } from './eco/loot';
 import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
 import { CRUMBLING, KIN_STOP, RANK_AT, packLook, unpackLook } from './eco/roster';
@@ -9,6 +9,7 @@ import { SKILL_KOBOLD_SLING } from './eco/koboldskill';
 import { SKILL_MYC_SPORE } from './eco/myconidskill';
 import { SKILL_GHOST_WAIL } from './eco/ghostskill';
 import { SKILL_ORC_ROAR } from './eco/orcskill';
+import { SKILL_BASILISK_GAZE } from './eco/basilisk';
 import { BONE_KINDS, BONE_SP, LICH_RISE, RISE_N } from './eco/undead';
 import { HOP_DT, HOP_N, hopAt } from './eco/charge';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
@@ -2433,9 +2434,22 @@ export class CreatureView {
           yy += ph.sy * 3 * k;
         }
       }
+      // バジリスクの睨みで石化しかけている者（src/eco/basilisk.ts の gazeRelease）：進みに比例して、その姿のまま石の色へ寄せる（shaders.ts の kind 8）
+      const stoneT = !isCorpse && c.stone > 0 && !hidden && veil !== 2 && !thrallOf ? Math.min(1, c.stone / STONE_FULL) : 0;
       if (holy > 0) pushSprite(x, yy, lift, flip, frame, holy, 7, (c.id * 0.6180339) % 1);
+      else if (stoneT > 0) pushSprite(x, yy, lift, flip, frame, stoneT, (veil === 3 ? 20 : flash) + 8, (c.id * 0.6180339) % 1);
       else pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0) + (thrallOf && !hidden && veil !== 2 ? 6 : 0), (c.id * 0.6180339) % 1);
       if (armorGear) for (const g of armorGear) if (g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
+      // バジリスクの睨みの溜め（src/eco/basilisk.ts の gazeStart）：目が黄緑に光り、溜めが進むほど強まって、放つ手前で目のまわりに光の輪が広がる（描画専用）。
+      // 目のある向き（横向きは前の端の上、前向きは顔の左右）にだけ描く。後ろ向きは目が見えない
+      if (sp === Kind.Basilisk && !c.dead && c.run === -1 && c.act === 2 && c.actT < 0 && dir !== 1 && !hidden && veil !== 2) {
+        const p = Math.max(0, Math.min(1, (SKILL_BASILISK_GAZE.windup + c.actT + alpha) / SKILL_BASILISK_GAZE.windup));
+        const eyes: [number, number][] = dir === 0 ? [[-2, 4], [2, 4]] : [[dir === 2 ? 12 : -12, 7]];
+        for (const [ex, el] of eyes) {
+          if (p < 0.6) pushSprite(x + ex, yy + 0.06, lift + el, false, A.fx(`orb:3:${Math.floor((eco.w.tick + alpha) / 2) % 2}`), 0, 4);
+          else pushSprite(x + ex, yy + 0.06, lift + el, false, A.fx(`ring:0:3:${Math.min(5, Math.floor((p - 0.6) * 15))}`), 0, 4);
+        }
+      }
       // ゴーストの金切り声の溜め（src/eco/ghostskill.ts）：口もとに青白い冷気の玉が膨らみ、まわりから冷気の粒が渦を巻いて吸い寄せられる（体のあとに描く）
       if (sp === Kind.Ghost && !c.dead && c.run === -1 && c.act === 2 && c.actT < 0) {
         const p = Math.max(0, Math.min(1, (SKILL_GHOST_WAIL.windup + c.actT + alpha) / SKILL_GHOST_WAIL.windup));

@@ -832,7 +832,7 @@ export function checkTraps(this: Ecology): void {
 export function watchWarrens(this: Ecology): void {
   for (const wr of this.warrens) {
     if (wr.id < 0) continue;
-    // 近づいてくる強い相手：冒険者の一行、若い竜と成竜、トロール、ミノタウロス
+    // 近づいてくる強い相手：冒険者の一行、若い竜と成竜、トロール、ミノタウロス、見回りで歩いてくるバジリスク（src/eco/basilisk.ts の basiliskPatrol）
     let near: Cr | null = null;
     let nd = 1e18;
     let threat = 0;
@@ -848,7 +848,7 @@ export function watchWarrens(this: Ecology): void {
         }
       }
     this.nearby(wr.x, wr.y, 14, (o) => {
-      if (o.dead || o.away || !((o.k === Kind.Dragon && o.sp >= 1) || o.k === Kind.Troll || o.k === Kind.Minotaur)) return;
+      if (o.dead || o.away || !((o.k === Kind.Dragon && o.sp >= 1) || o.k === Kind.Troll || o.k === Kind.Minotaur || (o.k === Kind.Basilisk && o.gait > 0))) return;
       const d = sq(o.x - wr.x) + sq(o.y - wr.y);
       if (d < nd) {
         nd = d;

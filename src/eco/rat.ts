@@ -7,13 +7,14 @@ import type { World } from '../world';
 
 export function rat(this: Ecology, c: Cr, day: number): void {
   const s = SPEC[Kind.Rat];
-  // 動いている大トカゲに気づいたら逃げる
+  // 動いている大トカゲ（と、見回りで歩いてくるバジリスク）に気づいたら逃げる
   let threat: Cr | null = null;
   // 逃げるほどではないが近く（40px の内）にいる怖い相手
   let wary: Cr | null = null;
   this.nearby(c.x, c.y, 3, (o) => {
     if (o.dead) return;
-    const scary = (o.k === Kind.Lizard && o.act !== 0) || (o.k === Kind.Zombie && o.act !== 0) || o.k === Kind.Ghost || ((o.k === Kind.Kobold || o.k === Kind.Goblin || o.k === Kind.Lizardman || o.k === Kind.Orc || o.k === Kind.Minotaur) && o.hungry > 0);
+    // バジリスクは見回りのあいだだけ（gait が 1〜3。src/eco/basilisk.ts の basiliskPatrol）。狩りで忍び寄るときまで逃げると、獲物が取れなくなる
+    const scary = (o.k === Kind.Lizard && o.act !== 0) || (o.k === Kind.Zombie && o.act !== 0) || o.k === Kind.Ghost || (o.k === Kind.Basilisk && o.gait > 0) || ((o.k === Kind.Kobold || o.k === Kind.Goblin || o.k === Kind.Lizardman || o.k === Kind.Orc || o.k === Kind.Minotaur) && o.hungry > 0);
     if (!scary) return;
     const d = sq(o.x - c.x) + sq(o.y - c.y);
     if (d < (o.k === Kind.Ghost ? 34 * 34 : 26 * 26)) threat = o;
@@ -42,6 +43,8 @@ export function rat(this: Ecology, c: Cr, day: number): void {
   }
   if (threat) {
     const t = threat as Cr;
+    // 分析用：見回りのバジリスクから逃げた（生き物の更新20回に1回だけ記録する）
+    if (t.k === Kind.Basilisk && this.step % 20 === c.id % 20) this.record('settle', { t: this.w.tick, k: Kind.Rat, id: c.id, ev: 'fleeBasilisk', x: Math.round(c.x), y: Math.round(c.y) } as never);
     const dx = c.x - t.x;
     const dy = c.y - t.y;
     const d = Math.sqrt(dx * dx + dy * dy) || 1;

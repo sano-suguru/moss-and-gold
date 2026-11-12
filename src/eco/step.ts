@@ -1,7 +1,7 @@
 /** Ecology のメソッド：生き物の更新1回（step。src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { BONE_CAP, BONE_KINDS, KIN_RISE_MANA, KIN_ZOMBIE_CAP, KIN_ZOMBIES, ZOMBIE_KINDS } from './undead';
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq, STONE_DECAY_EVERY } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { VAMP_SCATTER } from './vampire';
@@ -25,6 +25,8 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
 
   for (const c of this.list) {
     if (c.dead === 2) continue;
+    // バジリスクの睨みで進んだ石化は、睨まれ続けなければ少しずつ戻る（どの生き物も、ほかの処理で更新を飛ばす前に）
+    if (c.dead === 0 && c.stone > 0 && this.step % STONE_DECAY_EVERY === c.id % STONE_DECAY_EVERY) c.stone--;
     // ウィスプ（光の精を除く）は WISP_EVERY 回に1回だけ判断して動く（Ecology.WISP_EVERY）。ほかの回は腹が減るだけ。
     // px は動いた回の前の位置のまま残す（描画が WISP_EVERY 回ぶんの時間をかけて補間する）
     if (c.dead === 0 && c.k === Kind.Wisp && c.elite !== 7 && !c.caught && this.wispIdle(c)) {
@@ -98,6 +100,11 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
     }
     // アンデッドの起き上がりと、スケルトンがリッチに変わる間（src/eco/undead.ts）
     if ((c.k === Kind.Skeleton || c.k === Kind.Zombie || c.k === Kind.Lich) && (c.st === 10 || c.st === 11) && this.undeadRise(c)) {
+      this.metabolism(c);
+      continue;
+    }
+    // バジリスクの睨みの溜めと、睨む判断（src/eco/basilisk.ts）。深手で逃げる処理と、火を怖がって離れる処理より先に（逃げながらでも、追ってくる者や松明を持つ冒険者を睨む）
+    if (c.k === Kind.Basilisk && this.basiliskGaze(c)) {
       this.metabolism(c);
       continue;
     }

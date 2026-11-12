@@ -1237,6 +1237,17 @@ void main() {
     glow = 0.0;
     kind = 1.0;
   }
+  // バジリスクの睨みで石化しかけている生き物（kind 8）：その姿のまま、石の色へ寄せる（寄せ具合は glow。0〜1。src/creatureView.ts）。
+  // 照らされ方は生き物と同じ。寄せ具合が半分を超えたら、目などの自ら光る部分も光らなくなる
+  if (kind > 7.5 && kind < 8.5) {
+    float l = dot(tx.rgb, vec3(0.3, 0.5, 0.2));
+    vec3 st = mix(vec3(34.0, 36.0, 44.0), vec3(168.0, 172.0, 180.0), clamp(l * 1.15, 0.0, 1.0)) / 255.0;
+    float sv = clamp(glow, 0.0, 1.0);
+    tx.rgb = mix(tx.rgb, st, sv);
+    if (sv > 0.5 && a8 < 254.5 && a8 > 250.5) a8 = 255.0;
+    glow = 0.0;
+    kind = 1.0;
+  }
   // 石像：その姿のまま石の色に（光る部分も光らない）
   if (kind > 2.5) {
     float l = dot(tx.rgb, vec3(0.3, 0.5, 0.2));

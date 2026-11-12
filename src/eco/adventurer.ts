@@ -1,6 +1,6 @@
 /** Ecology のメソッド：冒険者（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Note, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Note, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq, STONE_FULL } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
@@ -200,12 +200,13 @@ export function updateParties(this: Ecology): void {
         this.setExit(p);
         continue;
       }
-      // 一行の撤退：皆で向かっている相手との戦いで、仲間が倒れたか、一行の体力が半分を切ったら、一行ごと退く。
-      // 仲間が倒れていれば町へ帰り、倒れていなければ離れた所で休んでから、その相手を避けて探索を続ける
+      // 一行の撤退：皆で向かっている相手との戦いで、仲間が倒れたか、一行の体力が半分を切ったか、仲間の誰かがバジリスクの睨みで半ば石になったら、一行ごと退く。
+      // 仲間が倒れていれば町へ帰り、倒れていなければ離れた所で休んでから（離れているうちに石化も戻る）、その相手を避けて探索を続ける
       if (p.engage && (p.retreatUntil ?? 0) <= this.step) {
         const e = this.byId.get(p.engage);
         const fell = alive.length < (p.engageN ?? alive.length);
-        if (e && !e.dead && !e.away && (fell || avgHp < 0.5)) {
+        const stoned = alive.some((o) => o.stone >= STONE_FULL / 2);
+        if (e && !e.dead && !e.away && (fell || avgHp < 0.5 || stoned)) {
           p.retreatUntil = this.step + RETREAT_N;
           p.retreatX = Math.round(e.x);
           p.retreatY = Math.round(e.y);
@@ -218,8 +219,8 @@ export function updateParties(this: Ecology): void {
             p.goal = 1;
             this.setExit(p);
           }
-          this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'partyRetreat', n: e.k, how: fell ? 1 : 0, x: Math.round(alive[0].x), y: Math.round(alive[0].y) } as never);
-          this.log(alive[0].x, alive[0].y, `${this.partyTitle(p)}の一行が{k:${e.k}}にかなわず、${fell ? '倒れた仲間を残して' : '傷を負って'}退いた`);
+          this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'partyRetreat', n: e.k, how: fell ? 1 : stoned ? 2 : 0, x: Math.round(alive[0].x), y: Math.round(alive[0].y) } as never);
+          this.log(alive[0].x, alive[0].y, `${this.partyTitle(p)}の一行が{k:${e.k}}にかなわず、${fell ? '倒れた仲間を残して' : stoned ? '石になりかけた仲間を連れて' : '傷を負って'}退いた`);
           continue;
         }
       }

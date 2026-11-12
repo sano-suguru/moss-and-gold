@@ -568,6 +568,11 @@ export interface Cr {
   doze: number;
   /** 最後にマイコニドの胞子でうたた寝した時刻（tick。src/eco/myconidskill.ts）：そのあとしばらくは胞子に慣れて眠らない */
   sporeAt: number;
+  /**
+   * 石化の進み（src/eco/basilisk.ts の gazeRelease）：バジリスクの睨みを受けるたびに増え、STONE_FULL に達すると石像になる。
+   * 進むほど体が灰色になり、歩みが鈍る（tryMove）。生き物の更新 STONE_DECAY_EVERY 回ごとに1ずつ戻る（src/eco/step.ts）
+   */
+  stone: number;
   /** 死骸ができたときの養分（腐り具合の目安） */
   init: number;
 }
@@ -623,6 +628,14 @@ export const HUNT3: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, K
 export const HUNT4: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Lizardman, Kind.Orc, Kind.Slime, Kind.Zombie, Kind.Myconid, Kind.Adventurer];
 export const HUNT5: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Ant, Kind.Kobold, Kind.Goblin];
 export const HUNT6: Kind[] = [Kind.Rat];
+/** 石化の進み（Cr.stone）がこれに達すると石像になる */
+export const STONE_FULL = 100;
+/** バジリスクの睨み1回で進む石化の量の元。実際の量は round(STONE_GAZE × 40 / (40 + 体 + マナ / 2))：体が大きいほど、体のマナが多いほど進みにくい */
+export const STONE_GAZE = 100;
+/** 石化の進みは、生き物の更新この回数ごとに1ずつ戻る（睨まれ続けなければ、元の体に戻る） */
+export const STONE_DECAY_EVERY = 8;
+/** 石化の進みが満ちる手前で、歩く速さがこの割合まで落ちる（進みに比例） */
+export const STONE_SLOW = 0.6;
 /** 上下左右（呼ぶたびに配列を作らないように） */
 export const NB4: readonly (readonly [number, number])[] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 /** 16方向の単位ベクトル（三角関数を使わずに作る） */
