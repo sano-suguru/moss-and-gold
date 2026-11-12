@@ -185,6 +185,27 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 依頼の仕組み（src/eco/quest.ts）：噂から依頼が出て、一行は重さに比例したくじで一つ引き受けて入ってくる。種類が偏らず混ざって来るか
+    name: '一行が依頼を受けて入ってくる（15シードの合計で、町に依頼が出る10回以上・依頼の種類が4種類以上混ざる）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const posted = sum(rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'quest').length));
+      const kinds = new Map<number, number>();
+      for (const r of rs) for (const x of r.settle) if (x.k === 25 && x.ev === 'enter' && x.q > 0) kinds.set(x.q, (kinds.get(x.q) ?? 0) + 1);
+      const NM = ['', '宝探し', '竜退治', '魔物の狩り', '祓い', 'ゴブリン退治'];
+      return { ok: posted >= 10 && kinds.size >= 4, value: `依頼が出た ${posted}、受けて入った ${[...kinds].sort((a, b) => a[0] - b[0]).map(([q, n]) => `${NM[q]} ${n}`).join('・')}` };
+    },
+  },
+  {
+    // バジリスクに仲間を石にされた一行が帰ると、バジリスクの噂が強まり、狩りの依頼が出る（どの種も同じ決まり。src/eco/quest.ts）
+    name: 'バジリスク狩りの依頼が出る（15シードの合計で1回以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'quest' && x.how === 3 && x.to === 17).length);
+      return { ok: sum(n) >= 1, value: rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、') || 'なし' };
+    },
+  },
+  {
     // 目標でない住処・集落のそばを通るときは身構えて通り過ぎる（seed7 で10〜18日に数回）
     name: '冒険者の一行が住処のそばで身構えて通り過ぎる（4シードで1回以上）',
     ...RUN_A,

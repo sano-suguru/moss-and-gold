@@ -10,7 +10,7 @@ import type { World } from '../world';
 import { SKILL_HUNTER_RAIN, SKILL_PRIEST_HAMMER, SKILL_SLAYER_CLEAVE, SKILL_THIEF_THROW, SKILL_WARRIOR_SLASH, SKILL_WIZARD_MISSILE, type Skill } from './skill';
 import { HP_PER_STR } from './combat';
 import { HERO_SKILL_MANA, HERO_SKILL_R } from './salamander';
-import { beastSeenKind } from './quest';
+import { QUEST_LEAD, beastSeenKind } from './quest';
 
 /** 一行の撤退で下がる生き物の更新の回数（およそ12秒） */
 const RETREAT_N = 60;
@@ -47,11 +47,11 @@ export function maybeParty(this: Ecology): void {
   const r = this.rumors;
   const want = Math.min(5, 2 + (ih(this.step, 202, 7) % 3) + (rep > 3 ? 1 : 0));
   const tier = rep < 2 ? 0 : rep < 6 ? 1 : 2;
-  // ゴブリンの盗みの噂が溜まっていれば、ゴブリン退治の一行（戦士が多い）
-  const gobHunt = this.goblinHuntReady();
-  // 噂の中身で顔ぶれが変わる：金貨なら盗賊、アンデッドなら僧侶、大物や竜なら戦士
+  // 町に出ている依頼から、重さに比例したくじで一つ引き受ける（探索も一定の重さでくじに入る。src/eco/quest.ts）
+  const quest = this.pickQuest();
+  // 噂の中身で顔ぶれが変わる：金貨なら盗賊、アンデッドなら僧侶、大物や竜なら戦士、ゴブリン退治なら戦士が多い
   const beast = this.beastTotal();
-  const wts = [3 + 3 * (beast + r.dragon) + (gobHunt ? 6 : 0), 2, 1 + 3 * r.gold, 2 + 3 * r.undead, 1, r.beasts.length ? 3 * beast : 0, 0];
+  const wts = [3 + 3 * (beast + r.dragon) + (quest.a === 5 ? 6 : 0), 2, 1 + 3 * r.gold, 2 + 3 * r.undead, 1, r.beasts.length ? 3 * beast : 0, 0];
   const jobs: number[] = [];
   for (let i = 0; i < want; i++) {
     const tot = wts.reduce((a, b) => a + b, 0);
@@ -60,11 +60,8 @@ export function maybeParty(this: Ecology): void {
     while (j < wts.length - 1 && v >= wts[j]) v -= wts[j++];
     jobs.push(j);
   }
-  // 竜の噂があれば、竜殺しが一行を率いる
-  if (r.dragon > 0.3 && !gobHunt) jobs[0] = Job.Slayer;
-  // 竜の寝床への道が町で知られていれば、3回に2回は竜殺しが一行を率いて竜退治に来る（src/eco/aim.ts。竜退治の場面を増やす）
-  else if (!gobHunt && this.lore.dragonWay && this.list.some((o) => o.k === Kind.Dragon && !o.dead && !o.away) && ih(this.step, 209, 7) % 3 !== 0) jobs[0] = Job.Slayer;
-  if (gobHunt) jobs[0] = Job.Warrior;
+  // 依頼に合う職業が一行を率いる（ゴブリン退治は戦士、竜退治は竜殺し、魔物の狩りは狩人、祓いは僧侶、宝探しは盗賊）
+  if (QUEST_LEAD[quest.a] >= 0) jobs[0] = QUEST_LEAD[quest.a];
   // 光がなければ進めない：魔法使いも僧侶もいなければ、戦士が一人松明を持つ。戦士もいなければ一人を戦士に
   if (!jobs.includes(Job.Wizard) && !jobs.includes(Job.Priest) && !jobs.includes(Job.Warrior)) jobs[jobs.length - 1] = Job.Warrior;
   // 顔ぶれは町の名簿から（中にいる者は選ばない。その職業がいなければ別の職業の者で埋める。src/eco/roster.ts）
@@ -109,8 +106,8 @@ export function maybeParty(this: Ecology): void {
   }
   party.name = heroes[0].name;
   this.parties.push(party);
-  // 目標を一つ決める（噂と職業の役目から）
-  this.chooseAim(party, jobs, gobHunt);
+  // 引き受けた依頼から目標を決める
+  this.chooseAim(party, quest);
   // 町の知っている物資の置き場を覚え、深部の探索なら置き場に残す荷を背負う
   this.packForCaches(party);
   const names = heroes.map((h) => `${JOB_NAMES[h.job]}${h.name}${h.trips > 1 ? `（${RANK_NAMES[h.rank]}、${h.trips}度目）` : ''}`).join('・');
@@ -121,7 +118,7 @@ export function maybeParty(this: Ecology): void {
   const farewell = old ? `英雄${old.name}の最後の遠征${ap ? `、見習いの${JOB_NAMES[ap.job]}${ap.name}を連れて` : ''}。` : '';
   if (old) this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: pid, ev: 'farewell', n: old.id, how: ap ? ap.id : 0, x: 0, y: 0 } as never);
   const who = `${farewell}${heroTitle(heroes[0])}の一行（${names}）が、${aim ? aim + '、' : ''}`;
-  this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: pid, ev: 'enter', how: party.aim ?? 0, n: party.aimId ?? 0, to: party.aimKnown ?? 0, x: 0, y: 0 } as never);
+  this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: pid, ev: 'enter', how: party.aim ?? 0, n: party.aimId ?? 0, to: party.aimKnown ?? 0, q: party.q ?? 0, qk: party.qk ?? 0, x: 0, y: 0 } as never);
   // 入口で身支度をして、食べ残しを少し落としていく
   if (door < 0) this.pendingScraps.push(pid);
   if (door < 0) this.log(m.entrance.x * TILE + 8, TILE + 8, `${who}入口から入ってきた`);
@@ -989,8 +986,9 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
   this.goldOut += c.gold;
   this.tellCaches(p);
   this.bringTrophy(c, p);
-  // 生きて帰った者が噂を持ち帰る
+  // 生きて帰った者が噂を持ち帰る（強まる前に出ていた依頼を覚えておき、新しく出た依頼を町の出来事にする）
   const r = this.rumors;
+  const posted = this.questKeys();
   // 吟遊詩人が生きて帰れば噂は何倍にも広まり、吟遊詩人を失った一行の噂は細る
   let bard = 1;
   for (const id of p.members) {
@@ -1032,6 +1030,9 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
       }
     }
   }
+  // 依頼を果たして帰れば、その噂は鎮まる（果たせずに帰れば、そのまま残る。src/eco/quest.ts）
+  this.calmQuest(p);
+  this.postNewQuests(posted);
   c.body = 0;
   c.food = 0;
   c.gold = 0;

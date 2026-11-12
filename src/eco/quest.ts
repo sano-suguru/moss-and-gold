@@ -1,5 +1,15 @@
 /**
- * Ecology のメソッド：外の世界の魔物の噂（種ごと）。
+ * Ecology のメソッド：外の世界の噂と、町に出る依頼（クエスト）。
+ *
+ * 見せたい場面：町に依頼が出て（ログ「町に〇〇の依頼が出た」）、一行がそれを引き受けて入ってくる（「〇〇の依頼を受けて」）。
+ * 噂の強さに応じて、竜退治・魔物の狩り・ゴブリン退治・祓い・宝探し・探索の一行が混ざって来る。
+ *
+ * 依頼は噂から毎回つくる（状態を持たない）。重さは噂の強さそのもので、一行は重さに比例したくじで一つ引き受け、
+ * 依頼に合う職業が率いる（ゴブリン退治は戦士、竜退治は竜殺し、魔物の狩りは狩人、祓いは僧侶、宝探しは盗賊）。
+ * 依頼を受けた一行が中にいる間（目標を終えていない間）は、その依頼は掲示から外れる。
+ * 果たして生きて帰ればその噂が鎮まり、果たせずに帰れば噂はそのまま残る（宝探しだけは、持ち帰った金貨がそのまま噂を強める）。
+ *
+ * 魔物の噂（種ごと）：
  *
  * 生きて帰った冒険者が、見かけた大物と、受けた被害（仲間が石化しかけた・倒された）を町に伝え、その種の噂が強まる。
  * 噂は種ごとに強さと最後に知られた場所を持ち、日ごとに薄れる（src/eco/salamander.ts の onDayEvents）。
@@ -7,7 +17,8 @@
  * 噂の種になる魔物：冒険者が敵とみなす魔物のうち、アンデッド（祓いの噂）・ゴブリン（盗みの噂）・竜の仲間（竜の噂）を除いたもの。
  * 見かけただけで噂になるのは強さ10以上、仲間が石化しかけたり倒されたりすれば強さ6以上（どの種も同じ決まり）。
  */
-import { Ecology, Kind, Party, STR } from '../ecology';
+import { Ecology, Job, Kind, Party, STR, ih } from '../ecology';
+import { TILE } from '../mapgen';
 
 /** 魔物の噂になりうる種（アンデッド・ゴブリン・竜の仲間は、それぞれ別の噂になる） */
 const BEAST_KINDS = [Kind.Kobold, Kind.Orc, Kind.Lizardman, Kind.Minotaur, Kind.Troll, Kind.Vampire, Kind.Thrall, Kind.Basilisk];
@@ -102,11 +113,121 @@ export function carryBeastRumors(this: Ecology, p: Party, mul: number): void {
     }
     const n = Math.min(left, h[1]);
     left -= n;
+    // 分析用：被害の噂を持ち帰った（一行で一度。tools/analysis/lib/moments.ts の petriQuest）
+    if (!(p.hurtTold ??= []).includes(h[0])) {
+      p.hurtTold.push(h[0]);
+      this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'hurtTold', how: h[0], n, x: h[2], y: h[3] } as never);
+    }
     const e = this.beastRumor(h[0]);
     e[1] += HURT_ADD * n * mul;
     e[2] = h[2];
     e[3] = h[3];
   }
+}
+
+/** 町に出る依頼：a は目標の種類（Party.aim と同じ番号：0 探索、1 宝探し、2 竜退治、3 魔物の狩り、4 アンデッド祓い、5 ゴブリン退治）、k は狩る種、w は重さ */
+export interface Quest {
+  a: number;
+  k: number;
+  w: number;
+}
+/** 依頼を受けない一行（探索）のくじの重さ */
+const EXPLORE_W = 0.5;
+/** 依頼が出る噂の強さ */
+const DRAGON_AT = 0.3;
+const BEAST_AT = 0.15;
+const UNDEAD_AT = 0.4;
+const GOLD_AT = 0.3;
+/** 依頼を率いる職業（目標の種類の番号で引く。探索は決めない） */
+export const QUEST_LEAD = [-1, Job.Thief, Job.Slayer, Job.Hunter, Job.Priest, Job.Warrior];
+const UNDEAD = [Kind.Zombie, Kind.Skeleton, Kind.Lich, Kind.Ghost, Kind.Armor];
+
+/** 竜退治の相手になる竜：ドラゴン、ワイバーン、岩の中を動くワームは床にいるときだけ */
+export function questDragon(this: Ecology): number {
+  const m = this.w.map;
+  const d = this.list.find((o) => !o.dead && !o.away && o.k === Kind.Dragon) ?? this.list.find((o) => !o.dead && !o.away && o.k === Kind.Wyvern) ?? this.list.find((o) => !o.dead && !o.away && o.k === Kind.Worm && this.tileOf(o.x, o.y) >= 0 && !m.solid[this.tileOf(o.x, o.y)]);
+  return d ? d.k : 0;
+}
+
+/** その依頼を受けた一行が中にいて、まだ目標を終えていないか */
+function questTaken(e: Ecology, a: number, k: number): boolean {
+  return e.parties.some((p) => p.q === a && (p.qk ?? 0) === k && !p.aimEnd && p.members.some((id) => { const c = e.byId.get(id); return !!c && !c.dead; }));
+}
+
+/** いま町に出ている依頼の一覧（噂から毎回つくる。並びは決まった順） */
+export function questBoard(this: Ecology): Quest[] {
+  const r = this.rumors;
+  const out: Quest[] = [];
+  const add = (a: number, k: number, w: number) => {
+    if (!questTaken(this, a, k)) out.push({ a, k, w });
+  };
+  if (this.goblinHuntReady()) add(5, 0, r.goblin + 0.25 * r.goblinRobs);
+  if (r.dragon >= DRAGON_AT && this.questDragon()) add(2, 0, r.dragon);
+  for (const b of r.beasts) if (b[1] >= BEAST_AT && this.list.some((o) => o.k === b[0] && !o.dead && !o.away)) add(3, b[0], b[1]);
+  if (r.undead >= UNDEAD_AT && this.list.some((o) => !o.dead && !o.away && UNDEAD.includes(o.k))) add(4, 0, r.undead);
+  if (r.gold >= GOLD_AT && this.lore.gold.length) add(1, 0, r.gold);
+  return out;
+}
+
+/** 一行が引き受ける依頼を、重さに比例したくじで一つ引く（探索も一定の重さでくじに入る） */
+export function pickQuest(this: Ecology): Quest {
+  const qs = [...this.questBoard(), { a: 0, k: 0, w: EXPLORE_W }];
+  const tot = qs.reduce((s, q) => s + q.w, 0);
+  let v = ((ih(this.step, 220, 7) % 10000) / 10000) * tot;
+  for (const q of qs) {
+    if (v < q.w) return q;
+    v -= q.w;
+  }
+  return qs[qs.length - 1];
+}
+
+/** 依頼の呼び名（記録の文。{k:種} は照らされた種なら名前になる） */
+export function questName(this: Ecology, a: number, k: number): string {
+  switch (a) {
+    case 1:
+      return '宝探し';
+    case 2:
+      return `{k:${this.questDragon() || Kind.Dragon}}退治`;
+    case 3:
+      return `{k:${k}}狩り`;
+    case 4:
+      return 'アンデッド祓い';
+    case 5:
+      return `{k:${Kind.Goblin}}退治`;
+    default:
+      return '探索';
+  }
+}
+
+/** 噂が強まったあと、新しく出た依頼を町の出来事として記録する（before は強まる前の一覧の鍵） */
+export function postNewQuests(this: Ecology, before: number[]): void {
+  const m = this.w.map;
+  for (const q of this.questBoard()) {
+    if (before.includes(q.a * 100 + q.k)) continue;
+    this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: 0, ev: 'quest', how: q.a, to: q.k, x: 0, y: 0 } as never);
+    this.log(m.entrance.x * TILE + 8, TILE + 8, `町に${this.questName(q.a, q.k)}の依頼が出た`);
+  }
+}
+
+/** いま出ている依頼の鍵（postNewQuests に渡す） */
+export function questKeys(this: Ecology): number[] {
+  return this.questBoard().map((q) => q.a * 100 + q.k);
+}
+
+/** 依頼を果たした一行が生きて帰ると、その噂が鎮まる（一行で一度だけ） */
+export function calmQuest(this: Ecology, p: Party): void {
+  if (p.aimEnd !== 1 || p.qCalm) return;
+  p.qCalm = 1;
+  const r = this.rumors;
+  if (p.q === 5) {
+    r.goblin *= 0.3;
+    r.goblinRobs = 0;
+  } else if (p.q === 2 && p.aim === 2) r.dragon *= 0.3;
+  else if (p.q === 3) {
+    const b = r.beasts.find((e) => e[0] === p.qk);
+    if (b) b[1] *= 0.2;
+    this.fadeBeastRumors(1);
+  } else if (p.q === 4) r.undead *= 0.3;
 }
 
 declare module '../ecology' {
@@ -117,7 +238,14 @@ declare module '../ecology' {
     partyHurt: typeof partyHurt;
     partySawBeast: typeof partySawBeast;
     carryBeastRumors: typeof carryBeastRumors;
+    questDragon: typeof questDragon;
+    questBoard: typeof questBoard;
+    pickQuest: typeof pickQuest;
+    questName: typeof questName;
+    postNewQuests: typeof postNewQuests;
+    questKeys: typeof questKeys;
+    calmQuest: typeof calmQuest;
   }
 }
 
-Object.assign(Ecology.prototype, { beastRumor, beastTotal, fadeBeastRumors, partyHurt, partySawBeast, carryBeastRumors });
+Object.assign(Ecology.prototype, { beastRumor, beastTotal, fadeBeastRumors, partyHurt, partySawBeast, carryBeastRumors, questDragon, questBoard, pickQuest, questName, postNewQuests, questKeys, calmQuest });
