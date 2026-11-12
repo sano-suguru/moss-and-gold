@@ -6,7 +6,7 @@
  *
  * 依頼は噂から毎回つくる（状態を持たない）。重さは噂の強さそのもので、一行は重さに比例したくじで一つ引き受け、
  * 依頼に合う職業が率いる（ゴブリン退治は戦士、竜退治と竜の寝床への道探しは竜殺し、魔物の狩りは狩人、祓いは僧侶、宝探しは盗賊）。
- * 率いる職業の者が名簿に空いていなければ、その職業の新人を雇う（src/eco/roster.ts の pickHeroes）。
+ * 率いる職業の者が名簿に空いていなければ、名簿に空きがあればその職業の新人を雇い、空きもなければその依頼は引かない（src/eco/roster.ts の canLead）。
  * 依頼を受けた一行が中にいる間（目標を終えていない間）は、その依頼は掲示から外れる。
  * 果たして生きて帰ればその噂が鎮まり、果たせずに帰れば噂はそのまま残る（宝探しだけは、持ち帰った金貨がそのまま噂を強める）。
  *
@@ -167,9 +167,9 @@ export function dragonWayKnown(this: Ecology): boolean {
   return !!wd && !wd.dead && !wd.away && wd.k === Kind.Dragon;
 }
 
-/** その依頼を受けた一行が中にいて、まだ目標を終えていないか */
+/** その依頼を受けた一行が中にいて、まだ目標を終えていないか、果たして帰る途中か（最後の一人が帰るまで、その依頼は掲示に戻らない） */
 function questTaken(e: Ecology, a: number, k: number): boolean {
-  return e.parties.some((p) => p.q === a && (p.qk ?? 0) === k && !p.aimEnd && p.members.some((id) => { const c = e.byId.get(id); return !!c && !c.dead; }));
+  return e.parties.some((p) => p.q === a && (p.qk ?? 0) === k && (!p.aimEnd || (p.aimEnd === 1 && !p.qCalm)) && p.members.some((id) => { const c = e.byId.get(id); return !!c && !c.dead; }));
 }
 
 /** いま町に出ている依頼の一覧（噂から毎回つくる。並びは決まった順） */
@@ -191,9 +191,9 @@ export function questBoard(this: Ecology): Quest[] {
   return out;
 }
 
-/** 一行が引き受ける依頼を、重さに比例したくじで一つ引く（探索も一定の重さでくじに入る） */
+/** 一行が引き受ける依頼を、重さに比例したくじで一つ引く（探索も一定の重さでくじに入る。率いる職業の者が名簿にいなければ、その依頼は引かない） */
 export function pickQuest(this: Ecology): Quest {
-  const qs = [...this.questBoard(), { a: 0, k: 0, w: EXPLORE_W }];
+  const qs = [...this.questBoard().filter((q) => this.canLead(QUEST_LEAD[q.a])), { a: 0, k: 0, w: EXPLORE_W }];
   const tot = qs.reduce((s, q) => s + q.w, 0);
   let v = ((ih(this.step, 220, 7) % 10000) / 10000) * tot;
   for (const q of qs) {
@@ -238,7 +238,7 @@ export function questKeys(this: Ecology): number[] {
   return this.questBoard().map((q) => q.a * 100 + q.k);
 }
 
-/** 依頼を果たした一行が生きて帰ると、その噂が鎮まる（一行で一度だけ） */
+/** 依頼を果たした一行が生きて帰ると、最後の一人が帰ったところで、その噂が鎮まる（一行で一度だけ。src/eco/adventurer.ts の updateParties） */
 export function calmQuest(this: Ecology, p: Party): void {
   if (p.aimEnd !== 1 || p.qCalm) return;
   p.qCalm = 1;

@@ -197,6 +197,27 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 依頼を果たして帰る一行の、目標を果たしてから最後の一人が帰るまでの間に、同じ依頼がまた町に出ない（鎮まるのは最後の一人が帰ったとき。src/eco/quest.ts）
+    name: '果たした依頼が、その一行の帰り道にまた出ない（15シードの合計で0回）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      let n = 0;
+      let tot = 0;
+      for (const r of rs) {
+        const a = r.settle.filter((x) => x.k === 25);
+        const q = a.filter((x) => x.ev === 'quest');
+        for (const e of a.filter((x) => x.ev === 'enter' && x.q > 0)) {
+          const ok = a.find((x) => x.id === e.id && x.ev === 'aim' && x.reason === 1);
+          const end = a.find((x) => x.id === e.id && x.ev === 'end' && x.reason === 'returned');
+          if (!ok || !end) continue;
+          tot++;
+          if (q.some((x) => x.how === e.q && (x.to ?? 0) === (e.qk ?? 0) && x.t >= ok.t && x.t <= end.t)) n++;
+        }
+      }
+      return { ok: n === 0, value: `果たして帰った一行 ${tot}、帰り道に同じ依頼が出た ${n}` };
+    },
+  },
+  {
     // バジリスクに仲間を石にされた一行が帰ると、バジリスクの噂が強まり、狩りの依頼が出る（どの種も同じ決まり。src/eco/quest.ts）
     name: 'バジリスク狩りの依頼が出る（15シードの合計で1回以上）',
     ...RUN_WIDE,

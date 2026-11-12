@@ -159,7 +159,17 @@ export function rankMul(this: Ecology, c: Cr): number {
  * その職業の、中にいない者から選ぶ。いなければ、名簿が12人に満たないときだけ新人を加え、満ちていれば中にいない別の職業の者で埋める。
  * 灯りを持つ職業（魔法使い・僧侶・戦士）が一人もいなければ、最後の一人を灯りを持つ職業の者に替える。組めなければ null
  */
-export function pickHeroes(this: Ecology, jobs: number[], salt: number, lead = false): Hero[] | null {
+/**
+ * その職業の者が一行を率いられるか：名簿に空いている（中にいない、傷を癒やしていない）その職業の者がいるか、名簿に空きがあって新人を雇えるか。
+ * 率いる者がいない依頼は、その一行のくじから外す（src/eco/quest.ts の pickQuest）。
+ * （名簿の上限を超えて新人を雇うと、英雄の最後の遠征（名簿が上限以下のときだけ）が16シード×25日で106→51に減った）
+ */
+export function canLead(this: Ecology, job: number): boolean {
+  const tick = this.w.tick;
+  return this.roster.length < ROSTER_SIZE || this.roster.some((h) => h.job === job && h.cid === 0 && (h.rest ?? 0) <= tick);
+}
+
+export function pickHeroes(this: Ecology, jobs: number[], salt: number): Hero[] | null {
   this.fillRoster();
   const out: Hero[] = [];
   const tick = this.w.tick;
@@ -167,8 +177,7 @@ export function pickHeroes(this: Ecology, jobs: number[], salt: number, lead = f
   const choose = (cands: Hero[], i: number) => cands[ih(salt, i, 303) % cands.length];
   for (let i = 0; i < jobs.length; i++) {
     let c = this.roster.filter((h) => h.job === jobs[i] && free(h));
-    // 依頼を率いる者（lead）は、その職業の者が空いていなければ新人を雇う（名簿は上限を2人まで超えてよい。超えた分は、倒れたり引退したりしても補わないので戻る）
-    if (!c.length && (this.roster.length < ROSTER_SIZE || (lead && i === 0 && this.roster.length < ROSTER_SIZE + 2))) {
+    if (!c.length && this.roster.length < ROSTER_SIZE) {
       out.push(this.recruit(jobs[i]));
       continue;
     }
@@ -467,6 +476,7 @@ declare module '../ecology' {
     heroOf: typeof heroOf;
     rankMul: typeof rankMul;
     pickHeroes: typeof pickHeroes;
+    canLead: typeof canLead;
     heroEnter: typeof heroEnter;
     heroHome: typeof heroHome;
     rosterStep: typeof rosterStep;
@@ -482,4 +492,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { recruit, fillRoster, heroOf, rankMul, pickHeroes, heroEnter, heroHome, rosterStep, raiseGrave, graveBrace, blessBrace, riseSpot, blessCrumble, pickGrave, blessGearNear, ensureCrests, heroHurt });
+Object.assign(Ecology.prototype, { recruit, fillRoster, heroOf, rankMul, pickHeroes, canLead, heroEnter, heroHome, rosterStep, raiseGrave, graveBrace, blessBrace, riseSpot, blessCrumble, pickGrave, blessGearNear, ensureCrests, heroHurt });

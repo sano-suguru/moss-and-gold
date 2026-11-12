@@ -65,7 +65,7 @@ export function maybeParty(this: Ecology): void {
   // 光がなければ進めない：魔法使いも僧侶もいなければ、戦士が一人松明を持つ。戦士もいなければ一人を戦士に
   if (!jobs.includes(Job.Wizard) && !jobs.includes(Job.Priest) && !jobs.includes(Job.Warrior)) jobs[jobs.length - 1] = Job.Warrior;
   // 顔ぶれは町の名簿から（中にいる者は選ばない。その職業がいなければ別の職業の者で埋める。src/eco/roster.ts）
-  const heroes = this.pickHeroes(jobs, this.step, QUEST_LEAD[quest.a] >= 0);
+  const heroes = this.pickHeroes(jobs, this.step);
   if (!heroes) return;
   jobs.length = heroes.length;
   heroes.forEach((h, i) => (jobs[i] = h.job));
@@ -156,6 +156,9 @@ export function updateParties(this: Ecology): void {
       if (!(p.saw & 16)) this.log(last?.x ?? 0, last?.y ?? 0, `${p.name ? p.name + 'の' : ''}冒険者の一行が全滅した`);
       // 担いでいた戦利品は、倒れた所に残る
       this.dropTrophy(p, last);
+      // 依頼を果たして生きて帰った一行は、最後の一人が帰ったところで、その噂を鎮める（果たせずに帰れば、そのまま残る。src/eco/quest.ts）。
+      // （帰る者が一人ずつ噂を足すので、最初の一人で鎮めると残りの仲間が足し直し、果たした152の一行のうち44で、帰る途中に同じ依頼がまた出ていた）
+      if (p.saw & 16) this.calmQuest(p);
       // 一行の終わり：目標、着いたか、果たしたか、生きて帰ったか
       this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'end', how: p.aim ?? 0, reason: p.saw & 16 ? 'returned' : 'wiped', to: p.aimEnd ?? 0, n: p.aimId ?? 0, arrived: p.aimAt ? 1 : 0, x: Math.round(last?.x ?? 0), y: Math.round(last?.y ?? 0) } as never);
     }
@@ -1030,8 +1033,6 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
       }
     }
   }
-  // 依頼を果たして帰れば、その噂は鎮まる（果たせずに帰れば、そのまま残る。src/eco/quest.ts）
-  this.calmQuest(p);
   this.postNewQuests(posted);
   c.body = 0;
   c.food = 0;
