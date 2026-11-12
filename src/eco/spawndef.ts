@@ -3,12 +3,12 @@
  *
  * 勇者のくせになまいきだ シリーズの構造に寄せて、野の魔物はダンジョンの中の資源（土の養分とマナ）から湧く。
  * 一行が一つの種の湧き方：どちらの資源から（side）、どの段か（tier）、いつ判定するか（every・phase・cool・minDay）、
- * 湧ける条件（ok・cap・chance）、どこに（site）、何匹（band）、体と胃とマナの量（body・food・mana。体と胃はすべて土の養分から取る）。
+ * 湧ける条件（ok・cap・chance。cap は無くてもよい）、どこに（site）、何匹（band）、体と胃とマナの量（body・food・mana。体と胃はすべて土の養分から取る）。
  * 種を足すときは、ここに一行足す。湧くかどうかは、資源の量と場所の条件（食べ物があるか）で決まる。
  */
 import { Burrow, Camp, Colony, Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, Warren, ih } from '../ecology';
 import { TILE } from '../mapgen';
-import { BASILISK_MANA } from './monsters';
+import { BASILISK_MANA } from './basilisk';
 
 export interface SpawnDef {
   k: Kind;
@@ -25,8 +25,8 @@ export interface SpawnDef {
   minDay: number;
   /** 湧ける条件（住処がまだ無い、大ネズミが10匹以上など）。省略なら常に true */
   ok?(e: Ecology): boolean;
-  /** ダンジョン全体の上限 */
-  cap(e: Ecology): number;
+  /** ダンジョン全体の上限。無ければ上限なし（数は資源と、場所の条件にある縄張りの間隔で決まる） */
+  cap?(e: Ecology): number;
   /** この回に湧くかのくじ。site より先に見る（site は重い） */
   chance?(e: Ecology): boolean;
   /** 湧く場所（タイル番号、なければ -1）。状態を書き換えてはいけない（巣穴を足すなどは before で） */
@@ -42,6 +42,8 @@ export interface SpawnDef {
   /** 養分を集める半径（既定4）と、マナを集める半径（既定3） */
   nutrR?: number;
   manaR?: number;
+  /** true なら、体のマナ（mana × 湧く数）を土から全部集められるときだけ湧く（養分と同じく全部か無しか。false ならあるだけ集める） */
+  manaAll?: boolean;
   /** 湧く前の準備（住処・集落・巣・巣穴を作る）。extra で取った養分を第3引数で受け取る。戻り値は setup に渡す */
   before?(e: Ecology, site: number, extra: number): unknown;
   /** i 匹目を置くピクセル座標（既定は spotNear） */
@@ -480,19 +482,22 @@ export const SPAWN_DEFS: SpawnDef[] = [
     },
     log: `深部の濃いマナから、{k:${Kind.Dragon}}の幼子が生まれた`,
   },
-  // バジリスク：マナがとても濃く（30〜。以前は60）、暗く、人の気配の薄い所。ほかのバジリスク（30マス）・トロール（12マス）・竜（25マス）のそばには湧かない
+  // バジリスク：マナがとても濃く（30〜。以前は60）、暗く、人の気配が濃すぎない所（0.3未満）。ほかのバジリスク（30マス）・トロール（12マス）・竜（12マス）のそばには湧かない。
+  // 上限は置かない（以前は2頭）。数は、湧ける場所と縄張りの間隔と、湧くたびに払う体のマナ（全部か無しか）で決まる。
+  // 竜から離れる距離は、以前は25マス。マナの濃い暗がりは竜の寝床のある深部に集まるので、25マスでは、かしたれ・seed40・seed41 で湧ける場所がほぼ無くなり、
+  // 16シード×25日の10日目以降に0匹だった時間の多くがそれだった
   {
     k: Kind.Basilisk, side: 'mana', tier: 2, every: 50, phase: 13, cool: 0, minDay: 0,
-    cap: () => 2,
     site: (e) =>
       manaSite(e, (k, mn, bigs) => {
         if (mn < BASILISK_MANA || !darkDeep(e, k)) return false;
         const m = e.w.map;
-        if (e.presenceAt((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8) >= 0.15) return false;
-        return !near(e, bigs, k, Kind.Basilisk, 30) && !near(e, bigs, k, Kind.Troll, 12) && !near(e, bigs, k, Kind.Dragon, 25);
+        // 人の気配は0.3未満なら湧く（以前は0.15。冒険者の通り道から離れすぎて、16シード×25日で冒険者と出会ったのは9シードだけだった）
+        if (e.presenceAt((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8) >= 0.3) return false;
+        return !near(e, bigs, k, Kind.Basilisk, 30) && !near(e, bigs, k, Kind.Troll, 12) && !near(e, bigs, k, Kind.Dragon, 12);
       }),
     band: () => 1,
-    body: 60, food: 30, mana: 240, nutrR: 3, manaR: 3,
+    body: 60, food: 30, mana: 240, nutrR: 3, manaR: 3, manaAll: true,
     log: `濃いマナの暗がりから、{k:${Kind.Basilisk}}が湧いた`,
   },
   // トロール：マナが濃く（18〜。以前は40）、暗い所。ほかのトロール（25マス）・バジリスク（12マス）・竜（25マス）のそばには湧かない。

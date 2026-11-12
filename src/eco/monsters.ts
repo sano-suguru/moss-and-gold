@@ -1,4 +1,4 @@
-/** Ecology のメソッド：ミノタウロス、トロール、バジリスク、ガーゴイル、ミミック、ゴーレム、ワーム（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+/** Ecology のメソッド：ミノタウロス、トロール、ガーゴイル、ミミック、ゴーレム、ワーム（バジリスクは src/eco/basilisk.ts）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
 import { LAIR_R, lineOfSight, TILE } from '../mapgen';
@@ -259,72 +259,6 @@ export function troll(this: Ecology, c: Cr, day: number): void {
   this.tryMove(c, j[0] * s.speed * 0.9, j[1] * s.speed * 0.9);
 }
 
-/** バジリスクが湧いた所をそのまま住みかにする、まわりのマナの濃さ（湧くときのしきい値と同じ。src/eco/spawndef.ts） */
-export const BASILISK_MANA = 30;
-
-export function basilisk(this: Ecology, c: Cr): void {
-  const s = SPEC[Kind.Basilisk];
-  if (this.leaveIfStarving(c)) return;
-  if (c.act === 2 && c.actT < 6) return;
-  // 自分より大きなものが近づくと睨みつけ、見通しの通っている相手を石に変える
-  if (this.step % 10 === c.id % 10) {
-    let target: Cr | null = null;
-    this.nearby(c.x, c.y, 4, (o) => {
-      if (target || o.dead || o.away || STR[o.k] < 6 || o.k === Kind.Basilisk || o.k === Kind.Gargoyle || o.k === Kind.Dragon) return;
-      if (sq(o.x - c.x) + sq(o.y - c.y) > 4 * TILE * 4 * TILE) return;
-      const m = this.w.map;
-      if (!lineOfSight(m, c.x, c.y, o.x, o.y)) return;
-      target = o;
-    });
-    if (target) {
-      const t = target as Cr;
-      c.act = 2;
-      c.actT = 0;
-      const dx = t.x - c.x;
-      const dy = t.y - c.y;
-      c.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 2 : 3) : dy > 0 ? 0 : 1;
-      if (ih(c.id, t.id, this.step) % 24 === 0) this.petrify(t);
-      return;
-    }
-  }
-  // マナが尽きかけて飢えていれば、住みかから遠く（24マスの内）まで出て、広く（14マス）獲物を探す（マナで命をつなぐ大物の遠出）
-  const roam = c.hungry > 0 && c.mana < Ecology.MANA_LOW;
-  if (c.hungry && this.hunt(c, roam ? 14 : 8, HUNT5, s.speed * 1.2)) return;
-  // 狩れる獲物がいなければ、マナが減っているとき、近くのウィスプを吸う
-  if (this.sipWisp(c)) return;
-  // 入口から離れた暗がりを住みかにする。マナの濃い暗がりに湧いた者は、そこを住みかにする（休んでいる間に足もとのマナを吸えるように。
-  // 湧いた所から離れた暗がりへ移ると、マナが薄くて吸えず、16シード×25日でバジリスクの3割が飢えで失われていた）
-  const m = this.w.map;
-  const hk = this.tileOf(c.hx, c.hy);
-  if (c.hx === c.x && c.hy === c.y && !(hk >= 0 && this.manaAround(hk) >= BASILISK_MANA && this.w.lightBase[hk] === 0)) {
-    const lair = this.pickDark(2, 80);
-    if (lair >= 0) {
-      c.hx = (lair % m.w) * TILE + 8;
-      c.hy = Math.floor(lair / m.w) * TILE + 8;
-    }
-  }
-  const leash = roam ? 24 : 10;
-  if (sq(c.hx - c.x) + sq(c.hy - c.y) > leash * TILE * leash * TILE) {
-    c.act = 1;
-    this.goTo(c, c.hx, c.hy, s.speed);
-    return;
-  }
-  // 遠出のあいだは、立ち止まらずに歩き回る
-  if (roam) {
-    c.act = 1;
-    const j = DIR16[ih(c.id, this.step >> 6, 114) & 15];
-    this.tryMove(c, j[0] * s.speed, j[1] * s.speed);
-    return;
-  }
-  // 住みかのそばで、たいてい立ち止まり、ときどき、ふつうに近い速さで歩く（もともと足の遅い種なので、それでもゆっくり）。
-  // （以前はふつうの速さの0.6倍で歩き、脚を動かしながらほとんど進まず、足踏みして見えていた）
-  c.act = c.actT % 90 < 50 ? 0 : 1;
-  if (c.act === 1) {
-    const j = DIR16[ih(c.id, this.step >> 5, 113) & 15];
-    this.tryMove(c, j[0] * s.speed * 0.9, j[1] * s.speed * 0.9);
-  }
-}
-
 export function gargoyle(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Gargoyle];
   if (c.act === 2 && c.actT < 4) return;
@@ -553,7 +487,6 @@ declare module '../ecology' {
     minotaur: typeof minotaur;
     sipWisp: typeof sipWisp;
     troll: typeof troll;
-    basilisk: typeof basilisk;
     gargoyle: typeof gargoyle;
     mimic: typeof mimic;
     golem: typeof golem;
@@ -561,4 +494,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { inLair, lairTiles, dragToLair, minotaur, sipWisp, troll, basilisk, gargoyle, mimic, golem, worm });
+Object.assign(Ecology.prototype, { inLair, lairTiles, dragToLair, minotaur, sipWisp, troll, gargoyle, mimic, golem, worm });

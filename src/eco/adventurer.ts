@@ -1,6 +1,6 @@
 /** Ecology のメソッド：冒険者（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Note, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Note, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq, STONE_FULL } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
@@ -141,6 +141,9 @@ export function seenBy(this: Ecology, c: Cr, lights: Cr[], o: Cr): boolean {
   if ((o.st === 7 || o.st === 12) && this.isHidden(o) && !this.atDoorOf(c, o) && !this.searchesCamp(c, o)) return false;
   if (c.sp === Job.Thief && sq(o.x - c.x) + sq(o.y - c.y) < 3 * TILE * 3 * TILE) return true;
   for (const l of lights) if (sq(o.x - l.x) + sq(o.y - l.y) < 5.5 * TILE * 5.5 * TILE) return true;
+  // 光っている者（glow が16を超える：光る苔やウィスプを食べた者、睨みの溜めや見つめで目を光らせるバジリスクなど。描画でもまわりを照らす）は、
+  // 暗がりでも8マスの内なら、見通しが通れば見える
+  if (o.glow > 16 && sq(o.x - c.x) + sq(o.y - c.y) < 8 * TILE * 8 * TILE && lineOfSight(this.w.map, c.x, c.y, o.x, o.y)) return true;
   return this.isLit(o);
 }
 
@@ -200,12 +203,13 @@ export function updateParties(this: Ecology): void {
         this.setExit(p);
         continue;
       }
-      // 一行の撤退：皆で向かっている相手との戦いで、仲間が倒れたか、一行の体力が半分を切ったら、一行ごと退く。
-      // 仲間が倒れていれば町へ帰り、倒れていなければ離れた所で休んでから、その相手を避けて探索を続ける
+      // 一行の撤退：皆で向かっている相手との戦いで、仲間が倒れたか、一行の体力が半分を切ったか、仲間の誰かがバジリスクの睨みで半ば石になったら、一行ごと退く。
+      // 仲間が倒れていれば町へ帰り、倒れていなければ離れた所で休んでから（離れているうちに石化も戻る）、その相手を避けて探索を続ける
       if (p.engage && (p.retreatUntil ?? 0) <= this.step) {
         const e = this.byId.get(p.engage);
         const fell = alive.length < (p.engageN ?? alive.length);
-        if (e && !e.dead && !e.away && (fell || avgHp < 0.5)) {
+        const stoned = alive.some((o) => o.stone >= STONE_FULL / 2);
+        if (e && !e.dead && !e.away && (fell || avgHp < 0.5 || stoned)) {
           p.retreatUntil = this.step + RETREAT_N;
           p.retreatX = Math.round(e.x);
           p.retreatY = Math.round(e.y);
@@ -218,8 +222,8 @@ export function updateParties(this: Ecology): void {
             p.goal = 1;
             this.setExit(p);
           }
-          this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'partyRetreat', n: e.k, how: fell ? 1 : 0, x: Math.round(alive[0].x), y: Math.round(alive[0].y) } as never);
-          this.log(alive[0].x, alive[0].y, `${this.partyTitle(p)}の一行が{k:${e.k}}にかなわず、${fell ? '倒れた仲間を残して' : '傷を負って'}退いた`);
+          this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'partyRetreat', n: e.k, how: fell ? 1 : stoned ? 2 : 0, x: Math.round(alive[0].x), y: Math.round(alive[0].y) } as never);
+          this.log(alive[0].x, alive[0].y, `${this.partyTitle(p)}の一行が{k:${e.k}}にかなわず、${fell ? '倒れた仲間を残して' : stoned ? '石になりかけた仲間を連れて' : '傷を負って'}退いた`);
           continue;
         }
       }
@@ -490,8 +494,10 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     this.nearby(c.x, c.y, 6, (o) => {
       if (o.dead || o === c || !this.seenBy(c, lights, o)) return;
       if (o.k === Kind.Zombie || o.k === Kind.Ghost) p.saw |= 2;
-      if (STR[o.k] >= 10 && o.k !== Kind.Adventurer && o.k !== Kind.Dragon && o.k !== Kind.Wyvern && o.k !== Kind.Worm && o.k !== Kind.Golem) {
+      // 噂の魔物：強さ10以上の大物と、バジリスク（強さ8だが、睨みで人を石にする魔物として噂になり、狩人のいる一行が「眼」を狙って狩りに来る。src/eco/aim.ts の aim 3）
+      if ((STR[o.k] >= 10 || o.k === Kind.Basilisk) && o.k !== Kind.Adventurer && o.k !== Kind.Dragon && o.k !== Kind.Wyvern && o.k !== Kind.Worm && o.k !== Kind.Golem) {
         p.saw |= 4;
+        // 一度の探索で見た中で、強いものほど噂の種になる
         if (STR[o.k] >= STR[p.bk] || !p.bk) {
           p.bk = o.k;
           p.bx = Math.round(o.x);
@@ -569,7 +575,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       const attacked = o.id === c.foe && this.w.tick - c.hitAt < 150;
       // 目標でない住民（住処・集落・村・縄張りの者）には、自分たちから戦いを始めない
       // 威嚇して退くオーク（src/eco/orc.ts の orcWary）も追わない
-      const enemy = (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)) || (o.k === Kind.Gargoyle && o.act !== 0) || (o.k === Kind.Mimic && c.sp === Job.Thief) || (c.sp === Job.Hunter && o.k === this.rumors.beastKind);
+      const enemy = (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)) || (o.k === Kind.Gargoyle && o.act !== 0) || (o.k === Kind.Mimic && c.sp === Job.Thief) || (c.sp === Job.Hunter && o.k === (p.aim === 3 && p.aimK ? p.aimK : this.rumors.beastKind));
       const minor = MINOR.includes(o.k) && (o.k !== Kind.Bat || o.st === 0 || o.foe === c.id);
       if (!enemy && !minor && !attacked) return;
       if (!attacked && (c.sp === Job.Bard || (c.sp === Job.Thief && o.k !== Kind.Mimic))) return;
@@ -1005,6 +1011,15 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
       r.beastX = p.bx;
       r.beastY = p.by;
     }
+  }
+  // バジリスクの見つめで仲間が石化しかけた一行は、そのバジリスクがまだ生きていれば、その噂を強く持ち帰る（次の一行が狩りに来る。上の見ただけの噂より優先する。
+  // 倒したバジリスクの噂で、目当てのいない狩りに出ないように）
+  const bs = p.bsHit ? this.byId.get(p.bsId ?? 0) : undefined;
+  if (bs && !bs.dead && !bs.away && bs.k === Kind.Basilisk) {
+    r.beast += 0.3 * mul;
+    r.beastKind = Kind.Basilisk;
+    r.beastX = p.bsX ?? r.beastX;
+    r.beastY = p.bsY ?? r.beastY;
   }
   if (p.saw & 8) {
     r.dragon += 0.25 * mul;

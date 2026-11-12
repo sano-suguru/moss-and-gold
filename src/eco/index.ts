@@ -19,6 +19,7 @@ import './goblin';
 import './orc';
 import './lizardman';
 import './monsters';
+import './basilisk';
 import './statue';
 import './vampire';
 import './treasure';

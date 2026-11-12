@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-const K = { Myconid: 8, Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5, Ghost: 7 };
+const K = { Myconid: 8, Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5, Ghost: 7, Basilisk: 17 };
 
 export interface Moment {
   key: string;
@@ -89,6 +89,17 @@ export const MOMENTS: Moment[] = [
   { key: 'minoBirth', label: 'ミノタウロス：縄張りでマナから生まれた' },
   { key: 'minoKill', label: 'ミノタウロス：縄張りのそばで獲物を仕留めた（寝床から16マスの内でしか狩らない）' },
   { key: 'minoDrag', label: 'ミノタウロス：仕留めた獲物を寝床まで引きずった' },
+  { key: 'bsGaze', label: 'バジリスク：睨みで相手を石に変えた' },
+  { key: 'bsKill', label: 'バジリスク：獲物を仕留めた（ウィスプを吸ったのは除く）' },
+  { key: 'bsStone', label: 'バジリスク：見つめられて目が合い、石化しはじめた' },
+  { key: 'bsAvert', label: 'バジリスク：睨みの溜めに気づいた冒険者が目を背けた' },
+  { key: 'bsStoneAdv', label: 'バジリスク：見つめられて目が合い、冒険者が石化しはじめた' },
+  { key: 'bsGazeAdv', label: 'バジリスク：睨みで冒険者が石像になった' },
+  { key: 'bsStoneRetreat', label: 'バジリスク：仲間が半ば石になり、冒険者の一行が退いた' },
+  { key: 'bsHunt', label: 'バジリスク：噂のバジリスクを狩りに来た一行が、目当ての個体を見つけた' },
+  { key: 'bsPatrol', label: 'バジリスク：縄張りを見回りに出た' },
+  { key: 'bsBedMove', label: 'バジリスク：寝床を引っ越した' },
+  { key: 'bsScare', label: 'バジリスク：見回りで歩いてくるバジリスクから大ネズミが逃げた' },
   { key: 'soilBirth', label: '土の養分から魔物の群れが湧いた（コウモリを除く）' },
   { key: 'heroMana', label: '冒険者が倒れた所でマナが立ちのぼった' },
   { key: 'wispSip', label: 'マナの減った大物がウィスプを吸った' },
@@ -325,6 +336,17 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     hatch: b.filter((x) => x.origin === 'mana' && x.k === K.Dragon).length,
     minoBirth: b.filter((x) => x.origin === 'mana' && x.k === K.Minotaur).length,
     minoKill: d.filter((x) => x.by === K.Minotaur && (x.cause === 'eaten' || x.cause === 'fight')).length,
+    bsGaze: d.filter((x) => x.by === K.Basilisk && x.cause === 'petrified').length,
+    bsKill: d.filter((x) => x.by === K.Basilisk && (x.cause === 'eaten' || x.cause === 'fight')).length,
+    bsStone: ev(K.Basilisk, 'gaze').filter((x) => x.how === 1).length,
+    bsAvert: ev(K.Basilisk, 'gaze').filter((x) => x.how === 0 && x.n === K.Adventurer).length,
+    bsStoneAdv: ev(K.Basilisk, 'gaze').filter((x) => x.how === 1 && x.n === K.Adventurer).length,
+    bsGazeAdv: d.filter((x) => x.by === K.Basilisk && x.cause === 'petrified' && x.k === K.Adventurer).length,
+    bsStoneRetreat: s.filter((x) => x.k === K.Adventurer && x.ev === 'partyRetreat' && x.how === 2).length,
+    bsHunt: s.filter((x) => x.k === K.Adventurer && x.ev === 'arrive' && x.how === 3 && x.to === K.Basilisk).length,
+    bsPatrol: ev(K.Basilisk, 'patrol').length,
+    bsBedMove: ev(K.Basilisk, 'bedMove').length,
+    bsScare: ev(K.Rat, 'fleeBasilisk').length,
     minoDrag: ev(K.Minotaur, 'drag').length,
     // 湧きの記録（src/eco/generate.ts の settle 'gen'。群れごとに1回）
     soilBirth: s.filter((x) => x.ev === 'gen' && x.how === 'nutr' && x.k !== K.Bat).length,

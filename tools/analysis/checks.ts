@@ -403,17 +403,57 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // バジリスクが画面にいる（src/eco/spawndef.ts のバジリスクの行）：上限を置かず、竜からは12マス離れれば湧く。いないと、睨みの石像・コボルトとゴブリンが避ける住みか・
+    // 冒険者の戦利品の眼など、バジリスクがほかの種に与えている意味も消える。15シードの10〜18日目で、1/4日ごとのサンプルの半分以上にいたシードの数を見る。
+    // 入れた版で main の10日目から始めると13シード（seed4 18％・seed17 0％。seed17 は湧ける暗がりがどれも竜のそばか人のよく通る所で、main でも一度も湧かない）
+    name: 'バジリスクが画面にいる（15シードのうち11シード以上で、10〜18日目のサンプルの半分以上にいた）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const share = rs.map((r) => (r.samples.length ? r.samples.filter((x) => (x.counts?.[17] ?? 0) > 0).length / r.samples.length : 0));
+      const seeds = share.filter((v) => v >= 0.5).length;
+      return { ok: seeds >= 11, value: `${seeds}シード（` + rs.map((r, i) => `${r.seed} ${Math.round(share[i] * 100)}％`).join('、') + '）' };
+    },
+  },
+  {
+    // バジリスク（src/eco/monsters.ts の basilisk）：飢えの猶予を過ぎると住みかを出て、同じ洞窟の領域の獲物（大ネズミ・大トカゲ・アリ）のいる所まで遠出して狩り
+    // （獲物がいなければ、マナの濃い暗がりへ寝床を移して休み）、自分より大きな者を睨んで石に変える（石化の記録の by が17）。1〜2シードの出来事に偏るので、15シードの合計と、起きたシードの数で見る。
+    // 入れた版で main の10日目から始めると、仕留めた69回（8シード）・睨み59回（10シード）。上限をやめ、獲物がいなければ寝床で休むようにした版では、仕留めた42回（6シード）・睨み78回（10シード）。睨みを少しずつ進む石化にした版では、仕留めた47回（4シード）・石像84（6シード）。
+    // 展開が分かれただけで大きく変わるので、目安は少なめにする
+    name: 'バジリスクが獲物を仕留め、睨みで石に変える（15シードの合計で、仕留めた30回以上・睨み25回以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const kill = rs.map((r) => r.deaths.filter((x) => x.by === 17 && (x.cause === 'eaten' || x.cause === 'fight')).length);
+      const gaze = rs.map((r) => r.deaths.filter((x) => x.by === 17 && x.cause === 'petrified').length);
+      const seeds = (a: number[]) => a.filter((v) => v > 0).length;
+      return { ok: sum(kill) >= 30 && sum(gaze) >= 25, value: `仕留めた ${sum(kill)}（${seeds(kill)}シード）、睨み ${sum(gaze)}（${seeds(gaze)}シード）` };
+    },
+  },
+  {
+    // バジリスクの睨みと見回り（src/eco/basilisk.ts）：目を光らせる溜めのあと、見えている相手を見つめ続け、目が合っている間に石化が少しずつ進む
+    // （満ちたら石像。gaze の how 1 最初に目が合った / 2 石像。ここでは1と2を「睨みを受けた」として数える）。
+    // 遠出していないときは、同じ洞窟の中のマナの濃い暗がりへ見回りに出る（patrol）。15シードの合計で見る。入れた版で main の10日目から始めると、睨みを受けた631回（12シード）・見回り132回（13シード）。目安はその半分ほどにする
+    name: 'バジリスクが睨みで石化を進め、縄張りを見回る（15シードの合計で、睨みを受けた300回以上・見回り60回以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const stone = rs.map((r) => r.settle.filter((x) => x.k === 17 && x.ev === 'gaze' && x.how >= 1).length);
+      const patrol = rs.map((r) => r.settle.filter((x) => x.k === 17 && x.ev === 'patrol').length);
+      const seeds = (a: number[]) => a.filter((v) => v > 0).length;
+      return { ok: sum(stone) >= 300 && sum(patrol) >= 60, value: `睨みを受けた ${sum(stone)}（${seeds(stone)}シード）、見回り ${sum(patrol)}（${seeds(patrol)}シード）` };
+    },
+  },
+  {
     // マナの減った大物が、近くのウィスプへ寄って吸う（src/eco/monsters.ts の sipWisp）。大物は暗い深部に、ウィスプは苔のある明るい所に多く、
     // 近くにいることは少ない（main の8シード×10〜18日目の深夜で、大物の1割ほどが8マス以内にウィスプがいた）。15シードの合計で見る。
     // 入れた版で main の10日目から始めると218回（seed4 101・seed41 60・seed8 34 など7シード）。野の生き物を外から来させないようにした版では39回（7シード）。
     // 狩りの後に吸い、見通しの通るウィスプだけを狙い、ヴァンパイアも吸うようにした版では143回（9シード）。死骸の一覧の古い者を除いた版では54回（6シード。展開が分かれただけで大きく変わる）。
-    // 1〜2シードの出来事に大きく偏るので、目安は少なめにし、起きたシードの数で見る
-    name: 'マナの減った大物がウィスプを吸う（15シードの合計で20回以上・4シード以上）',
+    // バジリスクの上限をやめ、獲物がいなければ寝床で休むようにした版では308回（2シード：seed30 287・seed8 21）。16シード×25日では429回（11シード。main は416回）で、
+    // 10〜18日目に起きるシードの数だけが展開の分かれ方で大きく変わる。1〜2シードの出来事に大きく偏るので、目安は少なめにし、起きたシードの数は2以上で見る
+    name: 'マナの減った大物がウィスプを吸う（15シードの合計で20回以上・2シード以上）',
     ...RUN_WIDE,
     test: (rs) => {
       const n = rs.map((r) => r.deaths.filter((x) => x.cause === 'sipped').length);
       const seeds = n.filter((v) => v > 0).length;
-      return { ok: sum(n) >= 20 && seeds >= 4, value: rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、') + `（${seeds}シード）` };
+      return { ok: sum(n) >= 20 && seeds >= 2, value: rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、') + `（${seeds}シード）` };
     },
   },
   {

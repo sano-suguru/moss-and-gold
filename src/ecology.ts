@@ -92,6 +92,16 @@ export const enum Job {
 export interface Party {
   id: number;
   members: number[];
+  /** バジリスクの見つめで石化しかけた・石になった仲間の数と、そのバジリスクのいた所（町へ帰ると、バジリスクの噂が強まる。src/eco/basilisk.ts、src/eco/adventurer.ts） */
+  bsHit?: number;
+  bsX?: number;
+  bsY?: number;
+  /** 噂の魔物の狩り（aim 3）で、一行が出たときに目当てにした種（src/eco/aim.ts）。出たあとで町の噂が別の魔物に変わっても、目当ては変えない */
+  aimK?: number;
+  /** 噂の魔物の狩りで、噂の場所にいなかった目当てを、まわりで探して足跡をたどったか（1回の狩りで1回まで。src/eco/aim.ts） */
+  aimTracked?: number;
+  /** 見つめで仲間を石化しかけたバジリスクの番号（町へ帰ったとき、そのバジリスクが生きていれば噂を強める） */
+  bsId?: number;
   /** 皆で向かう相手に向かいはじめたときの、生きている仲間の数（src/eco/adventurer.ts の撤退） */
   engageN?: number;
   /** 撤退：下がり終える step 番号と、退く相手のいた所 */
@@ -568,6 +578,13 @@ export interface Cr {
   doze: number;
   /** 最後にマイコニドの胞子でうたた寝した時刻（tick。src/eco/myconidskill.ts）：そのあとしばらくは胞子に慣れて眠らない */
   sporeAt: number;
+  /**
+   * 石化の進み（src/eco/basilisk.ts の basiliskGaze）：バジリスクと目が合っている間に増え、STONE_FULL に達すると石像になる。
+   * 進むほど体が灰色になり、歩みが鈍る（tryMove）。生き物の更新 STONE_DECAY_EVERY 回ごとに1ずつ戻る（src/eco/step.ts）
+   */
+  stone: number;
+  /** バジリスクの見つめから目を背けている間の、終わる tick（src/eco/basilisk.ts）。背けている間は石化が進まず、相手を見ずに打つので傷が半分になる（src/eco/combat.ts の strike） */
+  avert: number;
   /** 死骸ができたときの養分（腐り具合の目安） */
   init: number;
 }
@@ -623,6 +640,12 @@ export const HUNT3: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, K
 export const HUNT4: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Lizardman, Kind.Orc, Kind.Slime, Kind.Zombie, Kind.Myconid, Kind.Adventurer];
 export const HUNT5: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Ant, Kind.Kobold, Kind.Goblin];
 export const HUNT6: Kind[] = [Kind.Rat];
+/** 石化の進み（Cr.stone）がこれに達すると石像になる */
+export const STONE_FULL = 100;
+/** 石化の進みは、生き物の更新この回数ごとに1ずつ戻る（睨まれ続けなければ、元の体に戻る） */
+export const STONE_DECAY_EVERY = 8;
+/** 石化の進みが満ちる手前で、歩く速さがこの割合まで落ちる（進みに比例） */
+export const STONE_SLOW = 0.6;
 /** 上下左右（呼ぶたびに配列を作らないように） */
 export const NB4: readonly (readonly [number, number])[] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 /** 16方向の単位ベクトル（三角関数を使わずに作る） */
@@ -900,7 +923,9 @@ export class Ecology {
    * 書かれていない種は夜目と同じ
    */
   static SENSE: Record<number, string> = {
-    [Kind.Adventurer]: 'eye', [Kind.Lizard]: 'eye', [Kind.Lizardman]: 'eye', [Kind.Basilisk]: 'eye', [Kind.Wyvern]: 'eye',
+    [Kind.Adventurer]: 'eye', [Kind.Lizard]: 'eye', [Kind.Lizardman]: 'eye', [Kind.Wyvern]: 'eye',
+    // バジリスクは、濃いマナの暗がりに住むので夜目（以前は光に頼る目で、暗がりの獲物には1.5マスまで近づかないと気づかず、ほとんど狩れなかった）
+    [Kind.Basilisk]: 'night',
     [Kind.Goblin]: 'night', [Kind.Kobold]: 'night', [Kind.Orc]: 'night', [Kind.Dwarf]: 'night', [Kind.Vampire]: 'night', [Kind.Dragon]: 'night',
     [Kind.Rat]: 'smell', [Kind.Ant]: 'smell', [Kind.Troll]: 'smell', [Kind.Zombie]: 'smell', [Kind.Minotaur]: 'smell', [Kind.Slime]: 'smell',
     [Kind.Spider]: 'vib', [Kind.Worm]: 'vib', [Kind.Mimic]: 'vib',

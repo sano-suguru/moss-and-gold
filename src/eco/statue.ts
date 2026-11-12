@@ -5,27 +5,32 @@ import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import type { World } from '../world';
 
-/** 生き物を、その瞬間の姿のまま石像に変える */
-export function petrify(this: Ecology, c: Cr): void {
+/** 生き物を、その瞬間の姿のまま石像に変える。by は石にした種（バジリスクの睨みなら17、トロールが光の筋を浴びたなら −1） */
+export function petrify(this: Ecology, c: Cr, by = -1): void {
+  // ゴーレムとワームは石にならない（体が石と土）
+  if (c.k === Kind.Golem || c.k === Kind.Worm) return;
+  const k = this.tileOf(c.x, c.y);
+  const m = this.w.map;
+  // 入口のそばでは石像にならない（入口をふさがないように）。死として扱い、持ち物と金貨は die が落とす
+  // （以前は、ここへ来る前にも持ち物を落としていたので、二度落としていた。冒険者なら倒れた数も2つ増えた）
+  const nearGate = Math.abs((k % m.w) - m.entrance.x) + Math.floor(k / m.w) < 10;
+  if (k < 0 || this.statueAt.has(k) || nearGate) {
+    this.die(c, 'petrified', by);
+    return;
+  }
   this.dropBelongings(c);
   if (c.gold > 0) {
     this.dropGold(c.x, c.y, c.gold, this.ownerNote(c, 'fell'));
     c.gold = 0;
   }
-  if (c.k === Kind.Golem || c.k === Kind.Worm) return;
-  const k = this.tileOf(c.x, c.y);
-  const m = this.w.map;
-  // 入口のそばでは石像にならない（入口をふさがないように）
-  const nearGate = Math.abs((k % m.w) - m.entrance.x) + Math.floor(k / m.w) < 10;
-  if (k < 0 || this.statueAt.has(k) || nearGate) {
-    this.die(c, 'petrified');
-    return;
-  }
-  this.record('deaths', { t: this.w.tick, id: c.id, k: c.k, cause: 'petrified', by: -1, x: Math.round(c.x), y: Math.round(c.y) } as never);
+  this.record('deaths', { t: this.w.tick, id: c.id, k: c.k, cause: 'petrified', by, x: Math.round(c.x), y: Math.round(c.y) } as never);
   this.releaseMana(c);
   const st: Statue = { id: this.nextId++, x: Math.round(c.x), y: Math.round(c.y), k: c.k, sp: c.sp, dir: c.dir, act: c.act === 3 ? 0 : c.act, f: (this.step >> 2) & 3, units: c.body + c.food + c.units, age: 0 };
   this.statues.push(st);
-  this.note(st.id, this.ownerNote(c, 'petrified'));
+  // 石像の覚え書き：誰が石になったかと、石にした種（情報パネルに出る）
+  const n = this.ownerNote(c, 'petrified');
+  if (by >= 0) n.by = by;
+  this.note(st.id, n);
   if (STR[c.k] >= 5) this.log(c.x, c.y, `{k:${c.k}}が石になった`);
   // 石像のマスは、覚えておく位置（丸めた座標）で決める（ロードし直したときと同じマスになるように）
   const sk = this.tileOf(st.x, st.y);
