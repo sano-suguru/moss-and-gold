@@ -7,7 +7,7 @@
  *   渇きが THIRST_MAX を超えたら、時刻に関わらず行く。渇いて死ぬことはない（水場が遠い者は行かず、渇きは THIRST_MAX で止まる）。
  * - 冒険者とドワーフは、一行や一団から離れないよう、通り道から8マスの内に水場があるときだけ立ち寄る。
  * - 水場に着いたら、DRINK_TIME 回のあいだ水際でかがんで飲み（Cr.thirst を負の数にして、残りの回数を数える）、渇きが0に戻る。
- *   途中で打たれたり逃げたりして水際を離れたら、飲むのをやめて渇いたままにする。
+ *   途中で打たれたり、逃げるなどして水場を離れたりしたら、飲むのをやめて渇いたままにする。
  * - 弱い種は、水場のまわりに自分より強い種（STR が上で、同じ群れでない者）がいれば、少し離れた所で待ち、強い種が去ってから飲む
  *   （いちばん弱い種、強さ WEAK_STR 以下は待たずに、その日はあきらめて引き返す）。眠っている者は数えない。
  *   待つのは WAIT_MAX 回まで（待った回数は Cr.waitW。過ぎたら、その日はあきらめて渇きを THIRSTY の半分にする）。腹を空かせた捕食者は、ふだんどおり狩る（水場の休戦にはしない）。
@@ -15,7 +15,7 @@
  *   ゲーム内の時間で決まった間隔（WH_EVERY tick ごと）にだけ作り直し、一覧をセーブに入れる（ロードし直しても同じ一覧になるように）。
  * - 水を飲みはじめたとき、その水場のまわりに3種以上いれば、水場ごとに生き物の更新 CROWD_GAP 回に1回だけ、賑わいとして記録する（分析用）。
  */
-import { Cr, Ecology, Kind, SPEC, STR, sq } from '../ecology';
+import { CR_EVERY, Cr, Ecology, Kind, SPEC, STR, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 水を飲む種 */
@@ -173,20 +173,13 @@ function shoreFor(e: Ecology, h: Waterhole, c: Cr): [number, number] {
   return [bx, by];
 }
 
-/** その者のマスかまわり8マスに水（10より多い）があるか（水際にいるか） */
-function atWater(e: Ecology, c: Cr): boolean {
-  const m = e.w.map;
-  const k = e.tileOf(c.x, c.y);
-  if (k < 0) return false;
-  const x = k % m.w;
-  const y = Math.floor(k / m.w);
-  for (let dy = -1; dy <= 1; dy++)
-    for (let dx = -1; dx <= 1; dx++) {
-      const xx = x + dx;
-      const yy = y + dy;
-      if (xx >= 0 && yy >= 0 && xx < m.w && yy < m.h && e.w.water[yy * m.w + xx] > POOL_WATER) return true;
-    }
-  return false;
+/**
+ * 飲んでいる場所を離れたか：どの水場の中心からも8マスより離れたか（岸は中心から縦横5マスの四角の内、斜めの隅でも7.1マスなので、岸で飲んでいる間は離れたことにならない。
+ * 6マスにしていたときは、隅の岸に着くたびに、飲みはじめては止めるのをくり返していた）。
+ * （水のマスがまわりにあるかで見ると、浅い水たまりでは水の量が10の前後を行き来して、飲みはじめては止めるのを毎回くり返していた）
+ */
+function leftWater(e: Ecology, c: Cr): boolean {
+  return !e.waterholes.some((h) => sq(h.x - c.x) + sq(h.y - c.y) < sq(8 * TILE));
 }
 
 /**
@@ -202,9 +195,10 @@ export function thirstStep(this: Ecology, c: Cr): boolean {
   if (!DRINKERS.has(c.k) || c.away || c.elite) return false;
   // 飲んでいる最中（thirst が負）：水際でかがんだまま、残りの回数を数える
   if (c.thirst < 0) {
-    // 飲んでいる途中で打たれたり逃げたりして水際を離れていたら、飲むのをやめる（渇いたままにして、あとで飲み直しに行く）。
+    // 飲んでいる途中で打たれたか、逃げるなどして水場を離れていたら、飲むのをやめる（渇いたままにして、あとで飲み直しに行く）。
+    // 打たれたかは、残りの回数ぶんより最近に打たれたかで見る（飲みはじめた時刻を持たずに済むように、ゆるめに見る）。
     // （続けると、逃げた先の乾いた床で立ち止まって飲み続けていた）
-    if (!atWater(this, c)) {
+    if (this.w.tick - c.hitAt < -c.thirst * CR_EVERY || leftWater(this, c)) {
       c.thirst = THIRSTY;
       return false;
     }
