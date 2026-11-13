@@ -63,8 +63,13 @@ export const RANK_NAMES = ['見習い', '熟練', '歴戦', '英雄'];
 export const RANK_AT = [0, 2, 4, 7];
 /** 位ごとの強さの倍率（英雄で頭打ち。英雄でも竜には一行で挑む強さ） */
 export const RANK_MUL = [1, 1.07, 1.14, 1.2];
-/** はじめの名簿の職業（戦士3、魔法使い2、盗賊2、僧侶2、吟遊詩人、狩人、竜殺し） */
-const START_JOBS = [Job.Warrior, Job.Warrior, Job.Warrior, Job.Wizard, Job.Wizard, Job.Thief, Job.Thief, Job.Priest, Job.Priest, Job.Bard, Job.Hunter, Job.Slayer];
+/**
+ * はじめの名簿の職業（戦士2、魔法使い2、盗賊2、僧侶2、吟遊詩人、狩人2、竜殺し）。倒れた者・引退した者は同じ職業の新人で補うので、この顔ぶれが続く。
+ * 依頼を率いる職業（src/eco/quest.ts）の者が中にいる間は、その依頼は引かれないので、狩人を2人にした
+ * （1人のときは、16シード×25日で魔物の狩りの依頼の一行が225→151に減り、石化のあとにバジリスク狩りが来る場面が2シードだけだった）。
+ * 竜殺しも2人にすると、はじめのうちの一行が強くなって宝物庫のゴーレムが早く倒され、ゴーレムが0匹の割合が400→692に増えたので、1人のまま
+ */
+const START_JOBS = [Job.Warrior, Job.Warrior, Job.Wizard, Job.Wizard, Job.Thief, Job.Thief, Job.Priest, Job.Priest, Job.Bard, Job.Hunter, Job.Hunter, Job.Slayer];
 /** 引退：英雄になってからこの回数の遠征を終えて帰ると引退する（帰還 RANK_AT[3] + RETIRE_AFTER 回）。最後の遠征は見習いを一人連れて入る */
 export const RETIRE_AFTER = 3;
 export const RETIRE_RET = RANK_AT[3] + RETIRE_AFTER;
@@ -152,6 +157,16 @@ export function heroOf(this: Ecology, c: Cr): Hero | null {
 export function rankMul(this: Ecology, c: Cr): number {
   const h = this.heroOf(c);
   return h ? RANK_MUL[h.rank] : 1;
+}
+
+/**
+ * その職業の者が一行を率いられるか：名簿に空いている（中にいない、傷を癒やしていない）その職業の者がいるか、名簿に空きがあって新人を雇えるか。
+ * 率いる者がいない依頼は、その一行のくじから外す（src/eco/quest.ts の pickQuest）。
+ * （名簿の上限を超えて新人を雇うと、英雄の最後の遠征（名簿が上限以下のときだけ）が16シード×25日で106→51に減った）
+ */
+export function canLead(this: Ecology, job: number): boolean {
+  const tick = this.w.tick;
+  return this.roster.length < ROSTER_SIZE || this.roster.some((h) => h.job === job && h.cid === 0 && (h.rest ?? 0) <= tick);
 }
 
 /**
@@ -466,6 +481,7 @@ declare module '../ecology' {
     heroOf: typeof heroOf;
     rankMul: typeof rankMul;
     pickHeroes: typeof pickHeroes;
+    canLead: typeof canLead;
     heroEnter: typeof heroEnter;
     heroHome: typeof heroHome;
     rosterStep: typeof rosterStep;
@@ -481,4 +497,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { recruit, fillRoster, heroOf, rankMul, pickHeroes, heroEnter, heroHome, rosterStep, raiseGrave, graveBrace, blessBrace, riseSpot, blessCrumble, pickGrave, blessGearNear, ensureCrests, heroHurt });
+Object.assign(Ecology.prototype, { recruit, fillRoster, heroOf, rankMul, pickHeroes, canLead, heroEnter, heroHome, rosterStep, raiseGrave, graveBrace, blessBrace, riseSpot, blessCrumble, pickGrave, blessGearNear, ensureCrests, heroHurt });

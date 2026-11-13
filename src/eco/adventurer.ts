@@ -10,6 +10,7 @@ import type { World } from '../world';
 import { SKILL_HUNTER_RAIN, SKILL_PRIEST_HAMMER, SKILL_SLAYER_CLEAVE, SKILL_THIEF_THROW, SKILL_WARRIOR_SLASH, SKILL_WIZARD_MISSILE, type Skill } from './skill';
 import { HP_PER_STR } from './combat';
 import { HERO_SKILL_MANA, HERO_SKILL_R } from './salamander';
+import { QUEST_LEAD, beastSeenKind } from './quest';
 
 /** 一行の撤退で下がる生き物の更新の回数（およそ12秒） */
 const RETREAT_N = 60;
@@ -35,7 +36,7 @@ function runsOff(o: Cr): boolean {
 }
 export function reputation(this: Ecology): number {
   const r = this.rumors;
-  return r.light + r.gold * 2 + r.undead + r.beast + r.dragon * 2;
+  return r.light + r.gold * 2 + r.undead + this.beastTotal() + r.dragon * 2;
 }
 
 export function maybeParty(this: Ecology): void {
@@ -46,10 +47,11 @@ export function maybeParty(this: Ecology): void {
   const r = this.rumors;
   const want = Math.min(5, 2 + (ih(this.step, 202, 7) % 3) + (rep > 3 ? 1 : 0));
   const tier = rep < 2 ? 0 : rep < 6 ? 1 : 2;
-  // ゴブリンの盗みの噂が溜まっていれば、ゴブリン退治の一行（戦士が多い）
-  const gobHunt = this.goblinHuntReady();
-  // 噂の中身で顔ぶれが変わる：金貨なら盗賊、アンデッドなら僧侶、大物や竜なら戦士
-  const wts = [3 + 3 * (r.beast + r.dragon) + (gobHunt ? 6 : 0), 2, 1 + 3 * r.gold, 2 + 3 * r.undead, 1, r.beastKind ? 3 * r.beast : 0, 0];
+  // 町に出ている依頼から、重さに比例したくじで一つ引き受ける（探索も一定の重さでくじに入る。src/eco/quest.ts）
+  const quest = this.pickQuest();
+  // 噂の中身で顔ぶれが変わる：金貨なら盗賊、アンデッドなら僧侶、大物や竜なら戦士、ゴブリン退治なら戦士が多い
+  const beast = this.beastTotal();
+  const wts = [3 + 3 * (beast + r.dragon) + (quest.a === 5 ? 6 : 0), 2, 1 + 3 * r.gold, 2 + 3 * r.undead, 1, r.beasts.length ? 3 * beast : 0, 0];
   const jobs: number[] = [];
   for (let i = 0; i < want; i++) {
     const tot = wts.reduce((a, b) => a + b, 0);
@@ -58,11 +60,8 @@ export function maybeParty(this: Ecology): void {
     while (j < wts.length - 1 && v >= wts[j]) v -= wts[j++];
     jobs.push(j);
   }
-  // 竜の噂があれば、竜殺しが一行を率いる
-  if (r.dragon > 0.3 && !gobHunt) jobs[0] = Job.Slayer;
-  // 竜の寝床への道が町で知られていれば、3回に2回は竜殺しが一行を率いて竜退治に来る（src/eco/aim.ts。竜退治の場面を増やす）
-  else if (!gobHunt && this.lore.dragonWay && this.list.some((o) => o.k === Kind.Dragon && !o.dead && !o.away) && ih(this.step, 209, 7) % 3 !== 0) jobs[0] = Job.Slayer;
-  if (gobHunt) jobs[0] = Job.Warrior;
+  // 依頼に合う職業が一行を率いる（ゴブリン退治は戦士、竜退治は竜殺し、魔物の狩りは狩人、祓いは僧侶、宝探しは盗賊）
+  if (QUEST_LEAD[quest.a] >= 0) jobs[0] = QUEST_LEAD[quest.a];
   // 光がなければ進めない：魔法使いも僧侶もいなければ、戦士が一人松明を持つ。戦士もいなければ一人を戦士に
   if (!jobs.includes(Job.Wizard) && !jobs.includes(Job.Priest) && !jobs.includes(Job.Warrior)) jobs[jobs.length - 1] = Job.Warrior;
   // 顔ぶれは町の名簿から（中にいる者は選ばない。その職業がいなければ別の職業の者で埋める。src/eco/roster.ts）
@@ -76,7 +75,7 @@ export function maybeParty(this: Ecology): void {
   const known = (this.lore.mouths ?? []).filter((i) => this.mouthOpen(i));
   const pick = ih(this.step, 205, 7) % (1 + known.length);
   const door = pick === 0 ? -1 : known[pick - 1];
-  const party: Party = { id: pid, members: [], goal: 0, tx: m.entrance.x * TILE + 8, ty: 3 * TILE, since: this.step, tier, initial: size, saw: 0, targetAt: 0, waitT: 0, bk: 0, bx: 0, by: 0, door, mouths: [], explored: this.lore.explored.slice(), goldCells: this.lore.gold.slice(), goneGold: [], danger: this.lore.danger.filter((d) => this.w.tick - d[2] < DAY_TICKS_ECO * 3).map((d) => [d[0], d[1]]), fatigue: 0, camp: -1, campUntil: 0, lastCamp: this.step };
+  const party: Party = { id: pid, members: [], goal: 0, tx: m.entrance.x * TILE + 8, ty: 3 * TILE, since: this.step, tier, initial: size, saw: 0, targetAt: 0, waitT: 0, door, mouths: [], explored: this.lore.explored.slice(), goldCells: this.lore.gold.slice(), goneGold: [], danger: this.lore.danger.filter((d) => this.w.tick - d[2] < DAY_TICKS_ECO * 3).map((d) => [d[0], d[1]]), fatigue: 0, camp: -1, campUntil: 0, lastCamp: this.step };
   let torchGiven = false;
   for (let i = 0; i < size; i++) {
     const j = jobs[i];
@@ -107,8 +106,8 @@ export function maybeParty(this: Ecology): void {
   }
   party.name = heroes[0].name;
   this.parties.push(party);
-  // 目標を一つ決める（噂と職業の役目から）
-  this.chooseAim(party, jobs, gobHunt);
+  // 引き受けた依頼から目標を決める
+  this.chooseAim(party, quest);
   // 町の知っている物資の置き場を覚え、深部の探索なら置き場に残す荷を背負う
   this.packForCaches(party);
   const names = heroes.map((h) => `${JOB_NAMES[h.job]}${h.name}${h.trips > 1 ? `（${RANK_NAMES[h.rank]}、${h.trips}度目）` : ''}`).join('・');
@@ -119,7 +118,7 @@ export function maybeParty(this: Ecology): void {
   const farewell = old ? `英雄${old.name}の最後の遠征${ap ? `、見習いの${JOB_NAMES[ap.job]}${ap.name}を連れて` : ''}。` : '';
   if (old) this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: pid, ev: 'farewell', n: old.id, how: ap ? ap.id : 0, x: 0, y: 0 } as never);
   const who = `${farewell}${heroTitle(heroes[0])}の一行（${names}）が、${aim ? aim + '、' : ''}`;
-  this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: pid, ev: 'enter', how: party.aim ?? 0, n: party.aimId ?? 0, to: party.aimKnown ?? 0, x: 0, y: 0 } as never);
+  this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: pid, ev: 'enter', how: party.aim ?? 0, n: party.aimId ?? 0, to: party.aimKnown ?? 0, q: party.q ?? 0, qk: party.qk ?? 0, x: 0, y: 0 } as never);
   // 入口で身支度をして、食べ残しを少し落としていく
   if (door < 0) this.pendingScraps.push(pid);
   if (door < 0) this.log(m.entrance.x * TILE + 8, TILE + 8, `${who}入口から入ってきた`);
@@ -157,6 +156,11 @@ export function updateParties(this: Ecology): void {
       if (!(p.saw & 16)) this.log(last?.x ?? 0, last?.y ?? 0, `${p.name ? p.name + 'の' : ''}冒険者の一行が全滅した`);
       // 担いでいた戦利品は、倒れた所に残る
       this.dropTrophy(p, last);
+      // 依頼を果たした一行の一部が帰り、残りが中で倒れた：帰った者が知らせたので、噂を鎮める（ふつうは最後の一人が帰ったとき。leaveDungeon）
+      if (p.saw & 16 && p.aimEnd === 1 && !p.qCalm) {
+        this.calmQuest(p);
+        this.syncQuests();
+      }
       // 一行の終わり：目標、着いたか、果たしたか、生きて帰ったか
       this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'end', how: p.aim ?? 0, reason: p.saw & 16 ? 'returned' : 'wiped', to: p.aimEnd ?? 0, n: p.aimId ?? 0, arrived: p.aimAt ? 1 : 0, x: Math.round(last?.x ?? 0), y: Math.round(last?.y ?? 0) } as never);
     }
@@ -401,7 +405,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   let p = this.parties.find((q) => q.id === c.party);
   if (!p) {
     // 一行を失った（ほかの者が先に外へ出た）：一人の一行として、近い出口から外へ出る
-    p = { id: this.nextId++, members: [c.id], goal: 1, tx: 0, ty: 0, since: this.step, tier: 0, initial: 1, saw: 16, targetAt: this.step, waitT: 0, bk: 0, bx: 0, by: 0, door: -1, mouths: [], explored: [], goldCells: [], goneGold: [], danger: [], fatigue: 0, camp: -1, campUntil: 0, lastCamp: this.step } as Party;
+    p = { id: this.nextId++, members: [c.id], goal: 1, tx: 0, ty: 0, since: this.step, tier: 0, initial: 1, saw: 16, targetAt: this.step, waitT: 0, door: -1, mouths: [], explored: [], goldCells: [], goneGold: [], danger: [], fatigue: 0, camp: -1, campUntil: 0, lastCamp: this.step } as Party;
     this.parties.push(p);
     c.party = p.id;
     this.setExit(p);
@@ -494,15 +498,10 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     this.nearby(c.x, c.y, 6, (o) => {
       if (o.dead || o === c || !this.seenBy(c, lights, o)) return;
       if (o.k === Kind.Zombie || o.k === Kind.Ghost) p.saw |= 2;
-      // 噂の魔物：強さ10以上の大物と、バジリスク（強さ8だが、睨みで人を石にする魔物として噂になり、狩人のいる一行が「眼」を狙って狩りに来る。src/eco/aim.ts の aim 3）
-      if ((STR[o.k] >= 10 || o.k === Kind.Basilisk) && o.k !== Kind.Adventurer && o.k !== Kind.Dragon && o.k !== Kind.Wyvern && o.k !== Kind.Worm && o.k !== Kind.Golem) {
+      // 噂の魔物：見かけた大物（強さ10以上の魔物。種ごとに覚える。src/eco/quest.ts）
+      if (beastSeenKind(o.k)) {
         p.saw |= 4;
-        // 一度の探索で見た中で、強いものほど噂の種になる
-        if (STR[o.k] >= STR[p.bk] || !p.bk) {
-          p.bk = o.k;
-          p.bx = Math.round(o.x);
-          p.by = Math.round(o.y);
-        }
+        this.partySawBeast(p, o.k, o.x, o.y);
       }
       if (o.k === Kind.Skeleton || o.k === Kind.Lich || o.k === Kind.Armor) p.saw |= 2;
       // 危ない相手：一行より強そうなら区画を覚え、勝てそうになければ引き返す
@@ -575,7 +574,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       const attacked = o.id === c.foe && this.w.tick - c.hitAt < 150;
       // 目標でない住民（住処・集落・村・縄張りの者）には、自分たちから戦いを始めない
       // 威嚇して退くオーク（src/eco/orc.ts の orcWary）も追わない
-      const enemy = (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)) || (o.k === Kind.Gargoyle && o.act !== 0) || (o.k === Kind.Mimic && c.sp === Job.Thief) || (c.sp === Job.Hunter && o.k === (p.aim === 3 && p.aimK ? p.aimK : this.rumors.beastKind));
+      const enemy = (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)) || (o.k === Kind.Gargoyle && o.act !== 0) || (o.k === Kind.Mimic && c.sp === Job.Thief) || (c.sp === Job.Hunter && p.aim === 3 && !!p.aimK && o.k === p.aimK);
       const minor = MINOR.includes(o.k) && (o.k !== Kind.Bat || o.st === 0 || o.foe === c.id);
       if (!enemy && !minor && !attacked) return;
       if (!attacked && (c.sp === Job.Bard || (c.sp === Job.Thief && o.k !== Kind.Mimic))) return;
@@ -1004,23 +1003,8 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
   const mul = bard;
   if (c.gold > 0 || p.saw & 1) r.gold += (0.15 + c.gold / 150) * mul;
   if (p.saw & 2) r.undead += 0.2 * mul;
-  if (p.saw & 4) {
-    r.beast += 0.2 * mul;
-    if (p.bk) {
-      r.beastKind = p.bk;
-      r.beastX = p.bx;
-      r.beastY = p.by;
-    }
-  }
-  // バジリスクの見つめで仲間が石化しかけた一行は、そのバジリスクがまだ生きていれば、その噂を強く持ち帰る（次の一行が狩りに来る。上の見ただけの噂より優先する。
-  // 倒したバジリスクの噂で、目当てのいない狩りに出ないように）
-  const bs = p.bsHit ? this.byId.get(p.bsId ?? 0) : undefined;
-  if (bs && !bs.dead && !bs.away && bs.k === Kind.Basilisk) {
-    r.beast += 0.3 * mul;
-    r.beastKind = Kind.Basilisk;
-    r.beastX = p.bsX ?? r.beastX;
-    r.beastY = p.bsY ?? r.beastY;
-  }
+  // 見かけた大物と、受けた被害（石化・死者）は、種ごとの魔物の噂になる（src/eco/quest.ts）
+  this.carryBeastRumors(p, mul);
   if (p.saw & 8) {
     r.dragon += 0.25 * mul;
     if (p.dgx || p.dgy) {
@@ -1055,6 +1039,13 @@ export function leaveDungeon(this: Ecology, c: Cr, p: Party): void {
   c.gold = 0;
   c.dead = 2;
   this.returned++;
+  // 最後の一人が帰ったところで：依頼を果たした一行ならその噂を鎮め、町の掲示を作り直す（src/eco/quest.ts）。
+  // （帰る者が一人ずつ噂を足すので、最初の一人で鎮めると残りの仲間が足し直し、果たした152の一行のうち44で、帰る途中に同じ依頼がまた出ていた。
+  //  次の一行の更新で鎮めると、それまでの間に次の一行が、果たしたばかりの依頼を引けた）
+  if (!p.members.some((id) => { const o = this.byId.get(id); return !!o && !o.dead; })) {
+    this.calmQuest(p);
+    this.syncQuests();
+  }
 }
 
 /** 倒れた者の持ち物を床に落とす（冒険者の道具） */

@@ -11,11 +11,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { CELL, Camp, Cr, Ecology, Job, Kind, Party, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
-import { ADV_NAMES, AIM_NAMES, JOB_NAMES } from '../names';
+import { ADV_NAMES, AIM_NAMES, JOB_NAMES, NAMES } from '../names';
 import { heroTitle } from './roster';
+import { UNDEAD, type Quest } from './quest';
 
 const DRAGONS = [Kind.Dragon, Kind.Wyvern, Kind.Worm];
-const UNDEAD = [Kind.Zombie, Kind.Skeleton, Kind.Lich, Kind.Ghost, Kind.Armor];
 /** ゴブリン退治の一行が来る噂の強さ */
 export const GOBLIN_HUNT_AT = 0.5;
 /** ゴブリン退治の一行が来る、生還者が伝えた盗みの回数 */
@@ -42,8 +42,8 @@ export function loreKnows(this: Ecology, x: number, y: number): boolean {
   return false;
 }
 
-/** 一行が入ってくるときに、噂と職業の役目から目標を一つ決める */
-export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: boolean): void {
+/** 一行が入ってくるときに、引き受けた依頼から目標を決める（行き先が決まらなければ探索。src/eco/quest.ts） */
+export function chooseAim(this: Ecology, p: Party, q: Quest): void {
   const r = this.rumors;
   const m = this.w.map;
   p.name ??= ADV_NAMES[ih(p.id, this.step, 260) % ADV_NAMES.length];
@@ -55,7 +55,9 @@ export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: bool
   p.aimAt = 0;
   p.aimEnd = 0;
   p.passed = [];
-  if (gobHunt) {
+  p.q = q.a;
+  p.qk = q.k;
+  if (q.a === 5) {
     // ゴブリン退治：いちばん最近盗みを働いた集落（逃げ帰ったゴブリンの足跡を、盗まれた一行がたどって町に伝えた）。
     // その集落がすでに捨てられていれば、その近くの別の集落（場所を知らなければ当て推量で探す）
     let best: Camp | null = this.camps.find((cp) => cp.id >= 0 && cp.kind === 0 && r.goblinCamp && cp.id === r.goblinCamp) ?? null;
@@ -85,21 +87,18 @@ export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: bool
       p.aimY = best.y;
       p.aimKnown = known || this.loreKnows(best.x, best.y) ? 1 : 0;
       this.guessDeep(p);
-      // 噂は、退治を引き受けた一行が出たことで落ち着く
-      r.goblin *= 0.3;
-      r.goblinRobs = 0;
       return;
     }
   }
-  if (jobs.includes(Job.Slayer)) {
-    const dragon = this.list.find((o) => !o.dead && !o.away && o.k === Kind.Dragon);
-    if (dragon) {
+  if (q.a === 2 || q.a === 6) {
+    // 相手の竜と寝床への道は、依頼の一覧と同じ判定で決める（src/eco/quest.ts の questDragonCr・dragonWayKnown）
+    const d = this.questDragonCr();
+    if (d && d.k === Kind.Dragon) {
       // ドラゴン：寝床までの道が町で知られている（前の一行が見つけて持ち帰った）ときだけ、竜退治を目標にする
       const way = this.lore.dragonWay;
-      const wd = way ? this.byId.get(way[2]) : undefined;
-      if (way && wd && !wd.dead && !wd.away && wd.k === Kind.Dragon) {
+      if (way && this.dragonWayKnown()) {
         p.aim = 2;
-        p.aimId = wd.id;
+        p.aimId = way[2];
         p.aimX = way[0];
         p.aimY = way[1];
         p.aimKnown = 1;
@@ -113,7 +112,6 @@ export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: bool
       return;
     }
     // ドラゴンがいなければ、ワイバーン、岩の中を動くワームは床にいるときだけ（場所は噂か深部で当て推量）
-    const d = this.list.find((o) => !o.dead && !o.away && o.k === Kind.Wyvern) ?? this.list.find((o) => !o.dead && !o.away && o.k === Kind.Worm && this.tileOf(o.x, o.y) >= 0 && !m.solid[this.tileOf(o.x, o.y)]);
     p.aim = 2;
     if (d) {
       p.aimId = d.id;
@@ -124,16 +122,18 @@ export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: bool
     this.guessDeep(p);
     return;
   }
-  if (jobs.includes(Job.Hunter) && r.beastKind) {
+  // 魔物の狩り：噂の場所へ向かい、その場所にいちばん近い目当ての種の者を狙う
+  const hb = q.a === 3 ? r.beasts.find((b) => b[0] === q.k) : undefined;
+  if (hb) {
     p.aim = 3;
-    p.aimK = r.beastKind;
-    p.aimX = r.beastX;
-    p.aimY = r.beastY;
+    p.aimK = hb[0];
+    p.aimX = hb[2];
+    p.aimY = hb[3];
     p.aimKnown = 1;
     let bd = 1e18;
     for (const o of this.list) {
-      if (o.dead || o.away || o.k !== r.beastKind) continue;
-      const d = sq(o.x - r.beastX) + sq(o.y - r.beastY);
+      if (o.dead || o.away || o.k !== hb[0]) continue;
+      const d = sq(o.x - hb[2]) + sq(o.y - hb[3]);
       if (d < bd) {
         bd = d;
         p.aimId = o.id;
@@ -141,7 +141,7 @@ export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: bool
     }
     return;
   }
-  if (jobs.includes(Job.Priest) && r.undead >= 0.4) {
+  if (q.a === 4) {
     p.aim = 4;
     // 地図に載った区画のうち、アンデッドのいちばん多い所
     const cnt = new Map<number, number>();
@@ -163,7 +163,7 @@ export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: bool
     this.guessDeep(p);
     return;
   }
-  if (r.gold >= 0.3 && this.lore.gold.length) {
+  if (q.a === 1 && this.lore.gold.length) {
     const g = this.lore.gold[ih(p.id, this.step, 261) % this.lore.gold.length];
     const k = this.cellFloor(g);
     if (k >= 0) {
@@ -173,6 +173,11 @@ export function chooseAim(this: Ecology, p: Party, jobs: number[], gobHunt: bool
       p.aimY = Math.floor(k / m.w) * TILE + 8;
       p.aimKnown = 1;
     }
+  }
+  // 行き先が決まらなかった依頼は、探索として入る
+  if (!p.aim) {
+    p.q = 0;
+    p.qk = 0;
   }
 }
 
@@ -200,33 +205,40 @@ export function guessDeep(this: Ecology, p: Party): void {
   p.aimGuess = 1;
 }
 
-/** 入ってくるときの記録の言葉（「〜を目指して」） */
+/** 入ってくるときの記録の言葉（「〇〇の依頼を受けて、〜」）。探索なら空 */
 export function aimPhrase(this: Ecology, p: Party): string {
-  const dk = p.aimId ? this.byId.get(p.aimId)?.k ?? Kind.Dragon : Kind.Dragon;
+  const took = p.q ? `${this.questName(p.q, this.questTargetKind(p))}の依頼を受けて` : '';
   switch (p.aim) {
     case 1:
-      return '知られた宝の山を目指して';
+      return `${took}、知られた宝の山を目指して`;
     case 2:
-      return p.aimWay ? `知られた道をたどって{k:${dk}}の寝床を目指し` : p.aimKnown ? `{k:${dk}}の寝床を目指して` : `深部の{k:${dk}}を探しに`;
+      return `${took}、${p.aimWay ? '知られた道をたどって寝床を目指し' : p.aimKnown ? '寝床を目指して' : '深部を探しに'}`;
     case 6:
-      return `{k:${Kind.Dragon}}の寝床への道を探しに、深部へ`;
+      return `${took}、深部へ`;
     case 3:
-      return `噂の{k:${p.aimK ?? this.rumors.beastKind}}を狩りに`;
+      return took;
     case 4:
-      return p.aimKnown ? `{k:${Kind.Zombie}}たちの群れる所を祓いに` : `深部のアンデッドを祓いに`;
+      return `${took}、${p.aimKnown ? `{k:${Kind.Zombie}}たちの群れる所へ` : '深部へ'}`;
     case 5:
-      return `{k:${Kind.Goblin}}の集落を退治しに`;
+      return took;
     default:
       return '';
   }
 }
 
-/** 情報パネルに出す言葉：「目的：竜退治（向かっている）」 */
+/** 情報パネルに出す言葉：「依頼：トロール狩り（向かっている）」。依頼のない一行は「目的：探索」 */
 export function aimLine(this: Ecology, p: Party): string {
   const a = p.aim ?? 0;
   if (!a) return `目的：${AIM_NAMES[0]}`;
   const st = p.aimEnd === 1 ? '果たした' : p.aimEnd === 2 ? 'あきらめた' : p.aimAt ? '目標に着いた' : p.aimKnown ? '向かっている' : '場所を探している';
-  return `目的：${AIM_NAMES[a]}（${st}）`;
+  if (!p.q) return `目的：${AIM_NAMES[a]}（${st}）`;
+  return `依頼：${this.questName(p.q, this.questTargetKind(p), true)}（${st}）`;
+}
+
+/** 依頼の呼び名に使う種：魔物の狩りなら狩る種、竜退治なら目指す竜の種（ログと情報パネルで同じ呼び名にする。src/eco/quest.ts の questName） */
+export function questTargetKind(this: Ecology, p: Party): number {
+  if (p.q === 2) return (p.aimId ? this.byId.get(p.aimId)?.k : undefined) ?? Kind.Dragon;
+  return p.qk ?? 0;
 }
 
 /** 目指す集落（ゴブリン退治のときだけ） */
@@ -361,7 +373,7 @@ export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
       // 目指した相手がいなくなっても、同じ種（竜なら竜のなかま）が見えたらそれを目標にする
       this.nearby(lead.x, lead.y, 7, (o) => {
         if (t || o.dead || o.away) return;
-        if ((p.aim === 2 ? DRAGONS.includes(o.k) : o.k === (p.aimK ?? this.rumors.beastKind)) && sees(o, 7)) t = o;
+        if ((p.aim === 2 ? DRAGONS.includes(o.k) : o.k === p.aimK) && sees(o, 7)) t = o;
       });
       if (t) p.aimId = (t as Cr).id;
     }
@@ -500,7 +512,7 @@ export function endAim(this: Ecology, p: Party, lead: Cr, end: number): void {
   if (end === 1) {
     // 倒した目標にちなむ戦利品を担ぐ（src/eco/loot.ts）
     this.takeTrophy(p, lead);
-    if (a !== 6) this.log(lead.x, lead.y, a === 5 ? `${p.name ?? ''}の一行が{k:${Kind.Goblin}}の集落を退治し、引き返した` : `${p.name ?? ''}の一行が目的（${AIM_NAMES[a]}）を果たした`);
+    if (a !== 6) this.log(lead.x, lead.y, a === 5 ? `${p.name ?? ''}の一行が{k:${Kind.Goblin}}の集落を退治し、引き返した` : (p.q ? `${p.name ?? ''}の一行が${this.questName(p.q, p.qk ?? 0)}の依頼を果たした` : `${p.name ?? ''}の一行が目的（${AIM_NAMES[a]}）を果たした`));
     // ゴブリン退治を果たしたら、誇らしく外へ帰る
     if (a === 5 && p.goal === 0) {
       p.goal = 1;
@@ -648,6 +660,7 @@ declare module '../ecology' {
     chooseAim: typeof chooseAim;
     aimPhrase: typeof aimPhrase;
     aimLine: typeof aimLine;
+    questTargetKind: typeof questTargetKind;
     aimCamp: typeof aimCamp;
     homeKey: typeof homeKey;
     spareResident: typeof spareResident;
@@ -669,4 +682,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { goblinHuntReady, loreKnows, chooseAim, aimPhrase, aimLine, aimCamp, homeKey, spareResident, avoidZones, advPath, brace, partyMark, aimPoint, aimStep, endAim, passBrace, aimTarget, aimDeep, partyTitle, searchesCamp, guessDeep, huntsCamp, inPartyLight });
+Object.assign(Ecology.prototype, { goblinHuntReady, loreKnows, chooseAim, aimPhrase, aimLine, questTargetKind, aimCamp, homeKey, spareResident, avoidZones, advPath, brace, partyMark, aimPoint, aimStep, endAim, passBrace, aimTarget, aimDeep, partyTitle, searchesCamp, guessDeep, huntsCamp, inPartyLight });

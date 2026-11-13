@@ -472,6 +472,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
     setup: (e, c) => {
       // 幼竜が卵を割って出てくると、地の底の揺れと咆哮が町にも伝わる（竜の噂。竜殺しが深部を探りに来る）
       e.rumors.dragon += 0.6;
+      e.syncQuests();
       c.sp = 0;
       c.st = 0;
       c.hx = c.x;

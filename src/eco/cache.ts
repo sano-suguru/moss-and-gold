@@ -1,20 +1,24 @@
 /**
  * Ecology のメソッド：物資の置き場（冒険者の作り直しの三歩目）。
  *
- * 見せたい瞬間：深部の探索の一行が、行けた一番奥に木箱と寝具（物資の置き場）を残して引き返す。
+ * 見せたい瞬間：深部へ向かう一行（竜の寝床への道探し・竜退治と、目指す所が深部の近くにある依頼の一行）が、行けた一番奥に木箱と寝具（物資の置き場）を残して引き返す。
  * 次の一行はそこで食料を補ってさらに奥へ進み、新しい置き場を残す。遠征を重ねるたびに置き場が奥へ伸び、
  * ついに竜退治の一行が置き場をたどって寝床に着く。置き場は大ネズミにあさられることがあり、空になった木箱は残骸として残る。
  * 蓄えの乏しいゴブリンの集落からは、歩いて行ける所にある置き場へ、1〜2匹が暗がりづたいに食料を取りに出る。
  * 木箱をあさって袋に詰め、集落へ持ち帰る（人がそばにいれば手を出さずに帰る）。
  *
  * 状態：Ecology.caches（SupplyCache。セーブデータでは SC）、町の知識 Lore.caches、一行の cacheKnown / cacheVis / cacheD / cacheGo / cacheMine。
- * 深部の探索の一行の者は、置き場に残す食料の荷（Cr.units）を背負って入ってくる（入るときに imported に足す。養分の保存則に含まれる）。
+ * 深部へ向かう一行の者は、置き場に残す食料の荷（Cr.units）を背負って入ってくる（入るときに imported に足す。養分の保存則に含まれる）。
+ * （以前は竜の寝床への道探しの一行だけが荷を背負った。目標を依頼のくじで決めるようにして道探しの一行が271→45に減り、
+ *  16シード×25日で置き場を残す場面が88→23に減ったので、深部へ向かう依頼の一行にも広げた）
  */
 import { Cr, DAY_TICKS_ECO, Ecology, Kind, Party, SPEC, SupplyCache, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 深部の探索の一行の者が背負ってくる、置き場に残す食料の荷 */
 export const CACHE_PACK = 60;
+/** 深部へ向かう一行とみなす、目指す所と深部との近さ（マス） */
+const DEEP_R = 45;
 /** これより入口に近い所（歩いて、マス）には置き場を残さない（荷は持ち帰る） */
 const CACHE_MIN_D = 30;
 /** 置き場の数の上限（超えたら、古い空の置き場から片づける） */
@@ -33,19 +37,31 @@ const CRAID_GIVEUP = 5000;
 /** 木箱をあさる長さ（生き物の更新の回数。1回に3ずつ袋に詰める） */
 const CRAID_DIG = 12;
 
-/** 置き場をたどる一行：深部の探索と竜退治 */
+/** 置き場をたどる一行：竜の寝床への道探し、竜退治、深部へ向かう一行 */
 function followsCaches(p: Party): boolean {
-  return p.aim === 6 || p.aim === 2;
+  return p.aim === 6 || p.aim === 2 || !!p.deepTrip;
 }
 
-/** 一行が入ってくるとき（chooseAim のあと）：町の知っている置き場を覚え、深部の探索なら荷を背負う */
+/** 荷を背負って入り、引き返す所に置き場を残す一行：竜の寝床への道探しと、深部へ向かう一行 */
+function packsCache(p: Party): boolean {
+  return p.aim === 6 || !!p.deepTrip;
+}
+
+/** 一行が入ってくるとき（chooseAim のあと）：町の知っている置き場を覚え、深部へ向かう一行なら荷を背負う */
 export function packForCaches(this: Ecology, p: Party): void {
   p.cacheKnown = (this.lore.caches ?? []).filter((id) => this.caches.some((o) => o.id === id));
   p.cacheVis = [];
   p.cacheD = 0;
   p.cacheGo = 0;
   p.cacheMine = [];
-  if (p.aim !== 6) return;
+  // 深部へ向かう一行：目指す所（知っていればその場所、知らなければ当て推量の行き先）が深部の近く
+  const m = this.w.map;
+  if (p.aim && p.aim !== 6 && p.aim !== 2 && m.deep.x >= 0) {
+    const gx = p.aimKnown ? (p.aimX ?? 0) : p.aimGuess ? (p.aimGuessX ?? 0) : -1e9;
+    const gy = p.aimKnown ? (p.aimY ?? 0) : p.aimGuess ? (p.aimGuessY ?? 0) : -1e9;
+    if (sq(gx - (m.deep.x * TILE + 8)) + sq(gy - (m.deep.y * TILE + 8)) < DEEP_R * TILE * DEEP_R * TILE) p.deepTrip = 1;
+  }
+  if (!packsCache(p)) return;
   for (const id of p.members) {
     const c = this.byId.get(id);
     if (!c || c.dead) continue;
@@ -64,7 +80,7 @@ export function nextCache(this: Ecology, p: Party, from?: Cr): SupplyCache | und
   if (!lead) return undefined;
   const m = this.w.map;
   const r = this.rumors;
-  const [gx, gy] = p.aim === 2 && p.aimKnown ? [p.aimX ?? 0, p.aimY ?? 0] : p.aim === 2 && (r.dragonX || r.dragonY) ? [r.dragonX, r.dragonY] : [m.deep.x * TILE + 8, m.deep.y * TILE + 8];
+  const [gx, gy] = (p.aim === 2 || p.deepTrip) && p.aimKnown ? [p.aimX ?? 0, p.aimY ?? 0] : p.aim === 2 && (r.dragonX || r.dragonY) ? [r.dragonX, r.dragonY] : [m.deep.x * TILE + 8, m.deep.y * TILE + 8];
   let best: SupplyCache | undefined;
   let bd = sq(gx - lead.x) + sq(gy - lead.y) - 8 * TILE * 8 * TILE;
   for (const id of p.cacheKnown ?? []) {
@@ -105,7 +121,7 @@ export function cacheAhead(this: Ecology, p: Party, lead: Cr, foodAvg: number): 
  */
 export function cacheStep(this: Ecology, p: Party, alive: Cr[]): void {
   const lead = alive[0];
-  if (p.goal !== 0 && p.aim === 6 && !(p.cacheMine ?? []).includes(-1) && alive.some((c) => c.units > 0)) this.dropCache(p, alive);
+  if (p.goal !== 0 && packsCache(p) && !(p.cacheMine ?? []).includes(-1) && alive.some((c) => c.units > 0)) this.dropCache(p, alive);
   if (!this.caches.length || this.step % 3 !== p.id % 3) return;
   const cap = SPEC[Kind.Adventurer].cap;
   for (const o of this.caches) {

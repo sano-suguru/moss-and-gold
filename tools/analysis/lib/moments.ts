@@ -71,6 +71,18 @@ export const MOMENTS: Moment[] = [
   { key: 'nightHit', label: '焚き火の夜襲：寝込みの一打ち' },
   { key: 'campDeath', label: '焚き火の夜襲：焚き火で休む間に倒れた（人数。目安は1シード25日に1〜2人まで）' },
   { key: 'campBreak', label: '焚き火の夜襲：被害を受けて焚き火を消して発った' },
+  { key: 'questPost', label: '依頼：町に新しい依頼が出た（src/eco/quest.ts）' },
+  { key: 'questKinds', label: '依頼：入ってきた一行の依頼の種類の数（探索を除く。竜退治・道探し・魔物の狩り・ゴブリン退治・祓い・宝探しのうち）' },
+  { key: 'questDragon', label: '依頼：竜退治の依頼を受けた一行が入ってきた' },
+  { key: 'questDeep', label: '依頼：竜の寝床への道探し（深部の探索）の依頼を受けた一行が入ってきた' },
+  { key: 'questBeast', label: '依頼：魔物の狩りの依頼を受けた一行が入ってきた' },
+  { key: 'questGoblin', label: '依頼：ゴブリン退治の依頼を受けた一行が入ってきた' },
+  { key: 'questUndead', label: '依頼：アンデッド祓いの依頼を受けた一行が入ってきた' },
+  { key: 'questGold', label: '依頼：宝探しの依頼を受けた一行が入ってきた' },
+  { key: 'beastArrive', label: '魔物の狩りの一行が、目当ての種を見つけて構えた' },
+  { key: 'undeadArrive', label: 'アンデッド祓いの一行が、アンデッドの群れる所に着いた' },
+  { key: 'goldArrive', label: '宝探しの一行が、知られた宝の山に着いた' },
+  { key: 'petriQuest', label: '依頼：バジリスクに仲間を石にされた一行が帰ってから3日の内に、バジリスク狩りの依頼の一行が入ってきた' },
   { key: 'huntArrive', label: 'ゴブリン退治の一行が集落に着いた' },
   { key: 'reveal', label: '松明で隠れたゴブリンを見つけた' },
   { key: 'lairFound', label: '深部の探索の一行が竜の寝床を見つけた' },
@@ -266,6 +278,24 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     campBreak: ev(K.Adventurer, 'campBreak').filter((x) => x.how !== 'stoned').length,
     campDeath: d.filter((x) => x.k === K.Adventurer && x.camp === 1).length,
     huntArrive: new Set(ev(K.Adventurer, 'arrive').filter((x) => x.how === 5).map((x) => x.id)).size,
+    questPost: ev(K.Adventurer, 'quest').filter((x) => !x.init).length,
+    questKinds: new Set(ev(K.Adventurer, 'enter').filter((x) => x.q > 0).map((x) => x.q)).size,
+    questDragon: ev(K.Adventurer, 'enter').filter((x) => x.q === 2).length,
+    questDeep: ev(K.Adventurer, 'enter').filter((x) => x.q === 6).length,
+    questBeast: ev(K.Adventurer, 'enter').filter((x) => x.q === 3).length,
+    questGoblin: ev(K.Adventurer, 'enter').filter((x) => x.q === 5).length,
+    questUndead: ev(K.Adventurer, 'enter').filter((x) => x.q === 4).length,
+    questGold: ev(K.Adventurer, 'enter').filter((x) => x.q === 1).length,
+    beastArrive: new Set(ev(K.Adventurer, 'arrive').filter((x) => x.how === 3).map((x) => x.id)).size,
+    undeadArrive: new Set(ev(K.Adventurer, 'arrive').filter((x) => x.how === 4).map((x) => x.id)).size,
+    goldArrive: new Set(ev(K.Adventurer, 'arrive').filter((x) => x.how === 1).map((x) => x.id)).size,
+    // 被害の噂を持ち帰った一行（settle 'hurtTold'、一行で一度）ごとに、その帰還から3日（43200 tick）の内にバジリスク狩りの依頼の一行が入ってきたか
+    petriQuest: (() => {
+      const told = new Map<number, number>();
+      for (const x of ev(K.Adventurer, 'hurtTold')) if (x.how === K.Basilisk && !told.has(x.id)) told.set(x.id, x.t);
+      const ent = ev(K.Adventurer, 'enter').filter((x) => x.q === 3 && x.qk === K.Basilisk).map((x) => x.t);
+      return [...told.values()].filter((t) => ent.some((u) => u > t && u <= t + 43200)).length;
+    })(),
     reveal: ev(K.Adventurer, 'reveal').length,
     chargeKnock2: (() => {
       const g = new Map<string, number>();

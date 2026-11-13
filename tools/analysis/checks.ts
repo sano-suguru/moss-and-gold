@@ -185,6 +185,75 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 依頼の仕組み（src/eco/quest.ts）：噂から依頼が出て、一行は重さに比例したくじで一つ引き受けて入ってくる。種類が偏らず混ざって来るか
+    name: '一行が依頼を受けて入ってくる（15シードの合計で、町に依頼が出る10回以上・依頼の種類が4種類以上混ざる）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const posted = sum(rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'quest' && !x.init).length));
+      const kinds = new Map<number, number>();
+      for (const r of rs) for (const x of r.settle) if (x.k === 25 && x.ev === 'enter' && x.q > 0) kinds.set(x.q, (kinds.get(x.q) ?? 0) + 1);
+      const NM = ['', '宝探し', '竜退治', '魔物の狩り', '祓い', 'ゴブリン退治', '道探し'];
+      return { ok: posted >= 10 && kinds.size >= 4, value: `依頼が出た ${posted}、受けて入った ${[...kinds].sort((a, b) => a[0] - b[0]).map(([q, n]) => `${NM[q]} ${n}`).join('・')}` };
+    },
+  },
+  {
+    // 依頼を果たして帰る一行の、目標を果たしてから最後の一人が帰るまでの間に、同じ依頼がまた町に出ない（鎮まるのは最後の一人が帰ったとき。src/eco/quest.ts）
+    name: '果たした依頼が、その一行の帰り道にまた出ない（15シードの合計で0回）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      let n = 0;
+      let tot = 0;
+      for (const r of rs) {
+        const a = r.settle.filter((x) => x.k === 25);
+        const q = a.filter((x) => x.ev === 'quest');
+        for (const e of a.filter((x) => x.ev === 'enter' && x.q > 0)) {
+          const ok = a.find((x) => x.id === e.id && x.ev === 'aim' && x.reason === 1);
+          const end = a.find((x) => x.id === e.id && x.ev === 'end' && x.reason === 'returned');
+          if (!ok || !end) continue;
+          tot++;
+          if (q.some((x) => x.how === e.q && (x.to ?? 0) === (e.qk ?? 0) && x.t >= ok.t && x.t <= end.t)) n++;
+        }
+      }
+      return { ok: n === 0, value: `果たして帰った一行 ${tot}、帰り道に同じ依頼が出た ${n}` };
+    },
+  },
+  {
+    // 依頼を受けて入った一行の依頼は、その前に必ず町の掲示に出ている（ログ「町に〇〇の依頼が出た」。掲示を覚えていないスナップショットから始めたときは、最初の作り直しの init の記録）
+    name: '依頼で入った一行の依頼は、その前に町に出ている（15シードの合計で例外0）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      let n = 0;
+      let tot = 0;
+      for (const r of rs) {
+        const a = r.settle.filter((x) => x.k === 25);
+        for (const e of a.filter((x) => x.ev === 'enter' && x.q > 0)) {
+          tot++;
+          if (!a.some((x) => x.ev === 'quest' && x.how === e.q && (x.to ?? 0) === (e.qk ?? 0) && x.t <= e.t)) n++;
+        }
+      }
+      return { ok: n === 0, value: `依頼で入った一行 ${tot}、その前に依頼が出ていなかった ${n}` };
+    },
+  },
+  {
+    // 依頼を果たして帰った一行の噂は、依頼が出る強さの半分まで下がる（帰った直後の掲示に同じ依頼が無い。settle の calm の left）
+    name: '果たして帰った直後に、同じ依頼が掲示に残らない（15シードの合計で例外0）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const c = rs.flatMap((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'calm'));
+      const n = c.filter((x) => x.left).length;
+      return { ok: c.length > 0 && n === 0, value: `噂を鎮めた一行 ${c.length}、同じ依頼が残った ${n}` };
+    },
+  },
+  {
+    // バジリスクに仲間を石にされた一行が帰ると、バジリスクの噂が強まり、狩りの依頼が出る（どの種も同じ決まり。src/eco/quest.ts）
+    name: 'バジリスク狩りの依頼が出る（15シードの合計で1回以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'quest' && x.how === 3 && x.to === 17).length);
+      return { ok: sum(n) >= 1, value: rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、') || 'なし' };
+    },
+  },
+  {
     // 目標でない住処・集落のそばを通るときは身構えて通り過ぎる（seed7 で10〜18日に数回）
     name: '冒険者の一行が住処のそばで身構えて通り過ぎる（4シードで1回以上）',
     ...RUN_A,
