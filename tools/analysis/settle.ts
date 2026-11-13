@@ -1,6 +1,6 @@
 /** 住みつくはずの種（コボルト、ゴブリン、ドワーフ）が、来てから去るまでの様子を一匹ずつ追う */
 import { DAY_TICKS, World } from '../../src/world';
-const w = new World(process.argv[2] || 'abc'); const e = w.eco as any; const m = w.map;
+const w = new World(process.argv[2] || 'abc'); const e = w.eco as any;
 const info = new Map<number, any>();
 const out: any[] = [];
 while (w.tick < 12 * DAY_TICKS) {

@@ -416,49 +416,6 @@ export function buildAtlas(): Atlas {
       named.set(`dragon,${d},2,${f},1`, raws.length);
       raws.push(dragon(DIRS[d], 'fly', f) as RawFrame);
     }
-  // 幼竜と若い竜：成竜の絵を、ドット絵らしさを保つ縮め方で縮める（縮めたあとの1ピクセルごとに、もとの絵で一番多い色を選ぶ。縁取りの暗い色は残しやすく）
-  const shrink = (fr: RawFrame, sc: number): RawFrame => {
-    const W = Math.max(1, Math.round(fr.W * sc));
-    const H = Math.max(1, Math.round(fr.H * sc));
-    const px = new Uint8ClampedArray(W * H * 4);
-    const mat: (string | null)[] = new Array(W * H).fill(null);
-    for (let y = 0; y < H; y++)
-      for (let x = 0; x < W; x++) {
-        const x0 = Math.floor(x / sc);
-        const x1 = Math.max(x0 + 1, Math.floor((x + 1) / sc));
-        const y0 = Math.floor(y / sc);
-        const y1 = Math.max(y0 + 1, Math.floor((y + 1) / sc));
-        const votes = new Map<number, number>();
-        const matOf = new Map<number, string | null>();
-        let opaque = 0;
-        let total = 0;
-        for (let yy = y0; yy < Math.min(fr.H, y1); yy++)
-          for (let xx = x0; xx < Math.min(fr.W, x1); xx++) {
-            total++;
-            const p = (yy * fr.W + xx) * 4;
-            if (!fr.px[p + 3]) continue;
-            opaque++;
-            const key = (fr.px[p] << 16) | (fr.px[p + 1] << 8) | fr.px[p + 2];
-            const lum = fr.px[p] + fr.px[p + 1] + fr.px[p + 2];
-            votes.set(key, (votes.get(key) ?? 0) + (lum < 120 ? 1.4 : 1));
-            if (!matOf.has(key)) matOf.set(key, fr.mat[yy * fr.W + xx]);
-          }
-        if (opaque * 2 < total) continue;
-        let best = 0;
-        let bv = -1;
-        for (const [k, v] of votes) if (v > bv) {
-          bv = v;
-          best = k;
-        }
-        const q = (y * W + x) * 4;
-        px[q] = best >> 16;
-        px[q + 1] = (best >> 8) & 255;
-        px[q + 2] = best & 255;
-        px[q + 3] = 255;
-        mat[y * W + x] = matOf.get(best) ?? null;
-      }
-    return { W, H, px, mat, ax: Math.round(fr.ax * sc), ay: Math.round(fr.ay * sc) } as RawFrame;
-  };
   // 骨の竜：成竜の絵の鱗の色を、骨の色に塗り替える（赤みの強い色を明るさに応じて骨の段へ。光る目は青白く）
   {
     const cache = new Map<number, number>();

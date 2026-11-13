@@ -63,7 +63,7 @@ function vassalGoblin(this: Ecology, c: Cr, o: Cr): boolean {
 }
 
 /** 投げ斧の当たってよい者（オーク自身の群れと、従う集落のゴブリンには当たらない。霊とウィスプはすり抜ける） */
-export function axeHits(this: Ecology, a: Cr, o: Cr): boolean {
+export function axeHits(this: Ecology, _a: Cr, o: Cr): boolean {
   return o.k !== Kind.Orc && o.k !== Kind.Ghost && o.k !== Kind.Wisp && !(o.k === Kind.Goblin && !o.party);
 }
 

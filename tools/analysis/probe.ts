@@ -209,7 +209,7 @@ function bornDay(seed: string, id: number, o: OpenOpts): number {
 
 async function life(seed: string, a: Record<string, string>, o: OpenOpts) {
   const id = +a.id;
-  let from = a.from !== undefined ? +a.from : bornDay(seed, id, o);
+  const from = a.from !== undefined ? +a.from : bornDay(seed, id, o);
   if (from < 0) throw new Error(`生まれた日がわからない：--from で、${id} がいる日を指定してください`);
   const every = +(a.every ?? 20);
   const { w } = await openAt(seed, Math.round(from * DAY_TICKS), o);

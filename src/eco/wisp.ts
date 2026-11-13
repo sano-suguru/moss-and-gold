@@ -1,9 +1,6 @@
 /** Ecology のメソッド：ウィスプ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
-import { lineOfSight, TILE } from '../mapgen';
-import { JOB_NAMES } from '../names';
-import type { World } from '../world';
+import { Cr, DIR16, Ecology, Kind, NB4, SPEC, ih, sq } from '../ecology';
+import { TILE } from '../mapgen';
 
 export function wisp(this: Ecology, c: Cr, day: number): void {
   // 光の精：生まれた光の筋のまわり5マスをゆっくり漂う。飢えない。襲われたときだけ、まぶしい光線で打ち返す

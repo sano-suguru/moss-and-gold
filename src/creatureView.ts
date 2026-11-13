@@ -14,7 +14,6 @@ import { BONE_KINDS, BONE_SP, LICH_RISE, RISE_N } from './eco/undead';
 import { HOP_DT, HOP_N, hopAt } from './eco/charge';
 import { VAMP_COFFIN, VAMP_SCATTER } from './eco/vampire';
 import { MAX_DYN } from './shaders';
-import { lineOfSight } from './mapgen';
 import { heroOrbAt } from './sprites';
 
 /** 冒険者の攻撃で、技の演出を振り下ろしのコマまで遅らせる tick 数（攻撃のコマ 0 構え・1 振り上げのあと） */
@@ -411,7 +410,6 @@ export class CreatureView {
       const uy = vy / dist;
       const flip = vx < 0;
       const sz = Math.min(2, r.size + (r.big ? 1 : 0));
-      const f3 = (a: number, per: number) => Math.min(2, Math.floor(a / per));
       const lift = 9;
       // 当たる時（飛ぶものは届くまでの時間）
       const fly = r.style === 'arrow' || r.style === 'orb' || r.style === 'bats' ? Math.max(3, Math.min(9, Math.round(dist / 12))) : r.style === 'smash' || r.style === 'charge' ? 2 : r.style === 'rune' ? 3 : 0;

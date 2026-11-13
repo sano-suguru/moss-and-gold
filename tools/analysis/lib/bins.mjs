@@ -51,7 +51,6 @@ function redirect(root) {
   }];
 }
 
-const h = (s) => createHash('sha256').update(s).digest('hex').slice(0, 12);
 /** ビルドに含まれたファイルの中身のハッシュ（パスは、取り出したコミットのフォルダを除いた相対パスで数える） */
 function inputsHash(meta, root) {
   const strip = (p) => {

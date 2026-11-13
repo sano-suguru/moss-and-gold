@@ -1,9 +1,6 @@
 /** Ecology のメソッド：ワイバーン、ドラゴン（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+import { Cr, DAY_TICKS_ECO, Ecology, Job, Kind, Pile, SPEC, STR, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
-import { JOB_NAMES } from '../names';
-import type { World } from '../world';
 
 export function wyvern(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Wyvern];
@@ -99,7 +96,7 @@ export function dragonFlightGoal(this: Ecology, c: Cr): [number, number] {
   return goingOut ? [c.tx, c.ty] : [c.hx, c.hy];
 }
 
-export function dragon(this: Ecology, c: Cr, day: number): void {
+export function dragon(this: Ecology, c: Cr, _day: number): void {
   const s = SPEC[Kind.Dragon];
   const m = this.w.map;
   // 幼竜の遊び：起きていて腹が満ちていれば、近くのコウモリやウィスプを追いかけ、ときどき煙の息を吐く練習をする

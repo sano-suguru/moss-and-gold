@@ -11,8 +11,8 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { DAY_TICKS, World } from '../../src/world';
-import { CAUSE_NAMES, KIND_NAMES, ORIGIN_NAMES, countsAsStuck, encodePng, parseArgs } from './common';
+import { World } from '../../src/world';
+import { CAUSE_NAMES, KIND_NAMES, countsAsStuck, encodePng, parseArgs } from './common';
 
 const args = parseArgs(process.argv.slice(2));
 const run = args.run;

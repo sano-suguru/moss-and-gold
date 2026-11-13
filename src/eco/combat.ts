@@ -1,11 +1,8 @@
 /** Ecology のメソッド：強さと戦い、飢えて去ること、傷と戦い（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { BONE_SP } from './undead';
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
-import { lineOfSight, TILE } from '../mapgen';
+import { BLOOD, CR_EVERY, Cr, DAY_TICKS_ECO, DWARF_STR, Ecology, FLEE_AT, JOB_STR, Job, Kind, SPEC, STR, TIER, TIER_MUL, ih, sq } from '../ecology';
+import { TILE } from '../mapgen';
 import { thrallStr } from './thrall';
-import { JOB_NAMES } from '../names';
-import type { World } from '../world';
 import { ARMOR_HAND_MAX } from './armor';
 
 /** 攻める側の勝つ確率は、近くの仲間を含めた強さの比で決まる。負けた側は死ぬことがある */

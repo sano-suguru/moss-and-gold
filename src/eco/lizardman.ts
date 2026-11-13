@@ -1,9 +1,6 @@
 /** Ecology のメソッド：リザードマン（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
-import { lineOfSight, TILE } from '../mapgen';
-import { JOB_NAMES } from '../names';
-import type { World } from '../world';
+import { Cr, DIR16, Ecology, HUNT2, Kind, SPEC, ih, sq } from '../ecology';
+import { TILE } from '../mapgen';
 
 export function waterNear(this: Ecology, x0: number, y0: number, R: number): number {
   const m = this.w.map;

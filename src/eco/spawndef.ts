@@ -257,7 +257,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
       e.colonies.push(col);
       return col;
     },
-    setup: (e, c, _site, _i, ctx) => {
+    setup: (_e, c, _site, _i, ctx) => {
       const col = ctx as Colony;
       c.ref = col.id;
       c.hx = col.x;

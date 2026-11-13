@@ -8,10 +8,9 @@
  *
  * 目標（Party.aim）：0 なし（探索）、1 宝、2 竜、3 大物、4 アンデッド、5 ゴブリン退治。状態はすべて Party に入れる（セーブ時は Party ごと JSON にシリアライズする）。
  */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { CELL, Camp, Cr, Ecology, Job, Kind, Party, ih, sq } from '../ecology';
+import { CELL, Camp, Cr, Ecology, Kind, Party, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
-import { ADV_NAMES, AIM_NAMES, JOB_NAMES, NAMES } from '../names';
+import { ADV_NAMES, AIM_NAMES, JOB_NAMES, } from '../names';
 import { heroTitle } from './roster';
 import { UNDEAD, type Quest } from './quest';
 

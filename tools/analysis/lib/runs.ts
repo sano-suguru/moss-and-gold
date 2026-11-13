@@ -116,7 +116,7 @@ const inflight = new Map<string, Promise<string>>();
 async function withLock<T>(dir: string, f: () => Promise<T>): Promise<T> {
   const lock = dir + '.lock';
   mkdirSync(dirname(lock), { recursive: true });
-  for (let i = 0; ; i++) {
+  for (;;) {
     try {
       mkdirSync(lock);
       writeFileSync(join(lock, 'pid'), String(process.pid));
@@ -211,7 +211,7 @@ export function snapsOf(run: string): string {
 
 /** タスクを並列数 n で、重いもの（w が大きいもの）から実行する */
 export async function pool<T>(tasks: { w: number; f: () => Promise<T> }[], n: number): Promise<T[]> {
-  const order = tasks.map((t, i) => i).sort((a, b) => tasks[b].w - tasks[a].w);
+  const order = tasks.map((_t, i) => i).sort((a, b) => tasks[b].w - tasks[a].w);
   const res: T[] = new Array(tasks.length);
   let i = 0;
   await Promise.all(Array.from({ length: Math.max(1, Math.min(n, tasks.length)) }, async () => {

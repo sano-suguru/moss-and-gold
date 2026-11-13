@@ -15,7 +15,6 @@ import { cpus } from 'os';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { generate } from '../../src/mapgen';
-import { DAY_TICKS } from '../../src/world';
 import { KIND_NAMES, parseArgs } from './common';
 import { defaultAdv, getBin } from './lib/runs';
 import { dirName, finished, reports, runSets } from './lib/batchrun';

@@ -55,7 +55,6 @@
  */
 import { Cr, DIR16, Ecology, Item, ItemKind, Kind, SPEC, STR, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
-import { ITEM_NAMES } from './inspect';
 
 /** 冒険者とドワーフが倒れたとき、落とした職業の道具1つに宿る未練（マナ） */
 export const ARMOR_REMNANT = 24;
@@ -344,7 +343,6 @@ export function absorbItem(this: Ecology, c: Cr, it: Item): void {
   c.dir = Math.abs(it.x - c.x) > Math.abs(it.y - c.y) ? (it.x > c.x ? 2 : 3) : it.y > c.y ? 0 : 1;
   this.noise(c.x, c.y, 5);
   this.record('settle', { t: this.w.tick, k: Kind.Armor, id: c.id, ev: 'absorb', how: rob ? 'rob' : 'floor', part: hand ? 'hand' : 'body', n: it.kind, x: Math.round(c.x), y: Math.round(c.y) } as never);
-  const name = ITEM_NAMES[it.kind] ?? '武具';
 }
 
 /**

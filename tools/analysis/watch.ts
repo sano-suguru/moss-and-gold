@@ -9,7 +9,7 @@ const from = +(a.from || 5) * DAY_TICKS, to = +(a.to || 5.3) * DAY_TICKS, every 
 while (w.tick < from) w.step();
 const c0 = e.list.find((c: any) => c.k === kind && !c.dead);
 if (!c0) { console.log('いない'); process.exit(); }
-let lx = c0.x, ly = c0.y, osc = 0, moved = 0;
+let lx = c0.x, ly = c0.y, moved = 0;
 while (w.tick < to) {
   w.step();
   const c = e.list.find((o: any) => o.id === c0.id);

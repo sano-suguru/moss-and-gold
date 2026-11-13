@@ -36,5 +36,4 @@ while (w.tick < days * DAY_TICKS) {
   }
 }
 stats.forage = e.forage.length; stats.openMoss = e.openMoss;
-const ages: number[] = [];
 console.log(JSON.stringify(stats));

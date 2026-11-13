@@ -296,7 +296,7 @@ function spider(dir,act,f){
  const leg=(h,ft,lift,mat='spi')=>{const kx=(h[0]+ft[0])/2+(ft[0]>h[0]?1.4:-1.4),ky=(h[1]+ft[1])/2-2.4-lift;const fy=ft[1]-lift;P.push(LN(h[0],h[1],kx,ky,mat,2,{no:1}),LN(kx,ky,ft[0],fy,mat,2,{no:1}),GD(kx,ky,RAMP[mat][3]))};
  if(dir==='side'){
   const W=26,hips=[[13,10.5],[14,10.6],[15,10.6],[16,10.5]],feet=[[5,15],[9.5,15],[17,15],[22,15]];
-  hips.forEach((h,i)=>{const lift=mv&&((i%2)===(q%2))&&q%2===0?0:0;leg([h[0]+0.5,h[1]-0.5],[feet[i][0]+(i<2?1:-1),feet[i][1]-0.5],(mv&&((i+q)%2===0))?1:0,'spiD')});
+  hips.forEach((h,i)=>{leg([h[0]+0.5,h[1]-0.5],[feet[i][0]+(i<2?1:-1),feet[i][1]-0.5],(mv&&((i+q)%2===0))?1:0,'spiD')});
   P.push(E(7.5,8+rise,4.6,3.8,'spi',{ol:1}));
   [[6,6],[7,6],[8,6],[7,7]].forEach(([x,y])=>P.push(GD(x,y+rise,COL.red)));
   P.push(E(14,10+rise,3,2.2,'spi',{ol:1}),GD(16,9+rise,COL.redL),GD(15,9+rise,COL.red),D(17,11+rise,COL.bone));
@@ -306,7 +306,7 @@ function spider(dir,act,f){
  }
  const flip=dir==='up';
  const Y=(y)=>flip?16-y:y;
- let feetR=[[17,15],[20.5,12],[21,8],[18.5,4]],hipsR=[[12.5,11.5],[13.2,10.6],[13.2,9.6],[12.5,8.6]];
+ const feetR=[[17,15],[20.5,12],[21,8],[18.5,4]],hipsR=[[12.5,11.5],[13.2,10.6],[13.2,9.6],[12.5,8.6]];
  const mx=(p)=>[22-p[0],p[1]];
  if(dead){
   P.push(E(11,11,4.6,3,'spi',{ol:1}),E(11,13,2.8,1.6,'spi',{ol:1}));
@@ -393,7 +393,7 @@ function wisp(dir,act,f,g){
  const L=(a,b,t)=>a.map((v,i)=>Math.round(v+(b[i]-v)*t));
  const core=L([120,200,190],[248,255,252],g),mid=L([40,110,120],[150,240,220],g),out=L([20,60,70],[70,180,170],g);
  const put=(x,y,c)=>{x=Math.round(x);y=Math.round(y);if(x<0||y<0||x>=W||y>=H)return;const p=y*W+x;px[p*4]=c[0];px[p*4+1]=c[1];px[p*4+2]=c[2];px[p*4+3]=255;mat[p]='wisp'};
- let cx=7,cy=8+(act==='attack'?[0,1,1,0][q]:0);
+ const cx=7,cy=8+(act==='attack'?[0,1,1,0][q]:0);
  if(act==='death'){
   const R=[0,2.5,4.5,6][q],n=[0,6,5,3][q];
   if(q===0){for(let y=0;y<H;y++)for(let x=0;x<W;x++){const d=Math.hypot(x+.5-cx,y+.5-cy);if(d<1.2)put(x,y,core);else if(d<2)put(x,y,mid)}}
@@ -471,7 +471,7 @@ function slime(dir,act,f,size){
 }
 // ===== ゴースト =====
 function ghost(dir,act,f){
- const W=20,H=24,q=mod(f,4),px=new Uint8Array(0);
+ const W=20,H=24,q=mod(f,4);
  const P=[];
  const bob=act==='death'?0:[0,-1,-1,0][q],wave=[0,1,0,-1][q];
  const grow=act==='attack'?[0,1,1.5,0.6][q]:0;
@@ -636,7 +636,6 @@ function myconid(dir,act,f){
  return {...fr,ax:cx,ay:feet};
 }
 // ===== サラマンダー（ずんぐりした赤い体に、炎のひれと光る斑点） =====
-const SMAP={};
 function flame(P,x,y,h,w,q,tilt){
  // 炎の舌（外側は橙、内側は黄）。q で揺らぐ
  const s=[0,0.6,0,-0.6][q]+(tilt||0);
@@ -958,7 +957,6 @@ function gargoyle(dir,act,f){
   P.push(E(cx+2.6,by-4,2.6,2.4,'stone',{ol:1}),PL([[cx+1.4,by-6],[cx+0.6,by-9],[cx+2.6,by-6.4]],'stone',3,{ol:1}),C(cx+4,by-3.6,cx+5.6,by-3.2,0.9,'stone'));
   fr0();
  }else{
-  const sp=fly?1:0.55;
   for(const sx of [-1,1]){const X=(x)=>cx+sx*x;const wp=fly?[[X(2),by-2],[X(10),by-8+wingUp*3],[X(13),by-2+wingUp],[X(8),by],[X(11),by+3],[X(3),by+1]]:[[X(2),by-3],[X(6),by-8],[X(7.4),by+1],[X(3),by+2]];P.push(PL(wp,back?'stone':'stoneD',2,{ol:1}))}
   P.push(E(cx,by,3.8,3.8,'stone',{ol:1}));
   P.push(C(cx-1.6,by+3,cx-2,by+6.4,1.1,'stone'),C(cx+1.6,by+3,cx+2,by+6.4,1.1,'stone'));
@@ -1304,7 +1302,7 @@ function scales(fr,mats,salt){
  const {W,H,px,mat}=fr;
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=y*W+x;if(!mats.includes(mat[p]))continue;
   const on=((x+(((y/2)|0)%2)*2)%4===0&&y%2===0)||hz(x,y,salt)<0.06;
-  if(!on)continue;const m=RAMP[mat[p]];const c=[px[p*4],px[p*4+1],px[p*4+2]];let i=m.findIndex(r=>r[0]===c[0]&&r[1]===c[1]&&r[2]===c[2]);if(i<=0)continue;const d=m[i-1];px[p*4]=d[0];px[p*4+1]=d[1];px[p*4+2]=d[2]}
+  if(!on)continue;const m=RAMP[mat[p]];const c=[px[p*4],px[p*4+1],px[p*4+2]];const i=m.findIndex(r=>r[0]===c[0]&&r[1]===c[1]&&r[2]===c[2]);if(i<=0)continue;const d=m[i-1];px[p*4]=d[0];px[p*4+1]=d[1];px[p*4+2]=d[2]}
 }
 /** ドラゴン：四本の太い脚で地面を踏みしめる重たい体。翼は肩からたたんで脇腹に垂らす。
  * idle = 宝の山の上で体を丸めて眠る、move = 歩く、attack = 地面へ炎を吐きつける、fly = 翼を広げて飛ぶ */
@@ -1348,7 +1346,7 @@ function dragon(dir,act,f){
  if(fly){
   // 翼を大きく広げて飛ぶ（上から見たような姿）。頭が上の絵を基準に描き、向きに合わせて座標を変える：
   // up = 頭が画面の上（後頭部が見える）、down = 頭が画面の下（顔と光る目が見える）、side = 頭が右（翼は上下に広がる。左向きは描くときに反転）
-  const flap=[0,1,2,1][q],up=[-8,0,8,0][q];
+  const up=[-8,0,8,0][q];
   const cy=34;
   const back=dir==='up',side=dir==='side';
   const FW=100,FH=side?104:78,sc=52;
@@ -2250,7 +2248,7 @@ function pxWarrior(dir,act,f,torch,L,rank,pc,hairM,opts={}){
   if(swP&&!sw.behind)P.push(swP);
  }else{
   // 盾は体の前に構えているので、後ろからは体の向こう側に隠れ、脇から裏側の縁がのぞくだけ（体より先に描き、盾の右の縁を体の左の輪郭に重ねる。黒い線が2本並ばない）
-  const [sx,sy]=PXW.shieldAt[rank],sb=PXW.shieldBack[rank];
+  const [,sy]=PXW.shieldAt[rank],sb=PXW.shieldBack[rank];
   if(!tq)P.push({g:sb,x:ux-sb[0].length+1,y:uy+sy-1-sw1,mats:shieldM});
   if(swP&&sw.behind)P.push(swP);
   P.push(lg,td);
@@ -3590,7 +3588,6 @@ function heroOrbAt(dir,f,rank){
  return [hx-col+sx/n+0.5+lx-7,hy-(15-top)+sy/n+0.5+ly-20];
 }
 /** 体の座標の点を、左右反転する（正面の右手の構えを左手に、など）。手は2ピクセル幅なので 12-x */
-const pxMirror=a=>[12-a[0],a[1],12-a[2],a[3],-a[4],a[5],a[6]];
 /**
  * ほかの職の攻撃の1コマ：腕を外す胴の側（複数）と、描く部品（{g,x,y,behind,soft,noGlow}。体の座標）。
  * 魔法使い：杖を掲げ、宝玉が光る（0 構え、1 掲げる、2 さらに突き上げて宝玉がいちばん明るい、3 下ろす）。宝玉の光は描画の光（creatureView の heroOrb）。
@@ -3728,12 +3725,6 @@ function pxCrop(fr){
  for(let y=0;y<fr.H;y++)for(let x=0;x<fr.W;x++)if(fr.px[(y*fr.W+x)*4+3]){x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y)}
  const W=x1-x0+1,H=y1-y0+1,px=new Uint8ClampedArray(W*H*4),mat=new Array(W*H).fill(null);
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=(y+y0)*fr.W+x+x0,q=y*W+x;for(let c=0;c<4;c++)px[q*4+c]=fr.px[p*4+c];mat[q]=fr.mat[p]}
- return {W,H,px,mat};
-}
-/** 絵を左へ90度回す（上にあった頭が左へ、右を向いていた顔が上へ。ドットは崩れない） */
-function pxRotL(fr){
- const W=fr.H,H=fr.W,px=new Uint8ClampedArray(W*H*4),mat=new Array(W*H).fill(null);
- for(let ny=0;ny<H;ny++)for(let nx=0;nx<W;nx++){const ox=fr.W-1-ny,oy=nx,p=oy*fr.W+ox,q=ny*W+nx;for(let c=0;c<4;c++)px[q*4+c]=fr.px[p*4+c];mat[q]=fr.mat[p]}
  return {W,H,px,mat};
 }
 /** 絵 src を、大きな絵 dst の (x,y) に重ねる（透明な所は重ねない） */
@@ -4376,7 +4367,7 @@ function inlet(f){
  for(let y=25;y<33;y++)for(let x=2;x<W-2;x++){
   const dx=(x-ax)/11,dy=(y-28.5)/4;const d=Math.sqrt(dx*dx+dy*dy);if(d>1)continue;
   const ring=Math.abs(((d*3-q*0.25)%1)-0.5)<0.12;
-  let c=d<0.35?[214,236,252]:ring?[150,196,236]:[50,98,160];
+  const c=d<0.35?[214,236,252]:ring?[150,196,236]:[50,98,160];
   setPx(fr,x,y,c,d<0.3);
  }
  for(let i=0;i<10;i++){const x=ax-6+Math.round(hz(i,q,18)*12),y=22+Math.round(hz(i,q+4,18)*6);setPx(fr,x,y,[240,250,255],true)}
@@ -5761,7 +5752,7 @@ function dragonling(stage,act,f){
  const mv=act==='move',at=act==='attack',fl=act==='fly';
  const bob=mv?[0,-1,0,-1][q]:act==='idle'?[0,0,-0.5,0][q]:0;
  const step=mv?[-1.5,0,1.5,0][q]:0;
- const ox=y1?6:3,oy=0;
+ const ox=y1?6:3;
  const X=v=>ox+v*k, Y=v=>G-(28-v)*k+bob*0.8;
  if(act==='death'){
   P.push(E(X(18),Y(25),9*k,3.5*k,S,{ol:1}),E(X(29),Y(25),5*k,3*k,S,{ol:1}),C(X(10),Y(26),X(2),Y(27),1.6*k,S),E(X(16),Y(22),5*k,2*k,WG,{ol:1}));
