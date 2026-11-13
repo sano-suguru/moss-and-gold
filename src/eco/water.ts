@@ -10,7 +10,7 @@
  * - 弱い種は、水場のまわりに自分より強い種（STR が上で、同じ群れでない者）がいれば、少し離れた所で待ち、強い種が去ってから飲む
  *   （大ネズミだけは待たずに、その日はあきらめて引き返す）。
  *   待つのは WAIT_MAX 回まで（待った回数は、渇きの THIRST_MAX を超えた分で数える。過ぎたら、その日はあきらめて渇きを THIRSTY の半分にする）。腹を空かせた捕食者は、ふだんどおり狩る（水場の休戦にはしない）。
- * - 水場（waterholes）は、ミノタウロスの寝床のまわり（LAIR_R マスの内）を除く、どのマップにもある湧き水と、水（POOL_WATER より多い）のマスが POOL_MIN 以上まとまった水たまり。水の量は刻々と変わるので、
+ * - 水場（waterholes）は、どのマップにもある湧き水と、水（POOL_WATER より多い）のマスが POOL_MIN 以上まとまった水たまり。水の量は刻々と変わるので、
  *   ゲーム内の時間で決まった間隔（WH_EVERY tick ごと）にだけ作り直し、一覧をセーブに入れる（ロードし直しても同じ一覧になるように）。
  * - 水を飲みはじめたとき、その水場のまわりに3種以上いれば、水場ごとに生き物の更新 CROWD_GAP 回に1回だけ、賑わいとして記録する（分析用）。
  */
@@ -18,8 +18,7 @@ import { Cr, Ecology, Kind, SPEC, STR, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 水を飲む種 */
-// （ミノタウロスも入れていたが、寝床を離れて遠くの水場へ行く間に倒され、いない時間が倍になったので外した）
-const DRINKERS = new Set<Kind>([Kind.Rat, Kind.Lizard, Kind.Kobold, Kind.Goblin, Kind.Orc, Kind.Lizardman, Kind.Troll, Kind.Basilisk, Kind.Adventurer, Kind.Dwarf, Kind.Bat]);
+const DRINKERS = new Set<Kind>([Kind.Rat, Kind.Lizard, Kind.Kobold, Kind.Goblin, Kind.Orc, Kind.Lizardman, Kind.Troll, Kind.Minotaur, Kind.Basilisk, Kind.Adventurer, Kind.Dwarf, Kind.Bat]);
 /** 住処や集落や巣穴から遠く離れないよう、近くの水場（HOME_R マスの内）にだけ行く種（遠くの水場へ行かせると、留守の間に住処が手薄になり、
  *  コボルトの住処が続く日数が半分になった。大ネズミは食べ物から離れすぎて、飢え死にが3倍になった） */
 const HOMEBODIES = new Set<Kind>([Kind.Kobold, Kind.Goblin, Kind.Rat]);
@@ -29,7 +28,7 @@ const PASSERS = new Set<Kind>([Kind.Adventurer, Kind.Dwarf]);
 /** 水を飲みに行く時刻（一日のうちの割合。0 が真夜中）：0 夜明けと夕暮れ、1 夜、2 昼 */
 const WINDOW: Partial<Record<Kind, 0 | 1 | 2>> = {
   [Kind.Rat]: 0, [Kind.Lizard]: 0, [Kind.Lizardman]: 0, [Kind.Troll]: 0, [Kind.Basilisk]: 0,
-  [Kind.Bat]: 1, [Kind.Goblin]: 1, [Kind.Kobold]: 1, [Kind.Orc]: 1,
+  [Kind.Bat]: 1, [Kind.Goblin]: 1, [Kind.Kobold]: 1, [Kind.Minotaur]: 1, [Kind.Orc]: 1,
   [Kind.Adventurer]: 2, [Kind.Dwarf]: 2,
 };
 /** 渇いたとみなす値と、時刻に関わらず飲みに行く値（生き物の更新の回数。ゲーム内の1日は7200回） */
@@ -43,8 +42,6 @@ const WAIT_MAX = 150;
 /** 水たまりを水場とみなす、水の量と、まとまったマスの数（浅い水たまりも入れる。深い水だけでは、水場が3か所ほどのマップが多く、歩いて40マスの内に水場のない生き物が多かった） */
 const POOL_WATER = 10;
 const POOL_MIN = 5;
-/** ミノタウロスの寝床から、水場にしない距離（マス。縦と横の和） */
-const LAIR_R = 16;
 /** 水場の一覧を作り直す間隔（tick） */
 const WH_EVERY = 2000;
 /** 水場の賑わいを記録する間隔（生き物の更新の回数） */
@@ -74,10 +71,7 @@ export function updateWaterholes(this: Ecology): void {
   const water = this.w.water;
   const old = this.waterholes;
   const list: Waterhole[] = [];
-  // ミノタウロスの寝床から LAIR_R マスの内は水場にしない（水場に立ち寄った冒険者がミノタウロスと出くわし、倒される数が倍近くになった）
-  const nearLair = (x: number, y: number) => m.lair.x >= 0 && Math.abs(x / TILE - m.lair.x) + Math.abs(y / TILE - m.lair.y) < LAIR_R;
   const keep = (x: number, y: number) => {
-    if (nearLair(x, y)) return;
     const o = old.find((h) => Math.abs(h.x - x) < 3 * TILE && Math.abs(h.y - y) < 3 * TILE);
     list.push({ x, y, crowd: o ? o.crowd : -1e9 });
   };
