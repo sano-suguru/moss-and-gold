@@ -178,6 +178,7 @@ export class Input {
   /** キーボードでの移動（毎フレーム） */
   update(dt: number): void {
     if (!this.keys.size) return;
+    this.h.onInteract?.();
     let dx = 0;
     let dy = 0;
     if (this.keys.has('a') || this.keys.has('arrowleft')) dx -= 1;
