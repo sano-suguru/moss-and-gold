@@ -232,13 +232,46 @@ export function roostSpot(this: Ecology, sx: number, sy: number, x: number, y: n
   return [sx + Math.max(-6, Math.min(6, x - sx)), top + 3];
 }
 
+/**
+ * ねぐらで眠るコウモリの糞：ねぐらの下（ねぐらの位置 tx, ty のマス）のまわり4マスの内で、日の光がほとんど差さない
+ * （真昼でもキノコが枯れない明るさの）最初の床に落とす（近い輪から、決まった順に見る）。糞だまりの養分が濃く（30以上）、
+ * 湿り気が70以上で、苔もキノコも無ければ、その養分からキノコが芽吹く。そういう床が無ければ、その場の土に返す
+ */
+export function batDropping(this: Ecology, c: Cr): void {
+  const w = this.w;
+  const m = w.map;
+  const k0 = c.tx > 0 ? this.tileOf(c.tx, c.ty) : -1;
+  if (k0 >= 0) {
+    const x0 = k0 % m.w;
+    const y0 = Math.floor(k0 / m.w);
+    for (let r = 0; r <= 4; r++)
+      for (let dy = -r; dy <= r; dy++)
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const x = x0 + dx;
+          const y = y0 + dy;
+          if (x < 1 || y < 1 || x >= m.w - 1 || y >= m.h - 1) continue;
+          const q = y * m.w + x;
+          if (m.solid[q] || m.sealed[q] || m.lava[q] || w.lightBase[q] > 100) continue;
+          w.nutr[q]++;
+          if (w.fungus[q] === 0 && w.moss[q] === 0 && w.nutr[q] >= 30 && w.moist[q] >= 70) {
+            w.nutr[q] -= 2;
+            w.fungus[q] = 2;
+          }
+          return;
+        }
+  }
+  this.deposit(c.x, c.y, 1);
+}
+
 declare module '../ecology' {
   interface Ecology {
     bat: typeof bat;
+    batDropping: typeof batDropping;
     roostSpot: typeof roostSpot;
     batForage: typeof batForage;
     batRoam: typeof batRoam;
   }
 }
 
-Object.assign(Ecology.prototype, { bat, batForage, batRoam, roostSpot });
+Object.assign(Ecology.prototype, { bat, batDropping, batForage, batRoam, roostSpot });

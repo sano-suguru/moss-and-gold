@@ -1671,6 +1671,21 @@ export class CreatureView {
           else pushSprite(x + (hsh(i, si) - 0.5) * 8, y, 0, false, A.speck(3, Math.floor((ph - 0.85) / 0.15 * 4)), 0, 2);
         }
       }
+      // 天井のしずく（src/world.ts の dripAt）：天井から水滴が落ち、床で小さく跳ねて輪に広がる。間隔はしずくごとに少しずつ違う
+      for (const k of w.drips) {
+        const x = (k % mm.w) * 16 + 4 + Math.floor(hsh(k, 41) * 8);
+        const y = Math.floor(k / mm.w) * 16 + 6 + Math.floor(hsh(k, 43) * 6);
+        if (!inView(x, y, 40)) continue;
+        const ph = (t * (0.28 + hsh(k, 47) * 0.2) + hsh(k, 45)) % 1;
+        if (ph < 0.7) pushSprite(x, y, 40 * (1 - ph / 0.7), false, A.speck(3, 0), 0, 2);
+        else {
+          const q = (ph - 0.7) / 0.3;
+          const f = Math.floor(q * 4);
+          pushSprite(x - 1 - q * 5, y, q * 3, false, A.speck(3, f), 0, 2);
+          pushSprite(x + 1 + q * 5, y, q * 3, false, A.speck(3, f), 0, 2);
+          if (q < 0.5) pushSprite(x, y, 2 + q * 8, false, A.speck(3, f + 1), 0, 2);
+        }
+      }
     }
     const dyn: { x: number; y: number; r: number; i: number; c?: number }[] = [];
     // 当たった印（のけぞりのための記録）と、攻撃の技の演出。気づいた印：「！」「？」

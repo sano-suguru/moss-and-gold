@@ -301,6 +301,8 @@ export function metabolism(this: Ecology, c: Cr): void {
     if (c.food > 0) {
       c.food--;
       if (c.away) this.exported++;
+      // ねぐらで眠る野のコウモリの糞は、ねぐらの下の暗がりに溜まる（src/eco/bat.ts の batDropping）
+      else if (c.k === Kind.Bat && c.st === 0 && !c.ref2) this.batDropping(c);
       else this.deposit(c.x, c.y, 1);
       c.hungry = 0;
     }
@@ -319,6 +321,36 @@ export function metabolism(this: Ecology, c: Cr): void {
     } else this.die(c, 'starve');
   }
 }
+
+/**
+ * 死骸が1単位朽ちる：暗く湿った所（日の光がほとんど差さず、湿り気70以上）では、その養分がまわり1マスの床にキノコとして生える
+ * （骨のまわりにキノコの輪ができる。生える先は死骸と単位の番号のハッシュで決まる、苔も溶岩も無く、キノコが130未満のマス）。
+ * 明るい所・乾いた所・生えられるマスが無いときは、今までどおり土の養分に戻る
+ */
+export function rotInto(this: Ecology, c: Cr): void {
+  const w = this.w;
+  const m = w.map;
+  const k = this.tileOf(c.x, c.y);
+  if (k >= 0 && !m.solid[k] && w.lightBase[k] <= 100 && w.moist[k] >= 70) {
+    const x = k % m.w;
+    const y = Math.floor(k / m.w);
+    const h = ih(c.id, c.units, 0x7a1);
+    for (let j = 0; j < 8; j++) {
+      const [dx, dy] = RING8[(h + j) & 7];
+      const xx = x + dx;
+      const yy = y + dy;
+      if (xx < 1 || yy < 1 || xx >= m.w - 1 || yy >= m.h - 1) continue;
+      const q = yy * m.w + xx;
+      if (m.solid[q] || m.sealed[q] || m.lava[q] || w.moss[q] || w.fungus[q] >= 130 || w.moist[q] < 70) continue;
+      w.fungus[q]++;
+      return;
+    }
+  }
+  this.deposit(c.x, c.y, 1);
+}
+
+/** まわり8マスの向き */
+const RING8: [number, number][] = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
 
 /** 死骸の段階：0 新しい、1 腐りかけ、2 骨 */
 export function corpseStage(this: Ecology, c: Cr): number {
@@ -341,7 +373,7 @@ export function decay(this: Ecology, c: Cr): void {
   const every = stage === 2 ? (this.inLair(c.x, c.y) ? 1600 : 400) : 60;
   if (c.units > 0 && this.step % every === c.id % every) {
     c.units--;
-    this.deposit(c.x, c.y, 1);
+    this.rotInto(c);
   }
   if (c.units <= 0) {
     c.dead = 2;
@@ -419,8 +451,9 @@ declare module '../ecology' {
     update: typeof update;
     metabolism: typeof metabolism;
     corpseStage: typeof corpseStage;
+    rotInto: typeof rotInto;
     decay: typeof decay;
   }
 }
 
-Object.assign(Ecology.prototype, { update, restSoak, metabolism, corpseStage, decay });
+Object.assign(Ecology.prototype, { update, restSoak, metabolism, corpseStage, rotInto, decay });

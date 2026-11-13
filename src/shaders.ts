@@ -78,7 +78,8 @@ void main() {
   float lavaL = g.g;
   if (lavaL > 0.0) lavaL *= 0.72 + 0.2 * lnoise(p / 40.0 + vec2(uTime * 0.23, uTime * 0.11), 951u) + 0.06 * sin(uTime * 2.3 + lnoise(p / 24.0, 952u) * 6.28);
   // 光る苔は、どれだけ豊かになっても光の芯が白く飛ばないよう、上限をつける
-  L += min(g.r, 0.55) * uMossCol + lavaL * uLavaCol + min(g.a, 0.6) * vec3(0.6, 0.4, 0.95);
+  // 苔の光は描画だけで強める（暗がりのしずくのまわりに育つ苔の群落が、ほのかに色づいて見えるように。シミュレーションが見る苔の光 mossGlow の値は変えない）
+  L += min(g.r * 1.8, 0.55) * uMossCol + lavaL * uLavaCol + min(g.a, 0.6) * vec3(0.6, 0.4, 0.95);
   // 燃えているマスの光（まわりへにじませる）
   vec2 fu = p / 16.0 / vec2(uMapSize), fd = 1.0 / vec2(uMapSize);
   float fb = texture(uFx, fu).r * 0.4 + (texture(uFx, fu + vec2(fd.x, 0.0)).r + texture(uFx, fu - vec2(fd.x, 0.0)).r + texture(uFx, fu + vec2(0.0, fd.y)).r + texture(uFx, fu - vec2(0.0, fd.y)).r) * 0.15
@@ -665,12 +666,15 @@ void main() {
       float r = length((vec2(l) - 7.5) * vec2(1.0, 1.35));
       if (r < 4.6) alb = r < 3.2 ? cK : ca;
     }
-    float md = smoothstep(0.22, 0.62, fld.r);
+    // 苔：量が少ないうちから床にまだらに色が出る（苔の量20ほどから）。光る粒（mi）は、量が中くらいから混じりはじめ、
+    // 暗がりの群落でもほのかに光って見える（描画だけ。シミュレーションが見る苔の光は変えない）
+    float md = smoothstep(0.07, 0.5, fld.r);
     if (md > 0.0) {
       if (h01(w, 500u) < md) {
         float v = h01(w, 900u);
-        alb = v < 0.4 ? mg : (v < 0.75 ? mh : (v < 0.93 ? mf : mi));
-        emis = v >= 0.93 && md > 0.7;
+        float gl = 0.93 - 0.1 * smoothstep(0.3, 0.9, md);
+        alb = v < 0.4 ? mg : (v < 0.72 ? mh : (v < gl ? mf : mi));
+        emis = v >= gl && md > 0.35;
       }
     }
     // 微生物の膜：溶岩のまわりに白、黄、橙、赤茶の縞。端はまだらにかすれ、ほのかに光る
