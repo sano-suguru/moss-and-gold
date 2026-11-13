@@ -8,6 +8,7 @@ import { CR_EVERY } from './ecology';
 import type { Thing } from './eco/inspect';
 import { DAY_TICKS, TICKS_PER_SEC, World, dayIntensity, timeLabel } from './world';
 import { JOB_NAMES, NAMES, renderEvent } from './names';
+import { AutoCam } from './autocam';
 
 // 確認用の表示：URL の末尾に #lit（全体を明るく照らす）か #albedo（地形の色だけ）を付ける（#clean,lit のように並べてもよい）
 const debugMode = (): number => {
@@ -148,13 +149,27 @@ function boot(): void {
     updateZoomLabel();
   };
 
+  // おまかせカメラ（src/autocam.ts）：見る人が地図を動かす・拡大縮小する・触れると切れる。操作盤のボタンで入れ直す
+  const auto = new AutoCam();
+  const autoOff = () => {
+    if (!auto.on && !autoPending) return;
+    auto.set(false);
+    autoPending = false;
+    syncAuto();
+  };
+  let autoPending = false;
+  let syncAuto = () => {};
   const input = new Input(canvas, {
     cam,
     dpr: () => window.devicePixelRatio || 1,
     bounds: () => ({ w: MAP_W * TILE, h: MAP_H * TILE }),
-    onZoom: () => updateZoomLabel(),
+    onZoom: () => {
+      updateZoomLabel();
+      autoOff();
+    },
     onInteract: () => {
       hideHint();
+      autoOff();
     },
     onTap: (wx, wy) => onTap(wx, wy),
   });
@@ -310,6 +325,32 @@ function boot(): void {
   fold('mapbox', 'mapFold', 'map', '地図 ▴', '地図 ▾');
   fold('log', 'logFold', 'log', '▾', '▴');
 
+  // おまかせカメラのボタン。初めて開いたときは入れておき、20秒たってから動き出す（はじめは始まりの洞窟を見せる）。
+  // 画面のツール（Playwright。navigator.webdriver）や演出のデモでは入れない（撮る場面のカメラが動かないように）
+  {
+    const btn = $('autoCam');
+    syncAuto = () => btn.setAttribute('aria-pressed', String(auto.on || autoPending));
+    btn.addEventListener('click', () => {
+      const on = !(auto.on || autoPending);
+      ui.auto = on;
+      saveUi();
+      autoPending = false;
+      if (on) closeCard();
+      auto.set(on);
+      syncAuto();
+    });
+    if (ui.auto !== false && !navigator.webdriver && !DEMO) {
+      autoPending = true;
+      window.setTimeout(() => {
+        if (!autoPending) return;
+        autoPending = false;
+        auto.set(true);
+        syncAuto();
+      }, 20000);
+    }
+    syncAuto();
+  }
+
   // 画面の操作
   const speedBtns = [...document.querySelectorAll<HTMLButtonElement>('[data-speed]')];
   const syncSpeed = () => speedBtns.forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === speed)));
@@ -382,8 +423,9 @@ function boot(): void {
       t.textContent = timeLabel(ev.t);
       b.append(t, renderEvent(ev.m, e.discovered));
       b.addEventListener('click', () => {
-        // 別の場所へ飛ぶので、追いかけていた生き物からは離れる
+        // 別の場所へ飛ぶので、追いかけていた生き物からは離れる（おまかせカメラも切る）
         closeCard();
+        autoOff();
         cam.x = ev.x;
         cam.y = ev.y;
       });
@@ -461,8 +503,9 @@ function boot(): void {
     mctx.strokeRect(Math.floor(viewRect.x0 / TILE) + 0.5, Math.floor(viewRect.y0 / TILE) + 0.5, Math.max(2, Math.floor((viewRect.x1 - viewRect.x0) / TILE)), Math.max(2, Math.floor((viewRect.y1 - viewRect.y0) / TILE)));
   }
   mini.addEventListener('pointerdown', (ev) => {
-    // 別の場所へ飛ぶので、追いかけていた生き物からは離れる（情報パネルを閉じる）
+    // 別の場所へ飛ぶので、追いかけていた生き物からは離れる（情報パネルを閉じる）。おまかせカメラも切る
     closeCard();
+    autoOff();
     const r = mini.getBoundingClientRect();
     cam.x = ((ev.clientX - r.left) / r.width) * world.map.w * TILE;
     cam.y = ((ev.clientY - r.top) / r.height) * world.map.h * TILE;
@@ -605,6 +648,8 @@ function boot(): void {
     const scale = deviceScale(cam.zoom, dpr);
     const artW = Math.ceil(canvas.width / scale);
     const artH = Math.ceil(canvas.height / scale);
+    auto.update(now, Math.min(0.1, raw), world.eco, cam, artW, artH);
+    input.clamp();
     const ox = Math.round(cam.x - artW / 2);
     const oy = Math.round(cam.y - artH / 2);
     const t = now / 1000;

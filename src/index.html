@@ -86,6 +86,8 @@ button:hover { border-color: var(--edge-hi); }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--torch); outline-offset: 1px; }
 .seg { display: flex; gap: 2px; }
 .seg button[aria-pressed="true"] { background: var(--torch); color: var(--torch-ink); }
+button.auto { border-color: var(--edge-hi); color: var(--ink-dim); margin-right: 4px; }
+button.auto[aria-pressed="true"] { background: var(--torch); color: var(--torch-ink); border-color: transparent; }
 .clock { margin-top: 6px; padding: 0 4px; font-size: 13px; color: var(--ink-dim); }
 .panel { display: flex; flex-direction: column; gap: 8px; width: min(300px, calc(100vw - 24px)); padding: 12px; }
 .panel label { font-size: 13px; color: var(--ink-dim); line-height: 1.5; }
@@ -95,6 +97,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--torch); out
 .zoom { display: flex; align-items: center; gap: 2px; padding: 4px; }
 .zoom span { min-width: 2.6em; text-align: center; font-size: 14px; }
 .zoom button { min-width: 44px; font-size: 20px; }
+.zoom button.auto { font-size: 14px; }
+/* 狭い画面では、おまかせのボタンを拡大縮小の上の段に置く（右下の箱が左へ伸びて、記録の欄と重ならないように） */
+@media (max-width: 520px) { .zoom { flex-wrap: wrap; justify-content: flex-end; width: 124px; } .zoom button { min-width: 36px; } .zoom span { min-width: 2em; } .zoom button.auto { flex-basis: 100%; margin: 0 0 2px; } }
 /* たためる部品 */
 .fold { font-size: 13px; color: var(--ink-dim); min-height: 36px; min-width: 36px; padding: 4px 8px; }
 .collapsed .body { display: none !important; }
@@ -178,7 +183,7 @@ body.clean .hud { display: none !important; }
     </div>
   </div>
   <div class="hud bottom-right plaque zoom">
-    <button type="button" id="zoomOut" aria-label="縮小">−</button><span id="zoomLabel">2×</span><button type="button" id="zoomIn" aria-label="拡大">＋</button>
+    <button type="button" id="autoCam" class="auto" aria-pressed="false" title="いろいろな種が入り乱れる所へ、カメラがゆっくり寄っていきます（地図を動かすと切れます）">おまかせ</button><button type="button" id="zoomOut" aria-label="縮小">−</button><span id="zoomLabel">2×</span><button type="button" id="zoomIn" aria-label="拡大">＋</button>
   </div>
   <div id="log" class="hud bottom-left plaque log">
     <div class="head"><span>記録</span><span><button type="button" id="logToggle" aria-expanded="false">広げる</button><button type="button" class="fold" id="logFold" aria-expanded="true" aria-label="記録をたたむ">▾</button></span></div>
