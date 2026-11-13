@@ -1740,6 +1740,19 @@ export class CreatureView {
             pushSprite(web.x + Math.cos(a) * r, web.y + Math.sin(a) * r * 0.7, 6, false, A.speck(4, Math.sin(t * 2 + i) > 0 ? 0 : 1), 0, 2);
           }
         }
+        // 水を飲んでいる者（src/eco/water.ts。thirst が負の間）：口もとの水面に、小さな波紋が輪になって広がる
+        for (const c of eco.list) {
+          if (c.dead || c.thirst >= 0 || !inView(c.x, c.y, 20)) continue;
+          const ph = (t * 1.3 + c.id * 0.37) % 1;
+          const r = 2 + ph * 7;
+          const f = Math.floor(ph * 4);
+          // 向いている側の水際（0 下、1 上、2 右、3 左）
+          const mx = c.x + (c.dir === 3 ? -6 : c.dir === 2 ? 6 : 0);
+          for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * 6.28;
+            pushSprite(mx + Math.cos(a) * r, c.y + 3 + Math.sin(a) * r * 0.45, 0, false, A.speck(3, f), 0, 2);
+          }
+        }
         // 底の層を食べた所：粒がはじけて、食べた者の口もとへ吸い込まれる
         for (const fx of eco.fxGraze) {
           const age = w.tick - fx.t;

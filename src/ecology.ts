@@ -592,6 +592,11 @@ export interface Cr {
   stone: number;
   /** バジリスクの見つめから目を背けている間の、終わる tick（src/eco/basilisk.ts）。背けている間は石化が進まず、相手を見ずに打つので傷が半分になる（src/eco/combat.ts の strike） */
   avert: number;
+  /**
+   * のどの渇き（src/eco/water.ts）：水を飲む種で、生き物の更新ごとに1ずつ増える。負の数は水を飲んでいる最中で、残りの回数。
+   * THIRST_MAX を超えた分は、水場で強い種が去るのを待った回数
+   */
+  thirst: number;
   /** 死骸ができたときの養分（腐り具合の目安） */
   init: number;
 }
@@ -1028,6 +1033,10 @@ export class Ecology {
   /** 引き裂かれた巣の演出の記録（描画専用。破れた巣が垂れて消え、糸くずが舞う） */
   fxWebTears: { t: number; x: number; y: number; r: number }[] = [];
   fxEats: { t: number; id: number; k: number; sp: number; by: number; bk: number; x: number; y: number; slain: boolean }[] = [];
+  /** 水場（src/eco/water.ts）。ゲーム内の時間で決まった間隔で作り直し、セーブに入れる */
+  waterholes: import('./eco/water').Waterhole[] = [];
+  /** 水を飲んだ所（描画専用の波紋と、おまかせカメラの出来事。src/eco/water.ts） */
+  fxDrinks: { t: number; x: number; y: number }[] = [];
   /** 底の層を食べた演出（描画専用。k 0 粒スライム / 1 光る胞子、by 食べた者。src/eco/swarm.ts の graze） */
   fxGraze: { t: number; x: number; y: number; k: number; by: number }[] = [];
   /** ヴァンパイアがコウモリにばらけた瞬間（how 0）と、姿を戻した瞬間（how 1）の黒い霧の演出（描画専用。シミュレーションの判断に使わない。セーブには、映像のために直前の4秒分だけ残す） */

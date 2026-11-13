@@ -17,6 +17,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   this.rebuildGrid();
   this.buildGroups();
   this.buildLitMap();
+  this.updateWaterholes();
   this.corpses = this.list.filter((c) => c.dead === 1 && c.units > 0 && c.k !== Kind.Wisp && c.k !== Kind.Slime && c.k !== Kind.Myconid);
   this.counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (const c of this.list) if (!c.dead) this.counts[c.k]++;
@@ -138,6 +139,12 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       continue;
     }
     if (this.doSleep(c, day, this.phaseNow)) {
+      this.metabolism(c);
+      continue;
+    }
+    // のどが渇いていれば水場へ行って飲む（src/eco/water.ts）。追い払いや警戒、縄張りの見回りより先に見る
+    // （後ろに置くと、手前の処理でその回の行動が決まることの多い種は、渇ききっても水場へ行かなかった）。技の溜めの最中は行かない
+    if (this.thirstStep(c)) {
       this.metabolism(c);
       continue;
     }
@@ -294,6 +301,7 @@ export function metabolism(this: Ecology, c: Cr): void {
     return;
   }
   if (c.glow > 0) c.glow = Math.max(0, c.glow - s.glowDecay);
+  this.thirstTick(c);
   // 眠っている間は腹が減りにくい（生き物の更新2回に1回だけ）
   if (c.sleep > 0 && this.step % 2 === 0) return;
   c.sinceMeal++;
