@@ -20,6 +20,20 @@ import { decodeState, readState } from './lib/state';
 import { pool, readMeta, snapsOf } from './lib/runs';
 import { paired, pairedRow, PAIRED_HEAD, PAIRED_NOTE } from './lib/stats';
 
+/** いちばん賑やかな1画面の種類の数の式（metric の NAMED の screenKindsBest） */
+const SCREEN_BEST = `(() => {
+  const live = e.list.filter((c) => !c.dead && !c.away);
+  if (!live.length) return NaN;
+  const step = Math.max(1, Math.floor(live.length / 60));
+  let best = 0;
+  for (let i = 0; i < live.length; i += step) {
+    const o = live[i];
+    const n = new Set(live.filter((c) => Math.abs(c.x - o.x) < 250 && Math.abs(c.y - o.y) < 160).map((c) => c.k)).size;
+    if (n > best) best = n;
+  }
+  return best;
+})()`;
+
 /** 1画面に映る数の式（metric の NAMED の screenMovers・screenKinds） */
 function SCREEN(what: 'movers' | 'kinds'): string {
   return `(() => {
@@ -62,6 +76,8 @@ export const NAMED: Record<string, { expr: string; label: string; raw?: boolean 
   // まわりから8か所を、日ごとに決まった選び方で選び、その範囲の生き物の数に、底の層の描画の粒の数（src/creatureView.ts と同じ数え方）を足して平均する
   screenMovers: { label: '1画面に映る動く物の数（生き物＋底の層の粒。8か所の平均）', expr: SCREEN('movers') },
   screenKinds: { label: '1画面に映る生き物の種類の数（底の層を除く。8か所の平均）', expr: SCREEN('kinds') },
+  // おまかせカメラ（src/autocam.ts）が寄る先に近い見方：生き物の位置から最大60か所を見て、種類のいちばん多い画面の種類の数
+  screenKindsBest: { label: 'いちばん賑やかな1画面に映る生き物の種類の数（生き物の位置から最大60か所を見た中の最大）', expr: SCREEN_BEST },
   alive: { label: '生きている生き物の数', expr: 'e.list.filter((c) => !c.dead).length' },
   nextId: { label: '生き物の番号（これまでに現れた数）', expr: 's.eco.n', raw: true },
 };

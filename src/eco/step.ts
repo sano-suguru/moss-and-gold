@@ -17,6 +17,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   this.rebuildGrid();
   this.buildGroups();
   this.buildLitMap();
+  this.updateWaterholes();
   this.corpses = this.list.filter((c) => c.dead === 1 && c.units > 0 && c.k !== Kind.Wisp && c.k !== Kind.Slime && c.k !== Kind.Myconid);
   this.counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (const c of this.list) if (!c.dead) this.counts[c.k]++;
@@ -156,7 +157,19 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       this.metabolism(c);
       continue;
     }
-    if ((c.k === Kind.Orc && this.orcWary(c)) || this.heedAlarm(c) || this.fearFire(c) || this.lurk(c) || this.territory(c) || this.retreatStep(c) || this.shyOfPeople(c)) {
+    // 身の危険への反応（オークの見極め、群れの警報、火への怖れ）は、水より先
+    if ((c.k === Kind.Orc && this.orcWary(c)) || this.heedAlarm(c) || this.fearFire(c)) {
+      this.metabolism(c);
+      continue;
+    }
+    // のどが渇いていれば水場へ行って飲む（src/eco/water.ts）。待ち伏せ・縄張りの見回り・人を避ける処理・物音への聞き耳より先に見る
+    // （後ろに置くと、それらでその回の行動が決まることの多い種は、渇ききっても水場へ行かなかった）。
+    // 渇いていない者には何もしないので、渇いていない者の判断の順番は以前と同じ
+    if (this.thirstStep(c)) {
+      this.metabolism(c);
+      continue;
+    }
+    if (this.lurk(c) || this.territory(c) || this.retreatStep(c) || this.shyOfPeople(c)) {
       this.metabolism(c);
       continue;
     }
@@ -294,6 +307,7 @@ export function metabolism(this: Ecology, c: Cr): void {
     return;
   }
   if (c.glow > 0) c.glow = Math.max(0, c.glow - s.glowDecay);
+  this.thirstTick(c);
   // 眠っている間は腹が減りにくい（生き物の更新2回に1回だけ）
   if (c.sleep > 0 && this.step % 2 === 0) return;
   c.sinceMeal++;

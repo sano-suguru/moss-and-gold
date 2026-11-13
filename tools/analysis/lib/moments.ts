@@ -177,6 +177,10 @@ export const MOMENTS: Moment[] = [
   { key: 'grazeSpore', label: '底の層：コウモリ・ウィスプ・マイコニドが光る胞子を食べた（記録は4回に1回）' },
   { key: 'grazeWeb', label: '底の層：大グモが巣にかかった光る胞子を食べた（記録は4回に1回）' },
   { key: 'grainSlime', label: '底の層：粒スライムが寄り集まって大きいスライムが生まれた' },
+  // 水場（src/eco/water.ts）
+  { key: 'drink', label: '水場：水を飲んだ' },
+  { key: 'drinkKinds', label: '水場：水を飲んだ種の数' },
+  { key: 'waterCrowd', label: '水場：3種以上が同時にいた（水場ごとに、生き物の更新300回に1回まで数える）' },
   { key: 'joined', label: '住処の洞窟が入口側とつながる' },
   { key: 'joinedDig', label: '住処の洞窟が入口側とつながる：住処のコボルトが掘ってつないだ' },
 ];
@@ -428,6 +432,9 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     grazeSpore: s.filter((x) => x.ev === 'graze' && x.n === 1).length,
     grazeWeb: s.filter((x) => x.ev === 'graze' && x.n === 2).length,
     grainSlime: ev(K.Slime, 'grainSlime').length,
+    drink: s.filter((x) => x.ev === 'drink').length,
+    drinkKinds: new Set(s.filter((x) => x.ev === 'drink').map((x) => x.k)).size,
+    waterCrowd: s.filter((x) => x.ev === 'waterCrowd').length,
     armorSlain: d.filter((x) => x.k === K.Armor && (x.by === K.Adventurer || x.by === 28)).length,
     // 入口側と切り離されていた住みか（コボルトの住処、ゴブリン・リザードマンの集落、アリの巣）が、入口側の洞窟とつながった（src/eco/islands.ts の markJoined）
     joined: s.filter((x) => x.ev === 'joined').length,

@@ -927,6 +927,19 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 水場（src/eco/water.ts）：渇いた生き物が水場へ水を飲みに来て、いろいろな種が入れ替わり立ち寄る。
+    // 水を飲みはじめたとき、その水場のまわりに3種以上いれば、水場ごとに生き物の更新300回に1回だけ waterCrowd を記録する。
+    // 入れた版で main の10日目から18日目まで実行すると、8シードで水を飲んだのが約930回・waterCrowd が約220回（8シードすべて）
+    name: '水場に入れ替わり水を飲みに来て、3種以上が同時にいる（15シードの合計で、水を飲んだのが200回以上・3種以上が同時にいたのが30回以上、起きたシードが10以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const drink = sum(rs.map((r) => r.settle.filter((x) => x.ev === 'drink').length));
+      const crowd = rs.map((r) => r.settle.filter((x) => x.ev === 'waterCrowd').length);
+      const seeds = crowd.filter((v) => v > 0).length;
+      return { ok: drink >= 200 && sum(crowd) >= 30 && seeds >= 10, value: `水を飲んだ ${drink}、3種以上が同時にいた ${sum(crowd)}（${seeds}シード）` };
+    },
+  },
+  {
     // 底の層（src/eco/swarm.ts）：粒スライムと光る胞子を、決めた種が食べ、粒スライムが濃い所では大きいスライムが生まれる。
     // graze は4回に1回だけ settle に記録する（n 0 粒スライム / 1 光る胞子 / 2 大グモが巣にかかった胞子）
     name: '底の層を食べる（15シードの合計で、粒スライム・光る胞子・巣の胞子の記録がそれぞれ20以上、粒スライムを食べたシードが12以上、大きいスライムが1回以上生まれる）',
