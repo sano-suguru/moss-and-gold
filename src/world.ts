@@ -21,6 +21,13 @@ const SPRING_PERIOD = DAY_TICKS * 3;
 const MOIST_GROW = 110;
 /** これを下回ると苔が枯れ始める */
 const MOIST_DRY = 90;
+/** 天井のしずくの落ちる所の割合：開いた床のうち、およそ DRIP_N マスに1つ */
+const DRIP_N = 110;
+/** しずくが湿らせる半径（マス。縦と横の和）と、中心の湿り気の上乗せ（1マス離れるごとに DRIP_WET / DRIP_R ずつ減る） */
+const DRIP_R = 4;
+const DRIP_WET = 150;
+/** キノコが隣へ広がるのは、ダンジョン全体のキノコの量がこれ未満のときだけ */
+const FUNGUS_CAP = 90000;
 /** はじめに水を流しておく回数 */
 const WARMUP_WATER_STEPS = 900;
 
@@ -952,10 +959,12 @@ export class World {
     for (const k of this.staleWet) paint(k);
     this.dewAt(0);
     const dew = this.dewMap;
+    this.dripAt(0);
+    const drip = this.dripMap;
     // 床でなくなったマス（埋まった所など）に前の値を残さない（ロードし直したときは0から作るので、残すと続きの展開が分かれていた）
     this.moist.fill(0);
     for (const k of this.floors) {
-      const v = m.humidity[k] + Math.min(150, w[k] * 3) - this.heat[k] + dew[k];
+      const v = m.humidity[k] + Math.min(150, w[k] * 3) - this.heat[k] + dew[k] + drip[k];
       this.moist[k] = v < 0 ? 0 : v > 255 ? 255 : v;
     }
   }
@@ -978,6 +987,44 @@ export class World {
       this.dewTick = this.digs.length;
     }
     return this.dewMap[k];
+  }
+
+  /**
+   * 天井のしずく：開いた床のうち、およそ DRIP_N マスに1つ（マスの番号のハッシュで決まる）の、溶岩でない所に、天井から水滴が落ちる（溶岩のそばは熱で乾くので、湿り気は熱の分だけ減る）。
+   * まわり DRIP_R マスの内（縦と横の和）を湿らせる（中心で DRIP_WET、離れるほど薄く）。掘られて新しく開いた床にも落ちる。
+   * 地形が変わったとき（地形変更ログの長さが変わったとき）だけ作り直すので、ロードし直しても同じになる。描画はしずくの位置 drips を見る
+   */
+  private dripMap = new Uint8Array(0);
+  drips: number[] = [];
+  private dripTick = -1e9;
+  dripAt(k: number): number {
+    const m = this.map;
+    const N = m.w * m.h;
+    if (this.dripMap.length !== N || this.dripTick !== this.digs.length) {
+      if (this.dripMap.length !== N) this.dripMap = new Uint8Array(N);
+      const d = this.dripMap;
+      d.fill(0);
+      this.drips = [];
+      for (let q = 0; q < N; q++) {
+        if (m.solid[q] || m.sealed[q] || m.lava[q] || ih(q, 0x6d71) % DRIP_N !== 0) continue;
+        this.drips.push(q);
+        const x = q % m.w;
+        const y = (q / m.w) | 0;
+        for (let dy = -DRIP_R; dy <= DRIP_R; dy++)
+          for (let dx = -DRIP_R; dx <= DRIP_R; dx++) {
+            const r = Math.abs(dx) + Math.abs(dy);
+            const xx = x + dx;
+            const yy = y + dy;
+            if (r > DRIP_R || xx < 0 || yy < 0 || xx >= m.w || yy >= m.h) continue;
+            const p = yy * m.w + xx;
+            if (m.solid[p]) continue;
+            const v = DRIP_WET - Math.floor((r * DRIP_WET) / (DRIP_R + 1));
+            if (d[p] < v) d[p] = v;
+          }
+      }
+      this.dripTick = this.digs.length;
+    }
+    return this.dripMap[k];
   }
 
   /** 外とつながる口（正面の入口と、開いた地表の横穴）から入り込む夜露と雨の湿り気（口から6マスで消える） */
@@ -1224,13 +1271,23 @@ export class World {
         changed = true;
       }
     }
+    // しずくに混じった胞子：天井のしずくの落ちる所に、ときどき苔が芽吹く（明るさは問わない。暗がりの群落はゆっくり育つ）
+    for (const k of this.drips) {
+      if (mo[k] || moist[k] < MOIST_GROW || Nu[k] < 2 || this.heat[k] >= 60 || ih(k, step + 37) % 40 >= MOSS_R) continue;
+      Nu[k] -= 2;
+      mo[k] = 2;
+      changed = true;
+    }
     for (let i = 0; i < fl.length; i++) {
       const k = fl[i];
       const v = mo[k];
       if (v === 0 || m.lava[k]) continue;
       const h = this.heat[k];
+      // 苔の群落は湿り気を抱えて乾きにくい：枯れるか・育つかは、湿り気に苔の量の8分の1（最大31）を足して見る
+      // （湿り気のマップ moist には入れない。入れると、ロードし直したときに作り直す湿り気が、苔の育ったあとの量で変わってしまう）
+      const mk = moist[k] + (v >> 3);
       // 乾き、または熱で枯れる
-      if (moist[k] < MOIST_DRY || h > 100) {
+      if (mk < MOIST_DRY || h > 100) {
         const dec = Math.min(v, (2 + (h >> 5)) * MOSS_R);
         mo[k] = v - dec;
         Nu[k] += dec;
@@ -1245,7 +1302,7 @@ export class World {
         continue;
       }
       // 育つ：光の筋の下では速く、暗がりではゆっくり
-      if (moist[k] >= MOIST_GROW && h < 60 && v < 255) {
+      if (mk >= MOIST_GROW && h < 60 && v < 255) {
         const L = this.lightBase[k] * day;
         const want = (L > 50 ? 1 + Math.floor(L / 300) : (ih(k, step + 7) & 3) < MOSS_R ? 1 : 0) * (L > 50 ? MOSS_R : 1);
         const g = this.take(i, k, Math.min(want, 255 - v));
@@ -1350,7 +1407,7 @@ export class World {
           changed = true;
         }
       }
-      if (fu[k] >= 100 && this.totalFungus < 30000 && ih(k, step + 37) % 48 < MOSS_R) {
+      if (fu[k] >= 100 && this.totalFungus < FUNGUS_CAP && ih(k, step + 37) % 48 < MOSS_R) {
         const n = nb[i * 4 + (ih(k, step + 39) & 3)];
         if (n >= 0 && !m.lava[n] && fu[n] === 0 && moist[n] >= 90 && this.lightBase[n] * day < 150 && Nu[n] >= 30) {
           Nu[n] -= 2;

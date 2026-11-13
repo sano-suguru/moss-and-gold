@@ -919,6 +919,33 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 床を生かす（src/world.ts の dripAt・mossStep、src/eco/step.ts の rotInto、src/eco/bat.ts の batDropping）：天井のしずくのまわりに苔が育ち、
+    // 死骸やねぐらの糞からキノコが生えて、苔かキノコ（20以上）のある床が広がる。入れる前の main は、main の10日目から18日目まで実行して4〜7％、入れた版は13〜18％。
+    // 18日目の地形（日次スナップショットの掘削のログを作業ツリーのコードで再生したもの）と、スナップショットの苔とキノコで数える
+    name: '苔かキノコのある床が広がる（4シードそれぞれで、18日目に開いた床の10％以上）',
+    ...RUN_A,
+    test: (rs) => {
+      const v = rs.map((r) => {
+        const st = r.state(r.to);
+        if (!st) return NaN;
+        const w = new World(r.seed);
+        for (const op of (st.digs ?? []) as number[]) (w as any).replayOp(op);
+        const m = w.map;
+        const mo = Buffer.from(st.moss as unknown as string, 'base64');
+        const fu = Buffer.from(st.fungus as unknown as string, 'base64');
+        let n = 0;
+        let g = 0;
+        for (let k = 0; k < m.solid.length; k++) {
+          if (m.solid[k] || m.sealed[k]) continue;
+          n++;
+          if (mo[k] >= 20 || fu[k] >= 20) g++;
+        }
+        return (100 * g) / n;
+      });
+      return { ok: v.every((x) => x >= 10), value: rs.map((r, i) => `${r.seed} ${v[i].toFixed(1)}％`).join('、') };
+    },
+  },
+  {
     // 溶岩をはさんだ空洞（src/world.ts の applyDig・openPocket）：溶岩のマスには閉じた空洞の印が付かないので、空洞を開くときに溶岩を越えて広げる。
     // 越えないと、溶岩の溜まりで分かれた空洞の片側が開いたときや、開いた側から溶岩の隣を掘り抜いたときに、溶岩の向こうの床が閉じたまま残る
     // （直す前の main では、16シード中8シードで起き、seed30・seed35・seed40 は25日のうち19〜20日、はじまりの洞窟は16日残っていた）。
