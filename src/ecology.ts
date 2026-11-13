@@ -592,11 +592,10 @@ export interface Cr {
   stone: number;
   /** バジリスクの見つめから目を背けている間の、終わる tick（src/eco/basilisk.ts）。背けている間は石化が進まず、相手を見ずに打つので傷が半分になる（src/eco/combat.ts の strike） */
   avert: number;
-  /**
-   * のどの渇き（src/eco/water.ts）：水を飲む種で、生き物の更新ごとに1ずつ増える。負の数は水を飲んでいる最中で、残りの回数。
-   * THIRST_MAX を超えた分は、水場で強い種が去るのを待った回数
-   */
+  /** のどの渇き（src/eco/water.ts）：水を飲む種で、生き物の更新ごとに1ずつ増える。負の数は水を飲んでいる最中で、残りの回数 */
   thirst: number;
+  /** 水場で、自分より強い種が去るのを待った回数（src/eco/water.ts。飲みはじめるか、あきらめたら0に戻す） */
+  waitW: number;
   /** 死骸ができたときの養分（腐り具合の目安） */
   init: number;
 }

@@ -7,9 +7,10 @@
  *   渇きが THIRST_MAX を超えたら、時刻に関わらず行く。渇いて死ぬことはない（水場が遠い者は行かず、渇きは THIRST_MAX で止まる）。
  * - 冒険者とドワーフは、一行や一団から離れないよう、通り道から8マスの内に水場があるときだけ立ち寄る。
  * - 水場に着いたら、DRINK_TIME 回のあいだ水際でかがんで飲み（Cr.thirst を負の数にして、残りの回数を数える）、渇きが0に戻る。
+ *   途中で打たれたり逃げたりして水際を離れたら、飲むのをやめて渇いたままにする。
  * - 弱い種は、水場のまわりに自分より強い種（STR が上で、同じ群れでない者）がいれば、少し離れた所で待ち、強い種が去ってから飲む
- *   （大ネズミだけは待たずに、その日はあきらめて引き返す）。
- *   待つのは WAIT_MAX 回まで（待った回数は、渇きの THIRST_MAX を超えた分で数える。過ぎたら、その日はあきらめて渇きを THIRSTY の半分にする）。腹を空かせた捕食者は、ふだんどおり狩る（水場の休戦にはしない）。
+ *   （いちばん弱い種、強さ WEAK_STR 以下は待たずに、その日はあきらめて引き返す）。眠っている者は数えない。
+ *   待つのは WAIT_MAX 回まで（待った回数は Cr.waitW。過ぎたら、その日はあきらめて渇きを THIRSTY の半分にする）。腹を空かせた捕食者は、ふだんどおり狩る（水場の休戦にはしない）。
  * - 水場（waterholes）は、どのマップにもある湧き水と、水（POOL_WATER より多い）のマスが POOL_MIN 以上まとまった水たまり。水の量は刻々と変わるので、
  *   ゲーム内の時間で決まった間隔（WH_EVERY tick ごと）にだけ作り直し、一覧をセーブに入れる（ロードし直しても同じ一覧になるように）。
  * - 水を飲みはじめたとき、その水場のまわりに3種以上いれば、水場ごとに生き物の更新 CROWD_GAP 回に1回だけ、賑わいとして記録する（分析用）。
@@ -31,6 +32,8 @@ const WINDOW: Partial<Record<Kind, 0 | 1 | 2>> = {
   [Kind.Bat]: 1, [Kind.Goblin]: 1, [Kind.Kobold]: 1, [Kind.Minotaur]: 1, [Kind.Orc]: 1,
   [Kind.Adventurer]: 2, [Kind.Dwarf]: 2,
 };
+/** いちばん弱い種とみなす強さ（STR がこれ以下の種は、水場で待たずに引き返し、腹が4割を切ったら水を飲みに行かない） */
+const WEAK_STR = 1;
 /** 渇いたとみなす値と、時刻に関わらず飲みに行く値（生き物の更新の回数。ゲーム内の1日は7200回） */
 const THIRSTY = 5000;
 const THIRST_MAX = 9000;
@@ -42,8 +45,9 @@ const WAIT_MAX = 150;
 /** 水たまりを水場とみなす、水の量と、まとまったマスの数（浅い水たまりも入れる。深い水だけでは、水場が3か所ほどのマップが多く、歩いて40マスの内に水場のない生き物が多かった） */
 const POOL_WATER = 10;
 const POOL_MIN = 5;
-/** 水場の一覧を作り直す間隔（tick） */
+/** 水場の一覧を作り直す間隔（tick）と、一覧が空のあいだの間隔 */
 const WH_EVERY = 2000;
+const WH_EMPTY_EVERY = 200;
 /** 水場の賑わいを記録する間隔（生き物の更新の回数） */
 const CROWD_GAP = 300;
 
@@ -63,9 +67,12 @@ function inWindow(k: Kind, p: number): boolean {
   return p >= 0.32 && p < 0.66;
 }
 
-/** 水場の一覧を作り直す（WH_EVERY tick ごと。最初の一回は一覧が空のとき） */
+/**
+ * 水場の一覧を作り直す（WH_EVERY tick ごと。一覧が空のあいだは WH_EMPTY_EVERY tick ごと。
+ * 空のときに毎回作り直すと、水場のないマップでは生き物の更新ごとにマップ全体をなめていた）
+ */
 export function updateWaterholes(this: Ecology): void {
-  if (this.waterholes.length && this.w.tick % WH_EVERY !== 0) return;
+  if (this.w.tick % (this.waterholes.length ? WH_EVERY : WH_EMPTY_EVERY) !== 0) return;
   const m = this.w.map;
   const W = m.w;
   const water = this.w.water;
@@ -98,8 +105,21 @@ export function updateWaterholes(this: Ecology): void {
       }
     }
     if (q.length < POOL_MIN) continue;
-    const x = (sx / q.length) * TILE + 8;
-    const y = (sy / q.length) * TILE + 8;
+    // 水場の位置は、水たまりのマスのうち重心にいちばん近いマス（重心そのものは、輪や U 字の水たまりでは岩の上に落ち、
+    // その洞窟の領域が求まらずに、誰も来ない水場になっていた）
+    const gx = sx / q.length;
+    const gy = sy / q.length;
+    let bk = q[0];
+    let bd = Infinity;
+    for (const t of q) {
+      const d = sq((t % W) - gx) + sq(Math.floor(t / W) - gy);
+      if (d < bd) {
+        bd = d;
+        bk = t;
+      }
+    }
+    const x = (bk % W) * TILE + 8;
+    const y = Math.floor(bk / W) * TILE + 8;
     if (!list.some((h) => Math.abs(h.x - x) < 6 * TILE && Math.abs(h.y - y) < 6 * TILE)) keep(x, y);
   }
   this.waterholes = list;
@@ -121,12 +141,13 @@ function nearestHole(e: Ecology, c: Cr, r: number): Waterhole | undefined {
 }
 
 /**
- * 水を飲む岸：水場の中心から5マスの内で、深くない（水が40以下の）床のうち、上下左右のどこかに水（10より多い）があるマスの中から、
- * その者にいちばん近いマスの中心（ピクセル）。なければ水場の中心。
+ * 水を飲む岸：水場の中心から5マスの内で、その者と同じ洞窟の領域にある深くない（水が40以下の）床のうち、上下左右のどこかに水（10より多い）があるマスの中から、
+ * その者にいちばん近いマスの中心（ピクセル）。なければ水場の中心（壁の向こうの岸を目指して、壁ぎわで足踏みしないように）。
  * （中心を目指すと、中心が深い水の中にある水たまりでは岸までしか行けず、着いたことにならないまま足踏みしていた）
  */
 function shoreFor(e: Ecology, h: Waterhole, c: Cr): [number, number] {
   const m = e.w.map;
+  const reg = e.regionOf(e.tileOf(c.x, c.y));
   const W = m.w;
   const water = e.w.water;
   const cx = Math.floor(h.x / TILE);
@@ -138,7 +159,7 @@ function shoreFor(e: Ecology, h: Waterhole, c: Cr): [number, number] {
     for (let x = cx - 5; x <= cx + 5; x++) {
       if (x < 1 || y < 1 || x >= W - 1 || y >= m.h - 1) continue;
       const k = y * W + x;
-      if (m.solid[k] || m.sealed[k] || m.lava[k] || water[k] > 40) continue;
+      if (m.solid[k] || m.sealed[k] || m.lava[k] || water[k] > 40 || e.regionOf(k) !== reg) continue;
       if (!(water[k] > 10 || water[k + 1] > 10 || water[k - 1] > 10 || water[k + W] > 10 || water[k - W] > 10)) continue;
       const px = x * TILE + 8;
       const py = y * TILE + 8;
@@ -150,6 +171,22 @@ function shoreFor(e: Ecology, h: Waterhole, c: Cr): [number, number] {
       }
     }
   return [bx, by];
+}
+
+/** その者のマスかまわり8マスに水（10より多い）があるか（水際にいるか） */
+function atWater(e: Ecology, c: Cr): boolean {
+  const m = e.w.map;
+  const k = e.tileOf(c.x, c.y);
+  if (k < 0) return false;
+  const x = k % m.w;
+  const y = Math.floor(k / m.w);
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++) {
+      const xx = x + dx;
+      const yy = y + dy;
+      if (xx >= 0 && yy >= 0 && xx < m.w && yy < m.h && e.w.water[yy * m.w + xx] > POOL_WATER) return true;
+    }
+  return false;
 }
 
 /**
@@ -165,15 +202,22 @@ export function thirstStep(this: Ecology, c: Cr): boolean {
   if (!DRINKERS.has(c.k) || c.away || c.elite) return false;
   // 飲んでいる最中（thirst が負）：水際でかがんだまま、残りの回数を数える
   if (c.thirst < 0) {
+    // 飲んでいる途中で打たれたり逃げたりして水際を離れていたら、飲むのをやめる（渇いたままにして、あとで飲み直しに行く）。
+    // （続けると、逃げた先の乾いた床で立ち止まって飲み続けていた）
+    if (!atWater(this, c)) {
+      c.thirst = THIRSTY;
+      return false;
+    }
     c.thirst++;
     c.act = 0;
-    if (c.thirst === 0 && this.step % 4 === c.id % 4) this.fxDrinks.push({ t: this.w.tick, x: Math.round(c.x), y: Math.round(c.y) });
     return c.thirst < 0;
   }
   if (c.thirst < THIRSTY) return false;
-  // 戦っている・逃げている・食べている・飢えかけている（腹が15%を切った。3割では、腹の上限の大きいコボルトがふだんから引っかかって、渇ききっても行かなかった）間は、水より先に。
-  // 大ネズミは腹が4割を切ったら行かない（いちばん弱く水場で待たされやすいので、15%では食べる時間が削られて、飢え死にの割合が倍になった）
-  if (c.flee > 0 || c.feed || c.run !== 0 || c.caught || this.w.tick - c.hitAt < 120 || c.food < SPEC[c.k].cap * (c.k === Kind.Rat ? 0.4 : 0.15)) return false;
+  // 戦っている・逃げている・人の気配から退いている・食べている・飢えかけている間は、水より先に。
+  // 飢えかけの線は腹の15%（3割では、腹の上限の大きいコボルトがふだんから引っかかって、渇ききっても行かなかった）。
+  // ただし、いちばん弱い種（強さ1以下。大ネズミ・コウモリ）は4割（水場で待たされやすく、15%では食べる時間が削られて、大ネズミの飢え死にの割合が倍になった）
+  const weak = STR[c.k] <= WEAK_STR;
+  if (c.flee > 0 || c.feed || c.run !== 0 || c.caught || this.retreats.has(c.id) || this.w.tick - c.hitAt < 120 || c.food < SPEC[c.k].cap * (weak ? 0.4 : 0.15)) return false;
   if (c.thirst < THIRST_MAX && !inWindow(c.k, this.phaseNow)) return false;
   const h = nearestHole(this, c, PASSERS.has(c.k) ? 8 : HOMEBODIES.has(c.k) ? HOME_R : WATER_R);
   if (!h) return false;
@@ -183,19 +227,20 @@ export function thirstStep(this: Ecology, c: Cr): boolean {
     const s = STR[c.k];
     let bigger = false;
     this.nearby(h.x, h.y, 3, (o) => {
-      if (bigger || o === c || o.dead || o.away || STR[o.k] <= s) return;
+      // 眠っている者は数えない（水場のそばで眠りこんだ大物がいると、その間だれも飲めなかった）
+      if (bigger || o === c || o.dead || o.away || o.sleep > 0 || STR[o.k] <= s) return;
       if (o.k === c.k && o.ref === c.ref) return;
       bigger = true;
     });
-    if (bigger && c.k === Kind.Rat) {
-      // 大ネズミは待たずに引き返す（いちばん弱く、たいてい誰かを待つことになり、そのぶん食べる時間が削られて飢え死にが増えた）
+    if (bigger && weak) {
+      // いちばん弱い種は待たずに引き返す（たいてい誰かを待つことになり、そのぶん食べる時間が削られて、大ネズミの飢え死にが増えた）
       c.thirst = THIRSTY >> 1;
       return false;
     }
     if (bigger) {
-      // 待った回数は、渇きの THIRST_MAX を超えた分で数える（ふだんの渇きは THIRST_MAX で止まるので、待つ間だけ上に積む）
-      c.thirst = Math.max(c.thirst, THIRST_MAX) + 1;
-      if (c.thirst > THIRST_MAX + WAIT_MAX) {
+      c.waitW++;
+      if (c.waitW > WAIT_MAX) {
+        c.waitW = 0;
         c.thirst = THIRSTY >> 1;
         return false;
       }
@@ -214,6 +259,7 @@ export function thirstStep(this: Ecology, c: Cr): boolean {
   if (sq(sx - c.x) + sq(sy - c.y) < sq(0.8 * TILE) || d2 < sq(1.6 * TILE)) {
     // 着いた：飲みはじめる
     c.thirst = -DRINK_TIME;
+    c.waitW = 0;
     c.act = 0;
     this.fxDrinks.push({ t: this.w.tick, x: Math.round(c.x), y: Math.round(c.y) });
     if (this.fxDrinks.length > 60) this.fxDrinks.splice(0, 20);

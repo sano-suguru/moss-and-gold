@@ -142,12 +142,6 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       this.metabolism(c);
       continue;
     }
-    // のどが渇いていれば水場へ行って飲む（src/eco/water.ts）。追い払いや警戒、縄張りの見回りより先に見る
-    // （後ろに置くと、手前の処理でその回の行動が決まることの多い種は、渇ききっても水場へ行かなかった）。技の溜めの最中は行かない
-    if (this.thirstStep(c)) {
-      this.metabolism(c);
-      continue;
-    }
     // オークの技（雄叫び・投げ斧）の溜めと、使う判断（src/eco/orcskill.ts）
     if (c.k === Kind.Orc && this.orcSkill(c)) {
       this.metabolism(c);
@@ -163,7 +157,19 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       this.metabolism(c);
       continue;
     }
-    if ((c.k === Kind.Orc && this.orcWary(c)) || this.heedAlarm(c) || this.fearFire(c) || this.lurk(c) || this.territory(c) || this.retreatStep(c) || this.shyOfPeople(c)) {
+    // 身の危険への反応（オークの見極め、群れの警報、火への怖れ）は、水より先
+    if ((c.k === Kind.Orc && this.orcWary(c)) || this.heedAlarm(c) || this.fearFire(c)) {
+      this.metabolism(c);
+      continue;
+    }
+    // のどが渇いていれば水場へ行って飲む（src/eco/water.ts）。待ち伏せ・縄張りの見回り・人を避ける処理・物音への聞き耳より先に見る
+    // （後ろに置くと、それらでその回の行動が決まることの多い種は、渇ききっても水場へ行かなかった）。
+    // 渇いていない者には何もしないので、渇いていない者の判断の順番は以前と同じ
+    if (this.thirstStep(c)) {
+      this.metabolism(c);
+      continue;
+    }
+    if (this.lurk(c) || this.territory(c) || this.retreatStep(c) || this.shyOfPeople(c)) {
       this.metabolism(c);
       continue;
     }
