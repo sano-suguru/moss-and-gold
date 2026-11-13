@@ -26,9 +26,52 @@ export function tilePassable(this: Ecology, c: Cr, k: number): boolean {
   if (c.k === Kind.Troll && this.dayNow > 0.05 && this.w.lightBase[k] * this.dayNow > 150) return false;
   if (flies(c)) return true;
   if (m.lava[k]) return false;
-  if (this.statueAt.has(k) && this.tileOf(c.x, c.y) !== k) return false;
+  if (this.statueAt.size > 0 && this.statueAt.has(k) && this.tileOf(c.x, c.y) !== k) return false;
   // 大ネズミは深い水に入らない。ただし、水かさが増して深い水に取り残されたら、泳いで抜け出せる
   if (c.k === Kind.Rat && this.w.water[k] > 40 && this.ratOnDry(c)) return false;
+  return true;
+}
+
+/**
+ * 道を探す間に、マスが通れるかを速く調べるための準備（tilePassable と同じ答え）。探す間は、探す者も昼の明るさも変わらないので、
+ * 種・飛んでいるか・自分のいるマス・大ネズミが乾いた所にいるか、を探す前に一度だけ求めておき、マスごとには地形だけを見る
+ */
+let pSolid: Uint8Array;
+let pLava: Uint8Array;
+let pLight: Uint16Array;
+let pWater: Int32Array;
+let pStatue: Map<number, number>;
+let pWorm = false;
+let pTroll = false;
+let pDay = 0;
+let pFly = false;
+let pHere = -1;
+let pStat = false;
+let pRat = false;
+function beginPass(eco: Ecology, c: Cr): void {
+  const m = eco.w.map;
+  pSolid = m.solid;
+  pLava = m.lava;
+  pLight = eco.w.lightBase;
+  pWater = eco.w.water;
+  pStatue = eco.statueAt;
+  pWorm = c.k === Kind.Worm;
+  pDay = eco.dayNow;
+  pTroll = c.k === Kind.Troll && pDay > 0.05;
+  pFly = flies(c);
+  pHere = eco.tileOf(c.x, c.y);
+  pStat = eco.statueAt.size > 0;
+  pRat = c.k === Kind.Rat && eco.ratOnDry(c);
+}
+/** beginPass のあとで、マス k が通れるか（tilePassable と同じ判定を同じ順で） */
+function passK(k: number): boolean {
+  if (pWorm) return true;
+  if (pSolid[k]) return false;
+  if (pTroll && pLight[k] * pDay > 150) return false;
+  if (pFly) return true;
+  if (pLava[k]) return false;
+  if (pStat && pStatue.has(k) && pHere !== k) return false;
+  if (pRat && pWater[k] > 40) return false;
   return true;
 }
 
@@ -74,6 +117,25 @@ export function nearPath(this: Ecology, c: Cr, from: number, to: number): number
   if (from < 0 || to < 0) return [];
   const tx = to % m.w;
   const ty = (to / m.w) | 0;
+  // 直前の findPathAvoid が、同じ者・同じ出発点から避けるマスなしで探して道が見つからなかったのなら、その探索で調べたマスは、
+  // ここで探すマスとまったく同じ（隣を見る順も上限も同じで、目的地には届かなかった）。探し直さずに、そのとき調べた順（bq）から選ぶ
+  if (this.bfsMiss === this.bgen && this.bfsMissFrom === from && this.bfsMissId === c.id) {
+    const q = this.bq;
+    let best = from;
+    let bd = sq((from % m.w) - tx) + sq(((from / m.w) | 0) - ty);
+    for (let i = 0; i < this.bfsMissN; i++) {
+      const cur = q[i];
+      const d0 = sq((cur % m.w) - tx) + sq(((cur / m.w) | 0) - ty);
+      if (d0 < bd) {
+        bd = d0;
+        best = cur;
+      }
+    }
+    const path: number[] = [];
+    for (let k = best; k !== -1 && k !== from; k = this.bprev[k]) path.push(k);
+    path.reverse();
+    return path;
+  }
   const g = ++this.bgen;
   const q = this.bq;
   let qh = 0;
@@ -84,6 +146,7 @@ export function nearPath(this: Ecology, c: Cr, from: number, to: number): number
   let best = from;
   let bd = sq((from % m.w) - tx) + sq(((from / m.w) | 0) - ty);
   const limit = this.searchLimit(c);
+  beginPass(this, c);
   while (qh < qt && qh < limit) {
     const cur = q[qh++];
     const x = cur % m.w;
@@ -95,7 +158,7 @@ export function nearPath(this: Ecology, c: Cr, from: number, to: number): number
     }
     for (let d = 0; d < 4; d++) {
       const n = d === 0 ? (x + 1 < m.w ? cur + 1 : -1) : d === 1 ? (x > 0 ? cur - 1 : -1) : d === 2 ? (y + 1 < m.h ? cur + m.w : -1) : y > 0 ? cur - m.w : -1;
-      if (n < 0 || this.bmark[n] === g || !this.tilePassable(c, n)) continue;
+      if (n < 0 || this.bmark[n] === g || !passK(n)) continue;
       this.bmark[n] = g;
       this.bprev[n] = cur;
       q[qt++] = n;
@@ -114,6 +177,8 @@ export function unreachable(this: Ecology, c: Cr): number {
 
 export function findPathAvoid(this: Ecology, c: Cr, from: number, to: number, avoid: ((k: number) => boolean) | null): number[] | null {
   const m = this.w.map;
+  // 覚えている「道が見つからなかった探索」は、すぐあとの nearPath でだけ使う（ここで探さずに返すときも、古い探索を使わせない）
+  this.bfsMiss = -1;
   if (from < 0 || to < 0 || !this.tilePassable(c, to)) return null;
   const g = ++this.bgen;
   const q = this.bq;
@@ -123,6 +188,7 @@ export function findPathAvoid(this: Ecology, c: Cr, from: number, to: number, av
   this.bmark[from] = g;
   this.bprev[from] = -1;
   const limit = this.searchLimit(c);
+  beginPass(this, c);
   while (qh < qt && qh < limit) {
     const cur = q[qh++];
     if (cur === to) break;
@@ -130,13 +196,22 @@ export function findPathAvoid(this: Ecology, c: Cr, from: number, to: number, av
     const y = (cur / m.w) | 0;
     for (let d = 0; d < 4; d++) {
       const n = d === 0 ? (x + 1 < m.w ? cur + 1 : -1) : d === 1 ? (x > 0 ? cur - 1 : -1) : d === 2 ? (y + 1 < m.h ? cur + m.w : -1) : y > 0 ? cur - m.w : -1;
-      if (n < 0 || this.bmark[n] === g || !this.tilePassable(c, n) || (avoid && avoid(n))) continue;
+      if (n < 0 || this.bmark[n] === g || !passK(n) || (avoid && avoid(n))) continue;
       this.bmark[n] = g;
       this.bprev[n] = cur;
       q[qt++] = n;
     }
   }
-  if (this.bmark[to] !== g) return null;
+  if (this.bmark[to] !== g) {
+    // 道が見つからなかった探索を覚えておく（すぐあとに nearPath が同じ探索をし直さないように）
+    if (!avoid) {
+      this.bfsMiss = g;
+      this.bfsMissFrom = from;
+      this.bfsMissId = c.id;
+      this.bfsMissN = qh;
+    }
+    return null;
+  }
   const path: number[] = [];
   for (let k = to; k !== -1 && k !== from; k = this.bprev[k]) path.push(k);
   path.reverse();

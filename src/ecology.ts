@@ -803,6 +803,11 @@ export class Ecology {
   bprev: Int32Array;
   bmark: Int32Array;
   bgen = 0;
+  /** 道が見つからなかった直前の探索（その回の bgen、出発点、探した者、調べたマスの数）。src/eco/move.ts の nearPath が使う */
+  bfsMiss = -1;
+  bfsMissFrom = -1;
+  bfsMissId = -1;
+  bfsMissN = 0;
 
   constructor(readonly w: World) {
     const N = w.map.w * w.map.h;
@@ -944,9 +949,12 @@ export class Ecology {
 
   /** いまの tick に明るいマス（光源と、光る生き物の光が届く所。壁の遮りは見ない）。生き物の更新ごとに作り直す */
   litMap = new Uint8Array(0);
-  litMapStep = -1;
+  /** 明るさのマップに印を付けたマス（次に作り直すとき、ここだけ消す） */
   litMarked: number[] = [];
   litMapTick = -1;
+  /** 明るさのマップを作る間に、マスごとに、そこを中心に描いた最大の円（src/eco/senses.ts の buildLitMap） */
+  litCenter = new Int32Array(0);
+  litBuild = 0;
 
   /** 火を怖がる野の獣 */
   /** クモの巣の大きさ（半径 px。2×2マスほど。通路をまたいでふさぐ） */
