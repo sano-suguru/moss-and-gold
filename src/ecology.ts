@@ -596,6 +596,9 @@ export interface Cr {
   thirst: number;
   /** 水場で、自分より強い種が去るのを待った回数（src/eco/water.ts。飲みはじめるか、あきらめたら0に戻す） */
   waitW: number;
+  /** 群れの識別のキャッシュ（セーブしない）：gkAt が今の生き物の更新の番号のとき、その更新の初めに求めた群れの識別が gk（src/eco/groups.ts の buildGroups） */
+  gk: string | null;
+  gkAt: number;
   /** 死骸ができたときの養分（腐り具合の目安） */
   init: number;
 }
@@ -878,8 +881,6 @@ export class Ecology {
   /** 警戒：群れの仲間が襲われた（群れの識別キー → step 番号、襲ってきた相手、場所） */
   alarms = new Map<string, { t: number; foe: number; x: number; y: number }>();
 
-  /** 群れの識別キーのキャッシュ（生き物の更新ごとに、群れの一覧を作るときに作り直す。更新の途中で変わった者はキャッシュを使わずに求める） */
-  gkCache = new Map<number, string | null>();
   /** 群れの識別キーの文字列のキャッシュ（種と二つの数が同じなら同じ文字列。作り直しを減らすだけで、値は同じ） */
   gkMemo = new Map<number, [string, number, number, string]>();
 
@@ -944,9 +945,12 @@ export class Ecology {
 
   /** いまの tick に明るいマス（光源と、光る生き物の光が届く所。壁の遮りは見ない）。生き物の更新ごとに作り直す */
   litMap = new Uint8Array(0);
-  litMapStep = -1;
+  /** 明るさのマップに印を付けたマス（次に作り直すとき、ここだけ消す） */
   litMarked: number[] = [];
   litMapTick = -1;
+  /** 明るさのマップを作る間に、マスごとに、そこを中心に描いた最大の円（src/eco/senses.ts の buildLitMap） */
+  litCenter = new Int32Array(0);
+  litBuild = 0;
 
   /** 火を怖がる野の獣 */
   /** クモの巣の大きさ（半径 px。2×2マスほど。通路をまたいでふさぐ） */

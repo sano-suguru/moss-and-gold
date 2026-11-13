@@ -6,6 +6,7 @@
 import { spawn } from 'child_process';
 import { generate, MAP_W, MAP_H } from '../src/mapgen';
 import { World, DAY_TICKS } from '../src/world';
+import { crLights, LIGHT_ELITE, LIGHT_KIND } from '../src/eco/adventurer';
 import { decodeState, encodeState, readState } from '../tools/analysis/lib/state';
 import { join } from 'path';
 
@@ -55,6 +56,26 @@ check(fnv(generate('かしたれ').solid) !== fnv(generate('abc').solid), '別�
   m.solid[y * MAP_W + x + 1] = 0;
   const freed = w.eco.stepOk(c, x * 16 + 15, y * 16 + 15, x * 16 + 17, y * 16 + 17);
   check(blocked && inside && freed, `岩の角をすり抜けて斜めのマスへ入らない（上下左右のどちらかが開いていれば斜めに進める）`);
+}
+{
+  // 明るさのマップと描画は、光を出しうる種と光る格（LIGHT_KIND・LIGHT_ELITE）に当たらない者を先に飛ばす。
+  // すべての種・格・松明・職の組み合わせで、生き物の光（crLights）が光を出すなら、表のどちらかに当たっていること
+  const w = new World('かしたれ');
+  const c = w.eco.spawn(0, 100, 100, 10, 10);
+  // 種の番号は 0 から順（src/names.ts）。足されても漏れないよう、多めに見る
+  const bad: string[] = [];
+  let tried = 0;
+  for (let k = 0; k < 64; k++)
+    for (let elite = 0; elite < 16; elite++)
+      for (const torch of [0, 1])
+        for (let sp = 0; sp < 32; sp++) {
+          Object.assign(c, { k, elite, torch, sp });
+          let lights = 0;
+          crLights(c, () => lights++);
+          if (lights) tried++;
+          if (lights > 0 && !LIGHT_KIND[k] && !LIGHT_ELITE[elite]) bad.push(`種${k} 格${elite} 松明${torch} 職${sp}`);
+        }
+  check(tried > 0 && bad.length === 0, `光を出す者は、光を出しうる種か光る格の表に入っている${bad.length ? `（漏れ：${bad.slice(0, 5).join('、')}）` : ''}`);
 }
 {
   // 30個のシードで、溶岩を除いた床がすべて入口から歩いて行けること

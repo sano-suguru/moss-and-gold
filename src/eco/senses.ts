@@ -133,27 +133,75 @@ export function retreatStep(this: Ecology, c: Cr): boolean {
   return true;
 }
 
+/** 半径 R マスの円に入るマスの、中心からのずれ（dx, dy を交互に）。R ごとに一度だけ作る */
+const DISKS: Int8Array[] = [];
+function diskOf(R: number): Int8Array {
+  let d = DISKS[R];
+  if (d) return d;
+  const a: number[] = [];
+  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) if (dx * dx + dy * dy <= R * R) a.push(dx, dy);
+  d = DISKS[R] = Int8Array.from(a);
+  return d;
+}
+
+/**
+ * 明るさのマップ（litMap）を作り直す：光源（eachLight）ごとに、光の届く円（半径は光の強さの7割）に入るマスに印を付ける。
+ * 生き物の更新の初めに毎回作る。速さのため、次の二つで手間を省く（印の付く場所は省かないときと同じ）：
+ * - 円に入るマスのずれは、半径ごとに前もって計算しておく（diskOf）。
+ * - 同じマスを中心に、同じかより大きい円を、この回に既に描いていれば描かない（ウィスプやスライムが群れていると多い）。
+ *   中心ごとに、この回に描いた最大の半径を覚える（litCenter。値は「作り直しの回の番号×16＋半径＋1」で、回が変われば古い値は無視される）
+ */
 export function buildLitMap(this: Ecology): void {
   const m = this.w.map;
-  if (this.litMap.length !== m.w * m.h) this.litMap = new Uint8Array(m.w * m.h);
-  else for (const k of this.litMarked) this.litMap[k] = 0;
-  this.litMarked = [];
+  const W = m.w;
+  const H = m.h;
+  if (this.litMap.length !== W * H) {
+    this.litMap = new Uint8Array(W * H);
+    this.litCenter = new Int32Array(W * H);
+    this.litBuild = 0;
+  } else for (const k of this.litMarked) this.litMap[k] = 0;
+  const lit = this.litMap;
+  const center = this.litCenter;
+  const marked = this.litMarked;
+  marked.length = 0;
+  // 回の番号は16倍して半径と同じ値に詰めるので、大きくなりすぎたら番号を振り直す
+  if (++this.litBuild > 0x7ffff) {
+    center.fill(0);
+    this.litBuild = 1;
+  }
+  const stamp = this.litBuild * 16;
   this.eachLight((lx, ly, lr) => {
     const R = Math.floor((lr * 0.7) / TILE);
     const cx = Math.floor(lx / TILE);
     const cy = Math.floor(ly / TILE);
-    for (let dy = -R; dy <= R; dy++)
-      for (let dx = -R; dx <= R; dx++) {
-        if (dx * dx + dy * dy > R * R) continue;
-        const x = cx + dx;
-        const y = cy + dy;
-        if (x >= 0 && y >= 0 && x < m.w && y < m.h && !this.litMap[y * m.w + x]) {
-          this.litMap[y * m.w + x] = 1;
-          this.litMarked.push(y * m.w + x);
+    const inside = cx >= 0 && cy >= 0 && cx < W && cy < H;
+    if (inside && R < 15) {
+      const c0 = cy * W + cx;
+      const prev = center[c0];
+      if (prev > stamp && prev - stamp - 1 >= R) return;
+      center[c0] = stamp + R + 1;
+    }
+    const d = diskOf(R);
+    if (cx - R >= 0 && cy - R >= 0 && cx + R < W && cy + R < H) {
+      const base = cy * W + cx;
+      for (let i = 0; i < d.length; i += 2) {
+        const k = base + d[i + 1] * W + d[i];
+        if (!lit[k]) {
+          lit[k] = 1;
+          marked.push(k);
         }
       }
+      return;
+    }
+    for (let i = 0; i < d.length; i += 2) {
+      const x = cx + d[i];
+      const y = cy + d[i + 1];
+      if (x >= 0 && y >= 0 && x < W && y < H && !lit[y * W + x]) {
+        lit[y * W + x] = 1;
+        marked.push(y * W + x);
+      }
+    }
   });
-  this.litMapStep = this.step;
   this.litMapTick = this.w.tick;
 }
 

@@ -18,22 +18,94 @@ function flies(c: Cr): boolean {
   return c.k === Kind.Wisp || c.k === Kind.Bat || c.k === Kind.Ghost || c.k === Kind.Wyvern || (c.k === Kind.Gargoyle && c.act !== 0) || (c.k === Kind.Dragon && c.st === 2) || (c.k === Kind.Vampire && c.st === VAMP_SCATTER);
 }
 
+/**
+ * マスが通れるかの判定（tilePassable と、道を探す幅優先探索の両方が、この一つの判定を使う）。
+ * 探す間は、探す者も昼の明るさも変わらないので、者で決まる部分（種・飛んでいるか・トロールと昼の明るさ）を begin で一度だけ求め、
+ * ok ではマスごとに地形だけを見る。自分のいるマスと、大ネズミが乾いた所にいるかは、要るときに一度だけ求める。
+ * 使い終わったら end で世界の配列への参照を手放す（新しいゲームを始めたあとに、古い世界を持ち続けないように）
+ */
+const NO8 = new Uint8Array(0);
+const NO16 = new Uint16Array(0);
+const NO32 = new Int32Array(0);
+class PassTest {
+  private eco: Ecology | null = null;
+  private c: Cr | null = null;
+  private solid: Uint8Array = NO8;
+  private lava: Uint8Array = NO8;
+  private light: Uint16Array = NO16;
+  private water: Int32Array = NO32;
+  private worm = false;
+  private troll = false;
+  private day = 0;
+  private fly = false;
+  private stat = false;
+  private rat = false;
+  /** 自分のいるマス（-2 はまだ求めていない） */
+  private here = -2;
+  /** 大ネズミが乾いた所にいるか（0 まだ求めていない、1 乾いた所、2 深い水の中） */
+  private dry = 0;
+  begin(eco: Ecology, c: Cr): this {
+    const m = eco.w.map;
+    this.eco = eco;
+    this.c = c;
+    this.solid = m.solid;
+    this.lava = m.lava;
+    this.light = eco.w.lightBase;
+    this.water = eco.w.water;
+    this.worm = c.k === Kind.Worm;
+    this.day = eco.dayNow;
+    this.troll = c.k === Kind.Troll && this.day > 0.05;
+    this.fly = flies(c);
+    this.stat = eco.statueAt.size > 0;
+    this.rat = c.k === Kind.Rat;
+    this.here = -2;
+    this.dry = 0;
+    return this;
+  }
+  ok(k: number): boolean {
+    if (this.worm) return true;
+    if (this.solid[k]) return false;
+    // トロールは昼のあいだ、光の筋の差すマスを通らない（石にならないように）
+    if (this.troll && this.light[k] * this.day > 150) return false;
+    if (this.fly) return true;
+    if (this.lava[k]) return false;
+    // 石像のあるマスは通れない（自分が石像のマスに立っているときは、そのマスから出られるように通れる）
+    if (this.stat && (this.eco as Ecology).statueAt.has(k)) {
+      if (this.here === -2) this.here = (this.eco as Ecology).tileOf((this.c as Cr).x, (this.c as Cr).y);
+      if (this.here !== k) return false;
+    }
+    // 大ネズミは深い水に入らない。ただし、水かさが増して深い水に取り残されたら、泳いで抜け出せる
+    if (this.rat && this.water[k] > 40) {
+      if (this.dry === 0) this.dry = (this.eco as Ecology).ratOnDry(this.c as Cr) ? 1 : 2;
+      if (this.dry === 1) return false;
+    }
+    return true;
+  }
+  end(): void {
+    this.eco = null;
+    this.c = null;
+    this.solid = NO8;
+    this.lava = NO8;
+    this.light = NO16;
+    this.water = NO32;
+  }
+}
+/** 一マスだけ調べるとき（tilePassable）と、道を探すとき（幅優先探索）で、別々に持つ（探す途中で tilePassable が呼ばれても混ざらない） */
+const onePass = new PassTest();
+const bfsPass = new PassTest();
+
 export function tilePassable(this: Ecology, c: Cr, k: number): boolean {
-  const m = this.w.map;
-  if (c.k === Kind.Worm) return true;
-  if (m.solid[k]) return false;
-  // トロールは昼のあいだ、光の筋の差すマスを通らない（石にならないように）
-  if (c.k === Kind.Troll && this.dayNow > 0.05 && this.w.lightBase[k] * this.dayNow > 150) return false;
-  if (flies(c)) return true;
-  if (m.lava[k]) return false;
-  if (this.statueAt.has(k) && this.tileOf(c.x, c.y) !== k) return false;
-  // 大ネズミは深い水に入らない。ただし、水かさが増して深い水に取り残されたら、泳いで抜け出せる
-  if (c.k === Kind.Rat && this.w.water[k] > 40 && this.ratOnDry(c)) return false;
-  return true;
+  const ok = onePass.begin(this, c).ok(k);
+  onePass.end();
+  return ok;
 }
 
 /** マス単位の幅優先探索で道筋を作る（見つからなければ null） */
-export function findPath(this: Ecology, c: Cr, from: number, to: number): number[] | null {
+/**
+ * near を渡すと、道が見つからなかったとき、最後の探索で調べたマスのうち目的地にいちばん近いマスまでの道を near.path に入れる
+ * （nearPath と同じ道。goTo が、同じ探索をもう一度しないように）。最後の探索をしなかったとき（目的地のマスに立てないなど）は null のまま
+ */
+export function findPath(this: Ecology, c: Cr, from: number, to: number, near?: { path: number[] | null }): number[] | null {
   // ゴブリンは、コボルトの縄張りをできるだけ横切らない（縄張りを通らない道筋を先に探し、なければふつうに探す）
   if (c.k === Kind.Goblin && c.st < 15 && from >= 0 && to >= 0 && this.warrens.some((o) => o.id >= 0)) {
     const m = this.w.map;
@@ -53,7 +125,7 @@ export function findPath(this: Ecology, c: Cr, from: number, to: number): number
     const p = this.advPath(c, from, to);
     if (p) return p;
   }
-  return this.findPathAvoid(c, from, to, null);
+  return this.findPathAvoid(c, from, to, null, near);
 }
 
 /**
@@ -72,8 +144,6 @@ export function searchLimit(this: Ecology, c: Cr): number {
 export function nearPath(this: Ecology, c: Cr, from: number, to: number): number[] {
   const m = this.w.map;
   if (from < 0 || to < 0) return [];
-  const tx = to % m.w;
-  const ty = (to / m.w) | 0;
   const g = ++this.bgen;
   const q = this.bq;
   let qh = 0;
@@ -81,24 +151,41 @@ export function nearPath(this: Ecology, c: Cr, from: number, to: number): number
   q[qt++] = from;
   this.bmark[from] = g;
   this.bprev[from] = -1;
-  let best = from;
-  let bd = sq((from % m.w) - tx) + sq(((from / m.w) | 0) - ty);
   const limit = this.searchLimit(c);
+  const pass = bfsPass.begin(this, c);
   while (qh < qt && qh < limit) {
     const cur = q[qh++];
     const x = cur % m.w;
     const y = (cur / m.w) | 0;
-    const d0 = sq(x - tx) + sq(y - ty);
-    if (d0 < bd) {
-      bd = d0;
-      best = cur;
-    }
     for (let d = 0; d < 4; d++) {
       const n = d === 0 ? (x + 1 < m.w ? cur + 1 : -1) : d === 1 ? (x > 0 ? cur - 1 : -1) : d === 2 ? (y + 1 < m.h ? cur + m.w : -1) : y > 0 ? cur - m.w : -1;
-      if (n < 0 || this.bmark[n] === g || !this.tilePassable(c, n)) continue;
+      if (n < 0 || this.bmark[n] === g || !pass.ok(n)) continue;
       this.bmark[n] = g;
       this.bprev[n] = cur;
       q[qt++] = n;
+    }
+  }
+  pass.end();
+  return this.pathToNearest(from, to, qh);
+}
+
+/**
+ * 直前の幅優先探索で調べた順（bq の初めの n マス）のうち、目的地 to にいちばん近い（まっすぐ測って。同じなら先に調べたほう）マスまでの道。
+ * 出発点がいちばん近ければ空の道
+ */
+export function pathToNearest(this: Ecology, from: number, to: number, n: number): number[] {
+  const W = this.w.map.w;
+  const tx = to % W;
+  const ty = (to / W) | 0;
+  const q = this.bq;
+  let best = from;
+  let bd = sq((from % W) - tx) + sq(((from / W) | 0) - ty);
+  for (let i = 0; i < n; i++) {
+    const cur = q[i];
+    const d0 = sq((cur % W) - tx) + sq(((cur / W) | 0) - ty);
+    if (d0 < bd) {
+      bd = d0;
+      best = cur;
     }
   }
   const path: number[] = [];
@@ -112,7 +199,8 @@ export function unreachable(this: Ecology, c: Cr): number {
   return this.paths.get(c.id)?.miss ?? 0;
 }
 
-export function findPathAvoid(this: Ecology, c: Cr, from: number, to: number, avoid: ((k: number) => boolean) | null): number[] | null {
+/** 避けるマス（avoid）を通らずに道を探す。near は findPath と同じ（避けるマスなしで探して見つからなかったときだけ入れる） */
+export function findPathAvoid(this: Ecology, c: Cr, from: number, to: number, avoid: ((k: number) => boolean) | null, near?: { path: number[] | null }): number[] | null {
   const m = this.w.map;
   if (from < 0 || to < 0 || !this.tilePassable(c, to)) return null;
   const g = ++this.bgen;
@@ -123,6 +211,7 @@ export function findPathAvoid(this: Ecology, c: Cr, from: number, to: number, av
   this.bmark[from] = g;
   this.bprev[from] = -1;
   const limit = this.searchLimit(c);
+  const pass = bfsPass.begin(this, c);
   while (qh < qt && qh < limit) {
     const cur = q[qh++];
     if (cur === to) break;
@@ -130,13 +219,19 @@ export function findPathAvoid(this: Ecology, c: Cr, from: number, to: number, av
     const y = (cur / m.w) | 0;
     for (let d = 0; d < 4; d++) {
       const n = d === 0 ? (x + 1 < m.w ? cur + 1 : -1) : d === 1 ? (x > 0 ? cur - 1 : -1) : d === 2 ? (y + 1 < m.h ? cur + m.w : -1) : y > 0 ? cur - m.w : -1;
-      if (n < 0 || this.bmark[n] === g || !this.tilePassable(c, n) || (avoid && avoid(n))) continue;
+      if (n < 0 || this.bmark[n] === g || !pass.ok(n) || (avoid && avoid(n))) continue;
       this.bmark[n] = g;
       this.bprev[n] = cur;
       q[qt++] = n;
     }
   }
-  if (this.bmark[to] !== g) return null;
+  pass.end();
+  if (this.bmark[to] !== g) {
+    // 避けるマスなしで探して届かなかったなら、調べたマスは nearPath が探すマスとまったく同じ（隣を見る順も上限も同じ）。
+    // 頼まれていれば、ここで近づけるだけ近づく道を作る（nearPath が同じ探索をもう一度しないように）
+    if (near && !avoid) near.path = this.pathToNearest(from, to, qh);
+    return null;
+  }
   const path: number[] = [];
   for (let k = to; k !== -1 && k !== from; k = this.bprev[k]) path.push(k);
   path.reverse();
@@ -181,10 +276,12 @@ export function goTo(this: Ecology, c: Cr, tx: number, ty: number, speed: number
   // 道が見つからなかった目的地は、生き物の更新40回ごとに探し直す（掘られて道ができているかもしれない）
   if (!p || (p.gk !== gk && ((p.path.length === 0 && p.miss === 0) || this.step - p.at > 8)) || p.stall > 60 || (p.miss > 0 && this.step - p.at >= 40)) {
     const from = this.tileOf(c.x, c.y);
-    const path = this.findPath(c, from, gk);
+    const near: { path: number[] | null } = { path: null };
+    const path = this.findPath(c, from, gk, near);
     if (!path) {
       // 道がない：壁に押しつけて足踏みし続けないよう、目的地にいちばん近づけるマスまで歩いて、そこで立ち止まる
-      p = { gx: tx, gy: ty, gk, at: this.step, path: this.nearPath(c, from, gk), pi: 0, stall: 0, miss: (p?.miss ?? 0) + 1 };
+      // （道探しが近づけるだけ近づく道を作っていればそれを使い、作っていなければ nearPath で探す）
+      p = { gx: tx, gy: ty, gk, at: this.step, path: near.path ?? this.nearPath(c, from, gk), pi: 0, stall: 0, miss: (p?.miss ?? 0) + 1 };
       this.paths.set(c.id, p);
     } else {
       p = { gx: tx, gy: ty, gk, at: this.step, path, pi: 0, stall: 0, miss: 0 };
@@ -309,7 +406,7 @@ export function spawn(this: Ecology, k: Kind, x: number, y: number, body: number
   const c: Cr = {
     id: this.nextId++, k, x, y, px: x, py: y, vx: 0, vy: 0, dir: 0, act: 0, actT: 0,
     body, food, glow: 0, hungry: 0, sinceMeal: 0, st: 0, hx: x, hy: y, tx: x, ty: y,
-    dead: 0, units: 0, away: false, caught: false, ref: 0, sp: k, init: 0, ref2: 0, gold: 0, party: 0, torch: 0, hp: 0, hitAt: -99, foe: 0, flee: 0, gait: 0, bornAt: bornHere && this.w ? this.w.tick : -1e9, sleep: 0, drowsy: 0, lure: 0, lureAt: 0, feed: 0, mana: 0, elite: 0, cast: -1e9, poison: 0, poisonBy: -1, stun: 0, kb: 0, kbx: 0, kby: 0, run: 0, aim: 0, bind: 0, doze: 0, sporeAt: -1e9, stone: 0, avert: 0, thirst: 0, waitW: 0,
+    dead: 0, units: 0, away: false, caught: false, ref: 0, sp: k, init: 0, ref2: 0, gold: 0, party: 0, torch: 0, hp: 0, hitAt: -99, foe: 0, flee: 0, gait: 0, bornAt: bornHere && this.w ? this.w.tick : -1e9, sleep: 0, drowsy: 0, lure: 0, lureAt: 0, feed: 0, mana: 0, elite: 0, cast: -1e9, poison: 0, poisonBy: -1, stun: 0, kb: 0, kbx: 0, kby: 0, run: 0, aim: 0, bind: 0, doze: 0, sporeAt: -1e9, stone: 0, avert: 0, thirst: 0, waitW: 0, gk: null, gkAt: -1,
   };
   this.list.push(c);
   this.byId.set(c.id, c);
@@ -550,11 +647,12 @@ export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
         if (!(ahead > 0 && ahead < gap && side < gap * 0.6)) return;
         // 前の仲間がこちらへ向かってくる（向きが逆）なら、列ではなくすれ違い：ゆるめずに脇へよける
         // （以前は向かい合った二匹が互いにゆるめ合い、細い通路で押し戻し合って進めず、苔のそばで飢えていた）
-        const od = o.dir === 0 ? [0, 1] : o.dir === 1 ? [0, -1] : o.dir === 2 ? [1, 0] : [-1, 0];
+        const odx = o.dir === 0 || o.dir === 1 ? 0 : o.dir === 2 ? 1 : -1;
+        const ody = o.dir === 0 ? 1 : o.dir === 1 ? -1 : 0;
         // 前の仲間が同じ向きへ進んでいるとき（列になっているとき）だけ歩みをゆるめる。横切っている、別の向きへ歩いている仲間は、脇へよけて追い越す
         // （以前は向きが逆でなければゆるめていたので、仲間がいつもまわりにいるアリの巣のそばでは、横切る仲間のたびに歩みをゆるめ続け、
         //  脚を動かしたままほとんど進まず、足踏みして見えていた）
-        const along = od[0] * hx + od[1] * hy;
+        const along = odx * hx + ody * hy;
         if (o.act === 1 && o.sleep <= 0 && along > 0.5) slow = ahead < gap * 0.5 ? 0.15 : 0.5;
         else sidestep = cross > 0 ? -1 : cross < 0 ? 1 : c.id % 2 ? 1 : -1;
       });
@@ -967,6 +1065,7 @@ declare module '../ecology' {
     occupiedTiles: typeof occupiedTiles;
     unbury: typeof unbury;
     nearPath: typeof nearPath;
+    pathToNearest: typeof pathToNearest;
     unreachable: typeof unreachable;
     goTo: typeof goTo;
     straightOk: typeof straightOk;
@@ -997,4 +1096,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, unbury, searchLimit, nearPath, unreachable, findPathAvoid, goTo, straightOk, tileOf, ratOnDry, passable, stepOk, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, gaitPaused, tryMove, stroll, findMoss, updateForage, nearestForage, trimChews, eatMoss, eat, die, rebuildGrid, nearby });
+Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, unbury, searchLimit, nearPath, pathToNearest, unreachable, findPathAvoid, goTo, straightOk, tileOf, ratOnDry, passable, stepOk, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, gaitPaused, tryMove, stroll, findMoss, updateForage, nearestForage, trimChews, eatMoss, eat, die, rebuildGrid, nearby });

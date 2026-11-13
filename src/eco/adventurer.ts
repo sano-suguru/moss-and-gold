@@ -1132,27 +1132,47 @@ export function updateItems(this: Ecology): void {
   }
 }
 
-/** 光源（松明、光の呪文、床で燃える松明）。描画と「見たマス」の記録に使う */
-/** 光源を順に（lightSources と同じ順・同じ値。配列や物を作らない） */
-export function eachLight(this: Ecology, fn: (x: number, y: number, r: number, i: number, cr: number, cg: number, cb: number) => void): void {
+/**
+ * 光を出しうる種（ゴブリン・リッチ・ウィスプ・マイコニド・スライム・ゴースト・ドワーフ・冒険者）と、光る格（elite が 1・2・6・7・9）。
+ * 生き物の光（crLights）が光を出すのは、このどちらかに当たる者だけ。eachLight はそれ以外の者を先に飛ばす（速さのため）。
+ * crLights に光る種や格を足したら、ここにも足す（test/determinism.ts が、すべての種と格で食い違いがないかを確かめる）
+ */
+export const LIGHT_KIND: boolean[] = [];
+for (const k of [Kind.Goblin, Kind.Lich, Kind.Wisp, Kind.Myconid, Kind.Slime, Kind.Ghost, Kind.Dwarf, Kind.Adventurer]) LIGHT_KIND[k] = true;
+export const LIGHT_ELITE: boolean[] = [];
+for (const e of [1, 2, 6, 7, 9]) LIGHT_ELITE[e] = true;
+
+type LightFn = (x: number, y: number, r: number, i: number, cr: number, cg: number, cb: number) => void;
+
+/** 生きている者 c が出す光（松明、光の呪文、もともと光る種）を、fn に順に渡す */
+export function crLights(c: Cr, fn: LightFn): void {
+  if (c.k === Kind.Goblin && c.torch > 0) fn(c.x, c.y - 12, 80, 1.0, 1.0, 0.6, 0.28);
+  if (c.k === Kind.Lich) fn(c.x, c.y - 16, 56, 0.6, 0.7, 0.45, 1.0);
+  // もともと光る種：自分のまわり2〜3マスを、本当に照らす
+  if (c.elite === 1) fn(c.x, c.y - 12, 64, 0.8, 1.0, 0.55, 0.22);
+  else if (c.elite === 2) fn(c.x, c.y - 14, 40, 0.4, 0.6, 0.8, 1.0);
+  else if (c.elite === 6) fn(c.x, c.y - 10, 44, 0.4, 0.5, 0.8, 1.0);
+  else if (c.elite === 7) fn(c.x, c.y - 12, 72, 0.7, 1.0, 0.95, 0.8);
+  else if (c.elite === 9) fn(c.x, c.y - 14, 52, 0.45, 0.6, 1.0, 0.55);
+  else if (c.k === Kind.Wisp) fn(c.x, c.y - 10, 40, 0.55, 0.55, 1.0, 0.8);
+  else if (c.k === Kind.Myconid) fn(c.x, c.y - 8, 36, 0.45, 0.7, 1.0, 0.6);
+  else if (c.k === Kind.Slime) fn(c.x, c.y - 4, 30, 0.4, 0.55, 1.0, 0.5);
+  else if (c.k === Kind.Ghost) fn(c.x, c.y - 12, 44, 0.5, 0.7, 0.85, 1.0);
+  if (c.k === Kind.Dwarf && c.sp === 0) fn(c.x, c.y - 10, 52, 0.75, 1.0, 0.82, 0.5);
+  if (c.k !== Kind.Adventurer) return;
+  if (c.torch > 0) fn(c.x, c.y - 14, 92, 1.1, 1.0, 0.62, 0.3);
+  else if (c.sp === Job.Wizard) fn(c.x, c.y - 18, 80, 0.9, 0.72, 0.86, 1.0);
+}
+
+/**
+ * 光源（生き物の光、鍛冶場の火、坑道のランプ、冒険者の焚き火、床で燃える松明）を順に fn に渡す。描画と明るさのマップに使う。
+ * lightSources と同じ順・同じ値で、配列や物を作らない
+ */
+export function eachLight(this: Ecology, fn: LightFn): void {
   for (const c of this.list) {
     if (c.dead) continue;
-    if (c.k === Kind.Goblin && c.torch > 0) fn(c.x, c.y - 12, 80, 1.0, 1.0, 0.6, 0.28);
-    if (c.k === Kind.Lich) fn(c.x, c.y - 16, 56, 0.6, 0.7, 0.45, 1.0);
-    // もともと光る種：自分のまわり2〜3マスを、本当に照らす
-    if (c.elite === 1) fn(c.x, c.y - 12, 64, 0.8, 1.0, 0.55, 0.22);
-    else if (c.elite === 2) fn(c.x, c.y - 14, 40, 0.4, 0.6, 0.8, 1.0);
-    else if (c.elite === 6) fn(c.x, c.y - 10, 44, 0.4, 0.5, 0.8, 1.0);
-    else if (c.elite === 7) fn(c.x, c.y - 12, 72, 0.7, 1.0, 0.95, 0.8);
-    else if (c.elite === 9) fn(c.x, c.y - 14, 52, 0.45, 0.6, 1.0, 0.55);
-    else if (c.k === Kind.Wisp) fn(c.x, c.y - 10, 40, 0.55, 0.55, 1.0, 0.8);
-    else if (c.k === Kind.Myconid) fn(c.x, c.y - 8, 36, 0.45, 0.7, 1.0, 0.6);
-    else if (c.k === Kind.Slime) fn(c.x, c.y - 4, 30, 0.4, 0.55, 1.0, 0.5);
-    else if (c.k === Kind.Ghost) fn(c.x, c.y - 12, 44, 0.5, 0.7, 0.85, 1.0);
-    if (c.k === Kind.Dwarf && c.sp === 0) fn(c.x, c.y - 10, 52, 0.75, 1.0, 0.82, 0.5);
-    if (c.k !== Kind.Adventurer) continue;
-    if (c.torch > 0) fn(c.x, c.y - 14, 92, 1.1, 1.0, 0.62, 0.3);
-    else if (c.sp === Job.Wizard) fn(c.x, c.y - 18, 80, 0.9, 0.72, 0.86, 1.0);
+    if (!LIGHT_KIND[c.k] && !LIGHT_ELITE[c.elite]) continue;
+    crLights(c, fn);
   }
   // 鍛冶場の火と坑道のランプ、冒険者の焚き火
   const mw = this.w.map.w;
