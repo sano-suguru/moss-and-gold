@@ -712,7 +712,7 @@ export function buildAtlas(): Atlas {
   }
   // 見た目の粒
   const speckFrames: number[] = [];
-  for (let k = 0; k < 4; k++)
+  for (let k = 0; k < 6; k++)
     for (let f = 0; f < 4; f++) {
       speckFrames.push(raws.length);
       raws.push(speck(k, f) as RawFrame);
@@ -989,7 +989,7 @@ export function buildAtlas(): Atlas {
     mark: (k) => markFrames[k] ?? markFrames['!'],
     slash: (f) => slashFrames[Math.min(2, Math.max(0, f))],
     halo: (z) => haloFrames[Math.min(2, Math.max(0, z))],
-    speck: (kind, f) => speckFrames[(kind & 3) * 4 + Math.min(3, Math.max(0, f))],
+    speck: (kind, f) => speckFrames[Math.min(5, Math.max(0, kind)) * 4 + (kind === 5 ? f & 3 : Math.min(3, Math.max(0, f)))],
     mouth: (key, f) => mouthFrames[key][f & 3],
     blood: (c, v) => bloodFrames[(c & 3) * 4 + (v & 3)],
     lamp: (f) => lampFrames[f & 3],

@@ -164,6 +164,11 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
       this.metabolism(c);
       continue;
     }
+    // 底の層（粒スライムと光る胞子）を食べる（src/eco/swarm.ts）
+    if (this.graze(c)) {
+      this.metabolism(c);
+      continue;
+    }
     switch (c.k) {
       case Kind.Wisp: this.wisp(c, day); break;
       case Kind.Bat: this.bat(c, day, phase); break;
@@ -200,6 +205,7 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
     if (!c.dead) this.metabolism(c);
   }
   this.updateWebs();
+  this.swarmStep();
   if (this.step % 50 === 0) this.arrivals(day);
   if (this.step % 10 === 0) for (let i = 0; i < this.deathMap.length; i++) if (this.deathMap[i] > 0) this.deathMap[i]--;
   if (this.step % 200 === 0) for (let i = 0; i < this.graveMap.length; i++) if (this.graveMap[i] > 0) this.graveMap[i]--;

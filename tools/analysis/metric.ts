@@ -20,6 +20,32 @@ import { decodeState, readState } from './lib/state';
 import { pool, readMeta, snapsOf } from './lib/runs';
 import { paired, pairedRow, PAIRED_HEAD, PAIRED_NOTE } from './lib/stats';
 
+/** 1画面に映る数の式（metric の NAMED の screenMovers・screenKinds） */
+function SCREEN(what: 'movers' | 'kinds'): string {
+  return `(() => {
+    const live = e.list.filter((c) => !c.dead && !c.away && c.k !== K['冒険者'] && c.k !== K['ドワーフ']);
+    if (!live.length) return NaN;
+    const gw = Math.ceil(m.w / 4);
+    let tot = 0;
+    for (let i = 0; i < 8; i++) {
+      const o = live[Math.floor(((i * 2654435761) >>> 0) / 4294967296 * live.length)];
+      const x0 = o.x - 250, x1 = o.x + 250, y0 = o.y - 160, y1 = o.y + 160;
+      const inside = live.filter((c) => c.x >= x0 && c.x < x1 && c.y >= y0 && c.y < y1);
+      if (${what === 'kinds' ? 'true' : 'false'}) { tot += new Set(inside.map((c) => c.k)).size; continue; }
+      let n = inside.length;
+      if (e.grains && e.grains.length)
+        for (let cy = Math.max(0, Math.floor(y0 / 64)); cy <= Math.floor(y1 / 64); cy++)
+          for (let cx = Math.max(0, Math.floor(x0 / 64)); cx <= Math.floor(x1 / 64); cx++) {
+            const cell = cy * gw + cx;
+            if (cx >= gw || cell >= e.grains.length) continue;
+            n += Math.min(14, (e.grains[cell] + 2) >> 2) + Math.min(10, (e.spores[cell] + 1) >> 1);
+          }
+      tot += n;
+    }
+    return tot / 8;
+  })()`;
+}
+
 export const NAMED: Record<string, { expr: string; label: string; raw?: boolean }> = {
   campStore: { label: 'ゴブリンの集落の蓄えの合計', expr: 'e.camps.filter((c) => c.kind === 0 && c.id >= 0).reduce((a, c) => a + (c.store ?? 0), 0)' },
   camps: { label: 'ゴブリンの集落の数', expr: 'e.camps.filter((c) => c.kind === 0 && c.id >= 0).length' },
@@ -32,6 +58,10 @@ export const NAMED: Record<string, { expr: string; label: string; raw?: boolean 
   hungryRats: { label: '腹を空かせた大ネズミの割合（％）', expr: '(() => { const r = e.list.filter((c) => c.k === 2 && !c.dead); return r.length ? 100 * r.filter((c) => c.hungry).length / r.length : NaN; })()' },
   monsterKinds: { label: '同時にいるモンスターの種の数（にぎわい。冒険者・ドワーフを除き、1匹以上いれば数える）', expr: 'new Set(e.list.filter((c) => !c.dead && c.k !== K[\'冒険者\'] && c.k !== K[\'ドワーフ\']).map((c) => c.k)).size' },
   greenFloor: { label: '苔かキノコ（20以上）のある床の割合（％。閉じた空洞を除く）', expr: '(() => { let n = 0, g = 0; for (let k = 0; k < m.w * m.h; k++) { if (m.solid[k] || m.sealed[k]) continue; n++; if (w.moss[k] >= 20 || w.fungus[k] >= 20) g++; } return n ? 100 * g / n : NaN; })()' },
+  // 1画面（拡大率2倍で 1000×640 ピクセルの画面、つまり 500×320 の範囲）に映る数：生き物（冒険者・ドワーフを除く、ダンジョンの中の生きている者）の
+  // まわりから8か所を、日ごとに決まった選び方で選び、その範囲の生き物の数に、底の層の描画の粒の数（src/creatureView.ts と同じ数え方）を足して平均する
+  screenMovers: { label: '1画面に映る動く物の数（生き物＋底の層の粒。8か所の平均）', expr: SCREEN('movers') },
+  screenKinds: { label: '1画面に映る生き物の種類の数（底の層を除く。8か所の平均）', expr: SCREEN('kinds') },
   alive: { label: '生きている生き物の数', expr: 'e.list.filter((c) => !c.dead).length' },
   nextId: { label: '生き物の番号（これまでに現れた数）', expr: 's.eco.n', raw: true },
 };

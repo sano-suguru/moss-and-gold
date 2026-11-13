@@ -156,13 +156,15 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 三歩目：深部の探索の一行が物資の置き場を残し、次の一行がそこで食料を補う（abc では10〜18日に置き場が2つ以上、補うのが1回以上）
-    name: '物資の置き場が残され、次の一行が補う（4シードで置き場2つ・補う1回以上）',
-    ...RUN_A,
+    // 三歩目：深部の探索の一行が物資の置き場を残し、次の一行がそこで食料を補う。
+    // 以前は RUN_A の4シードで見ていたが、底の層を足した版で、展開が分かれただけで4シードとも0になった（15シードの合計は、床を生かした版 #94 と同じ置き場12・補った一行15→11）。
+    // まれな出来事の項目と同じく、RUN_WIDE の15シードの合計で見る
+    name: '物資の置き場が残され、次の一行が補う（15シードの合計で置き場4つ・補う2回以上）',
+    ...RUN_WIDE,
     test: (rs) => {
       const c = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'cache' && !x.merged).length);
       const u = rs.map((r) => new Set(r.settle.filter((x) => x.k === 25 && x.ev === 'supply').map((x) => x.id)).size);
-      return { ok: sum(c) >= 2 && sum(u) >= 1, value: rs.map((r, i) => `${r.seed} ${c[i]}（補った一行 ${u[i]}）`).join('、') };
+      return { ok: sum(c) >= 4 && sum(u) >= 2, value: `置き場 ${sum(c)}、補った一行 ${sum(u)}（${rs.filter((_, i) => c[i] > 0).length}シード）` };
     },
   },
   {
@@ -278,13 +280,12 @@ export const CHECKS: Check[] = [
   {
     // 食べ物の足りる場所がどの横穴の先にも無いマップでも、少ない群れが貧しい場所に集落を作る。
     // 迷路をなくして地形が変わる前は、かしたれ・seed7・seed8 で10〜18日目に起きていた。変わったあとは seed18・seed40 で3回ずつ、seed8 で1回（かしたれ・seed7 では起きない）
-    name: 'ゴブリンの少ない群れが貧しい場所に集落を作る（4シードの合計で2回以上）',
-    seeds: ['かしたれ', 'seed8', 'seed18', 'seed40'],
-    from: 10,
-    to: 18,
+    // 底の層を足した版では、展開が分かれただけでこの4シードとも0になった（RUN_WIDE の15シードの合計は、床を生かした版 #94 の7回に対して5回）ので、15シードの合計で見る
+    name: 'ゴブリンの少ない群れが貧しい場所に集落を作る（15シードの合計で2回以上）',
+    ...RUN_WIDE,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 12 && x.ev === 'found' && x.poor === 1).length);
-      return { ok: sum(n) >= 2, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+      return { ok: sum(n) >= 2, value: `${sum(n)}回（${rs.filter((_, i) => n[i] > 0).map((r) => r.seed).join('、') || 'なし'}）` };
     },
   },
   {
@@ -718,11 +719,16 @@ export const CHECKS: Check[] = [
     // 以前はねぐらのそばで更新のたびに向きを選び直して飛び、その場で震えて引っかかって見えていた。
     // main の10〜18日目では、コウモリの引っかかりが4シードの合計で約21400回（かしたれ 2807・seed8 8294・abc 3749・seed7 6545）、
     // 直したコードを main の10日目から続けると約2400回（かしたれ 75・seed8 758・abc 882・seed7 641）
-    name: 'コウモリがねぐらのそばで震えない（4シードの合計で引っかかりが6000回以下）',
+    // 回数はコウモリの数と混み具合で揺れる（底の層で胞子を食べてコウモリが増えた版では、引っかかりはどれも夜、まわりに他の生き物が多い所で、
+    // 4シードの合計が約2800回から約6200回に増えた）ので、コボルトの項目と同じく、コウモリ1匹あたり（回数 ÷ 1/4日ごとのサンプルで数えたコウモリの数の合計）で見る。
+    // 床を生かした版（#94）で 1.00、底の層を足した版で 1.55。直す前の約21400回は、コウモリが当時と同じくらいなら6〜7にあたる
+    name: 'コウモリがねぐらのそばで震えない（4シードで、コウモリ1匹あたりの引っかかりが2.5以下）',
     ...RUN_A,
     test: (rs) => {
       const n = rs.map((r) => r.hitch.filter((x) => x.k === 1).length);
-      return { ok: sum(n) <= 6000, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+      const bats = rs.map((r) => r.samples.filter((x) => x.t > r.from * 14400).reduce((a, x) => a + (x.counts[1] ?? 0), 0));
+      const v = sum(n) / Math.max(1, sum(bats));
+      return { ok: v <= 2.5, value: `${v.toFixed(2)}（${rs.map((r, i) => `${r.seed} ${n[i]}/${bats[i]}`).join('、')}）` };
     },
   },
   {
@@ -916,6 +922,19 @@ export const CHECKS: Check[] = [
     test: (rs) => {
       const d = Math.max(0, ...rs.flatMap((r) => r.samples.map((s) => Math.max(Math.abs(s.nutrientDrift), Math.abs(s.goldDrift), Math.abs(s.rockDrift), Math.abs(s.manaDrift ?? 0)))));
       return { ok: d === 0, value: `最大 ${d}` };
+    },
+  },
+  {
+    // 底の層（src/eco/swarm.ts）：粒スライムと光る胞子を、決めた種が食べ、粒スライムが濃い所では大きいスライムが生まれる。
+    // graze は4回に1回だけ settle に記録する（n 0 粒スライム / 1 光る胞子 / 2 大グモが巣にかかった胞子）
+    name: '底の層を食べる（15シードの合計で、粒スライム・光る胞子・巣の胞子の記録がそれぞれ20以上、粒スライムを食べたシードが12以上、大きいスライムが1回以上生まれる）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const cnt = (n: number) => sum(rs.map((r) => r.settle.filter((x) => x.ev === 'graze' && x.n === n).length));
+      const seeds = rs.filter((r) => r.settle.some((x) => x.ev === 'graze' && x.n === 0)).length;
+      const born = sum(rs.map((r) => r.settle.filter((x) => x.ev === 'grainSlime').length));
+      const [g, sp, wb] = [cnt(0), cnt(1), cnt(2)];
+      return { ok: g >= 20 && sp >= 20 && wb >= 20 && seeds >= 12 && born >= 1, value: `粒スライム ${g}（${seeds}シード）、光る胞子 ${sp}、巣の胞子 ${wb}、大きいスライム ${born}` };
     },
   },
   {

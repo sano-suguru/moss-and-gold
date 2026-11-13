@@ -1686,6 +1686,72 @@ export class CreatureView {
           if (q < 0.5) pushSprite(x, y, 2 + q * 8, false, A.speck(3, f + 1), 0, 2);
         }
       }
+      // 底の層（src/eco/swarm.ts）：区画の密度に合わせて、床に粒スライムを這わせ、宙に光る胞子を漂わせる。
+      // 粒の位置と動きは描画だけのもの（区画とその中の番号から決まる）。胞子は夜に明るく、昼は淡い
+      if (eco.grains.length) {
+        const C = 4;
+        const gw = Math.ceil(mm.w / C);
+        const cx0 = Math.max(0, Math.floor(view.x0 / 16 / C));
+        const cx1 = Math.min(gw - 1, Math.floor(view.x1 / 16 / C));
+        const cy0 = Math.max(0, Math.floor(view.y0 / 16 / C));
+        const cy1 = Math.min(Math.ceil(mm.h / C) - 1, Math.floor(view.y1 / 16 / C));
+        const dark = day < 0.35;
+        for (let cy = cy0; cy <= cy1; cy++)
+          for (let cx = cx0; cx <= cx1; cx++) {
+            const cell = cy * gw + cx;
+            const g = eco.grains[cell];
+            const sp = eco.spores[cell];
+            const ng = Math.min(14, (g + 2) >> 2);
+            for (let i = 0; i < ng; i++) {
+              const tx = cx * C + Math.floor(hsh(cell, i * 2 + 101) * C);
+              const ty = cy * C + Math.floor(hsh(cell, i * 2 + 102) * C);
+              if (tx >= mm.w || ty >= mm.h) continue;
+              const k = ty * mm.w + tx;
+              if (mm.solid[k] || mm.lava[k] || w.water[k] > 40) continue;
+              const ph = hsh(i, cell + 7) * 6.28;
+              const x = tx * 16 + 3 + hsh(cell, i + 131) * 10 + Math.sin(t * 0.35 + ph) * 3;
+              const y = ty * 16 + 4 + hsh(cell, i + 137) * 9 + Math.cos(t * 0.27 + ph) * 2;
+              pushSprite(x, y, 0, Math.sin(t * 0.35 + ph) < 0, A.speck(5, Math.floor(t * 2.5 + ph)), 0, 2);
+            }
+            const ns = Math.min(10, (sp + 1) >> 1);
+            for (let i = 0; i < ns; i++) {
+              const tx = cx * C + Math.floor(hsh(cell, i * 2 + 201) * C);
+              const ty = cy * C + Math.floor(hsh(cell, i * 2 + 202) * C);
+              if (tx >= mm.w || ty >= mm.h) continue;
+              const k = ty * mm.w + tx;
+              if (mm.solid[k]) continue;
+              const ph = hsh(i, cell + 11) * 6.28;
+              const x = tx * 16 + 8 + Math.sin(t * 0.18 + ph) * 9;
+              const y = ty * 16 + 8 + Math.cos(t * 0.13 + ph * 1.3) * 6;
+              const lift = 8 + 9 * (0.5 + 0.5 * Math.sin(t * 0.45 + ph * 2));
+              const tw = 0.5 + 0.5 * Math.sin(t * 1.7 + ph * 3);
+              pushSprite(x, y, lift, false, A.speck(4, dark ? (tw > 0.6 ? 0 : 1) : tw > 0.5 ? 2 : 3), 0, 2);
+            }
+          }
+        // 大グモの巣にかかった胞子：巣のある区画に胞子があれば、巣の糸にほのかな光の粒が点る
+        for (const web of eco.webs) {
+          if (!inView(web.x, web.y, 40)) continue;
+          const cell = eco.swarmCell(web.x, web.y);
+          if (cell < 0 || eco.spores[cell] < 4) continue;
+          const n = Math.min(6, eco.spores[cell] >> 3);
+          for (let i = 0; i < n; i++) {
+            const a = hsh(web.id, i + 301) * 6.28;
+            const r = web.r * (0.3 + 0.6 * hsh(web.id, i + 303));
+            pushSprite(web.x + Math.cos(a) * r, web.y + Math.sin(a) * r * 0.7, 6, false, A.speck(4, Math.sin(t * 2 + i) > 0 ? 0 : 1), 0, 2);
+          }
+        }
+        // 底の層を食べた所：粒がはじけて、食べた者の口もとへ吸い込まれる
+        for (const fx of eco.fxGraze) {
+          const age = w.tick - fx.t;
+          if (age < 0 || age > 16 || !inView(fx.x, fx.y, 30)) continue;
+          const q = age / 16;
+          for (let i = 0; i < 3; i++) {
+            const a = (i / 3) * 6.28 + fx.t;
+            const r = 7 * (1 - q);
+            pushSprite(fx.x + Math.cos(a) * r, fx.y + 2 + Math.sin(a) * r * 0.5, fx.k === 0 ? 1 + q * 4 : 6 + q * 4, false, A.speck(fx.k === 0 ? 2 : 4, Math.floor(q * 4)), 0, 2);
+          }
+        }
+      }
     }
     const dyn: { x: number; y: number; r: number; i: number; c?: number }[] = [];
     // 当たった印（のけぞりのための記録）と、攻撃の技の演出。気づいた印：「！」「？」
