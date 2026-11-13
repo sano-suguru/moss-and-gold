@@ -218,7 +218,8 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 依頼を受けて入った一行の依頼は、その前に必ず町の掲示に出ている（ログ「町に〇〇の依頼が出た」。掲示を覚えていないスナップショットから始めたときは、最初の作り直しの init の記録）
+    // 依頼を受けて入った一行の依頼は、その前に必ず町の掲示に出ている（ログ「町に〇〇の依頼が出た」。掲示を覚えていないスナップショットから始めたときは、最初の作り直しの init の記録）。
+    // 実行は始まりの日のスナップショットから始まり、それより前に出た依頼はログに無いので、始まりの日の掲示（セーブの RQ。依頼の種類×100＋狩る種）に出ていた依頼も、前に出ていたと数える
     name: '依頼で入った一行の依頼は、その前に町に出ている（15シードの合計で例外0）',
     ...RUN_WIDE,
     test: (rs) => {
@@ -226,8 +227,10 @@ export const CHECKS: Check[] = [
       let tot = 0;
       for (const r of rs) {
         const a = r.settle.filter((x) => x.k === 25);
+        const board = new Set(((r.state(r.from)?.eco?.RQ ?? []) as number[]));
         for (const e of a.filter((x) => x.ev === 'enter' && x.q > 0)) {
           tot++;
+          if (board.has(e.q * 100 + (e.qk ?? 0))) continue;
           if (!a.some((x) => x.ev === 'quest' && x.how === e.q && (x.to ?? 0) === (e.qk ?? 0) && x.t <= e.t)) n++;
         }
       }
