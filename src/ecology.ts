@@ -806,11 +806,6 @@ export class Ecology {
   bprev: Int32Array;
   bmark: Int32Array;
   bgen = 0;
-  /** 道が見つからなかった直前の探索（その回の bgen、出発点、探した者、調べたマスの数）。src/eco/move.ts の nearPath が使う */
-  bfsMiss = -1;
-  bfsMissFrom = -1;
-  bfsMissId = -1;
-  bfsMissN = 0;
 
   constructor(readonly w: World) {
     const N = w.map.w * w.map.h;
@@ -885,8 +880,6 @@ export class Ecology {
   groups = new Map<string, { key: string; k: number; type: number; hx: number; hy: number; members: Cr[] }>();
   /** 警戒：群れの仲間が襲われた（群れの識別キー → step 番号、襲ってきた相手、場所） */
   alarms = new Map<string, { t: number; foe: number; x: number; y: number }>();
-
-  /** 群れの識別キーのキャッシュ（生き物の更新ごとに、群れの一覧を作るときに作り直す。更新の途中で変わった者はキャッシュを使わずに求める） */
 
   /** 群れの識別キーの文字列のキャッシュ（種と二つの数が同じなら同じ文字列。作り直しを減らすだけで、値は同じ） */
   gkMemo = new Map<number, [string, number, number, string]>();
