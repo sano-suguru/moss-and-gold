@@ -640,20 +640,6 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 湧く種が飢え死にした区画では、しばらく湧きにくい（src/eco/generate.ts の starveBlocks。止まると settle に starveBlock を記録する）。
-    // 入れた版で main の10日目から始めると43回（13シード。大ネズミ 26・大グモ 6・コボルト 6 など）。目安はその半分ほど
-    name: '飢え死にの記憶で湧きが止まる（15シードの合計で20回以上・6シード以上）',
-    ...RUN_WIDE,
-    test: (rs) => {
-      const n = rs.map((r) => r.settle.filter((x) => x.ev === 'starveBlock').length);
-      const seeds = n.filter((v) => v > 0).length;
-      const byK = new Map<number, number>();
-      for (const r of rs) for (const x of r.settle) if (x.ev === 'starveBlock') byK.set(x.k, (byK.get(x.k) ?? 0) + 1);
-      const ks = [...byK].sort((a, b) => b[1] - a[1]).map(([k, v]) => `種${k} ${v}`).join('、');
-      return { ok: sum(n) >= 20 && seeds >= 6, value: `${sum(n)}回（${seeds}シード。${ks}）` };
-    },
-  },
-  {
     // 道が見つからないとき、壁に押しつけて足踏みし続けず、近づけるだけ近づいて立ち止まる（変更前のコードでは4シードの合計で約640回、変更後は約20回）
     name: '道が見つからないまま壁際で足踏みしない（4シードの合計で40回以下）',
     ...RUN_A,

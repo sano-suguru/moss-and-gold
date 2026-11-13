@@ -61,8 +61,6 @@ export function leaveIfStarving(this: Ecology, c: Cr): boolean {
   if (c.st !== 9 && c.sinceMeal < s.starve * 0.6) return false;
   // マナで命をつなぐ大物は、マナが残っているあいだは去らない
   if (c.st !== 9 && Ecology.MANA_FED.has(c.k) && c.mana >= Ecology.MANA_LOW) return false;
-  // この回に去りはじめたか（飢え死にの記憶は、飢えた場所＝去りはじめた所に付ける。出ていった口に付けると、口のそばだけ湧きにくくなる）
-  const starting = c.st !== 9;
   c.st = 9;
   c.act = 1;
   const m = this.w.map;
@@ -89,8 +87,6 @@ export function leaveIfStarving(this: Ecology, c: Cr): boolean {
       return false;
     }
   }
-  // 出ていく口が決まったら、去りはじめた所の区画に飢え死にの記憶を足す（口が無くて去れない回には足さない。中で飢え死にすれば die で足す）
-  if (starting) this.noteStarve(c);
   if (this.goTo(c, ex, ey, s.speed) || sq(ex - c.x) + sq(ey - c.y) < 30 * 30) {
     if (c.k === Kind.Adventurer) this.heroHome(c, false);
     this.record('exits', { t: this.w.tick, k: c.k, reason: 'starving', x: Math.round(c.x), y: Math.round(c.y) } as never);

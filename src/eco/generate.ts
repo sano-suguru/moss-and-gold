@@ -4,7 +4,7 @@
  * 体と胃の養分はすべて場所のまわりの土から取る（takeNutrients。全部取れなければ湧かない）ので、養分の保存則は自動で守られる。
  * 体のマナも場所のまわりの土から移す（takeMana）。表の行に manaAll があれば、マナも全部集められるときだけ湧く（いまはバジリスク）。
  */
-import { CELL, Cr, DAY_TICKS_ECO, Ecology, SPEC, ih } from '../ecology';
+import { Cr, DAY_TICKS_ECO, Ecology } from '../ecology';
 import { TILE } from '../mapgen';
 import { SPAWN_DEFS, SpawnDef } from './spawndef';
 
@@ -22,7 +22,6 @@ export function generateOne(this: Ecology, d: SpawnDef, at = -1): boolean {
   if (d.chance && !d.chance(this)) return false;
   const site = at >= 0 ? at : d.site(this);
   if (site < 0) return false;
-  if (this.starveBlocks(d, site)) return false;
   const n = d.band(this, site);
   // 体のマナを全部か無しかで払う種（manaAll）は、土から集めきれなければ湧かない（湧くたびにその場のマナが減り、続けては湧きにくくなる）
   if (d.manaAll && d.mana && !this.manaObtainable(site, n * d.mana, d.manaR ?? 3)) {
@@ -83,62 +82,12 @@ export function spotNear(this: Ecology, site: number, i: number): [number, numbe
   return [cx * TILE + 8, cy * TILE + 8];
 }
 
-/** 飢え死にを記憶に足す種（表にある種のうち、飢え死にの記憶を使わない行 starveMemo: false を除く） */
-const SPAWNED = new Set(SPAWN_DEFS.filter((d) => d.starveMemo !== false).map((d) => d.k));
-
-/**
- * 飢え死にの記憶に足す：湧く種が飢え死にするか飢えて去りはじめたら、その区画に体の大きさを足す（勇者のくせになまいきだ or2 の、飢え死にが多い所に合わせる考え方）。
- * 飢えて去る者は、出ていった口ではなく去りはじめた所で足す（src/eco/combat.ts の leaveIfStarving）
- */
-export function noteStarve(this: Ecology, c: Cr): void {
-  if (!SPAWNED.has(c.k)) return;
-  const i = this.starveCell(c.x, c.y);
-  if (i >= 0) this.starveMap[i] += SPEC[c.k].body;
-}
-
-/** ピクセルの位置の、飢え死にの記憶の区画（CELL タイル四方。24×18） */
-export function starveCell(this: Ecology, x: number, y: number): number {
-  const cx = Math.floor(x / TILE / CELL);
-  const cy = Math.floor(y / TILE / CELL);
-  return cx >= 0 && cy >= 0 && cx < 24 && cy < 18 ? cy * 24 + cx : -1;
-}
-
-/**
- * 飢え死にが続いた場所では湧きにくくする（結果を見て合わせる）。true なら、この回は湧かない。
- * 場所の区画とまわり8区画の記憶の合計を s、W = 4 × 体の大きさ × 段 として、W / (s + W) の割合でしか湧かない
- * （s が0なら必ず湧く。体の大きい上の段の種ほど、少しの飢え死にでは止まらない）
- */
-export function starveBlocks(this: Ecology, d: SpawnDef, site: number): boolean {
-  if (d.starveMemo === false) return false;
-  const m = this.w.map;
-  const i = this.starveCell((site % m.w) * TILE + 8, Math.floor(site / m.w) * TILE + 8);
-  if (i < 0) return false;
-  const cx = i % 24;
-  const cy = Math.floor(i / 24);
-  let s = 0;
-  for (let dy = -1; dy <= 1; dy++)
-    for (let dx = -1; dx <= 1; dx++) {
-      const x = cx + dx;
-      const y = cy + dy;
-      if (x >= 0 && y >= 0 && x < 24 && y < 18) s += this.starveMap[y * 24 + x];
-    }
-  if (s <= 0) return false;
-  const W = 4 * SPEC[d.k].body * d.tier;
-  if (ih(site, this.step, 811) % (s + W) < W) return false;
-  // 分析用：飢え死にの記憶で湧きが止まった（n はまわりの記憶の合計）
-  this.record('settle', { t: this.w.tick, k: d.k, ev: 'starveBlock', n: s, x: (site % m.w) * TILE + 8, y: Math.floor(site / m.w) * TILE + 8 } as never);
-  return true;
-}
-
 declare module '../ecology' {
   interface Ecology {
     generate: typeof generate;
     generateOne: typeof generateOne;
     spotNear: typeof spotNear;
-    starveBlocks: typeof starveBlocks;
-    noteStarve: typeof noteStarve;
-    starveCell: typeof starveCell;
   }
 }
 
-Object.assign(Ecology.prototype, { generate, generateOne, spotNear, starveBlocks, noteStarve, starveCell });
+Object.assign(Ecology.prototype, { generate, generateOne, spotNear });
