@@ -41,7 +41,7 @@ npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 
   - 金貨：`totalGold() − 初期値 − goldIn + goldOut = 0`
   - 岩：`rockLedger() === initialRock`
   - マナ：`totalMana() − manaBorn + manaLeaked + manaFaded = 0`（地面のマナ `world.mana` と、生き物が持つマナ `Cr.mana` の合計）
-- **キャッシュの無効化の条件**：セーブしないキャッシュ（明るさのマップ `litMap`、つながった洞窟の領域 `regionMap`、夜露のマップ `dewMap`、群れの識別 `gkCache` など）は、tick 番号か地形変更ログの長さ（`digs.length`）だけで作り直しを決める。「最後に作ってから何 tick たったか」で決めると、ロードし直したときに結果がずれる（実際に何度も起きた）。
+- **キャッシュの無効化の条件**：セーブしないキャッシュ（明るさのマップ `litMap`、つながった洞窟の領域 `regionMap`、夜露のマップ `dewMap`、群れの識別 `Cr.gk` など）は、tick 番号か生き物の更新の番号（`Ecology.step`）か地形変更ログの長さ（`digs.length`）だけで作り直しを決める。「最後に作ってから何 tick たったか」で決めると、ロードし直したときに結果がずれる（実際に何度も起きた）。
 - 時間：`TICKS_PER_SEC = 10`。ゲーム内の1日は `DAY_TICKS = 14400` tick（通常速度で24分）。生き物は `CR_EVERY = 2` tick ごとに更新する（更新の通し番号は `Ecology.step`。生き物の処理の間隔や経過は、多くがこの回数で決まる）。マップ：192×144 タイル、1タイル16px（src/mapgen.ts の `MapData`）。
 
 ## コマンドと分析の流れ

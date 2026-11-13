@@ -6,8 +6,7 @@ import { JOB_NAMES } from '../names';
 import type { World } from '../world';
 
 export function groupKey(this: Ecology, c: Cr): string | null {
-  const hit = this.gkCache.get(c.id);
-  if (hit !== undefined) return hit;
+  if (c.gkAt === this.step) return c.gk;
   return this.groupKeyRaw(c);
 }
 
@@ -47,12 +46,17 @@ export function groupKeyRaw(this: Ecology, c: Cr): string | null {
 
 export function buildGroups(this: Ecology): void {
   this.groups.clear();
-  this.gkCache.clear();
+  // 群れの識別は、生き物の更新の初めに一度だけ求めて、この更新の間はそれを使う（その者の gk に、この更新の番号 gkAt と一緒に置く。
+  // 番号が今の更新と違う者（死んでいる者、外にいる者、更新の途中で生まれた者、ロードし直した直後の者）は、groupKey がその場で求める）
+  const step = this.step;
   for (const c of this.list) {
     if (c.dead || c.away) continue;
     const key = this.groupKeyRaw(c);
     // 群れない種（groupKeyRaw がいつも null）はキャッシュしなくても groupKey が同じ null を返す
-    if (key || GROUPED[c.k]) this.gkCache.set(c.id, key);
+    if (key || GROUPED[c.k]) {
+      c.gk = key;
+      c.gkAt = step;
+    }
     if (!key) continue;
     let g = this.groups.get(key);
     if (!g) {

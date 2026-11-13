@@ -1132,11 +1132,19 @@ export function updateItems(this: Ecology): void {
   }
 }
 
+/** eachLight で光を出しうる種（ゴブリン・リッチ・ウィスプ・マイコニド・スライム・ゴースト・ドワーフ・冒険者）と、光る格（elite が 1・2・6・7・9） */
+const LIGHT_KIND: boolean[] = [];
+for (const k of [Kind.Goblin, Kind.Lich, Kind.Wisp, Kind.Myconid, Kind.Slime, Kind.Ghost, Kind.Dwarf, Kind.Adventurer]) LIGHT_KIND[k] = true;
+const LIGHT_ELITE: boolean[] = [];
+for (const e of [1, 2, 6, 7, 9]) LIGHT_ELITE[e] = true;
+
 /** 光源（松明、光の呪文、床で燃える松明）。描画と「見たマス」の記録に使う */
 /** 光源を順に（lightSources と同じ順・同じ値。配列や物を作らない） */
 export function eachLight(this: Ecology, fn: (x: number, y: number, r: number, i: number, cr: number, cg: number, cb: number) => void): void {
   for (const c of this.list) {
     if (c.dead) continue;
+    // 光りうる種でも、光る格（elite）でもない者は、下のどれにも当たらないので先に飛ばす（速さのため。LIGHT_KIND と LIGHT_ELITE は下の分岐と合わせる）
+    if (!LIGHT_KIND[c.k] && !LIGHT_ELITE[c.elite]) continue;
     if (c.k === Kind.Goblin && c.torch > 0) fn(c.x, c.y - 12, 80, 1.0, 1.0, 0.6, 0.28);
     if (c.k === Kind.Lich) fn(c.x, c.y - 16, 56, 0.6, 0.7, 0.45, 1.0);
     // もともと光る種：自分のまわり2〜3マスを、本当に照らす

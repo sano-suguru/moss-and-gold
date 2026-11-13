@@ -384,7 +384,7 @@ export function spawn(this: Ecology, k: Kind, x: number, y: number, body: number
   const c: Cr = {
     id: this.nextId++, k, x, y, px: x, py: y, vx: 0, vy: 0, dir: 0, act: 0, actT: 0,
     body, food, glow: 0, hungry: 0, sinceMeal: 0, st: 0, hx: x, hy: y, tx: x, ty: y,
-    dead: 0, units: 0, away: false, caught: false, ref: 0, sp: k, init: 0, ref2: 0, gold: 0, party: 0, torch: 0, hp: 0, hitAt: -99, foe: 0, flee: 0, gait: 0, bornAt: bornHere && this.w ? this.w.tick : -1e9, sleep: 0, drowsy: 0, lure: 0, lureAt: 0, feed: 0, mana: 0, elite: 0, cast: -1e9, poison: 0, poisonBy: -1, stun: 0, kb: 0, kbx: 0, kby: 0, run: 0, aim: 0, bind: 0, doze: 0, sporeAt: -1e9, stone: 0, avert: 0, thirst: 0, waitW: 0,
+    dead: 0, units: 0, away: false, caught: false, ref: 0, sp: k, init: 0, ref2: 0, gold: 0, party: 0, torch: 0, hp: 0, hitAt: -99, foe: 0, flee: 0, gait: 0, bornAt: bornHere && this.w ? this.w.tick : -1e9, sleep: 0, drowsy: 0, lure: 0, lureAt: 0, feed: 0, mana: 0, elite: 0, cast: -1e9, poison: 0, poisonBy: -1, stun: 0, kb: 0, kbx: 0, kby: 0, run: 0, aim: 0, bind: 0, doze: 0, sporeAt: -1e9, stone: 0, avert: 0, thirst: 0, waitW: 0, gk: null, gkAt: -1,
   };
   this.list.push(c);
   this.byId.set(c.id, c);
@@ -625,11 +625,12 @@ export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
         if (!(ahead > 0 && ahead < gap && side < gap * 0.6)) return;
         // 前の仲間がこちらへ向かってくる（向きが逆）なら、列ではなくすれ違い：ゆるめずに脇へよける
         // （以前は向かい合った二匹が互いにゆるめ合い、細い通路で押し戻し合って進めず、苔のそばで飢えていた）
-        const od = o.dir === 0 ? [0, 1] : o.dir === 1 ? [0, -1] : o.dir === 2 ? [1, 0] : [-1, 0];
+        const odx = o.dir === 0 || o.dir === 1 ? 0 : o.dir === 2 ? 1 : -1;
+        const ody = o.dir === 0 ? 1 : o.dir === 1 ? -1 : 0;
         // 前の仲間が同じ向きへ進んでいるとき（列になっているとき）だけ歩みをゆるめる。横切っている、別の向きへ歩いている仲間は、脇へよけて追い越す
         // （以前は向きが逆でなければゆるめていたので、仲間がいつもまわりにいるアリの巣のそばでは、横切る仲間のたびに歩みをゆるめ続け、
         //  脚を動かしたままほとんど進まず、足踏みして見えていた）
-        const along = od[0] * hx + od[1] * hy;
+        const along = odx * hx + ody * hy;
         if (o.act === 1 && o.sleep <= 0 && along > 0.5) slow = ahead < gap * 0.5 ? 0.15 : 0.5;
         else sidestep = cross > 0 ? -1 : cross < 0 ? 1 : c.id % 2 ? 1 : -1;
       });

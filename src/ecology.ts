@@ -596,6 +596,9 @@ export interface Cr {
   thirst: number;
   /** 水場で、自分より強い種が去るのを待った回数（src/eco/water.ts。飲みはじめるか、あきらめたら0に戻す） */
   waitW: number;
+  /** 群れの識別のキャッシュ（セーブしない）：gkAt が今の生き物の更新の番号のとき、その更新の初めに求めた群れの識別が gk（src/eco/groups.ts の buildGroups） */
+  gk: string | null;
+  gkAt: number;
   /** 死骸ができたときの養分（腐り具合の目安） */
   init: number;
 }
@@ -884,7 +887,7 @@ export class Ecology {
   alarms = new Map<string, { t: number; foe: number; x: number; y: number }>();
 
   /** 群れの識別キーのキャッシュ（生き物の更新ごとに、群れの一覧を作るときに作り直す。更新の途中で変わった者はキャッシュを使わずに求める） */
-  gkCache = new Map<number, string | null>();
+
   /** 群れの識別キーの文字列のキャッシュ（種と二つの数が同じなら同じ文字列。作り直しを減らすだけで、値は同じ） */
   gkMemo = new Map<number, [string, number, number, string]>();
 
