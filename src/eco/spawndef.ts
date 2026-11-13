@@ -14,8 +14,6 @@ export interface SpawnDef {
   k: Kind;
   /** 'nutr' 土の養分から湧く（origin 'soil'）／'mana' マナから湧く（origin 'mana'） */
   side: 'nutr' | 'mana';
-  /** 段：1 下の種、2 中くらい、3 上の種（飢え死にの記憶 starveBlocks の重みに使う） */
-  tier: 1 | 2 | 3;
   /** 判定する回：生き物の更新の通し番号 step について step % every === phase。every が 0 の行は generate では見ない（ほかの所から generateOne で呼ぶ） */
   every: number;
   phase: number;
@@ -54,11 +52,6 @@ export interface SpawnDef {
   dust?: boolean;
   /** ゲーム内ログの文（{k:番号} は種の名前になる）。同じ種の文は生き物の更新3000回あける */
   log?: string;
-  /**
-   * false なら、飢え死にの記憶（src/eco/generate.ts の noteStarve・starveBlocks）を使わない：この種の飢え死にを記憶に足さず、記憶で湧きを止めない。
-   * ねぐらで飢えて入れ替わるのがふつうの種（コウモリ）に付ける（その飢え死には場所の良し悪しの印にならず、同じ区画で湧く大物まで止めてしまう）
-   */
-  starveMemo?: false;
 }
 
 /** マナから湧く大物どうしが離れて湧くために見る、生きているトロール・バジリスク・ドラゴンの種と位置（ピクセル） */
@@ -191,9 +184,8 @@ export const SPAWN_DEFS: SpawnDef[] = [
   // ---- 土の養分から湧く種（以前は外から来ていた） ----
   // コウモリ：夕暮れに、まわり（±10マス）に苔の豊かな縦穴のねぐらへ、2匹ずつ湧く（ねぐらごとに20匹まで）。生き物の更新ごとには見ず、
   // 夕暮れの出来事（src/eco/salamander.ts の onDayEvents）から、縦穴ごとに generateOne で呼ぶ。土ぼこりは出さない（天井のねぐらに現れる）。
-  // コウモリは main でも死の8割が飢え死にで、ねぐらで飢えては湧いて入れ替わるので、飢え死にの記憶は使わない（starveMemo）
   {
-    k: Kind.Bat, side: 'nutr', tier: 1, every: 0, phase: 0, cool: 0, minDay: 0, starveMemo: false,
+    k: Kind.Bat, side: 'nutr', every: 0, phase: 0, cool: 0, minDay: 0,
     cap: () => 260,
     site: () => -1,
     band: () => 2,
@@ -214,7 +206,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
   // 大ネズミ：苔やキノコの豊かな群落のそばに、2匹ずつ湧く。まわりの巣穴に住みつく（いなければ巣穴を作る）。
   // ダンジョン全体の上限（ratCap。食べられる苔の量で決まる）を越えない。少ないうちは湧きやすく、増えると巣穴で殖えるのに任せる
   {
-    k: Kind.Rat, side: 'nutr', tier: 1, every: 50, phase: 0, cool: 0, minDay: 0,
+    k: Kind.Rat, side: 'nutr', every: 50, phase: 0, cool: 0, minDay: 0,
     cap: (e) => e.ratCap(),
     chance: (e) => ih(e.step, 1, 71) % (e.counts[Kind.Rat] < 4 ? 5 : 80) === 0,
     site: ratSite,
@@ -231,7 +223,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
   },
   // 大トカゲ：大ネズミが増えたら、獲物のいる所の、なるべく暖かい床に湧く
   {
-    k: Kind.Lizard, side: 'nutr', tier: 2, every: 50, phase: 0, cool: 0, minDay: 3,
+    k: Kind.Lizard, side: 'nutr', every: 50, phase: 0, cool: 0, minDay: 3,
     ok: (e) => e.counts[Kind.Rat] >= 10,
     cap: (e) => Math.min(24, Math.floor(e.counts[Kind.Rat] / 6)),
     chance: (e) => ih(e.step, 2, 71) % (e.counts[Kind.Lizard] < 2 ? 8 : 120) === 0,
@@ -242,7 +234,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
   },
   // 大グモ：飛ぶもの（ウィスプ・コウモリ）が増えたら、その近くの壁ぎわに湧く（巣は自分で張る）
   {
-    k: Kind.Spider, side: 'nutr', tier: 2, every: 50, phase: 0, cool: 0, minDay: 1,
+    k: Kind.Spider, side: 'nutr', every: 50, phase: 0, cool: 0, minDay: 1,
     ok: (e) => e.counts[Kind.Wisp] + e.counts[Kind.Bat] >= 30,
     cap: (e) => Math.min(14, Math.floor((e.counts[Kind.Wisp] + e.counts[Kind.Bat]) / 25)),
     chance: (e) => ih(e.step, 3, 71) % (e.counts[Kind.Spider] < 2 ? 10 : 150) === 0,
@@ -252,7 +244,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
   },
   // ジャイアントアント：キノコが増えたら、キノコの多い壁ぎわに、巣と女王と働きアリ5匹が湧く（巣の蓄え16と女王の30も土の養分から）
   {
-    k: Kind.Ant, side: 'nutr', tier: 1, every: 50, phase: 0, cool: 0, minDay: 5,
+    k: Kind.Ant, side: 'nutr', every: 50, phase: 0, cool: 0, minDay: 5,
     ok: (e) => e.openFungus > 2500 && e.colonies.length < 2,
     cap: () => 999,
     chance: (e) => ih(e.step, 4, 71) % 12 === 0,
@@ -277,7 +269,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
   // コボルト：大ネズミが6匹以上いるかキノコが増えたら、苔やキノコの豊かな所から歩いて行ける、食べ物の足りる壁ぎわに、4〜6匹の群れが住処ごと湧く
   // （住処の蓄えも土の養分から）。住処がすでにあれば湧かず、住処で生まれる子に任せる。住処が襲われて捨てられた直後はしばらく湧かない（koboldShun）
   {
-    k: Kind.Kobold, side: 'nutr', tier: 2, every: 50, phase: 0, cool: 0, minDay: 4,
+    k: Kind.Kobold, side: 'nutr', every: 50, phase: 0, cool: 0, minDay: 4,
     ok: (e) => e.w.tick >= e.koboldShun && (e.counts[Kind.Rat] >= 6 || e.openFungus > 2500) && !e.warrens.some((o) => o.id >= 0),
     cap: () => 13,
     chance: (e) => ih(e.step, 5, 71) % 14 === 0,
@@ -302,7 +294,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
   // ゴブリン：集落がなければ、苔やキノコの豊かな所から歩いて行ける、集落の条件を満たし食べ物の足りる所に、5匹の群れが集落ごと湧く。
   // 食べ物の足りる所がなければ、貧しい所に3匹で（集落の蓄えも土の養分から）。集落が襲われて捨てられた直後はしばらく湧かない（goblinShun）
   {
-    k: Kind.Goblin, side: 'nutr', tier: 2, every: 50, phase: 0, cool: 3600, minDay: 4,
+    k: Kind.Goblin, side: 'nutr', every: 50, phase: 0, cool: 3600, minDay: 4,
     ok: (e) => e.w.tick >= e.goblinShun && !goblinCamps(e).length,
     cap: () => 15,
     chance: (e) => ih(e.step, 6, 71) % 14 === 0,
@@ -326,7 +318,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
   // オーク：ゴブリンかコボルトの集落があり、両方で8匹以上いれば、まだ誰にも従っていないゴブリンの集落（なければ、いちばん古い集落か住処）の
   // 12〜20マス先に、2〜3頭が縄張りごと湧く。従えられる集落がなければ、まわりの獲物（大ネズミ・大トカゲ・コボルト。オーク1頭あたり4匹を差し引く）が足りるときだけ
   {
-    k: Kind.Orc, side: 'nutr', tier: 3, every: 50, phase: 0, cool: 3600, minDay: 4,
+    k: Kind.Orc, side: 'nutr', every: 50, phase: 0, cool: 3600, minDay: 4,
     ok: (e) => {
       const camps = goblinCamps(e);
       if (!(camps.length + e.warrens.length) || e.counts[Kind.Goblin] + e.counts[Kind.Kobold] < 8) return false;
@@ -357,7 +349,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
   },
   // リザードマン：大ネズミが10匹以上いて、村がまだなければ、大きな水たまりのそばに3〜4匹が村ごと湧く
   {
-    k: Kind.Lizardman, side: 'nutr', tier: 3, every: 50, phase: 0, cool: 3600, minDay: 9,
+    k: Kind.Lizardman, side: 'nutr', every: 50, phase: 0, cool: 3600, minDay: 9,
     ok: (e) => e.counts[Kind.Rat] >= 10 && !e.camps.some((o) => o.kind === 1),
     cap: () => 8,
     chance: (e) => ih(e.step, 9, 71) % 20 === 0,
@@ -379,7 +371,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
   // （以前は地表の横穴から入ってきた。湧く時刻はマップごとにずらす）。従うコウモリの体も土の養分から。
   // （以前の来訪の条件は18匹以上。コウモリも縦穴のねぐらに湧くようになって少し減り、16シード×25日でヴァンパイアの湧く数が 64 → 51 に減ったので下げる）
   {
-    k: Kind.Vampire, side: 'mana', tier: 2, every: 50, phase: 0, cool: 3600, minDay: 4,
+    k: Kind.Vampire, side: 'mana', every: 50, phase: 0, cool: 3600, minDay: 4,
     ok: (e) => e.counts[Kind.Bat] >= 15 && e.dayNow <= 0.05,
     cap: () => 1,
     chance: (e) => {
@@ -417,7 +409,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
   // （生き物の更新600回ごとに4つに1つのくじ。前に湧いてから2日はあける）。
   // 以前は一度倒されると二度と現れず、冒険者が深部へ行く回数が増えると、ワームが画面から消える日が増えた
   {
-    k: Kind.Worm, side: 'nutr', tier: 3, every: 600, phase: 413, cool: DAY_TICKS_ECO, minDay: 2,
+    k: Kind.Worm, side: 'nutr', every: 600, phase: 413, cool: DAY_TICKS_ECO, minDay: 2,
     ok: (e) => e.w.map.deep.x >= 0,
     cap: () => 1,
     site: (e) => {
@@ -445,7 +437,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
   // （マナの湧き口を半分にしたとき、しきい値を決め直した：深部のまわりの最大の中央値が 197 → 91 になったので、70 → 32。
   //  ほかのしきい値も、開いた床のうち満たすマスの割合が以前と同じになる値にした。8シード×10〜25日目で測った）
   {
-    k: Kind.Dragon, side: 'mana', tier: 3, every: 600, phase: 113, cool: 14400, minDay: 6,
+    k: Kind.Dragon, side: 'mana', every: 600, phase: 113, cool: 14400, minDay: 6,
     ok: (e) => !e.list.some((c) => c.k === Kind.Dragon && !c.dead),
     cap: () => 99,
     site: (e) => {
@@ -488,7 +480,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
   // 竜から離れる距離は、以前は25マス。マナの濃い暗がりは竜の寝床のある深部に集まるので、25マスでは、かしたれ・seed40・seed41 で湧ける場所がほぼ無くなり、
   // 16シード×25日の10日目以降に0匹だった時間の多くがそれだった
   {
-    k: Kind.Basilisk, side: 'mana', tier: 2, every: 50, phase: 13, cool: 0, minDay: 0,
+    k: Kind.Basilisk, side: 'mana', every: 50, phase: 13, cool: 0, minDay: 0,
     site: (e) =>
       manaSite(e, (k, mn, bigs) => {
         if (mn < BASILISK_MANA || !darkDeep(e, k)) return false;
@@ -504,7 +496,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
   // トロール：マナが濃く（18〜。以前は40）、暗い所。ほかのトロール（25マス）・バジリスク（12マス）・竜（25マス）のそばには湧かない。
   // 4日目より前は湧かない（しきい値を決め直したら、序盤のマナでも届き、main より4日ほど早く現れたので、main の初めて現れる日に合わせる）
   {
-    k: Kind.Troll, side: 'mana', tier: 2, every: 50, phase: 13, cool: 0, minDay: 4,
+    k: Kind.Troll, side: 'mana', every: 50, phase: 13, cool: 0, minDay: 4,
     cap: () => 2,
     site: (e) => manaSite(e, (k, mn, bigs) => mn >= 18 && darkDeep(e, k) && !near(e, bigs, k, Kind.Troll, 25) && !near(e, bigs, k, Kind.Basilisk, 12) && !near(e, bigs, k, Kind.Dragon, 25)),
     band: () => 1,
@@ -514,7 +506,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
   // ミノタウロス：縄張りは古い呪いの場所で、マナが薄くても、主がいなければ縄張りの中に湧く（2日目以降、前の一頭が湧いてから1日あける）。
   // 縄張りの床から一つ選んで見る（縄張りはせまく、ばらばらに見るだけではめったに当たらない）
   {
-    k: Kind.Minotaur, side: 'mana', tier: 3, every: 50, phase: 13, cool: DAY_TICKS_ECO / 2, minDay: 2,
+    k: Kind.Minotaur, side: 'mana', every: 50, phase: 13, cool: DAY_TICKS_ECO / 2, minDay: 2,
     cap: () => 1,
     site: (e) => {
       const m = e.w.map;

@@ -203,7 +203,6 @@ export function update(this: Ecology, tick: number, day: number, phase: number):
   if (this.step % 50 === 0) this.arrivals(day);
   if (this.step % 10 === 0) for (let i = 0; i < this.deathMap.length; i++) if (this.deathMap[i] > 0) this.deathMap[i]--;
   if (this.step % 200 === 0) for (let i = 0; i < this.graveMap.length; i++) if (this.graveMap[i] > 0) this.graveMap[i]--;
-  if (this.step % 200 === 100) for (let i = 0; i < this.starveMap.length; i++) if (this.starveMap[i] > 0) this.starveMap[i] = Math.max(0, this.starveMap[i] - 4);
   if (this.step % 400 === 0) for (let i = 0; i < this.advGrave.length; i++) if (this.advGrave[i] > 0) this.advGrave[i]--;
   if (this.step % 50 === 25) this.spawnGhosts(day);
   if (this.step % 40 === 20) this.spawnSlimes();

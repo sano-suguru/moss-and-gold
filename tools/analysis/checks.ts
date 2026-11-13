@@ -218,7 +218,8 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 依頼を受けて入った一行の依頼は、その前に必ず町の掲示に出ている（ログ「町に〇〇の依頼が出た」。掲示を覚えていないスナップショットから始めたときは、最初の作り直しの init の記録）
+    // 依頼を受けて入った一行の依頼は、その前に必ず町の掲示に出ている（ログ「町に〇〇の依頼が出た」。掲示を覚えていないスナップショットから始めたときは、最初の作り直しの init の記録）。
+    // 実行は始まりの日のスナップショットから始まり、それより前に出た依頼はログに無いので、始まりの日の掲示（セーブの RQ。依頼の種類×100＋狩る種）に出ていた依頼も、前に出ていたと数える
     name: '依頼で入った一行の依頼は、その前に町に出ている（15シードの合計で例外0）',
     ...RUN_WIDE,
     test: (rs) => {
@@ -226,8 +227,10 @@ export const CHECKS: Check[] = [
       let tot = 0;
       for (const r of rs) {
         const a = r.settle.filter((x) => x.k === 25);
+        const board = new Set(((r.state(r.from)?.eco?.RQ ?? []) as number[]));
         for (const e of a.filter((x) => x.ev === 'enter' && x.q > 0)) {
           tot++;
+          if (board.has(e.q * 100 + (e.qk ?? 0))) continue;
           if (!a.some((x) => x.ev === 'quest' && x.how === e.q && (x.to ?? 0) === (e.qk ?? 0) && x.t <= e.t)) n++;
         }
       }
@@ -637,20 +640,6 @@ export const CHECKS: Check[] = [
         }
       }
       return { ok: dead === 0 || back >= dead * 0.8, value: `倒された ${dead} 回、そのうち2日の内に湧き直した ${back} 回` };
-    },
-  },
-  {
-    // 湧く種が飢え死にした区画では、しばらく湧きにくい（src/eco/generate.ts の starveBlocks。止まると settle に starveBlock を記録する）。
-    // 入れた版で main の10日目から始めると43回（13シード。大ネズミ 26・大グモ 6・コボルト 6 など）。目安はその半分ほど
-    name: '飢え死にの記憶で湧きが止まる（15シードの合計で20回以上・6シード以上）',
-    ...RUN_WIDE,
-    test: (rs) => {
-      const n = rs.map((r) => r.settle.filter((x) => x.ev === 'starveBlock').length);
-      const seeds = n.filter((v) => v > 0).length;
-      const byK = new Map<number, number>();
-      for (const r of rs) for (const x of r.settle) if (x.ev === 'starveBlock') byK.set(x.k, (byK.get(x.k) ?? 0) + 1);
-      const ks = [...byK].sort((a, b) => b[1] - a[1]).map(([k, v]) => `種${k} ${v}`).join('、');
-      return { ok: sum(n) >= 20 && seeds >= 6, value: `${sum(n)}回（${seeds}シード。${ks}）` };
     },
   },
   {
