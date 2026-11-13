@@ -8,7 +8,9 @@
  * チェックを足すときは、起きることがわかっているシードと日を、前の batch の settle.jsonl などから選ぶ（例：かしたれは10日目ごろに貢ぎ物）。
  */
 import { countsAsStuck } from './common';
-import { World } from '../../src/world';
+import { World, DAY_TICKS } from '../../src/world';
+import { CR_EVERY, Kind } from '../../src/ecology';
+import { SPAWN_DEFS } from '../../src/eco/spawndef';
 export interface Recs {
   seed: string;
   from: number;
@@ -627,32 +629,47 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 倒されたワームは、また深部から湧く（src/eco/spawndef.ts のワームの行。前に湧いてから2日＝生き物の更新14400回あける）。
-    // ワームの死はまれ（16シード×25日で5回。5回とも、死んでから 2,000〜9,500 tick で湧き直した）なので、該当する死が無ければ通す
-    // （0回を落とすと、ほかの変更で展開が分かれただけで落ちる）。
-    // 湧き直したワームがすぐまた倒されたときは、前に湧いてから2日たつまで次は湧かないので、待つ窓は「死んだ時刻」と「前に湧いてから2日たった時刻」の遅いほうから2日にする
-    // （#97 のあと、seed41 で湧いて約0.4日で倒されたワームが、決まりどおり前に湧いてから2日待って湧き直したのに、死んでから2日を越えたので外れと数えられた）。
-    // 前に湧いた時刻は、実行の中の湧いた記録と、始まりの日のセーブの最後に湧いた生き物の更新の番号（LA。tick に直す）から取る。待つ窓が実行の終わりを越える死は数えない
-    name: '倒されたワームが、また深部から湧く（15シードで、湧ける時から2日の内に湧き直した回数が8割以上）',
+    // 倒されたワームは、また深部から湧く（src/eco/spawndef.ts のワームの行）。
+    // ワームの死はまれ（16シード×25日で数回）なので、該当する死が無ければ通す（0回を落とすと、ほかの変更で展開が分かれただけで落ちる）。
+    // ワームの行には「前に湧いてから cool 回の生き物の更新は次を湧かせない」決まり（src/eco/generate.ts の generateOne）と、湧き始める日（minDay）がある。
+    // なので、湧き直しを待つ窓は、死んだ時刻・前に湧いてから cool がすぎて湧けるようになる時刻・湧き始める日のうち、いちばん遅い時刻から2日にする。
+    // cool と minDay は表から読み、生き物の更新の回数は CR_EVERY を掛けて tick に直す（表や更新の間隔を変えても、チェックがずれない）。
+    // 前に湧いた時刻は、実行の中の湧いた記録（settle の gen）と、始まりの日のセーブにある、最後に湧いた時の生き物の更新の番号（LA）から取る。
+    // セーブに LA や更新の番号が無ければ、前に湧いた時刻が分からないので、数えずに落とす。待つ窓が実行の終わりを越える死は数えない
+    name: '倒されたワームが、また深部から湧く（15シードで、湧けるようになってから2日の内に湧き直した回数が8割以上）',
     ...RUN_WIDE,
     test: (rs) => {
+      const def = SPAWN_DEFS.find((d) => d.k === Kind.Worm);
+      if (!def) return { ok: false, value: 'src/eco/spawndef.ts にワームの行が無い' };
+      // generateOne は「step − 前に湧いた step ≦ cool」なら湧かせないので、湧けるのは cool＋1 回の更新のあと
+      const coolT = def.cool ? (def.cool + 1) * CR_EVERY : 0;
+      const W = 2 * DAY_TICKS;
       let dead = 0;
       let back = 0;
-      const W = 2 * 14400;
+      const noLA: string[] = [];
       for (const r of rs) {
-        const gens = r.settle.filter((x) => x.k === 22 && x.ev === 'gen').map((x) => x.t);
-        const eco = r.state(r.from)?.eco;
-        const la = (eco?.LA as (number | null)[] | undefined)?.[22];
-        if (la != null && typeof eco?.s === 'number') gens.push(r.from * 14400 - (eco.s - la) * 2);
-        for (const d of r.deaths.filter((x) => x.k === 22)) {
-          const prev = Math.max(-1e9, ...gens.filter((t) => t <= d.t));
-          const open = Math.max(d.t, prev + W);
-          if (open + W > r.to * 14400) continue;
+        const gens = r.settle.filter((x) => x.k === Kind.Worm && x.ev === 'gen').map((x) => x.t as number);
+        const st = r.state(r.from);
+        const la = st?.eco?.LA as (number | null)[] | undefined;
+        const s0 = st?.eco?.s;
+        const t0 = st?.tick ?? st?.w?.tick;
+        if (!Array.isArray(la) || typeof s0 !== 'number' || typeof t0 !== 'number') {
+          noLA.push(r.seed);
+          continue;
+        }
+        // LA の値が null なら、始まりの日までに一度も湧いていない（はじめからいたワームだけ）
+        const la0 = la[Kind.Worm];
+        if (la0 != null) gens.push(t0 - (s0 - la0) * CR_EVERY);
+        for (const d of r.deaths.filter((x) => x.k === Kind.Worm)) {
+          const prev = Math.max(-1e9, ...gens.filter((t) => t < d.t));
+          const open = Math.max(d.t, prev + coolT, def.minDay * DAY_TICKS);
+          if (open + W > r.to * DAY_TICKS) continue;
           dead++;
-          if (gens.some((t) => t > d.t && t <= open + W)) back++;
+          if (gens.some((t) => t >= d.t && t <= open + W)) back++;
         }
       }
-      return { ok: dead === 0 || back >= dead * 0.8, value: `倒された ${dead} 回、そのうち2日の内に湧き直した ${back} 回` };
+      if (noLA.length) return { ok: false, value: `始まりの日のセーブに、最後に湧いた時の記録（LA）か更新の番号が無い：${noLA.join('、')}` };
+      return { ok: dead === 0 || back >= dead * 0.8, value: `倒された ${dead} 回、そのうち湧けるようになってから2日の内に湧き直した ${back} 回` };
     },
   },
   {
