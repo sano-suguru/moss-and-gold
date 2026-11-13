@@ -835,6 +835,9 @@ export class Ecology {
   deathMap = new Int32Array(24 * 18);
   /** 長く残る「死者の多さ」（冒険者や大物が倒れた所。ゆっくり薄れる） */
   graveMap = new Int32Array(24 * 18);
+  /** 底の層の密度（区画ごと。src/eco/swarm.ts）：粒スライムと光る胞子。値は養分の量。セーブに入れる */
+  grains = new Int32Array(0);
+  spores = new Int32Array(0);
   /** 冒険者の亡骸の墓（区画ごと。ゲーム内の約6日残る） */
   advGrave = new Int32Array(24 * 18);
 
@@ -1025,6 +1028,8 @@ export class Ecology {
   /** 引き裂かれた巣の演出の記録（描画専用。破れた巣が垂れて消え、糸くずが舞う） */
   fxWebTears: { t: number; x: number; y: number; r: number }[] = [];
   fxEats: { t: number; id: number; k: number; sp: number; by: number; bk: number; x: number; y: number; slain: boolean }[] = [];
+  /** 底の層を食べた演出（描画専用。k 0 粒スライム / 1 光る胞子、by 食べた者。src/eco/swarm.ts の graze） */
+  fxGraze: { t: number; x: number; y: number; k: number; by: number }[] = [];
   /** ヴァンパイアがコウモリにばらけた瞬間（how 0）と、姿を戻した瞬間（how 1）の黒い霧の演出（描画専用。シミュレーションの判断に使わない。セーブには、映像のために直前の4秒分だけ残す） */
   fxVampMist: { t: number; x: number; y: number; how: number }[] = [];
   /** 炎に焼かれた瞬間（描画専用：焼かれた者に小さな炎がまとわりつく。シミュレーションの判断に使わない。セーブには、映像のために直前の4秒分だけ残す。src/eco/fire.ts の burnHurt） */

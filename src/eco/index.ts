@@ -58,6 +58,7 @@ import './charge';
 import './standoff';
 import './vampskill';
 import './orcskill';
+import './swarm';
 import './spiderskill';
 import './koboldskill';
 import './myconidskill';

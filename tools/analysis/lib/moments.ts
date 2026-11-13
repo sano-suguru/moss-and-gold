@@ -171,6 +171,12 @@ export const MOMENTS: Moment[] = [
   { key: 'armorFall', label: 'リビングアーマー：崩れて武具が砕け散った' },
   { key: 'armorSlain', label: 'リビングアーマー：冒険者かドワーフに倒された' },
   { key: 'slimeSplit', label: 'スライム：死骸を食べて育ち、二つに分かれた' },
+  // 底の層（src/eco/swarm.ts）。graze は4回に1回だけ記録するので、数は実際の約4分の1
+  { key: 'grazeGrain', label: '底の層：粒スライムを食べた（記録は4回に1回）' },
+  { key: 'grazeGrainKinds', label: '底の層：粒スライムを食べた種の数（大ネズミ・大トカゲ・スライムのうち）' },
+  { key: 'grazeSpore', label: '底の層：コウモリ・ウィスプ・マイコニドが光る胞子を食べた（記録は4回に1回）' },
+  { key: 'grazeWeb', label: '底の層：大グモが巣にかかった光る胞子を食べた（記録は4回に1回）' },
+  { key: 'grainSlime', label: '底の層：粒スライムが寄り集まって大きいスライムが生まれた' },
   { key: 'joined', label: '住処の洞窟が入口側とつながる' },
   { key: 'joinedDig', label: '住処の洞窟が入口側とつながる：住処のコボルトが掘ってつないだ' },
 ];
@@ -417,6 +423,11 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     armorShed: ev(K.Armor, 'shed').length,
     armorFall: ev(K.Armor, 'fall').length,
     slimeSplit: ev(K.Slime, 'split').length,
+    grazeGrain: s.filter((x) => x.ev === 'graze' && x.n === 0).length,
+    grazeGrainKinds: new Set(s.filter((x) => x.ev === 'graze' && x.n === 0).map((x) => x.k)).size,
+    grazeSpore: s.filter((x) => x.ev === 'graze' && x.n === 1).length,
+    grazeWeb: s.filter((x) => x.ev === 'graze' && x.n === 2).length,
+    grainSlime: ev(K.Slime, 'grainSlime').length,
     armorSlain: d.filter((x) => x.k === K.Armor && (x.by === K.Adventurer || x.by === 28)).length,
     // 入口側と切り離されていた住みか（コボルトの住処、ゴブリン・リザードマンの集落、アリの巣）が、入口側の洞窟とつながった（src/eco/islands.ts の markJoined）
     joined: s.filter((x) => x.ev === 'joined').length,

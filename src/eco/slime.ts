@@ -125,7 +125,13 @@ export function slime(this: Ecology, c: Cr): void {
   // 育ったら二つに分かれる
   if (c.body + c.food >= 70 && c.food >= 30 && this.counts[Kind.Slime] < 40) {
     c.food -= 15;
-    const ch = this.spawn(Kind.Slime, c.x + 6, c.y, 15, 0);
+    // 分かれた子は右隣に置く。右が岩なら左、左も岩ならその場（いつも右に置くと、壁ぎわで分かれた子が壁に埋まっていた）
+    const solidAt = (x: number) => {
+      const k = this.tileOf(x, c.y);
+      return k < 0 || this.w.map.solid[k] > 0;
+    };
+    const cx = !solidAt(c.x + 6) ? c.x + 6 : !solidAt(c.x - 6) ? c.x - 6 : c.x;
+    const ch = this.spawn(Kind.Slime, cx, c.y, 15, 0);
     ch.ref = 0;
     // 分かれた場面の記録（分析用のログだけ。シミュレーションの判断には使わない）
     this.record('settle', { t: this.w.tick, k: Kind.Slime, id: c.id, ev: 'split', n: ch.id, x: Math.round(c.x), y: Math.round(c.y) } as never);

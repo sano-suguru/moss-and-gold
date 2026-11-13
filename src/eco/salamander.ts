@@ -228,6 +228,8 @@ export function seed(this: Ecology): void {
       n++;
     }
   }
+  // 底の層（粒スライムと光る胞子）を、苔とキノコのある所に少し置いておく（src/eco/swarm.ts）
+  this.seedSwarm();
 }
 
 /** 苔からウィスプが生まれる（苔の更新から呼ばれる） */
@@ -457,6 +459,8 @@ export function heldNutrients(this: Ecology, openOnly = false): number {
   for (const cp of this.camps) if (cp.id >= 0 && ok(cp.x, cp.y)) s += (cp.fuel ?? 0) + (cp.store ?? 0);
   for (const e of this.eggs) if (ok(e.x, e.y)) s += e.units;
   for (const o of this.caches) if (ok(o.x, o.y)) s += o.food;
+  // 底の層（粒スライムと光る胞子。閉じた空洞の中の区画には広がらない）
+  s += this.swarmNutrients();
   return s;
 }
 

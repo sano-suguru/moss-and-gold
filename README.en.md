@@ -23,6 +23,7 @@ Each creature follows simple rules, but together they do things I didn't expect.
 <img src="docs/img/readme-sleepers.png" width="32%" alt="Creatures asleep by water lit from above, next to a kobold warren in the wall"> <img src="docs/img/readme-lava.png" width="32%" alt="A pool of lava with a flame-shaped salamander beside it"> <img src="docs/img/readme-dwarves.png" width="32%" alt="A dwarf hall with a golem standing by the treasure">
 
 - Glowing moss and mushrooms, underground water and lava. During the day, light comes in through cracks in the ceiling. Wisps, little specks of light born from the moss, drift toward the brightest patches.
+- Tiny slime grains crawling over the moss, and glowing spores that drift up from the mushrooms at night.
 - Small creatures that live on the moss, and the things that hunt them.
 - Settlers. Kobolds and goblins build warrens and camps, fight over food with their neighbors, and sometimes end up working for someone stronger.
 - Adventurers and dwarves from outside. Adventurers travel back and forth to town, so the same ones come back again and again.
