@@ -42,9 +42,17 @@ function png(w: number, h: number, rgba: Uint8Array): Buffer {
 }
 
 const a = buildAtlas();
+const index: Record<string, unknown> = {};
+// 冒険者は、ゲームの中では要るときに絵の下の名簿の区画へ描く（atlas.ts の hero）。書き出しでは、職ごとに
+// 松明なし・ふつうの見た目・見習いの位の姿を、全部の向き・動作・コマと眠る姿まで先に描かせてから PNG にする
+// （7職で364コマ。区画は504マスあるので描き替えは起きない）。
+const HERO_JOBS = ['warrior', 'wizard', 'thief', 'priest', 'bard', 'hunter', 'slayer'];
+HERO_JOBS.forEach((job, j) => {
+  DIRS.forEach((d, di) => ACTS.forEach((ac, ai) => { for (let f = 0; f < 4; f++) index[`adventurer/${job}/${d}/${ac}/${f}`] = { ...a.frames[a.hero(j, false, 0, 0, di, ai, f)] }; }));
+  for (let f = 0; f < 4; f++) index[`adventurer/${job}/sleep/${f}`] = { ...a.frames[a.heroBed(j, 0, 0, f)] };
+});
 mkdirSync('assets/sprites', { recursive: true });
 writeFileSync('assets/sprites/atlas.png', png(a.width, a.height, a.data));
-const index: Record<string, unknown> = {};
 SPECIES.forEach((s, si) =>
   DIRS.forEach((d, di) =>
     ACTS.forEach((ac, ai) => {
