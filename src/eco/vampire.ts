@@ -201,7 +201,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       if (this.vampEngage(c, [], p)) return;
       c.act = 1;
       if (sq(p.x - c.x) + sq(p.y - c.y) < 11 * 11) {
-        // 一口では食べず、打ち合って仕留める（hunt と同じ）
+        // 一口では食べず、打ち合って仕留める（src/eco/combat.ts の hunt と同じ）
         // 分析用：コウモリに群がられて足止めされた獲物に、ヴァンパイアが打ちかかった（獲物ごとに1回）
         if (this.batPinned(p) && c.gait !== p.id) {
           c.gait = p.id;
@@ -504,7 +504,7 @@ export function vampRaiseFallen(this: Ecology, c: Cr, day: number): boolean {
   if (sq(d.x - c.x) + sq(d.y - c.y) < 11 * 11) {
     c.ref2 = 0;
     if (this.vampClaim(c, d)) {
-      // 血を短く吸う（feeding。印を付けた亡骸からは生き物の更新15回で離れる）
+      // 血を短く吸う（src/eco/senses.ts の feeding。印を付けた亡骸からは生き物の更新15回で離れる）
       c.feed = d.id;
       c.act = 2;
       c.actT = 0;
@@ -652,7 +652,7 @@ const lordCache = new WeakMap<Ecology, { step: number; id: number }>();
 
 /**
  * o がコウモリに群がられて足止めされているか：ヴァンパイアが o を獲物に決めていて、8マス以内（PIN_R）まで近づき、
- * 従えるコウモリが2匹以上 o にまとわりついている（20px 以内）。足止めされた者は逃げられず（src/eco/step.ts）、打ち返しも弱い（fight）
+ * 従えるコウモリが2匹以上 o にまとわりついている（20px 以内）。足止めされた者は逃げられず（src/eco/step.ts）、打ち返しも弱い（src/eco/combat.ts の fight）
  */
 export function batPinned(this: Ecology, o: Cr): boolean {
   // （獲物の種は問わない：眷属を連れたヴァンパイアが狙うオークとドワーフも、群がられれば足止めされる）

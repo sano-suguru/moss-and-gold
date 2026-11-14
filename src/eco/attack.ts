@@ -212,7 +212,7 @@ export function resolveVolleys(this: Ecology): void {
       // 分析用：ゴーレムの跳ねる衝撃波に打たれた冒険者（lib/moments.ts が、一度の技で2人以上かを数える）
       if (a.k === Kind.Golem && o.k === Kind.Adventurer) this.record('settle', { t: this.w.tick, k: Kind.Golem, ev: 'quakeHit', id: a.id, at: a.cast, n: o.sp, x: Math.round(o.x), y: Math.round(o.y) } as never);
     });
-    // 投げ斧が届いた所：当たれば火花、外れれば床に打ちつけた土ぼこり（axehit）
+    // 投げ斧が届いた所：当たれば火花、外れれば床に打ちつけた土ぼこり（src/creatureView.ts の axehit）
     if (a.k === Kind.Orc) {
       this.fxAttacks.push({ t: this.w.tick, style: 'axehit', col: axeHit ? 1 : 0, size: 1, ax: a.x, ay: a.y, dx: v.x, dy: v.y, did: -1, aid: a.id, big: false, kill: false });
       if (this.fxAttacks.length > 160) this.fxAttacks.splice(0, 60);

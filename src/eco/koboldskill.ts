@@ -165,7 +165,7 @@ export function stoneLands(this: Ecology, a: Cr, v: { x: number; y: number; r: n
     if (this.fxHits.length > 120) this.fxHits.splice(0, 40);
     this.record('settle', { t: this.w.tick, k: Kind.Kobold, ev: 'stoneHit', id: a.id, n: o.sp, how, x: Math.round(o.x), y: Math.round(o.y) } as never);
   }
-  // 届いた所：当たれば小石が砕けて散り、外れれば床で跳ねて土ぼこりが立つ（slinghit）
+  // 届いた所：当たれば小石が砕けて散り、外れれば床で跳ねて土ぼこりが立つ（src/creatureView.ts の slinghit）
   const at = hit as Cr | null;
   this.fxAttacks.push({ t: this.w.tick, style: 'slinghit', col: at ? 1 : 0, size: 1, ax: a.x, ay: a.y, dx: at ? at.x : v.x, dy: at ? at.y : v.y, did: at ? at.id : -1, aid: a.id, big: false, kill: false });
   if (this.fxAttacks.length > 160) this.fxAttacks.splice(0, 60);

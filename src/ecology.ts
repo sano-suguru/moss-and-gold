@@ -92,7 +92,7 @@ export interface Party {
   members: number[];
   /**
    * 魔物から受けた被害：[種, 回数, x, y, 個体の番号（分からなければ -1）, そのうち石化の回数]。仲間が見つめで石化しかけたとき（src/eco/basilisk.ts）と、
-   * 強さ6以上の魔物に倒されたとき（die）に足す。生きて帰れば、その種の噂が強まる（src/eco/quest.ts）
+   * 強さ6以上の魔物に倒されたとき（src/eco/move.ts の die）に足す。生きて帰れば、その種の噂が強まる（src/eco/quest.ts）
    */
   hurt?: number[][];
   /** 一度の探索で見かけた大物（強さ10以上の魔物）：[種, x, y]（生きて帰れば、その種の噂になる） */

@@ -41,7 +41,7 @@
  * 取り込み：8マスの内の、見通しの利く床の武具。武器と盾は手に（ARMOR_HAND_MAX 個まで）、杖・聖印・リュート・弓は体に（ARMOR_BODY_MAX 個まで）。
  * 前に取り込んでから、未練の宿った武具なら ARMOR_GATHER_GAP 回、宿っていない武具なら ARMOR_ABSORB_GAP 回の更新が経っていれば取り込む。
  * 襲う相手：武具を持つ侵入者（冒険者、ドワーフ、武器を拾ったゴブリン・オーク）。アンデッド、獣や虫、他の番人は襲わない（番人の側も甲冑を襲わない）。
- * 賢さは本能だけで、逃げない。強さ（打撃）は6に、手に取り込んだ武器と盾1つごとに +3（ARMOR_HAND_MAX 個まで。str）。
+ * 賢さは本能だけで、逃げない。強さ（打撃）は6に、手に取り込んだ武器と盾1つごとに +3（ARMOR_HAND_MAX 個まで。src/eco/combat.ts の str）。
  * 体力（固さ）は体になった武具の数で決まる（armorHp）。剣や盾を拾うと打撃が重くなり、杖や聖印を体に取り込むと固くなる。
  * 倒れずに強い一打を受けると、最後に手に取った武器か盾を1つ床に落とし、打撃が下がる（armorShed）。落ちた武具にマナは宿っていないので、
  * 拾い直すのは ARMOR_ABSORB_GAP 回の更新おき。その前に冒険者やゴブリンに拾われることもある。強くなり続けず、打ち合うたびに強さが行き来する。
@@ -347,7 +347,7 @@ export function absorbItem(this: Ecology, c: Cr, it: Item): void {
 
 /**
  * 崩れる：体と手の武具が砕け散る（dropBelongings から。体のマナは die の releaseMana で土へ還る）。砕けた武具は床に残らず、次の甲冑の材料にならない。
- * 画面には、武具の破片が飛び散り、青白い未練が立ちのぼって消える（armorshatter）
+ * 画面には、武具の破片が飛び散り、青白い未練が立ちのぼって消える（src/creatureView.ts の armorshatter）
  */
 export function scatterArmor(this: Ecology, c: Cr): void {
   const kit = this.armorKit.get(c.id);

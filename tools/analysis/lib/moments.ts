@@ -388,7 +388,7 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     bsBedMove: ev(K.Basilisk, 'bedMove').length,
     bsScare: ev(K.Rat, 'fleeBasilisk').length,
     minoDrag: ev(K.Minotaur, 'drag').length,
-    // 湧きの記録（settle 'gen'。群れごとに1回）
+    // 湧きの記録（src/eco/generate.ts の settle 'gen'。群れごとに1回）
     soilBirth: s.filter((x) => x.ev === 'gen' && x.how === 'nutr' && x.k !== K.Bat).length,
     heroMana: ev(K.Adventurer, 'heroMana').length,
     wispSip: d.filter((x) => x.cause === 'sipped').length,

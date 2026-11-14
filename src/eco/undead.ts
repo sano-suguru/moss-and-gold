@@ -5,7 +5,7 @@ import { TILE } from '../mapgen';
 /**
  * 骨になって起き上がる人型（冒険者のほか）。ゴブリン・コボルト・オーク・ドワーフ・リザードマンの亡骸も、暗く死者の多い所で骨になったあと、
  * 骨が寄り集まって起き上がる（以前は冒険者の亡骸だけが起き上がり、冒険者が倒れにくくなると、アンデッドの場面がまとめて減った）。
- * 冒険者以外のスケルトンは、sp に BONE_SP + 生前の種を持つ（強さと骨の大きさが生前の種で決まる。str、beastSkeleton）
+ * 冒険者以外のスケルトンは、sp に BONE_SP + 生前の種を持つ（強さと骨の大きさが生前の種で決まる。src/eco/combat.ts の str、beastSkeleton）
  */
 export const BONE_KINDS: number[] = [Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Dwarf, Kind.Lizardman];
 export const BONE_SP = 100;
