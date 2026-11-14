@@ -100,7 +100,7 @@ URL の末尾に `#lit`（全体を明るくする）、`#albedo`（地形の色
 
 ## デプロイ（Cloudflare Workers の静的アセット）
 
-設定は `wrangler.jsonc`（`dist/` をそのまま配信）と `.github/workflows/deploy.yml`。PR では typecheck・test・check（main の10日目のスナップショットから）が走り、プレビュー URL（エイリアス `pr-<番号>`）が PR にコメントされる。main への push で本番にデプロイする。Secrets（`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`）が無ければデプロイだけスキップする。設定の確認は `npm run build && npx wrangler deploy --dry-run`。
+設定は `wrangler.jsonc`（`dist/` をそのまま配信）と `.github/workflows/deploy.yml`。PR では typecheck・lint・test・check（main の10日目のスナップショットから）が走り、プレビュー URL（エイリアス `pr-<番号>`）が PR にコメントされる。main への push で本番にデプロイする。Secrets（`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`）が無ければデプロイだけスキップする。設定の確認は `npm run build && npx wrangler deploy --dry-run`。
 
 ## ソースの構成
 
