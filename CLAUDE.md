@@ -117,7 +117,7 @@ URL の末尾に `#lit`（全体を明るくする）、`#albedo`（地形の色
 | test/*.ts | テスト |
 | tools/gallery/ | ビジュアル確認（scenes.ts・shoot.mjs：固定シーンの一覧、shot.ts：探して撮る、film.mjs：連続フレーム） |
 | tools/analysis/ | 分析ツール（入口は launch.mjs）。共通部品は lib/（engine.ts 実行、state.ts 状態の読み書き、runs.ts キャッシュ、open.ts スナップショットの取得、stats.ts A/B 比較の判定、seeds.ts 固定のシードの組、moments.ts 見せたい場面の数え方） |
-| tools/export-sprites.ts | 生き物のドット絵を、PNG のスプライトシートと各フレームの位置の JSON に書き出す（`npm run export-sprites`） |
+| tools/export-sprites.ts | 生き物のドット絵を、PNG のスプライトシートと各フレームの位置の JSON に書き出す（`npm run export-sprites` → build/sprites/。コミットしない） |
 
 ## 変更するときの注意
 

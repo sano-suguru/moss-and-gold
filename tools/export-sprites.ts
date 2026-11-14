@@ -1,6 +1,7 @@
 // 生き物のドット絵を PNG のスプライトシートと、各フレームの位置を書いた JSON に書き出す。
-// 使い方: npx esbuild tools/export-sprites.ts --bundle --platform=node --outfile=build/export.js && node build/export.js
-// 書き出した PNG はドット絵ツールで手直しできる（アルファ 255 は体、254 は輪郭や目、253 はそれ自体が光る部分）。
+// 使い方: npm run export-sprites  → build/sprites/atlas.png と atlas.json（コミットしない。ソースから毎回同じものができる）
+// 見て確かめるためのもの。ゲームは src/sprites.ts から毎回ドット絵を作るので、PNG を手直ししてもゲームには戻らない
+// （アルファ 255 は体、254 は輪郭や目、253 はそれ自体が光る部分、252〜250 は光る・半透明などの材質の印）。
 import { mkdirSync, writeFileSync } from 'fs';
 import { deflateSync } from 'zlib';
 import { ACTS, DIRS, SPECIES, buildAtlas } from '../src/atlas';
@@ -51,8 +52,8 @@ HERO_JOBS.forEach((job, j) => {
   DIRS.forEach((d, di) => ACTS.forEach((ac, ai) => { for (let f = 0; f < 4; f++) index[`adventurer/${job}/${d}/${ac}/${f}`] = { ...a.frames[a.hero(j, false, 0, 0, di, ai, f)] }; }));
   for (let f = 0; f < 4; f++) index[`adventurer/${job}/sleep/${f}`] = { ...a.frames[a.heroBed(j, 0, 0, f)] };
 });
-mkdirSync('assets/sprites', { recursive: true });
-writeFileSync('assets/sprites/atlas.png', png(a.width, a.height, a.data));
+mkdirSync('build/sprites', { recursive: true });
+writeFileSync('build/sprites/atlas.png', png(a.width, a.height, a.data));
 SPECIES.forEach((s, si) =>
   DIRS.forEach((d, di) =>
     ACTS.forEach((ac, ai) => {
@@ -74,5 +75,5 @@ index['worm-segment/tail'] = a.frames[a.wormSeg(1)];
 for (let kd = 0; kd < 11; kd++) for (let f = 0; f < 4; f++) index[`item/${['torch', 'stub', 'sword', 'shield', 'staff', 'mace', 'dagger', 'symbol', 'lute', 'bow', 'greatsword'][kd]}/${f}`] = a.frames[a.item(kd, f)];
 for (let f = 0; f < 4; f++) { index[`dragon-breath/side/${f}`] = a.frames[a.breath(false, f)]; index[`dragon-breath/down/${f}`] = a.frames[a.breath(true, f)]; }
 index['burrow'] = a.frames[a.burrow];
-writeFileSync('assets/sprites/atlas.json', JSON.stringify(index, null, 1));
-console.log(`assets/sprites/atlas.png ${a.width}x${a.height}, ${Object.keys(index).length} frames`);
+writeFileSync('build/sprites/atlas.json', JSON.stringify(index, null, 1));
+console.log(`build/sprites/atlas.png ${a.width}x${a.height}, ${Object.keys(index).length} frames`);
