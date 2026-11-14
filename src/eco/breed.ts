@@ -1,5 +1,5 @@
 /** Ecology のメソッド：中で殖える（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { DAY_TICKS_ECO, Ecology, Kind, ih, } from '../ecology';
+import { DAY_TICKS_ECO, Ecology, Kind, ih } from '../ecology';
 import { TILE } from '../mapgen';
 
 /**

@@ -1,5 +1,5 @@
 /** Ecology のメソッド：掘ることと、空洞と崩落（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Ecology, } from '../ecology';
+import { Ecology } from '../ecology';
 
 /** 巣穴やアリの通路を、空洞の気配の方へ一マスずつ掘り進める */
 export function tunnelToward(this: Ecology, head: number, home: number, R: number): number {

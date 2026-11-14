@@ -1,5 +1,5 @@
 /** Ecology のメソッド：外から来るもの（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Burrow, DAY_TICKS_ECO, Ecology, Kind, SPEC, ih, } from '../ecology';
+import { Burrow, DAY_TICKS_ECO, Ecology, Kind, SPEC, ih } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 口が開いているか（閉じた空洞の外にあるか） */

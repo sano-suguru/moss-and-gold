@@ -24,7 +24,7 @@ import { join } from 'path';
 import { parseArgs } from './common';
 import { defaultAdv, getBin, pool } from './lib/runs';
 import { dirName, runSets } from './lib/batchrun';
-import { parseSeeds, PRESETS, } from './lib/seeds';
+import { parseSeeds, PRESETS } from './lib/seeds';
 
 const a = parseArgs(process.argv.slice(2));
 const preset = a.preset ? PRESETS[a.preset] : undefined;

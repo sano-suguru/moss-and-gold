@@ -3587,7 +3587,6 @@ function heroOrbAt(dir,f,rank){
  const lx=q===2&&dir==='side'?1:0,ly=q===2?(dir==='up'?-1:dir==='down'?1:0):0;
  return [hx-col+sx/n+0.5+lx-7,hy-(15-top)+sy/n+0.5+ly-20];
 }
-/** 体の座標の点を、左右反転する（正面の右手の構えを左手に、など）。手は2ピクセル幅なので 12-x */
 /**
  * ほかの職の攻撃の1コマ：腕を外す胴の側（複数）と、描く部品（{g,x,y,behind,soft,noGlow}。体の座標）。
  * 魔法使い：杖を掲げ、宝玉が光る（0 構え、1 掲げる、2 さらに突き上げて宝玉がいちばん明るい、3 下ろす）。宝玉の光は描画の光（creatureView の heroOrb）。

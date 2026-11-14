@@ -1,5 +1,5 @@
 /** Ecology のメソッド：記録（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Ecology, } from '../ecology';
+import { Ecology } from '../ecology';
 
 /** 目立つ出来事を記録に残す（新しい順に60件まで） */
 export function log(this: Ecology, x: number, y: number, m: string): void {

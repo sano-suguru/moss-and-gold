@@ -10,7 +10,7 @@
  */
 import { CELL, Camp, Cr, Ecology, Kind, Party, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
-import { ADV_NAMES, AIM_NAMES, JOB_NAMES, } from '../names';
+import { ADV_NAMES, AIM_NAMES, JOB_NAMES } from '../names';
 import { heroTitle } from './roster';
 import { UNDEAD, type Quest } from './quest';
 

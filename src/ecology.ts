@@ -1,4 +1,3 @@
-
 /** ゲーム内の1日の tick 数（world.ts の DAY_TICKS と同じ） */
 export const DAY_TICKS_ECO = 14400;
 import type { World } from './world';

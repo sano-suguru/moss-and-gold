@@ -1,5 +1,5 @@
 /** Ecology のメソッド：石像（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, Ecology, Kind, STR, Statue, ih, } from '../ecology';
+import { Cr, Ecology, Kind, STR, Statue, ih } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 生き物を、その瞬間の姿のまま石像に変える。by は石にした種（バジリスクの睨みなら17、トロールが光の筋を浴びたなら −1） */

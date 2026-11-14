@@ -1,5 +1,5 @@
 /** Ecology のメソッド：島（入口側と切り離された洞窟。入口側の洞窟と歩いてつながっていない領域のこと。説明では「入口側と切り離された住処」と書く）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { DAY_TICKS_ECO, Ecology, Kind, ih, } from '../ecology';
+import { DAY_TICKS_ECO, Ecology, Kind, ih } from '../ecology';
 import { TILE } from '../mapgen';
 
 /**

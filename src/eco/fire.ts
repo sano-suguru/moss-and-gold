@@ -1,5 +1,5 @@
 /** Ecology のメソッド：炎（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, Ecology, Kind, ih, } from '../ecology';
+import { Cr, Ecology, Kind, ih } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import type { MapData } from '../mapgen';
 

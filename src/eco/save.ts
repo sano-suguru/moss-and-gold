@@ -1,5 +1,5 @@
 /** Ecology のメソッド：セーブとロード（シリアライズと復元。src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, DAY_TICKS_ECO, Ecology, Kind, Note, Party, } from '../ecology';
+import { Cr, DAY_TICKS_ECO, Ecology, Kind, Note, Party } from '../ecology';
 
 export function serialize(this: Ecology): object {
   const L: number[] = [];
