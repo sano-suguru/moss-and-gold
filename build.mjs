@@ -22,29 +22,34 @@ if (process.argv.includes('--dev')) {
   mkdirSync(dir, { recursive: true });
   const reload = "new EventSource('/esbuild').addEventListener('change', () => location.reload());";
   const indexPath = resolve('src/index.html');
-  // index.html も esbuild に見張らせる：main.ts を読み込むたびに、本番と同じ目印（/*__APP__*/）の所へ読み込み直しの処理を置いた
-  // 開発用の HTML を書き、index.html の中身のハッシュを main.ts の末尾のコメントに足す。index.html が変わるとソースマップが変わるので、
-  // esbuild が「書き換わった」と知らせ、ページが読み込み直される（watchFiles に入れるので、index.html の書き換えでも作り直す）。
+  // index.html も esbuild に見張らせる：main.ts を読み込むたびに index.html を読み、その中身のハッシュをグローバルに入れる1行を
+  // main.ts の末尾に足す（副作用のある式なので出力の JS に残り、index.html が変わると app.js が変わって、esbuild が「書き換わった」と知らせる）。
+  // watchFiles に入れるので、index.html の書き換えでも作り直す。開発用の HTML は、ビルドにエラーが無かったときだけ書く
+  // （エラーのときに新しい HTML と古い app.js が組み合わさらないように）。
+  let html = '';
   const devHtml = {
     name: 'dev-html',
     setup(b) {
       b.onLoad({ filter: /[\\/]src[\\/]main\.ts$/ }, (args) => {
         const src = readFileSync(indexPath, 'utf8');
         if (!src.includes('/*__APP__*/')) throw new Error('src/index.html に /*__APP__*/ が無い');
-        writeFileSync(`${dir}/index.html`, src.replace('/*__APP__*/', () => `${reload}</script>\n<script src="app.js">`));
+        html = src.replace('/*__APP__*/', () => `${reload}</script>\n<script src="app.js">`);
         const hash = createHash('sha256').update(src).digest('hex').slice(0, 12);
-        return { contents: `${readFileSync(args.path, 'utf8')}\n// index.html ${hash}\n`, loader: 'ts', watchFiles: [indexPath] };
+        return { contents: `${readFileSync(args.path, 'utf8')}\nglobalThis.__devIndexHtml = ${JSON.stringify(hash)};\n`, loader: 'ts', watchFiles: [indexPath] };
+      });
+      b.onEnd((result) => {
+        if (result.errors.length === 0 && html) writeFileSync(`${dir}/index.html`, html);
       });
     },
   };
+  const portEnv = process.env.PORT;
+  const port = portEnv ? Number(portEnv) : undefined;
+  if (port !== undefined && !(Number.isInteger(port) && port >= 1 && port <= 65535)) throw new Error(`PORT は 1〜65535 の整数にする（今は ${portEnv}）`);
   const ctx = await context({ ...opts, outfile: `${dir}/app.js`, sourcemap: true, logLevel: 'info', plugins: [devHtml] });
   await ctx.watch();
-  const { hosts, port } = await ctx.serve({
-    servedir: dir,
-    host: process.env.HOST || '127.0.0.1',
-    port: process.env.PORT ? Number(process.env.PORT) : undefined,
-  });
-  console.log(`開発サーバー: http://${hosts[0] === '0.0.0.0' ? 'localhost' : hosts[0]}:${port}/`);
+  const served = await ctx.serve({ servedir: dir, host: process.env.HOST || '127.0.0.1', port });
+  // HOST=0.0.0.0 のときは、各ネットワークのアドレスが並ぶ（実機からは 127.0.0.1 以外のアドレスで開く）
+  for (const h of served.hosts) console.log(`開発サーバー: http://${h}:${served.port}/`);
 } else {
   const r = await build({ ...opts, minify: true, write: false });
   const js = r.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');

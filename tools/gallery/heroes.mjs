@@ -14,7 +14,10 @@ const S = +opt('scale', '4');
 mkdirSync('build/img', { recursive: true });
 buildSync({ entryPoints: ['src/sprites.ts'], bundle: true, format: 'cjs', outfile: 'build/sprites-heroes.cjs', platform: 'node', logLevel: 'silent' });
 const SP = require(process.cwd() + '/build/sprites-heroes.cjs');
-const JOBS = [['warrior', '戦士'], ['wizard', '魔法使い'], ['thief', '盗賊'], ['priest', '僧侶'], ['bard', '吟遊詩人'], ['hunter', '狩人'], ['slayer', '竜殺し']];
+// 職の名前は src/sprites.ts の HERO_JOBS（職の番号の順）から読み、ここには表に出す日本語の名前だけを同じ順で持つ
+const JOB_JA = ['戦士', '魔法使い', '盗賊', '僧侶', '吟遊詩人', '狩人', '竜殺し'];
+if (SP.HERO_JOBS.length !== JOB_JA.length) throw new Error(`職の数（${SP.HERO_JOBS.length}）と日本語の名前の数（${JOB_JA.length}）が合わない`);
+const JOBS = SP.HERO_JOBS.map((j, i) => [j, JOB_JA[i]]);
 const RANKS = ['見習い', '熟練', '歴戦', '英雄'];
 const look = (hair, skin, color, build, head, crest = -1, scar = 0) => hair | (skin << 3) | (color << 5) | (build << 8) | (head << 10) | ((crest + 1) << 11) | (scar << 15);
 const LOOKS = [look(1, 1, 0, 1, 0, 0), look(3, 2, 1, 2, 1, 7)];
@@ -22,8 +25,7 @@ const toData = (fr) => ({ W: fr.W, H: fr.H, px: Array.from(fr.px), glow: fr.mat.
 const rows = JOBS.map(([j, jn]) => ({ jn, cells: RANKS.map((rn, r) => ({ rn, figs: LOOKS.flatMap((lk) => [['down', 0], ['side', 0], ['up', 0]].map(([d]) => toData(SP.heroSprite(j, d, 'idle', 0, false, lk, r)))) })) }));
 const graves = [1, 2, 3].map((r) => toData(SP.graveMarker(r, 2)));
 // 頭の飾り12種（名簿の12人で重ならない）：職業を替えながら、正面・横
-const CJ = ['warrior', 'wizard', 'thief', 'priest', 'bard', 'hunter', 'slayer'];
-const crests = SP.CREST_NAMES.map((n, i) => ({ n, figs: [['down', 1], ['side', 1], ['down', 0], ['down', 3]].map(([d, r]) => toData(SP.heroSprite(CJ[i % 7], d, 'idle', 0, false, look(i % 6, i % 4, i % 6, 1, 0, i), r))) }));
+const crests = SP.CREST_NAMES.map((n, i) => ({ n, figs: [['down', 1], ['side', 1], ['down', 0], ['down', 3]].map(([d, r]) => toData(SP.heroSprite(SP.HERO_JOBS[i % SP.HERO_JOBS.length], d, 'idle', 0, false, look(i % 6, i % 4, i % 6, 1, 0, i), r))) }));
 // 傷の姿：眼帯・包帯・両方
 const scars = [1, 2, 3].map((sc) => [['down', 1], ['side', 2], ['up', 1]].map(([d, r]) => toData(SP.heroSprite('warrior', d, 'idle', 0, false, look(2, 1, 0, 1, 1, 4, sc), r))));
 const html = `<!doctype html><meta charset=utf-8><style>body{margin:0;background:#22252b;color:#ddd;font:14px sans-serif;padding:12px}table{border-collapse:collapse}td,th{padding:4px 10px;border-bottom:1px solid #333;vertical-align:bottom}th{color:#e8d8a0}canvas{image-rendering:pixelated;margin-right:2px;background:#3a3f47}.g{margin-top:10px}</style>
