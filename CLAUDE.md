@@ -57,7 +57,7 @@ npm test                          # 決定性・保存則・ロード後の再�
 npm run typecheck                 # 使っていない変数・引数もエラー（tsconfig の noUnusedLocals / noUnusedParameters。要る引数は名前を _ で始める）
 npm run lint                      # Biome の推奨ルール一式（警告もエラー）。このリポジトリで意図して書いている形とぶつかるものだけ止めている（biome.json）。フォーマッタは使わない
 npm run build                     # dist/index.html（外部依存なしの1ファイル。dist はコミットしない）
-npm run dev                       # 開発サーバー（http://localhost:8000/。src を書き換えると作り直して、ページを読み込み直す）
+npm run dev                       # 開発サーバー（http://localhost:8000/。src と index.html を書き換えると作り直して、ページを読み込み直す。自分のマシンからだけ開ける。実機で見るときは HOST=0.0.0.0）
 ```
 
 lint の自動修正は `npx biome lint --write`（使っていない import の削除などは `--unsafe` も要る。`--unsafe` の修正は `a && a.b` を `a?.b` にするなど意味が変わりうるので、src に当てたら ab で出力が変わらないか確かめる）。

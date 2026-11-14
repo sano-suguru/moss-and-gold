@@ -4,6 +4,8 @@ import { fxSporeCloud, fxSporePuff, fxSporeMote, fxSlingWhirl, fxSlingStone, fxS
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
 export const DIRS = ['down', 'up', 'side'] as const;
 export const ACTS = ['idle', 'move', 'attack', 'death'] as const;
+/** 冒険者の職（番号の順。名簿の冒険者のコマを作るときに、番号から名前を引く） */
+export const JOBS = ['warrior', 'wizard', 'thief', 'priest', 'bard', 'hunter', 'slayer'];
 /** 名簿の冒険者のます目の大きさ（px）と、区画の行数 */
 const HERO_CELL = 48;
 const HERO_ROWS = 12;
@@ -448,7 +450,7 @@ export function buildAtlas(): Atlas {
       }
     }
   const eggShellFrame = raws.length;
-  raws.push(eggShell(0) as RawFrame);
+  raws.push(eggShell() as RawFrame);
   const manaMoteFrames: number[] = [];
   const dragonEggFrames: number[] = [];
   for (let i = 0; i < 4; i++) {
@@ -740,7 +742,7 @@ export function buildAtlas(): Atlas {
     raws.push(treasure(sz, f) as RawFrame);
   }
   const segFrames = [raws.length, raws.length + 1];
-  raws.push(wormSeg(0, 0) as RawFrame, wormSeg(1, 0) as RawFrame);
+  raws.push(wormSeg(0) as RawFrame, wormSeg(1) as RawFrame);
   const bodyFrames: number[] = [];
   for (let r = 3; r <= 12; r++) for (let v = 0; v < 2; v++) {
     bodyFrames.push(raws.length);
@@ -852,7 +854,6 @@ export function buildAtlas(): Atlas {
   const cellFrame = new Int32Array(nCells).fill(-1);
   const heroKeys = new Map<string, number>();
   let useT = 0;
-  const JOBS = ['warrior', 'wizard', 'thief', 'priest', 'bard', 'hunter', 'slayer'];
   const heroFrame = (job: number, torch: boolean, look: number, rank: number, d: number, a: number, f: number): number => {
     const key = `${job},${torch ? 1 : 0},${look},${rank},${d},${a},${f & 3}`;
     useT++;

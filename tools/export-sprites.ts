@@ -4,7 +4,7 @@
 // （アルファ 255 は体、254 は輪郭や目、253 はそれ自体が光る部分、252〜250 は光る・半透明などの材質の印）。
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
-import { ACTS, DIRS, SPECIES, buildAtlas } from '../src/atlas';
+import { ACTS, DIRS, JOBS, SPECIES, buildAtlas } from '../src/atlas';
 
 const CRC = (() => {
   const t = new Uint32Array(256);
@@ -46,12 +46,17 @@ const a = buildAtlas();
 const index: Record<string, unknown> = {};
 // 冒険者は、ゲームの中では要るときに絵の下の名簿の区画へ描く（atlas.ts の hero）。書き出しでは、職ごとに
 // 松明なし・ふつうの見た目・見習いの位の姿を、全部の向き・動作・コマと眠る姿まで先に描かせてから PNG にする
-// （7職で364コマ。区画は504マスあるので描き替えは起きない）。
-const HERO_JOBS = ['warrior', 'wizard', 'thief', 'priest', 'bard', 'hunter', 'slayer'];
-HERO_JOBS.forEach((job, j) => {
+// （7職で364コマ）。区画のます目が足りないと、あとのコマが先のコマのます目に描き替わり、JSON の位置が古い絵を指すので、
+// 描き終えたあとに、冒険者のコマどうしの位置が重なっていないかを確かめ、重なっていたら止める。
+JOBS.forEach((job, j) => {
   DIRS.forEach((d, di) => ACTS.forEach((ac, ai) => { for (let f = 0; f < 4; f++) index[`adventurer/${job}/${d}/${ac}/${f}`] = { ...a.frames[a.hero(j, false, 0, 0, di, ai, f)] }; }));
   for (let f = 0; f < 4; f++) index[`adventurer/${job}/sleep/${f}`] = { ...a.frames[a.heroBed(j, 0, 0, f)] };
 });
+{
+  const heroKeys = Object.keys(index);
+  const cells = new Set(heroKeys.map((k) => { const fr = index[k] as { x: number; y: number }; return `${fr.x},${fr.y}`; }));
+  if (cells.size !== heroKeys.length) throw new Error(`冒険者のコマ ${heroKeys.length} 枚が、名簿の区画のます目 ${cells.size} か所にしか収まっていない（atlas.ts の HERO_ROWS を増やす）`);
+}
 mkdirSync('build/sprites', { recursive: true });
 writeFileSync('build/sprites/atlas.png', png(a.width, a.height, a.data));
 SPECIES.forEach((s, si) =>

@@ -11,7 +11,7 @@ export function dwarfTarget(this: Ecology): number {
   for (const p of this.piles) {
     const k = this.tileOf(p.x, p.y);
     if (k < 0) continue;
-    if (m.vault[k] && ((h?.golem) || this.dwarfLore & 1)) continue;
+    if (m.vault[k] && (h?.golem || this.dwarfLore & 1)) continue;
     if (h && sq(p.x - (h.hk % m.w) * TILE) + sq(p.y - Math.floor(h.hk / m.w) * TILE) < 6 * TILE * 6 * TILE) continue;
     const v = p.gold - (h ? Math.abs(p.x / TILE - (h.hk % m.w)) + Math.abs(p.y / TILE - Math.floor(h.hk / m.w)) : 0) * 2;
     if (v > bv) {

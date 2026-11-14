@@ -341,7 +341,7 @@ const WING={up:{e:[14,2],t:[19,0.4],tr:[[18.6,5.2],[16.6,4.4],[15.6,7.4],[13.6,6
 function bat(dir,act,f){
  const P=[],q=mod(f,4);
  if(act==='idle')return batRoost(f);
- if(act==='death')return batDead(f);
+ if(act==='death')return batDead();
  const pose=act==='attack'?(q===0?'mid':'up'):['up','mid','down','mid'][q];
  const w=WING[pose],dy=act==='attack'?[0,1,2,1][q]:0;
  if(dir==='side'){
@@ -381,7 +381,7 @@ function batRoost(f){
  P.push(D(5,12,COL.red),D(7,12,COL.red),D(6,11,RAMP.bat[0]));
  return {...raster(13,17,P),ax:6,ay:16};
 }
-function batDead(_f){
+function batDead(){
  const P=[];
  P.push(PL([[9,5],[3,3],[0.5,6],[3,5.5],[8,6.5]],'memD',1,{ol:1}),PL([[11,5],[16,2.5],[19.5,4.5],[16.5,5.5],[12,6.5]],'mem',2,{ol:1}));
  P.push(E(10,5.5,2.4,1.8,'bat',{ol:1}),E(12.6,5.2,1.6,1.4,'bat',{ol:1}),D(13,5,COL.K));
@@ -442,7 +442,7 @@ function bones(sp){
  if(sp==='bat'){[[10,5,2,2],[10,5,4,7],[10,5,18,1],[10,5,17,6],[10,5,7,8]].forEach(([a,b,c,d])=>P.push(LN(a,b,c,d,'bone',2,{no:1})));P.push(E(12,4.5,1.7,1.4,'bone',{ol:1}),D(12,4,COL.K));return {...raster(20,9,P),ax:10,ay:7}}
  P.push(E(11,8,4.2,2.6,'zspi',{ol:1,flat:2}));[[8,8,5,4,7,2],[9.5,7,9,3,11,1.6],[12.5,7,13,3,11,1.6],[14,8,17,4,15,2],[7,9,3,9,4,6],[15,9,19,9,18,6]].forEach(([a,b,c,d,e,g])=>P.push(LN(a,b,c,d,'bone',1,{no:1}),LN(c,d,e,g,'bone',1,{no:1})));return {...raster(22,12,P),ax:11,ay:11};
 }
-const DEADF={rat:()=>ratDead(1),lizard:()=>lizDead(1),bat:()=>batDead(0),spider:()=>spider('side','death',3),kobold:()=>kobold('side','death',3),ant:()=>ant('side','death',0),salamander:()=>salamander('side','death',3),goblin:()=>goblin('side','death',3),orc:()=>orc('side','death',3),lizardman:()=>lizardman('side','death',3),minotaur:()=>minotaur('side','death',3),troll:()=>troll('side','death',3),basilisk:()=>basilisk('side','death',3),gargoyle:()=>gargoyle('side','death',3),vampire:()=>vampire('side','death',3),mimic:()=>mimic('side','death',3),golem:()=>golem('side','death',3),wyvern:()=>wyvern('side','death',3),dragon:()=>dragon('side','death',3),adventurer:()=>heroSprite('warrior','down','death',3,false,0,1),skeleton:()=>skeleton('none','side','death',3),lich:()=>lich('side','death',3),dwarf:()=>dwarf('miner','side','death',3)};
+const DEADF={rat:()=>ratDead(1),lizard:()=>lizDead(1),bat:()=>batDead(),spider:()=>spider('side','death',3),kobold:()=>kobold('side','death',3),ant:()=>ant('side','death',0),salamander:()=>salamander('side','death',3),goblin:()=>goblin('side','death',3),orc:()=>orc('side','death',3),lizardman:()=>lizardman('side','death',3),minotaur:()=>minotaur('side','death',3),troll:()=>troll('side','death',3),basilisk:()=>basilisk('side','death',3),gargoyle:()=>gargoyle('side','death',3),vampire:()=>vampire('side','death',3),mimic:()=>mimic('side','death',3),golem:()=>golem('side','death',3),wyvern:()=>wyvern('side','death',3),dragon:()=>dragon('side','death',3),adventurer:()=>heroSprite('warrior','down','death',3,false,0,1),skeleton:()=>skeleton('none','side','death',3),lich:()=>lich('side','death',3),dwarf:()=>dwarf('miner','side','death',3)};
 /** 死骸の段階：0 新しい、1 腐りかけ、2 骨 */
 function corpse(sp,stage){if(stage===2){if(sp==='ant')return rotFrame(ant('side','death',0),0.5,3,false);if(sp==='gargoyle')return gargoyle('side','death',3);if(sp==='wyvern'||sp==='dragon')return bones('lizard');if(sp==='adventurer'||sp==='skeleton'||sp==='lich'||sp==='dwarf')return bones('kobold');if(sp==='mimic')return mimic('side','death',3);if(sp==='golem')return golem('side','death',3);if(sp==='salamander'||sp==='lizardman'||sp==='basilisk')return bones('lizard');if(sp==='goblin'||sp==='orc'||sp==='minotaur'||sp==='troll'||sp==='vampire')return bones('kobold');return bones(sp)}const fr=DEADF[sp]();return stage===0?fr:rotFrame(fr,0.28,13,false)}
 // ===== スライム =====
@@ -1072,7 +1072,7 @@ function golem(dir,act,f){
  // 胴：上が広い台形。ブロックの継ぎ目
  P.push(PL([[7,14+bob],[39,14+bob],[34,33+bob],[12,33+bob]],'gst',2,{ol:1}));
  P.push(PL([[8,14+bob],[38,14+bob],[37,17+bob],[9,17+bob]],'gst',4));
- [[9,21],[11,27]].forEach(([x,y],_i)=>P.push(LN(x,y+bob,46-x,y+bob,'gst',0,{no:1})));
+ [[9,21],[11,27]].forEach(([x,y])=>P.push(LN(x,y+bob,46-x,y+bob,'gst',0,{no:1})));
  [[18,14,18,21],[28,14,28,21],[14,21,14,27],[23,21,23,27],[32,21,32,27],[19,27,19,33],[27,27,27,33]].forEach(([a,b,c,d])=>P.push(LN(a,b+bob,c,d+bob,'gst',0,{no:1})));
  // 頭：肩に沈んだ小さな塊と、細い目の溝
  blk(18,6+bob,28,15+bob,2);
@@ -1235,7 +1235,7 @@ function wormMound(v,big,hard){
  for(let i=0;i<(big?7:4);i++){const b=i*2.4+v;setPx(fr,Math.round(cx+Math.cos(b)*(R+1.5)),Math.round(cy+Math.sin(b)*(R*0.55+1)),RM[2],false)}
  return {...fr,ax:Math.round(cx),ay:H-1};
 }
-function wormSeg(kind,_f){
+function wormSeg(kind){
  const P=[],W=28,H=24,cx=14,base=20;
  const r=kind===1?6:10;
  P.push(E(cx,base-r*0.8,r,r*0.8,'flesh',{ol:1}));
@@ -1416,13 +1416,13 @@ function dragon(dir,act,f){
  }
  const back=dir==='up';
  const lf=[2,0,-2,0][step];
- const legs=(xs,yTop,yFoot,thick,m,_lift)=>{for(const [x,l] of xs){P.push(E(x,yTop,thick+2,thick+1.6,m,{ol:1}),C(x,yTop+2,x+(x<50?-1:1),yFoot-2+l,thick,m),PL([[x-thick-1,yFoot-3+l],[x+thick+1,yFoot-3+l],[x+thick+1,yFoot+l],[x-thick-1,yFoot+l]],m,2,{ol:1}));for(let i=-1;i<=1;i++)P.push(D(x+i*2,yFoot+1+l,RAMP.horn[3]))}};
+ const legs=(xs,yTop,yFoot,thick,m)=>{for(const [x,l] of xs){P.push(E(x,yTop,thick+2,thick+1.6,m,{ol:1}),C(x,yTop+2,x+(x<50?-1:1),yFoot-2+l,thick,m),PL([[x-thick-1,yFoot-3+l],[x+thick+1,yFoot-3+l],[x+thick+1,yFoot+l],[x-thick-1,yFoot+l]],m,2,{ol:1}));for(let i=-1;i<=1;i++)P.push(D(x+i*2,yFoot+1+l,RAMP.horn[3]))}};
  if(!back){
   // 正面（こちらへ向かう）：胸を張り、首をS字に持ち上げて、頭は肩より高い位置からこちらを見下ろす
   const hd=at?[0,2,3,2][q]:0,op=at&&q>0;
   // 尾（奥で片側へのぞく）と、奥の後ろ脚
   P.push(C(60,34+bob,74,26,3.6,'drgD'),C(74,26,82,30,2.4,'drgD'),PL([[80,26],[88,30],[82,33]],'drgD',2,{ol:1}));
-  legs([[34,-lf],[66,lf]],44+bob,58,3.4,'drgD',0);
+  legs([[34,-lf],[66,lf]],44+bob,58,3.4,'drgD');
   // 背中（胸の向こうに盛り上がる）ととげ
   P.push(E(50,40+bob,17,10,'drg',{ol:1}));
   [[38,32],[44,30],[56,30],[62,32]].forEach(([x,y])=>spike(x,y+bob,3));
@@ -1432,7 +1432,7 @@ function dragon(dir,act,f){
    P.push(C(X(12),40+bob,X(24),18+bob,1.6,'drgD'),PL([[X(24),18+bob],[X(25),12+bob],[X(26),19+bob]],'horn',3,{ol:1}));
    [[X(28),32],[X(26),46],[X(18),54]].forEach(([x,y])=>P.push(LN(X(24),18+bob,x,y+bob,'drgD',1,{no:1})));}
   // 前脚：張り出した胸の下に踏みしめる
-  legs([[38,lf],[62,-lf]],52+bob,G-4,4.4,'drg',0);
+  legs([[38,lf],[62,-lf]],52+bob,G-4,4.4,'drg');
   // 胸：前に張り出し、腹の板が縦に並ぶ
   P.push(E(50,50+bob,13,10,'drg',{ol:1}),PL([[45,42+bob],[55,42+bob],[56,58+bob],[44,58+bob]],'drgB',2));
   for(let y=45;y<=57;y+=3)P.push(LN(45,y+bob,55,y+bob,'drgB',1,{no:1}));
@@ -5807,7 +5807,7 @@ function dragonlingSleep(stage,f){
  return {...fr,ax:Math.round(cx),ay:G};
 }
 /** 卵の殻のかけら（幼竜が生まれた場所に残る） */
-function eggShell(_v){
+function eggShell(){
  const W=18,H=8,fr=blank(W,H),C1=[236,226,200],C2=[196,184,156],C3=[140,128,108];
  const bits=[[3,5,4],[8,6,5],[13,5,3]];
  bits.forEach(([x,y,w],i)=>{for(let dx=0;dx<w;dx++){setPx(fr,x+dx,y,dx===0?C3:C2,false);if(dx>0&&dx<w-1)setPx(fr,x+dx,y-1,C1,false)}if(i===1){setPx(fr,x+1,y-2,C1,false);setPx(fr,x+2,y-2,C2,false)}});
