@@ -1842,7 +1842,7 @@ export class CreatureView {
         const hop = Math.abs(Math.sin(t * 9 + c.id)) * 2.5;
         pushSprite(c.x + 5, c.y, 24 + hop + Ecology.bodySize(c.k) * 0.6, false, A.mark('!'), 0, 2);
       }
-      // 聞き耳の「？」：立ち止まって耳を澄ませているあいだずっと、皆の頭の上に（前は出た瞬間の2秒だけで、見落としやすかった）
+      // 聞き耳の「？」：立ち止まって耳を澄ませているあいだずっと、皆の頭の上に（出た瞬間だけでは見落とす）
       for (const id of listening) {
         const c = byId.get(id);
         if (!c || c.dead || c.sleep || !inView(c.x, c.y, 20)) continue;
@@ -1920,7 +1920,6 @@ export class CreatureView {
     for (const c of eco.list) {
       // コウモリの群れにばらけたヴァンパイア：姿の代わりに、14匹のコウモリが、飛ぶ向きの後ろへ尾を引いて住処へ飛ぶ（src/eco/vampire.ts の vampScatter）。
       // ばらけた直後（生き物の更新12回まで）は、ヴァンパイアのいた所から四方へはじけ、それから尾の形に寄り集まる。
-      // （以前は8匹が半径4〜14px に固まり、石像の色で描いていたので、小さな灰色の点にしか見えなかった）
       if (c.k === Kind.Vampire && c.st === VAMP_SCATTER && !c.dead) {
         const a = eco.moveAlpha(c, alpha);
         const x = c.px + (c.x - c.px) * a;
@@ -2031,7 +2030,7 @@ export class CreatureView {
       let dir = cdir === 0 || eco.isHidden(c) ? 0 : cdir === 1 ? 1 : 2;
       let flip = cdir === 3;
       // 幼竜と若い竜には横向きの絵しかない。上下へ動くときも、横にどちらへ動いているかで左右を決め、
-      // 一時停止中やロード直後で動きが分からなければ、飛んでいる竜は行き先の側を向き、それ以外は直前の左右を保つ（以前は上下の向きのとき必ず右を向き、左上へ飛ぶと右を向いたまま後ろへ滑って見えた）
+      // 一時停止中やロード直後で動きが分からなければ、飛んでいる竜は行き先の側を向き、それ以外は直前の左右を保つ
       const youngDragon = sp === Kind.Dragon && c.sp < 2 && c.elite !== 8;
       if (youngDragon) {
         if (c.dir === 2 || c.dir === 3) flip = c.dir === 3;
@@ -2065,7 +2064,7 @@ export class CreatureView {
       } else if (act === 1 && c.x === c.px && c.y === c.py && eco.gaitPaused(c)) {
         // 歩き方の止まる番（大ネズミの「止まってあたりをうかがう」、一行の先頭が見回す、など）で、この更新ではその場から動いていない。
         // 行動の多くは移動のあとで「着いていなければ歩く姿」と姿を決め直すので、act は歩く姿のままになっている。
-        // 本当に止まっているので立ち姿で描く（以前は、その場で足を動かし続けて引っかかって見えた）
+        // 本当に止まっているので立ち姿で描く（歩く姿だと、その場で足を動かして引っかかって見える）
         act = 0;
         f = Math.floor(t * 2.6 + seed) & 3;
       } else if (act === 1) {
@@ -2099,7 +2098,6 @@ export class CreatureView {
         } else if (c.caught) lift = 6;
       }
       // 炎に焼かれている者（描画専用）：燃える床の上にいる間と、炎に焼かれてから3秒ほど、体のまわりから火の粉が舞い上がる（src/eco/fire.ts の burnHurt）。
-      // （以前は、焼かれても傷を受けたときの白い光が出るだけで、燃える床で少しずつ焼かれていることが見えなかった）
       if (!c.dead && sp !== Kind.Dragon) {
         const tk = eco.tileOf(c.x, c.y);
         const onFire = tk >= 0 && eco.w.burn[tk] > 0 && !eco.airborne(c);

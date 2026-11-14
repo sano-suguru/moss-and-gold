@@ -158,7 +158,7 @@ export function forBreathFan(m: MapData, c: Cr, tx: number, t: number, d0: numbe
   const ox = inRock ? c.x : mx;
   const oy = inRock ? c.y : my;
   for (let d = d0; d <= reach; d += 0.5) {
-    // 横のずれは、0 を中心に半マスずつ左右対称に（口元の近くは1マス幅の線になる。以前は片側へ寄って、体の横や下にも火がついていた）
+    // 横のずれは、0 を中心に半マスずつ左右対称に（口元の近くは1マス幅の線になる）
     const hw = Math.floor((BREATH_HALF0 + d * BREATH_SPREAD) * 2) / 2;
     for (let w = -hw; w <= hw; w += 0.5) {
       const x = mx + (ux * d - uy * w) * TILE;
@@ -190,7 +190,6 @@ export function breathe(this: Ecology, c: Cr, tx: number, _ty: number, t: number
   fan(Math.max(0.5, reach - 1.2), (k) => this.ignite(k, BURN_MIN + (ih(k, this.step, 130) % BURN_RANGE)));
   // 扇の全体（口元から炎の先まで）にいる者は、炎を吐く間、生き物の更新ごとにドラゴンの強さの4〜8割の傷を負う（居続けると打ち合いの2〜3回分。逃げれば助かる）。
   // 飛んでいる者（コウモリ、ワイバーン、ウィスプ）は、床に燃え残った火では焼けないが、吐いている炎そのものには当たる。
-  // （以前は、飛んでいる者は炎の先に当たるとその場で焼け死に、地面にいる者は燃えるマスに立つとその場で焼け死んでいた）
   const hit = new Set<Cr>();
   fan(0, (k) => {
     const kx = (k % m.w) * TILE + 8;

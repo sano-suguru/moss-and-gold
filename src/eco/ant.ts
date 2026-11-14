@@ -96,11 +96,10 @@ export function ant(this: Ecology, c: Cr): void {
   let target = this.byId.get(c.ref2) ?? null;
   if (target && (target.dead !== 1 || target.units <= 0)) target = null;
   // 目当ての死骸が無くなっていたら（ほかの者に食べられた、朽ちた）、覚えた番号を消して探し直す
-  // （以前は番号が残ったまま探し直さず、何もしないまま歩く姿でその場に立ち続けていた）
   if (!target && c.ref2 > 0) c.ref2 = 0;
   if (!target && c.ref2 === 0) {
     // 巣から歩いて行ける物（巣と同じ、つながった洞窟の領域にある物）だけを選ぶ
-    // （以前はまっすぐの距離だけで選んだので、岩に囲まれた隅の巣のアリが、壁の向こうの苔へ道が見つからないまま歩き続けた。abc の10〜18日目で40回）
+    // （まっすぐの距離だけで選ぶと、壁の向こうの苔へ道が見つからないまま歩き続ける）
     const home = this.regionOf(this.tileOf(col.x, col.y));
     // コボルトの住処の畑（住処から5マスの内）の苔とキノコは取らない（すでに住処のそばにある巣のアリが、畑を食べ尽くしてしまう）
     const farm = (x: number, y: number) => this.warrens.some((o) => o.id >= 0 && sq(o.x - x) + sq(o.y - y) < 5 * TILE * 5 * TILE);
@@ -125,7 +124,6 @@ export function ant(this: Ecology, c: Cr): void {
         c.ref2 = -1 - kk;
       } else {
         // 運ぶ物が見つからなければ、巣のそばで休む（巣から3マスより遠ければ巣へ戻る。蓄えが十分なときと同じ）。
-        // 以前は約3秒ごとに乱数で向きを選んで半分の速さでぶらつき、向きが戻るとほとんど進まずに足踏みして見えていた
         c.act = sq(col.x - c.x) + sq(col.y - c.y) > 3 * TILE * 3 * TILE ? 1 : 0;
         if (c.act === 1) {
           const [ox, oy] = antSpot(c, 10);

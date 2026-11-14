@@ -415,7 +415,7 @@ export function skeleton(this: Ecology, c: Cr, _day: number): void {
     c.hy = by;
   }
   // 暗がりをさまよう（生まれた場所から離れすぎない）：120回のうち60回、ふつうに近い速さで歩き、残りは立ち止まる。
-  // （以前はふつうの速さの0.6倍で歩き、脚を動かしながら3秒で半タイルも進まず、足踏みして見えていた）
+  // （ゆっくり歩き続けると、脚を動かしながら進まず、足踏みして見える）
   c.act = c.actT % 120 < 60 ? 1 : 0;
   if (c.act === 1) {
     if (sq(c.hx - c.x) + sq(c.hy - c.y) > 14 * TILE * 14 * TILE) this.goTo(c, c.hx, c.hy, s.speed);

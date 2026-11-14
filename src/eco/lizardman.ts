@@ -55,7 +55,7 @@ export function lizardman(this: Ecology, c: Cr): void {
     this.goTo(c, cp.x, cp.y, s.speed);
   } else {
     // たいてい立ち止まり、ときどき、ふつうに近い速さで数歩うろつく。
-    // （以前は70回のうち25回、ふつうの速さの0.45倍で歩き、脚を動かしながら3秒で半タイルも進まず、足踏みして見えていた）
+    // （ゆっくり歩き続けると、脚を動かしながら進まず、足踏みして見える）
     c.act = c.actT % 70 < 45 ? 0 : 1;
     if (c.act === 1) {
       const j = DIR16[ih(c.id, this.step >> 4, 100) & 15];

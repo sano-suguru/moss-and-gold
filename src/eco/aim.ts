@@ -62,7 +62,6 @@ export function chooseAim(this: Ecology, p: Party, q: Quest): void {
     let best: Camp | null = this.camps.find((cp) => cp.id >= 0 && cp.kind === 0 && r.goblinCamp && cp.id === r.goblinCamp) ?? null;
     // オークに従う集落があれば、そちらを先に選ぶ（オークがゴブリンを従えていることは、外の世界にも噂として届いていて、場所も知られている）。
     // 一行がオークの縄張りに踏み込み、オークが吠えて集落のゴブリンを呼ぶ場面になる（src/eco/orc.ts の meetParty）
-    // （以前は盗みを働いた集落だけを選び、一行はオークに従う集落のそばをほとんど通らなかった）
     const vassal = best?.lx ? null : this.camps.filter((cp) => cp.id >= 0 && cp.kind === 0 && (cp.lx || cp.ly) && this.list.some((o) => o.k === Kind.Orc && !o.dead && !o.away && o.hx === cp.lx && o.hy === cp.ly)).sort((a, b) => sq(a.x - (r.goblinCampX || r.goblinX)) + sq(a.y - (r.goblinCampY || r.goblinY)) - (sq(b.x - (r.goblinCampX || r.goblinX)) + sq(b.y - (r.goblinCampY || r.goblinY))) || a.id - b.id)[0];
     if (vassal) best = vassal;
     const known = !!best;
@@ -389,7 +388,7 @@ export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
       p.aimY = tt.y;
     } else if (p.aimKnown && sq((p.aimX ?? 0) - lead.x) + sq((p.aimY ?? 0) - lead.y) < 2.5 * TILE * 2.5 * TILE) {
       // 噂の場所に着いたのに見当たらない。噂の魔物の狩りなら、まわり（30マスの内、同じ洞窟の領域）で目当ての種を探し、足跡をたどってそこへ向かう
-      // （寝床を移した魔物も見つけられるように。以前は見失ったまま、16シード×25日でバジリスクを狩りに来た一行が目当てを見つけたのは1回だった）。
+      // （寝床を移した魔物も見つけられるように）。
       // いなければ見失って、まわりを探す（見えたらまた目標にする）
       let tr: Cr | null = null;
       if (p.aim === 3 && p.aimK) {

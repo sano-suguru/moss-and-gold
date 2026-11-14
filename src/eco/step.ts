@@ -160,8 +160,7 @@ export function update(this: Ecology, _tick: number, day: number, phase: number)
       continue;
     }
     // のどが渇いていれば水場へ行って飲む（src/eco/water.ts）。待ち伏せ・縄張りの見回り・人を避ける処理・物音への聞き耳より先に見る
-    // （後ろに置くと、それらでその回の行動が決まることの多い種は、渇ききっても水場へ行かなかった）。
-    // 渇いていない者には何もしないので、渇いていない者の判断の順番は以前と同じ
+    // （後ろに置くと、それらでその回の行動が決まることの多い種は、渇ききっても水場へ行かない）
     if (this.thirstStep(c)) {
       this.metabolism(c);
       continue;

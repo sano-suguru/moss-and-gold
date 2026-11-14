@@ -465,7 +465,7 @@ export const SPEC: Spec[] = [
   { body: 16, cap: 40, meta: 12, starve: 900, speed: 1.0, glowDecay: 1 },
   { body: 60, cap: 120, meta: 60, starve: 4000, speed: 0.7, glowDecay: 1 },
   { body: 30, cap: 80, meta: 40, starve: 4000, speed: 0.6, glowDecay: 1 },
-  // スライム：食べた物は生き物の更新20回ごとに1減る（以前は5回ごとで、死骸を食べても体が育つ前に減ってしまい、二つに分かれることがほとんどなかった）
+  // スライム：食べた物は生き物の更新20回ごとに1減る（速く減ると、体が育つ前に減って二つに分かれない）
   { body: 12, cap: 60, meta: 20, starve: 1e9, speed: 0.35, glowDecay: 1 },
   { body: 0, cap: 0, meta: 1e9, starve: 1e9, speed: 0.4, glowDecay: 1 },
   { body: 0, cap: 0, meta: 1e9, starve: 1e9, speed: 0.5, glowDecay: 1 },
@@ -482,7 +482,7 @@ export const SPEC: Spec[] = [
   { body: 150, cap: 250, meta: 40, starve: 6000, speed: 0.85, glowDecay: 1 },
   { body: 60, cap: 100, meta: 50, starve: 5000, speed: 0.5, glowDecay: 1 },
   { body: 20, cap: 40, meta: 200, starve: 20000, speed: 1.6, glowDecay: 1 },
-  // ヴァンパイア：血を吸えば長くもつ（住処に数日は居つくように。以前は半日ほどで飢えて去っていた）
+  // ヴァンパイア：血を吸えば長くもつ（住処に数日は居つくように）
   { body: 50, cap: 100, meta: 100, starve: 16000, speed: 0.9, glowDecay: 1 },
   { body: 10, cap: 60, meta: 120, starve: 40000, speed: 0.4, glowDecay: 1 },
   { body: 0, cap: 0, meta: 1e9, starve: 1e9, speed: 0.6, glowDecay: 1 },
@@ -932,7 +932,7 @@ export class Ecology {
    */
   static SENSE: Record<number, string> = {
     [Kind.Adventurer]: 'eye', [Kind.Lizard]: 'eye', [Kind.Lizardman]: 'eye', [Kind.Wyvern]: 'eye',
-    // バジリスクは、濃いマナの暗がりに住むので夜目（以前は光に頼る目で、暗がりの獲物には1.5マスまで近づかないと気づかず、ほとんど狩れなかった）
+    // バジリスクは、濃いマナの暗がりに住むので夜目
     [Kind.Basilisk]: 'night',
     [Kind.Goblin]: 'night', [Kind.Kobold]: 'night', [Kind.Orc]: 'night', [Kind.Dwarf]: 'night', [Kind.Vampire]: 'night', [Kind.Dragon]: 'night',
     [Kind.Rat]: 'smell', [Kind.Ant]: 'smell', [Kind.Troll]: 'smell', [Kind.Zombie]: 'smell', [Kind.Minotaur]: 'smell', [Kind.Slime]: 'smell',

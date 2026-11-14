@@ -244,7 +244,7 @@ export function troll(this: Ecology, c: Cr, day: number): void {
   }
   if (this.sipWisp(c)) return;
   // 夜のぶらつき：生き物の更新32回ごとに、立ち止まる番（その始めに一度向きを変える）と、大股で歩く番を交互に。
-  // （以前はふつうの速さの0.6倍で歩き続け、脚を動かしながら3秒で半タイルも進まず、足踏みして見えていた）
+  // （ゆっくり歩き続けると、脚を動かしながら進まず、足踏みして見える）
   const seg = this.step >> 5;
   if ((seg + c.id) % 2 === 0) {
     c.act = 0;

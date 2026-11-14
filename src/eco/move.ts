@@ -266,8 +266,7 @@ export function goTo(this: Ecology, c: Cr, tx: number, ty: number, speed: number
   let p = this.paths.get(c.id);
   const gk = this.tileOf(tx, ty);
   // 近ければ道筋を探さずにまっすぐ向かう。ただし目的地のマスが壁の中など、立てない所なら、下の探索で近づけるだけ近づいて立ち止まる。
-  // まっすぐの線が岩の角を斜めに抜けるときも、道筋に従って回り込む（以前は、斜め向かいの畑のマスへ向かうコボルトが、
-  // 間の二つのマスが岩の角に押しつけられたまま足踏みし続けた。seed17 では5〜7匹が1日以上）
+  // まっすぐの線が岩の角を斜めに抜けるときも、道筋に従って回り込む（そうしないと、岩の角に押しつけられたまま足踏みし続ける）
   if (sq(tx - c.x) + sq(ty - c.y) < 24 * 24 && (gk < 0 || this.tilePassable(c, gk)) && this.straightOk(c, c.x, c.y, tx, ty)) return this.moveToward(c, tx, ty, speed);
   // 目的地のマスが変わったとき、または行き詰まったときだけ探し直す（動く獲物を追うたびに探さない）。
   // 道が見つからなかった目的地は、生き物の更新40回ごとに探し直す（掘られて道ができているかもしれない）
@@ -631,7 +630,6 @@ export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
       const gap = Ecology.bodySize(c.k) * 0.9;
       let slow = 1;
       // 前で止まっている仲間（休む、食べる、眠る）は、列ではなく障害物：ゆるめずに脇へよけて追い越す
-      // （以前は止まっている仲間の後ろでも歩みをゆるめ続け、やわらかい間合いで押し返されて、広い床でも先へ進めなかった）
       let sidestep = 0;
       this.nearby(c.x, c.y, 1, (o) => {
         if (o === c || o.dead || slow < 1 || sidestep || this.groupKey(o) !== key) return;
@@ -642,12 +640,11 @@ export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
         const side = Math.abs(cross);
         if (!(ahead > 0 && ahead < gap && side < gap * 0.6)) return;
         // 前の仲間がこちらへ向かってくる（向きが逆）なら、列ではなくすれ違い：ゆるめずに脇へよける
-        // （以前は向かい合った二匹が互いにゆるめ合い、細い通路で押し戻し合って進めず、苔のそばで飢えていた）
+        // （互いにゆるめ合うと、細い通路で押し戻し合って進めない）
         const odx = o.dir === 0 || o.dir === 1 ? 0 : o.dir === 2 ? 1 : -1;
         const ody = o.dir === 0 ? 1 : o.dir === 1 ? -1 : 0;
         // 前の仲間が同じ向きへ進んでいるとき（列になっているとき）だけ歩みをゆるめる。横切っている、別の向きへ歩いている仲間は、脇へよけて追い越す
-        // （以前は向きが逆でなければゆるめていたので、仲間がいつもまわりにいるアリの巣のそばでは、横切る仲間のたびに歩みをゆるめ続け、
-        //  脚を動かしたままほとんど進まず、足踏みして見えていた）
+        // （横切る仲間のたびにゆるめると、アリの巣のそばで脚を動かしたまま進まない）
         const along = odx * hx + ody * hy;
         if (o.act === 1 && o.sleep <= 0 && along > 0.5) slow = ahead < gap * 0.5 ? 0.15 : 0.5;
         else sidestep = cross > 0 ? -1 : cross < 0 ? 1 : c.id % 2 ? 1 : -1;
@@ -788,7 +785,7 @@ export function nearestForage(this: Ecology, x: number, y: number, R: number, av
   const ty = Math.floor(y / TILE);
   let best = -1;
   let bd = R * R;
-  // 歩いてつながっていない洞窟の群落は選ばない（以前は、飢えた大ネズミが道筋の通らない遠くの群落を目指し続けて、そばの薄い苔に戻れなかった）
+  // 歩いてつながっていない洞窟の群落は選ばない
   const r0 = this.regionOf(ty * m.w + tx);
   for (const k of this.forage) {
     const d = sq((k % m.w) - tx) + sq(Math.floor(k / m.w) - ty);

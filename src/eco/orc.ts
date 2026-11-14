@@ -63,7 +63,7 @@ export function orc(this: Ecology, c: Cr): void {
     this.goTo(c, c.hx, c.hy, s.speed);
   } else {
     // 住みかのそばでは、たいてい立ち止まり、ときどき数歩うろつく。
-    // （以前は80回のうち30回、ふつうの速さの0.4倍で歩き、脚を動かしながら3秒で半タイルも進まず、群れごと足踏みして見えていた）
+    // （ゆっくり歩き続けると、群れごと足踏みして見える）
     c.act = c.actT % 80 < 60 ? 0 : 1;
     if (c.act === 1) {
       const j = DIR16[ih(c.id, this.step >> 4, 97) & 15];
@@ -145,7 +145,6 @@ export function orcWary(this: Ecology, c: Cr): boolean {
       }
       if (el >= ORC_BLUFF) {
         // にらみ合いの決着：一行が前に出れば一行が打ちかかり、一行がひるめばオークが襲いかかる。どちらになるかは強さの差と乱数で決まる
-        // （以前は威嚇したあと縄張りの奥へ退き、一行も追わなかったので、出会っても戦わずに別れていた）
         const might = this.partyMight(p);
         const mine = Math.max(1, this.str(c));
         const advance = (ih(c.id, p.id ^ this.step, 402) % 100) < Math.max(20, Math.min(80, 50 + ((might - mine) / mine) * 25));

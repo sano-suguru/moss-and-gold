@@ -23,8 +23,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
   const m = this.w.map;
   const k = this.tileOf(c.x, c.y);
   // 近くのコウモリを従える。従えるのは RETINUE_MAX 匹まで
-  // （以前は上限がなく、コウモリの多いシードでは26匹ほどが狭い住処で主の周りに押し合っていた。偵察の遠さは5匹で上限に届き、
-  //  足止めは2匹からできるので、それより多い分は群れの見た目にしか効かない。渦を巻いて見える数は残す）
+  // （偵察の遠さは5匹で上限に届き、足止めは2匹からできるので、それより多い分は見た目にしか効かない。上限がないと狭い住処で押し合う。渦を巻いて見える数は残す）
   if (this.step % 25 === c.id % 25) {
     let n = 0;
     for (const o of this.list) if (o.k === Kind.Bat && !o.dead && o.ref2 === c.id) n++;
@@ -66,7 +65,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
   // 焚き火で眠っている者は避けない（寝込みを狙う）。打たれて間もないときは、退かずに打ち合う
   // 一行に技を使ってから生き物の更新60回のあいだは、打たれたばかりでも打ち合わずに退く（打って退く）。
   // ただし、そばの冒険者がコウモリに群がられて足止めされていれば、退かずに打ちかかる
-  // （以前は、技のあとに打ち返されると打ち合いに切り替わり、一行と殴り合って倒されていた。16シード×25日で、倒された52体のうち22体）
+  // （打ち合いに切り替わると、一行と殴り合って倒される）
   const afterSkill = this.w.tick - c.cast < 60 * CR_EVERY;
   if (this.w.tick - c.hitAt > 60 || afterSkill) {
     const foes: Cr[] = [];
@@ -93,7 +92,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
     // 昼になって住処が20マスより遠いか、住処が遠いまま眠気が出てきたら（眠りの目安の3割を超えたら）、近くの物陰（行き止まりや、人の気配の薄い暗い所）へ寄って、
     // （眠気が出てから探しはじめると、住処から遠い所では物陰に着く前に通路で眠り込み、そこに棺を出していた）
     // そこで眠り込んで棺を呼び出す（vampCoffin）。物陰は生き物の更新20回ごとに選び直し、tx, ty に持つ
-    // （以前はどこで眠り込んでもその場に棺を出したので、通路の真ん中の棺が僧侶や竜殺しに暴かれていた。16シード×25日で4回 → 17回）
+    // （通路の真ん中に棺を出すと、僧侶や竜殺しに暴かれる）
     const th = Ecology.SLEEP[Kind.Vampire]?.th ?? 1500;
     if (sq(c.hx - c.x) + sq(c.hy - c.y) > 12 * 12 && (c.drowsy > th * 0.3 || sq(c.hx - c.x) + sq(c.hy - c.y) > sq(20 * TILE))) {
       if (!c.tx || this.step % 20 === c.id % 20) {
@@ -123,7 +122,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       const y0 = c.y;
       this.goTo(c, c.hx, c.hy, s.speed);
       // 帰り道の次の一歩が明るい所なら、進まずに暗がりで日が落ちるのを待つ
-      // （以前は明るい所へ一歩出ては光を嫌って戻り、その場で行ったり来たりしていた）
+      // （進むと、光を嫌って戻るのを繰り返して行ったり来たりする）
       if (sunAt(this.tileOf(c.x, c.y)) > 60) {
         c.x = x0;
         c.y = y0;
@@ -156,11 +155,10 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       if (o.k === Kind.Rat && c.sinceMeal < s.starve * 0.3) return false;
       if (lightAt(this.tileOf(o.x, o.y)) > 60) return false;
       // 火（松明、焚き火、かがり火）の明かりの輪の3マス外までにいる獲物は狙わない。冒険者の焚き火は、細るのを待つ（src/eco/night.ts の campFire）。
-      // ヴァンパイアは明かりの輪の2マス外までに入ると火から離れて獲物をあきらめるので、以前は、ゴブリンの集落の焚き火のそばの獲物を選んでは
-      // 近づく途中で追い返され、それを繰り返して、シードによっては25日で数匹しか仕留められなかった
+      // ヴァンパイアは明かりの輪の2マス外までに入ると火から離れて獲物をあきらめるので、火のそばの獲物を選ぶと、近づいては追い返されるのを繰り返す
       for (const f of this.fires()) if (sq(o.x - f[0]) + sq(o.y - f[1]) < sq(f[2] + 3 * TILE) && !this.weakCampAt(f[0], f[1])) return false;
       // 起きている冒険者のそば（7マス以内）にいる、冒険者でない獲物は狙わない。ヴァンパイアは起きている冒険者に近づくと退いて獲物をあきらめるので、
-      // 以前は、冒険者の近くのゴブリンなどを選んでは退くのを繰り返していた（冒険者そのものは、退いても隙をうかがって狙い続ける）
+      // 狙うと退くのを繰り返す（冒険者そのものは、退いても隙をうかがって狙い続ける）
       if (o.k === Kind.Adventurer) return true;
       let awake = false;
       this.nearby(o.x, o.y, 8, (a) => {
@@ -430,7 +428,6 @@ export function vampCoffin(this: Ecology, c: Cr): boolean {
     return false;
   }
   // 住処に着いたら住処の棺に入る。住処へ帰れないまま昼の眠気に負けて眠り込んだら、その場に黒い霧から棺を呼び出して入る
-  // （以前は通路の床でそのまま眠り、棺に入らずに無防備に寝ていた）
   const atHome = (c.hx || c.hy) && sq(c.hx - c.x) + sq(c.hy - c.y) < 14 * 14;
   if (c.st === 0 && !c.dead && !c.away && this.dayNow > 0.05 && (atHome || c.sleep > 0) && this.w.tick - c.hitAt > 120) {
     c.st = VAMP_COFFIN;

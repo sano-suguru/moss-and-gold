@@ -251,7 +251,7 @@ export function pickArmorPost(this: Ecology, c: Cr): void {
       return;
     }
   }
-  // 未練の持ち場：生まれた場所のまわりだけを見回る（以前は生まれた場所と宝物庫を行き来し、宝物庫の入口に何体も集まって一行を次々に倒していた）
+  // 未練の持ち場：生まれた場所のまわりだけを見回る（宝物庫まで行き来すると、入口に何体も集まって一行を次々に倒す）
   const posts: [number, number][] = [];
   let tx = c.hx;
   let ty = c.hy;

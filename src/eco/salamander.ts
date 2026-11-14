@@ -63,7 +63,7 @@ export function salamander(this: Ecology, c: Cr): void {
     return;
   }
   // 熱の中を這い回る：50回のうち30回、ふつうに近い速さで這い、残りは止まる。
-  // （以前はふつうの速さの0.6倍で這い、脚を動かしながら3秒で半タイルも進まず、足踏みして見えていた）
+  // （ゆっくり這い続けると、脚を動かしながら進まず、足踏みして見える）
   c.act = c.actT % 50 < 30 ? 1 : 0;
   if (c.act === 1) {
     const j = DIR16[ih(c.id, this.step >> 4, 77) & 15];
@@ -81,7 +81,7 @@ export function pickBurrow(this: Ecology): Burrow {
   let residents = this.burrows.map((b) => this.list.filter((c) => c.k === Kind.Rat && !c.dead && c.hx === b.x && c.hy === b.y).length);
   // 巣穴が12を超えたら、誰も住んでいない巣穴は崩れて消える（見つけやすさのため数を抑える）。
   // 全部に住んでいて一つも消えないこともある（分家で24まで増える）ので、消したあと選び直すときに自分を呼び直さない
-  // （以前は呼び直していて、13以上の巣穴が全部埋まっていると無限に呼び続けてスタックが溢れた）
+  // （呼び直すと、13以上の巣穴が全部埋まっているとき無限に呼び続けてスタックが溢れる）
   if (this.burrows.length > 12) {
     this.burrows = this.burrows.filter((_, i) => residents[i] > 0);
     residents = residents.filter((n) => n > 0);
@@ -155,7 +155,7 @@ export function onDayEvents(this: Ecology, prevPhase: number, phase: number): vo
           const y = s.y + dy;
           if (x >= 0 && y >= 0 && x < m.w && y < m.h) moss += this.w.moss[y * m.w + x];
         }
-      // 苔の豊かな縦穴のねぐらに、土の養分からコウモリが湧く（以前は外から来ていた。湧きの表 src/eco/spawndef.ts のコウモリの行）。
+      // 苔の豊かな縦穴のねぐらに、土の養分からコウモリが湧く（湧きの表 src/eco/spawndef.ts のコウモリの行）。
       // 縦穴の真上が岩や別の洞窟なら、縦穴のマスの中に現れる（roostSpot）
       if (col < 20 && moss > 2500) this.generateOne(BAT_DEF, s.y * m.w + s.x);
     }
@@ -399,7 +399,7 @@ export function manaBirths(this: Ecology, day: number): void {
   void day;
   const m = this.w.map;
   // 水の精：深い水とマナが重なる所から（通常速度で1分ごとに数か所を見る。ダンジョンに一体まで）。
-  // （判定の回は、呼ぶ側の step % 50 === 13 と重なる 213。以前は 223 で、一度も生まれていなかった）
+  // （判定の回は、呼ぶ側の step % 50 === 13 と重なる 213 にする。重ならない回では一度も生まれない）
   if (this.step % 600 === 213 && !this.list.some((o) => o.elite === 6 && !o.dead) && this.w.tick - (this.lastElite[6] ?? -1e9) > DAY_TICKS_ECO * 2) {
     for (let i = 0; i < 80; i++) {
       const k = ih(this.step, i, 306) % (m.w * m.h);

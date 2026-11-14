@@ -563,8 +563,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   // 気づける遠さ（見通しが利くことが条件）：
   //   打ってきた相手は、暗がりでも NOTICE_HIT まで（打たれたら気づく。オークの投げ斧のように、灯りの外から打つ敵がいるので）。
   //   一行の灯りの輪の中か、明るい床にいる相手は NOTICE_LIT まで。暗がりの敵（雑魚は除く）は、すぐそば（NOTICE_DARK。盗賊は夜目が利いて3マス）なら気配で気づく。
-  //   （以前は、打たれても相手が暗がりにいれば向き直らなかった。
-  //    灯りの中の相手を10マス先まで見えるようにも試したが、16シード×25日で、ヴァンパイアの血吸いが 62→16 回、ゴブリンの夜の盗みが 35→15 回に減ったので、5.5マスのままにした）
+  //   （NOTICE_LIT を10マスほどに広げると、ヴァンパイアの血吸いやゴブリンの夜の盗みが大きく減る）
   if (!foe)
     this.nearby(c.x, c.y, NOTICE_HIT / TILE + 1, (o) => {
       if (o.dead || o.away) return;
@@ -592,10 +591,10 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       }
     });
   // 手強い敵に気づいたら、一行に知らせる（かなわない相手は、見張りの判断で引き返す）
-  // （以前は一行の1.2倍より強い相手には知らせず、皆で向かわなかった。いまは強さに関わらず皆で向かい、負けそうなら退く）
+  // （強さに関わらず皆で向かい、負けそうなら退く）
   // 暗がりから血を吸うヴァンパイア（灯りの中に見えていない）には、打たれて気づいても、一行で暗がりへ踏み込まない。
   // 吸われた者はヴァンパイアの方を向いて構え、届く技のある者は撃ち返す（src/eco/vampskill.ts の血吸い。
-  // 打たれたら気づくようにしたとき、一行が暗がりへ詰め寄ってヴァンパイアを追い払い、血吸いが16シード×25日で62→13回に減った）
+  // 一行で詰め寄ると、ヴァンパイアを追い払ってしまい、血吸いがほとんど見られなくなる）
   const darkVamp = !!foe && (foe as Cr).k === Kind.Vampire && !this.seenBy(c, lights, foe as Cr);
   if (foe && !darkVamp && !MINOR.includes((foe as Cr).k) && !p.engage && (p.retreatUntil ?? 0) <= this.step) {
     p.engage = (foe as Cr).id;
@@ -614,8 +613,6 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     const reach = JOB_REACH[c.sp] * TILE;
     if (skill) {
       // 職業の技（src/eco/skill.ts）：届く距離に敵がいれば溜め、溜め終わった回に放つ。使ったあとの間は溜め直さない。
-      // （以前は、近接の職は体が触れるくらい（1マス弱）でしか打てず、魔法使いは生き物の更新4回ごとに、狩人は3回に1回ほど、溜めなしで撃ち続けていた。
-      //  8シード×12日で、近接の一打ちを受ける前に死んだ大物が6割、魔法使いが打たれたのは25時間に1回、狩人は0回）
       if (ready) {
         c.act = 2;
         c.actT = 0;
@@ -774,7 +771,6 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       const d0 = Math.sqrt(d2);
       this.goTo(c, sx, sy, s.speed);
       // 席のそば（1.5マスの内）まで来て、眠る仲間や壁の角に阻まれてほとんど近づけなければ、その場に座る
-      // （以前は席へ入れないまま、眠る仲間の脇で歩く姿のまま押し返され続け、seed27 では2分近く足踏みしていた）
       if (!(d0 < 24 && d0 - Math.hypot(sx - c.x, sy - c.y) < 0.2)) return;
     }
     c.act = 0;
@@ -822,7 +818,6 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   let ox = [0, -14, 14, -8, 8][idx % 5];
   let oy = -[0, 10, 10, 22, 22][idx % 5];
   // 並ぶ位置が壁の中なら、左右を入れ替えた位置、先頭に寄せた位置、先頭の真後ろの順に、立てる床で先頭と歩いてつながる所にする
-  // （以前は先頭が壁ぎわを歩くと並ぶ位置が壁の中に入り、そこへまっすぐ向かって壁に押しつけたまま足踏みしていた。1回5〜7秒、1日に800回ほど）
   {
     const lk = this.tileOf(leader.x, leader.y);
     const ok = (dx: number, dy: number) => {

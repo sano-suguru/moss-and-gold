@@ -83,9 +83,8 @@ export function shyOfPeople(this: Ecology, c: Cr): boolean {
   }
   if (!bx && !by) return false;
   // 気配の薄いほうへ3マス先の床を退く先に決め、着くまでそこへ歩く（retreatStep）。
-  // 以前は気配の薄いほうへ一歩ずつ動いていたので、次の更新で元の行き先へ戻ろうとして、その間を一歩ずつ行き来し、
-  // その場で足踏みして見えていた（ミノタウロス・オーク・トロール・ワイバーン）
-  // （隣の区画（8マス先）まで退かせると、オークが従えた集落から離れて、従える集落が減り、冒険者に倒されるゴブリンが増えた）
+  // （一歩ずつ退くと、次の更新で元の行き先へ戻ろうとして行き来し、足踏みして見える。
+  // 隣の区画（8マス先）まで退かせると、オークが従えた集落から離れて、従える集落が減る）
   if (this.retreatTo(c, c.x + bx * 3 * TILE, c.y + by * 3 * TILE, 40, 300)) return this.retreatStep(c);
   c.act = 1;
   this.tryMove(c, bx * SPEC[c.k].speed, by * SPEC[c.k].speed);
@@ -290,7 +289,7 @@ export function fearFire(this: Ecology, c: Cr): boolean {
   if (c.sinceMeal > SPEC[c.k].starve * 0.85) return false;
   if (c.k === Kind.Bat && c.st !== 0 && c.st !== 1) return false;
   // ヴァンパイアに従うコウモリは、主の意のままに動き、火を怖がらない（主の狙う冒険者は松明を持っている）。
-  // 以前は主のそばに火があると、主へ向かう一歩と火から離れる一歩を交互に繰り返し、その場で1〜2分行ったり来たりしていた（seed7）
+  // （怖がると、主へ向かう一歩と火から離れる一歩を繰り返して、その場で行ったり来たりする）
   if (c.k === Kind.Bat && c.ref2) {
     const lord = this.byId.get(c.ref2);
     if (lord && !lord.dead && lord.k === Kind.Vampire) return false;
@@ -303,7 +302,6 @@ export function fearFire(this: Ecology, c: Cr): boolean {
   c.act = 1;
   this.tryMove(c, (dx / L) * SPEC[c.k].speed * 1.2, (dy / L) * SPEC[c.k].speed * 1.2);
   // 大ネズミ：火のそばにある目当ての苔はあきらめ（避ける印をつけて選び直す）、巣穴そのものが火のそばなら群れで移る
-  // （以前は、目当てや巣穴へ向かっては火に追い返され、その間を行ったり来たりして先へ進めなかった）
   if (c.k === Kind.Rat) {
     const r2 = f[2] * f[2];
     const t = c.ref - 1;
@@ -525,7 +523,7 @@ export function feeding(this: Ecology, c: Cr): boolean {
   const s = SPEC[c.k];
   const d2 = d ? sq(d.x - c.x) + sq(d.y - c.y) : 0;
   // 斧の薙ぎ払い（4マス）や突進で倒した獲物は、離れた所に倒れる。ミノタウロスは、まだ新しい死骸（骨にも腐りかけにもなっていない）なら、
-  // 6マスの内まで歩み寄ってから寝床へ引きずる（以前は18pxより遠いと食べるのをやめ、薙ぎ払いで仕留めた獲物の8割を一口も食べずに離れていた）。
+  // 6マスの内まで歩み寄ってから寝床へ引きずる。
   // 死骸は倒れてから生き物の更新900回で腐りかけになる（corpseStage）ので、行き着けなくても歩き続けはしない
   const walkTo = !!d && d.dead === 1 && d2 > 18 * 18 && c.k === Kind.Minotaur && this.corpseStage(d) === 0 && d2 < 6 * TILE * 6 * TILE;
   if (d?.dead !== 1 || d.units <= 0 || c.food >= s.cap || (this.w.tick - c.hitAt < 30 && c.foe !== d.id) || (d2 > 18 * 18 && !walkTo)) {

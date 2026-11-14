@@ -161,7 +161,6 @@ export function personalSpace(this: Ecology): void {
       const px = (ux / d) * push;
       const py = (uy / d) * push * 0.77;
       // 大きいほうは動きにくい。ドラゴンは小さな者に押されても動かず、相手だけがどく
-      // （以前はコウモリやクモに押され、炎を吐いたまま向きを変えずに斜め後ろへ滑っていった）
       const dA = c.k === Kind.Dragon && o.k !== Kind.Dragon;
       const dB = o.k === Kind.Dragon && c.k !== Kind.Dragon;
       const wa = dA ? 0 : dB ? 1 : sb / (sa + sb);

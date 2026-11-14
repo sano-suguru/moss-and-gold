@@ -9,7 +9,7 @@ export function petrify(this: Ecology, c: Cr, by = -1): void {
   const k = this.tileOf(c.x, c.y);
   const m = this.w.map;
   // 入口のそばでは石像にならない（入口をふさがないように）。死として扱い、持ち物と金貨は die が落とす
-  // （以前は、ここへ来る前にも持ち物を落としていたので、二度落としていた。冒険者なら倒れた数も2つ増えた）
+  // （持ち物を落とすのは die だけにする。ほかでも落とすと二度落ちる）
   const nearGate = Math.abs((k % m.w) - m.entrance.x) + Math.floor(k / m.w) < 10;
   if (k < 0 || this.statueAt.has(k) || nearGate) {
     this.die(c, 'petrified', by);
