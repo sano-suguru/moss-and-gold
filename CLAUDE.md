@@ -25,14 +25,10 @@ README.md（と英語版の README.en.md）は、訪れた人と遊ぶ人に向�
 眺めるゲームなので、内部の仕組みは、画面の中の生き物の動き・姿・場面の変化として見えて初めて意味がある。ゲーム内ログの文章や生き物の情報パネルは補助。
 
 - **見えることから設計する**：新しい仕組みは、まず「画面で何が見えるか」を決め、それに要る分だけ内部を作る。技や攻撃は、受けた側の反応（向き直る・「!」・飛び起きる）まで決める。気づかせることと、打ってきた相手（foe・hitAt）として追わせることは分けて決める（追わせると、その種が倒されて減りやすい）。
-- **スクリーンショットで見せる**：作業の終わりに、その瞬間のスクリーンショットを撮り（動きなら `npm run film` で連続フレーム。その版で実行した ab の結果を `--run` に渡すと、記録にある場面の tick で撮れる）、セッションの中でユーザーに送って見せる。画像は build/ に置き、コミットしない。撮れないときは理由を書く。
-- **発生回数を確かめる**：25日に一度も起きない場面は、見る人にとって存在しないのと同じ。見せたい場面がシードごとに何回起きたか（compare.md と advreport の表。数え方は tools/analysis/lib/moments.ts）を、A/B 比較の標準の指標にする。目安は「16シード中12シード以上で、25日に1回以上、できれば数回」。ごくまれな特別イベント（骨の竜など）は対象外。新しい場面を作ったら moments.ts に数え方を足す。
+- **スクリーンショットで見せる**：作業の終わりに、その瞬間のスクリーンショットを撮ってセッションの中でユーザーに送る（撮り方は visual-check skill）。撮れないときは理由を書く。
+- **発生回数を確かめる**：25日に一度も起きない場面は、見る人にとって存在しないのと同じ。見せたい場面の発生回数を A/B 比較の標準の指標にする（目安と数え方は ab-compare skill）。
 - **画面に出ない仕組みを見つけたら**：小さな修正で見せられるものはその場で直し、大きなものは PR の説明に挙げる。
 - **報告は PR の説明に書く**：狙い、見せたい場面とその発生回数、A/B 比較の要点、まだ見えない所。docs/ には報告も比較の表も置かない（docs/ に置くのは、今も使う説明と、README の画像 docs/img/readme-*.png だけ）。
-
-```bash
-npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 --name adv-enter   # → build/img/<name>.png
-```
 
 ## 最初に知っておくこと
 
@@ -46,80 +42,31 @@ npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 
 - **キャッシュの無効化の条件**：セーブしないキャッシュ（明るさのマップ `litMap`、つながった洞窟の領域 `regionMap`、夜露のマップ `dewMap`、群れの識別 `Cr.gk` など）は、tick 番号か生き物の更新の番号（`Ecology.step`）か地形変更ログの長さ（`digs.length`）だけで作り直しを決める。「最後に作ってから何 tick たったか」で決めると、ロードし直したときに結果がずれる（実際に何度も起きた）。
 - 時間：`TICKS_PER_SEC = 10`。ゲーム内の1日は `DAY_TICKS = 14400` tick（通常速度で24分）。生き物は `CR_EVERY = 2` tick ごとに更新する（更新の通し番号は `Ecology.step`。生き物の処理の間隔や経過は、多くがこの回数で決まる）。マップ：192×144 タイル、1タイル16px（src/mapgen.ts の `MapData`）。
 
-## コマンドと分析の流れ
+## コマンドと作業の流れ
 
-分析ツールはすべて `node tools/analysis/launch.mjs <ツール名>` から起動する（npm run も同じ）。**各ツールの使い方は、そのファイルの先頭のコメント**（tools/analysis/*.ts）にある。
-実行結果と日次スナップショットは、シミュレーションのソースのハッシュごとのキャッシュ `runs/.cache/` に残り、ソースとシードが同じならどのツールからも再利用される（しくみは docs/rework-tools.md。大きくなったら消してよい）。クラウドのセッションでは、SessionStart フックが main のキャッシュを GitHub Release「sim-cache」からバックグラウンドで取得する（ログは runs/.cache/fetched/log.txt）。
-- **main のキャッシュは手元で作らず、Release を待つ**：マージ直後で Release に無いとき（ログの「Release にまだない」は、フックが動いた時点の話）は、Actions の simcache の実行が終わってから `node tools/analysis/simcache.mjs fetch --ref origin/main` で取得し直す。手元で作るよりずっと速く、中身は同じ。待つ間に、main のコードで batch や probe を実行しない。キャッシュの同じフォルダに書きかけのログが残り、あとで取得したものと混ざって、ログが二重になる。待つ間は、コードを読めば分かる直しを実装し、typecheck と test まで進めておく。
-- **Node の版は `.node-version` の1か所だけに書く**：CI（setup-node）も、手元（mise や fnm なら、リポジトリに入ると自動でこの版になる）も、クラウドの環境のセットアップスクリプトも、このファイルを読む。`.nvmrc` など別のファイルに版を書き足さない。
+分析ツールはすべて `node tools/analysis/launch.mjs <ツール名>` から起動する（npm run も同じ）。使い方は各ファイルの先頭のコメント。
+実行結果と日次スナップショットは、ソースのハッシュごとのキャッシュ `runs/.cache/` に残る（しくみは docs/rework-tools.md。大きくなったら消してよい）。クラウドのセッションでは、SessionStart フックが main のキャッシュを Release「sim-cache」から取得する。**main のキャッシュは手元で作らない**（Release に無いときの待ち方は ab-compare skill）。
+Node の版は `.node-version` の1か所だけに書く（CI も手元もクラウドの環境も、このファイルを読む）。
 
 ```bash
-npm install                       # 初回のみ（クラウドのセッションでは SessionStart フックが入れる）
 npm test                          # 決定性・保存則・ロード後の再現性など（約10秒。TEST_FULL=1 で0日目から）
-npm run typecheck                 # 使っていない変数・引数もエラー（tsconfig の noUnusedLocals / noUnusedParameters。要る引数は名前を _ で始める）
-npm run lint                      # Biome の推奨ルール一式（警告もエラー）。このリポジトリで意図して書いている形とぶつかるものだけ止めている（biome.json）。フォーマッタは使わない
+npm run typecheck                 # 使っていない変数・引数もエラー（要る引数は名前を _ で始める）
+npm run lint                      # Biome（警告もエラー）。自動修正は npx biome lint --write。--unsafe の修正は意味が変わりうるので、src に当てたら ab で確かめる
 npm run build                     # dist/index.html（外部依存なしの1ファイル。dist はコミットしない）
-npm run dev                       # 開発サーバー（http://localhost:8000/。src と index.html を書き換えると作り直して、ページを読み込み直す。自分のマシンからだけ開ける。実機で見るときは HOST=0.0.0.0）
+npm run dev                       # 開発サーバー（http://localhost:8000/。実機で見るときは HOST=0.0.0.0）
 ```
 
-lint の自動修正は `npx biome lint --write`（使っていない import の削除などは `--unsafe` も要る。`--unsafe` の修正は `a && a.b` を `a?.b` にするなど意味が変わりうるので、src に当てたら ab で出力が変わらないか確かめる）。
+1. main と比べる前に、`git fetch origin main` し、作業ブランチに最新の main が入っているか確かめる（`git merge-base --is-ancestor origin/main HEAD`。入っていなければ取り込む）。ずれていると、ほかの PR の変更まで差に混ざり、CI とも結果が合わない。
+2. 変更したら `npm test && npm run check -- --base origin/main` が通ってからコミットする（`--base` を付けないと HEAD から始まり、CI と結果が分かれる）。check の項目は tools/analysis/checks.ts。新しい挙動を足したら項目を足す。1〜2シードの出来事で決まる項目は、`RUN_WIDE` の15シードなどの合計で見る。
+3. シミュレーションの挙動を変えたら `npm run ab` で main と比べる（流れと、差が問題かどうかの見分け方は ab-compare skill）。
 
-通常の作業の流れ：
+PR では typecheck・lint・test・check が走り、プレビュー URL がコメントされる。main への push で Cloudflare Workers に本番デプロイする（`wrangler.jsonc`、`.github/workflows/deploy.yml`）。
 
-0. main と比べる前に、`git fetch origin main` で main を最新にし、作業ブランチに最新の main が入っているかを確かめる（`git merge-base --is-ancestor origin/main HEAD`。入っていなければ取り込む）。ずれていると、ほかの PR の変更まで差に混ざり、main のキャッシュも使われず、CI の check（main の10日目から）とも結果が合わない。
-1. 変更したら `npm test` と `npm run check -- --base origin/main`（CI と同じく main の10日目から。付けないと HEAD から始まり、CI と結果が分かれる）。コミットは両方が通ってから（`&&` でつなぎ、落ちたら止まるようにする）。check は、新しい挙動が実際に起きるかを確かめる短いテスト（項目は tools/analysis/checks.ts）。新しい挙動を足したら項目を足す。1〜2シードの出来事で決まる項目は、ほかの変更で展開が分かれただけで落ちるので、既に実行している組（`RUN_WIDE` の15シードなど）の合計で見る。
-2. `npm run ab -- --preset quick`：8シードについて、HEAD の10日目のスナップショットから、HEAD と作業ツリーのそれぞれで18日目まで実行し、同じシード同士で比べる（結果は `runs/ab-quick-<日時>/compare.md`）。**判定が「はっきり」の行だけを効果とみなす**。「ばらつきの内」は、シードごとの展開のばらつきで説明できる程度の差という意味。1シードの出来事に引っ張られていないか「1シードの寄与」の列も見る。1シードだけでは効果は判断できない。
-   「はっきり」は差があるという意味で、問題があるという意味ではない。差が問題かどうかは、下の「差が問題かどうかの見分け方」で判断し、その判断を PR の説明に書く。
-   **差が問題かどうかの見分け方**：
-   - **画面で困るか**：見る人にとって、種が画面から消える、場面が起きなくなる、生き物が動けなくなる、のどれかになるか。数が少し減っただけなら問題ではない。
-   - **数か、出入りか**：生まれた数・来た数・死んだ数などの出入りがはっきり変わっても、数そのもの（最後の数、群れや住処の数）がばらつきの内なら、多くは補い合っているだけ（例：倒される数が減れば、補う出入りも減る）。
-   - **どれだけの時間か**：「0匹だった日数」のような数は、全体（16シード×日数）に対する割合と、いちばん長く続いたシードで見る。
-   - **1シードの寄与**：差の大半が1シードから来ていれば、そのシードで何が起きたか（例：ドラゴンがいたかどうか）を見てから判断する。版をまたいで同じ向きに出る差でも、main 側の1シードの大きな出来事を、分岐のあとで失っているだけのことがある（base と new のシードごとの数を並べる）。
-   - **原因を切り分ける**：作業ツリーで新しい仕組みを止めて（例：その種が来ないようにして）もう一度比べ、差が残るか消えるかを見る。ただし、止めたこと自体が別の変更になるので、main との違いがどこから始まったか（`ab` の「何日目のログから違う」）も合わせて見る。
-3. 気になるものは `npm run probe -- deaths|life|calls|look|stuck` で調べる（スナップショットから始めるので数秒で動き出す）。使い捨てのスクリプトを書く前に、probe の `--expr` で足りないか見る。スクリプトが要るなら、`lib/open.ts` の `openAt(シード, tick)` でその時点の状態を取得する。ログに無い値は、まず `npm run metric`（日次スナップショットから計算する）で足りるか見て、足りなければ sim.ts のログ出力に足す。
-4. 区切りがついたら `npm run ab -- --preset final`（16シード×25日、0日目から）で最終確認する。保存則のずれは compare.md の末尾に出る。ab はシードごとの report.md を作らないので、「おかしな兆候」は続けて `npm run batch -- --seeds 16 --days 25` で見る（ab の実行結果をキャッシュから使う。兆候の数は summary.md）。
-5. 保存則がずれたら、`tools/analysis/drift.ts`・`manacheck.ts`・`goldcheck.ts` で、ずれた tick と、その tick に変化した生き物を特定する。
+## ソースの構成で誤解しやすい所
 
-```bash
-npm run ab -- --base HEAD~1 --seeds abc,かしたれ,seed4,seed7 --days 10   # 挙動を変えないはずのリファクタリング：出力が1バイトも違わないか（違えば終了コード 1）
-npm run ab -- --resume-check 7 --seeds かしたれ --days 10              # 7日目で中断・再開しても、通しで実行したときと一致するか
-npm run bench -- --repeat 3                                            # 実行速度。変更の前後は続けて測る
-```
-
-ログファイル（settle.jsonl、samples.jsonl、deaths.jsonl など）の形式は docs/records.md。
-
-## ビジュアルの確認
-
-```bash
-npm run gallery -- --label before    # 変更前に撮って build/gallery/before/ に残す
-npm run gallery -- --compare before  # 変更後、before と左右に並べた build/gallery/compare-before.png を作る
-node tools/gallery/shoot.mjs --only dragon,camp     # 一部のシーンだけ撮り直す（先に node build.mjs）
-npm run shot -- --seed かしたれ --find warren         # 見たいものが現れるまで進めて撮る（build/shots/）
-```
-
-シーンの定義は `tools/gallery/scenes.ts` の `SCENES`。見た目は数値では測れないので、必ず画像を見て判断する（一か所を直すと別のシーンが崩れることがある）。古い dist で撮らないよう、`node build.mjs` を忘れない。
-URL の末尾に `#lit`（全体を明るくする）、`#albedo`（地形の色だけ）、`#clean`（UI を隠す）、`#fxdemo`（攻撃エフェクトの見本）を付けられる。`#clean,lit` のように組み合わせてもよい。
-
-## デプロイ（Cloudflare Workers の静的アセット）
-
-設定は `wrangler.jsonc`（`dist/` をそのまま配信）と `.github/workflows/deploy.yml`。PR では typecheck・lint・test・check（main の10日目のスナップショットから）が走り、プレビュー URL（エイリアス `pr-<番号>`）が PR にコメントされる。main への push で本番にデプロイする。Secrets（`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`）が無ければデプロイだけスキップする。設定の確認は `npm run build && npx wrangler deploy --dry-run`。
-
-## ソースの構成
-
-| ファイル | 中身 |
-|---|---|
-| src/mapgen.ts | 地形の生成（洞窟、水路、溶岩、苔、養分、宝物庫、深部、ミノタウロスの寝床、閉じた空洞） |
-| src/world.ts | 世界の1 tick の更新（水、養分、熱、苔、キノコ、光、掘削、瓦礫、崩落、マナの流れ `manaStep`）。地形変更ログ `digs`（値は `k*8+種類`。種類は 0 掘削 / 1 瓦礫 / 2 崩落 / 3 風化 / 4 石畳） |
-| src/ecology.ts | 生き物全体を持つクラス Ecology の本体：状態のフィールド、セーブしないキャッシュ、定数（種ごとの性質 `SPEC`、強さ `STR`、賢さの段階 `TIER` など）、型。メソッドはここには無い |
-| src/eco/*.ts | Ecology のメソッドを、種や仕組みごとに分けたもの（rat、kobold、goblin、orc、adventurer、aim、raid、cache、listen、loot、roster、dwarf、dragon、step、move、senses、groups、sleep、combat、arrivals、save など）。src/eco/index.ts がすべてを読み込む |
-| src/eco/spawndef.ts, generate.ts | 野の魔物の湧き方の表（どちらの資源から・どこに・何匹・体と胃とマナ）と、表を見て湧かせる共通の仕組み。外から来るのは冒険者・ドワーフ・ワイバーンだけで、野の魔物は土の養分とマナから湧く。種を足すときは表に一行足す |
-| src/sprites.ts, atlas.ts | ドット絵のパーツと、それをまとめたテクスチャアトラス |
-| src/creatureView.ts, renderer.ts, shaders.ts | 描画 |
-| src/main.ts | メインループ、UI、セーブ |
-| test/*.ts | テスト |
-| tools/gallery/ | ビジュアル確認（scenes.ts・shoot.mjs：固定シーンの一覧、shot.ts：探して撮る、film.mjs：連続フレーム） |
-| tools/analysis/ | 分析ツール（入口は launch.mjs）。共通部品は lib/（engine.ts 実行、state.ts 状態の読み書き、runs.ts キャッシュ、open.ts スナップショットの取得、stats.ts A/B 比較の判定、seeds.ts 固定のシードの組、moments.ts 見せたい場面の数え方） |
-| tools/export-sprites.ts | 生き物のドット絵を、PNG のスプライトシートと各フレームの位置の JSON に書き出す（`npm run export-sprites` → build/sprites/。コミットしない） |
+- src/ecology.ts は Ecology の状態・定数（`SPEC`・`STR`・`TIER` など）・型だけで、メソッドは無い。メソッドは種や仕組みごとに src/eco/*.ts に分かれ、src/eco/index.ts がすべてを読み込む。
+- 野の魔物は外から来ず、土の養分とマナから湧く。湧き方は src/eco/spawndef.ts の表で、種を足すときは表に一行足す。外から来るのは冒険者・ドワーフ・ワイバーンだけ。
+- 地形変更ログ `digs`（src/world.ts）の値は `k*8+種類`。種類は 0 掘削 / 1 瓦礫 / 2 崩落 / 3 風化 / 4 石畳。
 
 ## 変更するときの注意
 
