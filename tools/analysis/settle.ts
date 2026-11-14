@@ -1,6 +1,6 @@
 /** 住みつくはずの種（コボルト、ゴブリン、ドワーフ）が、来てから去るまでの様子を一匹ずつ追う */
 import { DAY_TICKS, World } from '../../src/world';
-const w = new World(process.argv[2] || 'abc'); const e = w.eco as any; const m = w.map;
+const w = new World(process.argv[2] || 'abc'); const e = w.eco as any;
 const info = new Map<number, any>();
 const out: any[] = [];
 while (w.tick < 12 * DAY_TICKS) {
@@ -18,5 +18,5 @@ const names: any = { 10: 'コボルト', 12: 'ゴブリン', 28: 'ドワーフ' 
 for (const k of [10, 12, 28]) {
   const rs = out.filter((r) => r.k === k && r.st9 >= 0);
   const stay = rs.map((r) => (r.st9 - r.t0) / DAY_TICKS).sort((a, b) => a - b);
-  console.log(names[k], '去った', rs.length, '住みかがあった', rs.filter((r) => r.home).length, '島', rs.filter((r) => r.island).length, '滞在（中央）', stay.length ? stay[Math.floor(stay.length / 2)].toFixed(2) + '日' : '-', '去る時の食料（平均）', rs.length ? (rs.reduce((a, r) => a + r.foodAt9, 0) / rs.length).toFixed(0) : '-', '飢え（平均）', rs.length ? (rs.reduce((a, r) => a + r.hungry9, 0) / rs.length).toFixed(0) : '-', k === 28 ? '住みかの段階' + JSON.stringify(rs.map((r) => r.holdStage).reduce((a: any, s: number) => ((a[s] = (a[s] ?? 0) + 1), a), {})) : '');
+  console.log(names[k], '去った', rs.length, '住みかがあった', rs.filter((r) => r.home).length, '島', rs.filter((r) => r.island).length, '滞在（中央）', stay.length ? stay[Math.floor(stay.length / 2)].toFixed(2) + '日' : '-', '去る時の食料（平均）', rs.length ? (rs.reduce((a, r) => a + r.foodAt9, 0) / rs.length).toFixed(0) : '-', '飢え（平均）', rs.length ? (rs.reduce((a, r) => a + r.hungry9, 0) / rs.length).toFixed(0) : '-', k === 28 ? '住みかの段階' + JSON.stringify(rs.map((r) => r.holdStage).reduce((a: any, s: number) => { a[s] = (a[s] ?? 0) + 1; return a; }, {})) : '');
 }

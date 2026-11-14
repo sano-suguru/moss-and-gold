@@ -1,14 +1,11 @@
 /** Ecology のメソッド：生き物の更新1回（step。src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { BONE_CAP, BONE_KINDS, KIN_RISE_MANA, KIN_ZOMBIE_CAP, KIN_ZOMBIES, ZOMBIE_KINDS } from './undead';
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq, STONE_DECAY_EVERY } from '../ecology';
-import { lineOfSight, TILE } from '../mapgen';
-import { JOB_NAMES } from '../names';
+import { type Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, STR, ih, STONE_DECAY_EVERY } from '../ecology';
+import { TILE } from '../mapgen';
 import { VAMP_SCATTER } from './vampire';
 import { BLESSED, CRUMBLING } from './roster';
-import type { World } from '../world';
 
-export function update(this: Ecology, tick: number, day: number, phase: number): void {
+export function update(this: Ecology, _tick: number, day: number, phase: number): void {
   this.step++;
   this.trimChews();
   this.day = day;

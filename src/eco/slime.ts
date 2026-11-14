@@ -1,9 +1,6 @@
 /** Ecology のメソッド：スライム（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
-import { lineOfSight, TILE } from '../mapgen';
-import { JOB_NAMES } from '../names';
-import type { World } from '../world';
+import { type Cr, DIR16, Ecology, Kind, SPEC, STR, ih, sq } from '../ecology';
+import { TILE } from '../mapgen';
 
 /** 一つの死骸に群がって食べられるスライムの数 */
 const SLIME_SHARE = 3;
@@ -56,7 +53,7 @@ export function slime(this: Ecology, c: Cr): void {
   }
   // 死骸の匂いをたどる
   let target: Cr | null = this.byId.get(c.ref) ?? null;
-  if (!target || target.dead !== 1 || target.units <= 0) {
+  if (target?.dead !== 1 || target.units <= 0) {
     target = null;
     let bd = 160 * 160;
     for (const o of this.corpses) {

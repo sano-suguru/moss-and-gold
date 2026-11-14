@@ -1,5 +1,5 @@
 import { CR_EVERY, Ecology, MOSS_R } from './eco/index';
-import { MapData, TILE, generate, lineOfSight } from './mapgen';
+import { type MapData, TILE, generate, lineOfSight } from './mapgen';
 
 export const TICKS_PER_SEC = 10;
 /** ゲーム内の1日の tick 数（通常速度で24分、仮） */
@@ -965,7 +965,7 @@ export class World {
     this.moist.fill(0);
     for (const k of this.floors) {
       const v = m.humidity[k] + Math.min(150, w[k] * 3) - this.heat[k] + dew[k] + drip[k];
-      this.moist[k] = v < 0 ? 0 : v > 255 ? 255 : v;
+      this.moist[k] = v < 0 ? 0 : Math.min(v, 255);
     }
   }
 

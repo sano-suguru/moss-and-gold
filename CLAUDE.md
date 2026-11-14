@@ -54,9 +54,13 @@ npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 
 ```bash
 npm install                       # 初回のみ（クラウドのセッションでは SessionStart フックが入れる）
 npm test                          # 決定性・保存則・ロード後の再現性など（約10秒。TEST_FULL=1 で0日目から）
-npm run typecheck
+npm run typecheck                 # 使っていない変数・引数もエラー（tsconfig の noUnusedLocals / noUnusedParameters。要る引数は名前を _ で始める）
+npm run lint                      # Biome の推奨ルール一式（警告もエラー）。このリポジトリで意図して書いている形とぶつかるものだけ止めている（biome.json）。フォーマッタは使わない
 npm run build                     # dist/index.html（外部依存なしの1ファイル。dist はコミットしない）
+npm run dev                       # 開発サーバー（http://localhost:8000/。src と index.html を書き換えると作り直して、ページを読み込み直す。自分のマシンからだけ開ける。実機で見るときは HOST=0.0.0.0）
 ```
+
+lint の自動修正は `npx biome lint --write`（使っていない import の削除などは `--unsafe` も要る。`--unsafe` の修正は `a && a.b` を `a?.b` にするなど意味が変わりうるので、src に当てたら ab で出力が変わらないか確かめる）。
 
 通常の作業の流れ：
 
@@ -96,7 +100,7 @@ URL の末尾に `#lit`（全体を明るくする）、`#albedo`（地形の色
 
 ## デプロイ（Cloudflare Workers の静的アセット）
 
-設定は `wrangler.jsonc`（`dist/` をそのまま配信）と `.github/workflows/deploy.yml`。PR では typecheck・test・check（main の10日目のスナップショットから）が走り、プレビュー URL（エイリアス `pr-<番号>`）が PR にコメントされる。main への push で本番にデプロイする。Secrets（`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`）が無ければデプロイだけスキップする。設定の確認は `npm run build && npx wrangler deploy --dry-run`。
+設定は `wrangler.jsonc`（`dist/` をそのまま配信）と `.github/workflows/deploy.yml`。PR では typecheck・lint・test・check（main の10日目のスナップショットから）が走り、プレビュー URL（エイリアス `pr-<番号>`）が PR にコメントされる。main への push で本番にデプロイする。Secrets（`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`）が無ければデプロイだけスキップする。設定の確認は `npm run build && npx wrangler deploy --dry-run`。
 
 ## ソースの構成
 
@@ -113,7 +117,7 @@ URL の末尾に `#lit`（全体を明るくする）、`#albedo`（地形の色
 | test/*.ts | テスト |
 | tools/gallery/ | ビジュアル確認（scenes.ts・shoot.mjs：固定シーンの一覧、shot.ts：探して撮る、film.mjs：連続フレーム） |
 | tools/analysis/ | 分析ツール（入口は launch.mjs）。共通部品は lib/（engine.ts 実行、state.ts 状態の読み書き、runs.ts キャッシュ、open.ts スナップショットの取得、stats.ts A/B 比較の判定、seeds.ts 固定のシードの組、moments.ts 見せたい場面の数え方） |
-| tools/export-sprites.ts | 生き物のドット絵を、PNG のスプライトシートと各フレームの位置の JSON に書き出す（`npm run export-sprites`） |
+| tools/export-sprites.ts | 生き物のドット絵を、PNG のスプライトシートと各フレームの位置の JSON に書き出す（`npm run export-sprites` → build/sprites/。コミットしない） |
 
 ## 変更するときの注意
 

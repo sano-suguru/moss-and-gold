@@ -17,7 +17,7 @@
  * 状態：溜めているあいだは run に技の番号（−1 雄叫び、−2 投げ斧）、斧が出ているあいだは run に残りの回数（正の数）、投げ斧で狙う相手の番号は aim に持つ（どれもセーブに入る）。
  * 斧が当たるのは、少し後で当たる攻撃（src/eco/attack.ts の queueVolley・resolveVolleys）で扱う。
  */
-import { CR_EVERY, Cr, Ecology, Job, Kind, sq } from '../ecology';
+import { CR_EVERY, type Cr, Ecology, Job, Kind, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import type { Skill } from './skill';
 
@@ -63,7 +63,7 @@ function vassalGoblin(this: Ecology, c: Cr, o: Cr): boolean {
 }
 
 /** 投げ斧の当たってよい者（オーク自身の群れと、従う集落のゴブリンには当たらない。霊とウィスプはすり抜ける） */
-export function axeHits(this: Ecology, a: Cr, o: Cr): boolean {
+export function axeHits(this: Ecology, _a: Cr, o: Cr): boolean {
   return o.k !== Kind.Orc && o.k !== Kind.Ghost && o.k !== Kind.Wisp && !(o.k === Kind.Goblin && !o.party);
 }
 

@@ -8,10 +8,9 @@
  *
  * 目標（Party.aim）：0 なし（探索）、1 宝、2 竜、3 大物、4 アンデッド、5 ゴブリン退治。状態はすべて Party に入れる（セーブ時は Party ごと JSON にシリアライズする）。
  */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { CELL, Camp, Cr, Ecology, Job, Kind, Party, ih, sq } from '../ecology';
+import { CELL, type Camp, type Cr, Ecology, Kind, type Party, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
-import { ADV_NAMES, AIM_NAMES, JOB_NAMES, NAMES } from '../names';
+import { ADV_NAMES, AIM_NAMES, JOB_NAMES } from '../names';
 import { heroTitle } from './roster';
 import { UNDEAD, type Quest } from './quest';
 
@@ -64,7 +63,7 @@ export function chooseAim(this: Ecology, p: Party, q: Quest): void {
     // オークに従う集落があれば、そちらを先に選ぶ（オークがゴブリンを従えていることは、外の世界にも噂として届いていて、場所も知られている）。
     // 一行がオークの縄張りに踏み込み、オークが吠えて集落のゴブリンを呼ぶ場面になる（src/eco/orc.ts の meetParty）
     // （以前は盗みを働いた集落だけを選び、一行はオークに従う集落のそばをほとんど通らなかった）
-    const vassal = best && best.lx ? null : this.camps.filter((cp) => cp.id >= 0 && cp.kind === 0 && (cp.lx || cp.ly) && this.list.some((o) => o.k === Kind.Orc && !o.dead && !o.away && o.hx === cp.lx && o.hy === cp.ly)).sort((a, b) => sq(a.x - (r.goblinCampX || r.goblinX)) + sq(a.y - (r.goblinCampY || r.goblinY)) - (sq(b.x - (r.goblinCampX || r.goblinX)) + sq(b.y - (r.goblinCampY || r.goblinY))) || a.id - b.id)[0];
+    const vassal = best?.lx ? null : this.camps.filter((cp) => cp.id >= 0 && cp.kind === 0 && (cp.lx || cp.ly) && this.list.some((o) => o.k === Kind.Orc && !o.dead && !o.away && o.hx === cp.lx && o.hy === cp.ly)).sort((a, b) => sq(a.x - (r.goblinCampX || r.goblinX)) + sq(a.y - (r.goblinCampY || r.goblinY)) - (sq(b.x - (r.goblinCampX || r.goblinX)) + sq(b.y - (r.goblinCampY || r.goblinY))) || a.id - b.id)[0];
     if (vassal) best = vassal;
     const known = !!best;
     if (!best) {

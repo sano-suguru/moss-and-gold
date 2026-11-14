@@ -8,7 +8,7 @@
  * 担ぐ者が倒れれば仲間が担ぎ直し、全滅すれば倒れた所に残る（床の道具 ItemKind.Trophy。fuel に種の番号）。
  * 生きて帰れば記録に「〜の一行が竜の牙を持ち帰った」。戦利品は保存則の対象外（姿と記録だけ）。
  */
-import { Cr, Ecology, ItemKind, Job, Kind, Party, sq } from '../ecology';
+import { type Cr, Ecology, ItemKind, Job, Kind, type Party, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 戦利品の名前と、絵の種類（src/sprites.ts の trophyArt） */

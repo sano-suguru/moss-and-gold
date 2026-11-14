@@ -12,7 +12,7 @@
  * （以前は竜の寝床への道探しの一行だけが荷を背負った。目標を依頼のくじで決めるようにして道探しの一行が271→45に減り、
  *  16シード×25日で置き場を残す場面が88→23に減ったので、深部へ向かう依頼の一行にも広げた）
  */
-import { Cr, DAY_TICKS_ECO, Ecology, Kind, Party, SPEC, SupplyCache, ih, sq } from '../ecology';
+import { type Cr, DAY_TICKS_ECO, Ecology, Kind, type Party, SPEC, type SupplyCache, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 深部の探索の一行の者が背負ってくる、置き場に残す食料の荷 */
@@ -341,7 +341,7 @@ export function planCacheRaids(this: Ecology): void {
 export function goblinCacheRaid(this: Ecology, c: Cr): boolean {
   const s = SPEC[Kind.Goblin];
   const cp = this.campOf(c);
-  if (!cp || cp.kind !== 0) {
+  if (cp?.kind !== 0) {
     c.st = 0;
     c.lure = 0;
     return false;

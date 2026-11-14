@@ -1,9 +1,6 @@
 /** Ecology のメソッド：死の気配（ゴーストが現れる）、ゾンビ、ゴースト、スケルトンとリッチ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
-import { lineOfSight, TILE } from '../mapgen';
-import { JOB_NAMES } from '../names';
-import type { World } from '../world';
+import { type Cr, DIR16, Ecology, type Item, ItemKind, Job, Kind, SPEC, STR, ih, sq } from '../ecology';
+import { TILE } from '../mapgen';
 
 /**
  * 骨になって起き上がる人型（冒険者のほか）。ゴブリン・コボルト・オーク・ドワーフ・リザードマンの亡骸も、暗く死者の多い所で骨になったあと、
@@ -340,7 +337,7 @@ export function raiseUndead(this: Ecology, c: Cr, manyDead: boolean): void {
   this.startRise(c, Kind.Adventurer);
 }
 
-export function skeleton(this: Ecology, c: Cr, day: number): void {
+export function skeleton(this: Ecology, c: Cr, _day: number): void {
   const s = SPEC[Kind.Skeleton];
   if (c.act === 2 && c.actT < 4) return;
   // 骨はゆっくり崩れて土に返る
@@ -429,7 +426,7 @@ export function skeleton(this: Ecology, c: Cr, day: number): void {
   }
 }
 
-export function lich(this: Ecology, c: Cr, day: number): void {
+export function lich(this: Ecology, c: Cr, _day: number): void {
   const s = SPEC[Kind.Lich];
   if (c.act === 2 && c.actT < 6) return;
   // 住みかに入ってきた生きものを、死の呪いで倒す

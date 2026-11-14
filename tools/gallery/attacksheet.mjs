@@ -6,8 +6,8 @@
  * できるもの（build/img/）：attack-<職>-x<scale>.png と attack-<職>-x<game>.png（ゲームの倍率）
  */
 import { buildSync } from 'esbuild';
-import { createRequire } from 'module';
-import { mkdirSync, writeFileSync } from 'fs';
+import { createRequire } from 'node:module';
+import { mkdirSync, writeFileSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const argv = process.argv.slice(2);
 const opt = (k, d) => (argv.includes('--' + k) ? argv[argv.indexOf('--' + k) + 1] : d);
@@ -22,7 +22,6 @@ const SP = require(process.cwd() + '/build/sprites-attack' + tag + '.cjs');
 const look = (hair, skin, color, build, head, crest = -1, scar = 0) => hair | (skin << 3) | (color << 5) | (build << 8) | (head << 10) | ((crest + 1) << 11) | (scar << 15);
 const lk = look(1, 1, 0, 1, 0, -1);
 const DIRS = ['down', 'side', 'up'];
-const RANKS = ['見習い', '熟練', '歴戦', '英雄'];
 const fr = (j, d, a, f, r) => SP.heroSprite(j, d, a, f, false, lk, r);
 const rowOf = (j, r) => DIRS.flatMap((d) => [{ t: '立' + d[0], f: fr(j, d, 'idle', 0, r) }, ...[0, 1, 2, 3].map((q) => ({ t: '攻' + d[0] + q, f: fr(j, d, 'attack', q, r) }))]);
 function bbox(frames) {

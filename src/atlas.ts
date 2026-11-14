@@ -1,9 +1,11 @@
-import { fxSporeCloud, fxSporePuff, fxSporeMote, fxSlingWhirl, fxSlingStone, fxStoneHit, fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, vampMist, livingArmor, heroSprite, heroBed, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
+import { fxSporeCloud, fxSporePuff, fxSporeMote, fxSlingWhirl, fxSlingStone, fxStoneHit, fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, vampMist, livingArmor, heroSprite, heroBed, HERO_JOBS, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
 export const DIRS = ['down', 'up', 'side'] as const;
 export const ACTS = ['idle', 'move', 'attack', 'death'] as const;
+/** 冒険者の職の名前（職の番号の順。一覧は src/sprites.ts の HERO_JOBS の1か所だけ） */
+export const JOBS: readonly string[] = HERO_JOBS;
 /** 名簿の冒険者のます目の大きさ（px）と、区画の行数 */
 const HERO_CELL = 48;
 const HERO_ROWS = 12;
@@ -416,49 +418,6 @@ export function buildAtlas(): Atlas {
       named.set(`dragon,${d},2,${f},1`, raws.length);
       raws.push(dragon(DIRS[d], 'fly', f) as RawFrame);
     }
-  // 幼竜と若い竜：成竜の絵を、ドット絵らしさを保つ縮め方で縮める（縮めたあとの1ピクセルごとに、もとの絵で一番多い色を選ぶ。縁取りの暗い色は残しやすく）
-  const shrink = (fr: RawFrame, sc: number): RawFrame => {
-    const W = Math.max(1, Math.round(fr.W * sc));
-    const H = Math.max(1, Math.round(fr.H * sc));
-    const px = new Uint8ClampedArray(W * H * 4);
-    const mat: (string | null)[] = new Array(W * H).fill(null);
-    for (let y = 0; y < H; y++)
-      for (let x = 0; x < W; x++) {
-        const x0 = Math.floor(x / sc);
-        const x1 = Math.max(x0 + 1, Math.floor((x + 1) / sc));
-        const y0 = Math.floor(y / sc);
-        const y1 = Math.max(y0 + 1, Math.floor((y + 1) / sc));
-        const votes = new Map<number, number>();
-        const matOf = new Map<number, string | null>();
-        let opaque = 0;
-        let total = 0;
-        for (let yy = y0; yy < Math.min(fr.H, y1); yy++)
-          for (let xx = x0; xx < Math.min(fr.W, x1); xx++) {
-            total++;
-            const p = (yy * fr.W + xx) * 4;
-            if (!fr.px[p + 3]) continue;
-            opaque++;
-            const key = (fr.px[p] << 16) | (fr.px[p + 1] << 8) | fr.px[p + 2];
-            const lum = fr.px[p] + fr.px[p + 1] + fr.px[p + 2];
-            votes.set(key, (votes.get(key) ?? 0) + (lum < 120 ? 1.4 : 1));
-            if (!matOf.has(key)) matOf.set(key, fr.mat[yy * fr.W + xx]);
-          }
-        if (opaque * 2 < total) continue;
-        let best = 0;
-        let bv = -1;
-        for (const [k, v] of votes) if (v > bv) {
-          bv = v;
-          best = k;
-        }
-        const q = (y * W + x) * 4;
-        px[q] = best >> 16;
-        px[q + 1] = (best >> 8) & 255;
-        px[q + 2] = best & 255;
-        px[q + 3] = 255;
-        mat[y * W + x] = matOf.get(best) ?? null;
-      }
-    return { W, H, px, mat, ax: Math.round(fr.ax * sc), ay: Math.round(fr.ay * sc) } as RawFrame;
-  };
   // 骨の竜：成竜の絵の鱗の色を、骨の色に塗り替える（赤みの強い色を明るさに応じて骨の段へ。光る目は青白く）
   {
     const cache = new Map<number, number>();
@@ -491,7 +450,7 @@ export function buildAtlas(): Atlas {
       }
     }
   const eggShellFrame = raws.length;
-  raws.push(eggShell(0) as RawFrame);
+  raws.push(eggShell() as RawFrame);
   const manaMoteFrames: number[] = [];
   const dragonEggFrames: number[] = [];
   for (let i = 0; i < 4; i++) {
@@ -783,7 +742,7 @@ export function buildAtlas(): Atlas {
     raws.push(treasure(sz, f) as RawFrame);
   }
   const segFrames = [raws.length, raws.length + 1];
-  raws.push(wormSeg(0, 0) as RawFrame, wormSeg(1, 0) as RawFrame);
+  raws.push(wormSeg(0) as RawFrame, wormSeg(1) as RawFrame);
   const bodyFrames: number[] = [];
   for (let r = 3; r <= 12; r++) for (let v = 0; v < 2; v++) {
     bodyFrames.push(raws.length);
@@ -895,7 +854,6 @@ export function buildAtlas(): Atlas {
   const cellFrame = new Int32Array(nCells).fill(-1);
   const heroKeys = new Map<string, number>();
   let useT = 0;
-  const JOBS = ['warrior', 'wizard', 'thief', 'priest', 'bard', 'hunter', 'slayer'];
   const heroFrame = (job: number, torch: boolean, look: number, rank: number, d: number, a: number, f: number): number => {
     const key = `${job},${torch ? 1 : 0},${look},${rank},${d},${a},${f & 3}`;
     useT++;

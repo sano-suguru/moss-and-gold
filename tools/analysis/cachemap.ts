@@ -6,8 +6,8 @@
  * 表：シードごとに、遠征（深部の探索・竜退治の一行）の順に、入った日、目標、たどった置き場、補った量、残した置き場の入口からの道のり、終わり方。
  * --png を付けると、シードごとにマップ（岩・床、入口、ドラゴン、置き場を残した順の番号）を <png>-<シード>.png に描く（SVG を Playwright でスクリーンショットする）。
  */
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { decodeState, readState } from './lib/state';
 import { snapsOf } from './lib/runs';
 

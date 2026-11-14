@@ -11,12 +11,12 @@
  * 作業ツリーで0日目から実行する。地形はセーブせずシードから作り直すので、ベースのスナップショットを新しい地形に載せると、
  * 生き物が岩の中に置かれるなど、ありえない状態から始まってしまうため（迷路をなくした変更で、埋まった生き物を床へ出すチェックが落ちた）。
  */
-import { cpus } from 'os';
-import { execFileSync } from 'child_process';
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { cpus } from 'node:os';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { parseArgs } from './common';
-import { CHECKS, Recs } from './checks';
+import { CHECKS, type Recs } from './checks';
 import { dayName, defaultAdv, ensureRun, getBin, pool } from './lib/runs';
 import { DAY_TICKS } from './lib/engine';
 import { readState } from './lib/state';

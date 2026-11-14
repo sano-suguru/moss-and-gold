@@ -7,7 +7,7 @@
  * 一行が住処から離れるか、体力が4割を切るか、生き物の更新300回たったら、ふだんに戻る。すぐそばに来た冒険者には打ちかかる。
  * （以前は、目標でない住処のそばを一行が身構えて通りすぎ、住民も何もしないので、互いに無視しているように見えた）
  */
-import { Cr, Ecology, Kind, ih, sq } from '../ecology';
+import { type Cr, Ecology, Kind, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 export const ST_STAND = 40;

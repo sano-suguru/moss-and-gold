@@ -24,7 +24,7 @@
  *
  * 状態：金切り声を溜めているあいだは run に −1、狙う相手は aim（どちらもセーブに入る）。
  */
-import { Cr, Ecology, Job, Kind, SPEC, STR, ih, sq } from '../ecology';
+import { type Cr, Ecology, Job, Kind, SPEC, STR, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import type { Skill } from './skill';
 

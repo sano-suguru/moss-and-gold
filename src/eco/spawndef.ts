@@ -6,7 +6,7 @@
  * 湧ける条件（ok・cap・chance。cap は無くてもよい）、どこに（site）、何匹（band）、体と胃とマナの量（body・food・mana。体と胃はすべて土の養分から取る）。
  * 種を足すときは、ここに一行足す。湧くかどうかは、資源の量と場所の条件（食べ物があるか）で決まる。
  */
-import { Burrow, Camp, Colony, Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, Warren, ih } from '../ecology';
+import { type Burrow, type Camp, type Colony, type Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, type Warren, ih } from '../ecology';
 import { TILE } from '../mapgen';
 import { BASILISK_MANA } from './basilisk';
 
@@ -257,7 +257,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
       e.colonies.push(col);
       return col;
     },
-    setup: (e, c, _site, _i, ctx) => {
+    setup: (_e, c, _site, _i, ctx) => {
       const col = ctx as Colony;
       c.ref = col.id;
       c.hx = col.x;

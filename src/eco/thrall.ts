@@ -12,7 +12,7 @@
  * 眷属の持ち物：sp に元の種、ref2 に主の番号、lure に元の冒険者の職業＋1（冒険者でなければ 0）、lureAt に起き上がった時刻（step）。
  * 終わり方：主が死ぬか、起き上がってからゲーム内の2日たつと崩れて、ふたたび亡骸になる（die。養分は亡骸へ戻る）。
  */
-import { CR_EVERY, Cr, DAY_TICKS_ECO, Ecology, JOB_STR, Kind, STR, SPEC, sq } from '../ecology';
+import { CR_EVERY, type Cr, DAY_TICKS_ECO, Ecology, JOB_STR, Kind, STR, SPEC, sq } from '../ecology';
 import { TILE } from '../mapgen';
 import { NAMES, UNKNOWN } from '../names';
 import { whoName } from './inspect';

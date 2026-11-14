@@ -8,7 +8,7 @@
  * 耳のよい盗賊と狩人は1.5倍遠くから聞き取る。灯りの中や明るい所の音（見えている物音）には止まらない。
  * 同じ方角（8方位）の音には通常速度で約3分（生き物の更新900回）、どの方角でも約40秒（200回）あける。
  */
-import { Cr, Ecology, Job, Kind, Party, sq } from '../ecology';
+import { type Cr, Ecology, Job, Kind, type Party, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 立ち止まって耳を澄ます長さ（生き物の更新の回数） */

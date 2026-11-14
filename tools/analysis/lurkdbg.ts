@@ -1,6 +1,6 @@
 import { DAY_TICKS, World } from '../../src/world';
-const w = new World('abc'); const e = w.eco as any; const m = w.map;
-let checks = 0, cands = 0, losOk = 0, near20 = 0;
+const w = new World('abc'); const e = w.eco as any;
+let checks = 0, cands = 0, near20 = 0;
 while (w.tick < 12 * DAY_TICKS) {
   w.step();
   if (w.tick % 60) continue;

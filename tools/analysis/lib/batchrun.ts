@@ -1,11 +1,11 @@
 /**
  * 複数のシードを実行して（キャッシュにあれば再利用して）、結果を out/<番号>-<シード>/ に置く。batch と ab が使う。
  */
-import { cpus } from 'os';
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
-import { spawn } from 'child_process';
-import { Bin, ensureRun, getBin, materialize, pool, readMeta, secPerDay } from './runs';
+import { cpus } from 'node:os';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { spawn } from 'node:child_process';
+import { type Bin, ensureRun, getBin, materialize, pool, readMeta, secPerDay } from './runs';
 import { DAY_TICKS } from './engine';
 
 export const dirName = (seeds: string[], i: number) => `${String(i + 1).padStart(2, '0')}-${seeds[i].replace(/[\\/:*?"<>|\s]/g, '_')}`;

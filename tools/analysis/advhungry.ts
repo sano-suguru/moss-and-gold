@@ -6,7 +6,6 @@ while (w.tick < 22 * DAY_TICKS) {
   if (w.tick % 200) continue;
   for (const c of e.list) {
     if (c.k !== 25 || c.dead || seen.has(c.id)) continue;
-    const st = e.constructor ? 0 : 0;
     if (c.hungry > 1500) {
       seen.add(c.id);
       const p = e.parties.find((q: any) => q.id === c.party);

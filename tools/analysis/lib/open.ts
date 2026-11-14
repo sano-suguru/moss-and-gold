@@ -9,8 +9,8 @@
  *   5. どれもなければ0日目から実行する（日次スナップショットは 2. のキャッシュに置くので、次からは速い）
  * どの場合も、目的の tick 以前でいちばん近い日のスナップショットから、1 tick ずつ進めて目的の tick まで行く（進め方は sim と同じ lib/engine.ts の tick）。
  */
-import { existsSync, mkdirSync, readdirSync } from 'fs';
-import { join } from 'path';
+import { existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { DAY_TICKS, Ecology, World, tick } from './engine';
 import { decodeState, encodeState, readState, writeState } from './state';
 import { CACHE, dayName, getSimHash, readMeta, SELF_SIM, seedKey, snapDays, snapDir, snapsOf } from './runs';

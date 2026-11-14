@@ -4,9 +4,9 @@
  * 体と胃の養分はすべて場所のまわりの土から取る（takeNutrients。全部取れなければ湧かない）ので、養分の保存則は自動で守られる。
  * 体のマナも場所のまわりの土から移す（takeMana）。表の行に manaAll があれば、マナも全部集められるときだけ湧く（いまはバジリスク）。
  */
-import { Cr, DAY_TICKS_ECO, Ecology } from '../ecology';
+import { type Cr, DAY_TICKS_ECO, Ecology } from '../ecology';
 import { TILE } from '../mapgen';
-import { SPAWN_DEFS, SpawnDef } from './spawndef';
+import { SPAWN_DEFS, type SpawnDef } from './spawndef';
 
 /** 生き物の更新ごとに呼ぶ。表の各行を、その行の判定の回（step % every === phase）にだけ見る */
 export function generate(this: Ecology): void {

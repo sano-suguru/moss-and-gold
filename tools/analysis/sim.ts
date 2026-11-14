@@ -25,8 +25,8 @@
  * 0日目から一つのバージョンだけで実行したもの（pure）は、日次スナップショットを runs/.cache/snap/<バージョン>/ にも置く（probe などが再利用する）。
  * レポートと画像は npm run report -- --run <フォルダ> で作る。
  */
-import { appendFileSync, existsSync, linkSync, mkdirSync, readFileSync, writeFileSync, cpSync } from 'fs';
-import { join } from 'path';
+import { appendFileSync, existsSync, linkSync, mkdirSync, readFileSync, writeFileSync, cpSync } from 'node:fs';
+import { join } from 'node:path';
 import { DAY_TICKS, Ecology, World, tick } from './lib/engine';
 import { SPEC } from '../../src/ecology';
 import { decodeState, encodeState, readState, writeState } from './lib/state';

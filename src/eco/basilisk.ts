@@ -1,6 +1,6 @@
 /** Ecology のメソッド：バジリスク（濃いマナの暗がりに住み、睨みで相手を石に変え、飢えると獲物の所まで遠出する。src/ecology.ts のクラスに、prototype で足す） */
-import { Cr, DIR16, Ecology, HUNT5, Job, Kind, SPEC, STONE_FULL, STR, TIER, ih, sq } from '../ecology';
-import { Skill } from './skill';
+import { type Cr, DIR16, Ecology, HUNT5, Job, Kind, SPEC, STONE_FULL, STR, TIER, ih, sq } from '../ecology';
+import type { Skill } from './skill';
 import { lineOfSight, TILE } from '../mapgen';
 
 /** バジリスクが湧く所の、まわりのマナの濃さのしきい値（src/eco/spawndef.ts）。湧いた所をそのまま住みかにする */

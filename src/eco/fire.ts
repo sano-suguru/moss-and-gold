@@ -1,10 +1,7 @@
 /** Ecology のメソッド：炎（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
+import { type Cr, Ecology, Kind, ih } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import type { MapData } from '../mapgen';
-import { JOB_NAMES } from '../names';
-import type { World } from '../world';
 
 /** マスに火をつける（dur は燃え続ける長さ。生き物の更新の回数） */
 export function ignite(this: Ecology, k: number, dur: number): void {
@@ -182,7 +179,7 @@ export function forBreathFan(m: MapData, c: Cr, tx: number, t: number, d0: numbe
  * 向きは絵の向きに合わせる（若い竜は横向きの絵しかないので左右だけ、成竜は上下左右）。斜めに吐くと、絵の炎の柱と燃える場所がずれていた。
  * 扇は体の中心ではなく口元から始まる（以前は体の中心から1マス先で燃え始め、ドラゴンの足元や体の横から火が湧いたように見えていた）
  */
-export function breathe(this: Ecology, c: Cr, tx: number, ty: number, t: number): void {
+export function breathe(this: Ecology, c: Cr, tx: number, _ty: number, t: number): void {
   const m = this.w.map;
   // 若い竜は、いつも獲物のいる側の左右を向く（絵の向きも合わせる）
   const ax = breathAxis(c, tx);

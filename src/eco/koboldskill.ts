@@ -21,7 +21,7 @@
  *
  * 状態：溜めているあいだは run に −1、狙う相手は aim（どちらもセーブに入る）。小石が当たるのは、少し後で当たる攻撃（src/eco/attack.ts の queueVolley・resolveVolleys）で扱う。
  */
-import { Cr, Ecology, Job, Kind, ih, sq } from '../ecology';
+import { type Cr, Ecology, Job, Kind, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import type { Skill } from './skill';
 

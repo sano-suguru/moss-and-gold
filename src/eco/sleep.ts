@@ -1,9 +1,6 @@
 /** Ecology のメソッド：眠り（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
-import { lineOfSight, TILE } from '../mapgen';
-import { JOB_NAMES } from '../names';
-import type { World } from '../world';
+import { type Cr, DAY_TICKS_ECO, Ecology, Job, Kind, SPEC, ih, sq } from '../ecology';
+import { TILE } from '../mapgen';
 
 /** 見張り：群れが休む間、一匹は起きている。ゲーム内の2時間ごとに交代する（群れの中で順番に） */
 export function isSentry(this: Ecology, c: Cr, key: string): boolean {
@@ -19,7 +16,7 @@ export function isSentry(this: Ecology, c: Cr, key: string): boolean {
  * 群れない種は、その場で眠る。まわりの仲間の半分以上が眠っていると眠くなりやすい（同調）。
  * true なら今は眠っている（ふだんの行いをしない。眠りながら動く種は除く）
  */
-export function doSleep(this: Ecology, c: Cr, day: number, phase: number): boolean {
+export function doSleep(this: Ecology, c: Cr, _day: number, phase: number): boolean {
   const sp = Ecology.SLEEP[c.k];
   // 盗みに出たゴブリンは眠らない
   if (!sp || (c.k === Kind.Goblin && (c.st === 15 || c.st === 16 || c.st === 17 || c.st === 18)) || (c.k === Kind.Rat && c.st === 11)) {

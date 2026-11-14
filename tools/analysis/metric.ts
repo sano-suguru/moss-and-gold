@@ -11,10 +11,10 @@
  * 二つの実行結果（--runs a,b）を渡すと、同じシード同士の差の分布とばらつきの目安（compare --paired と同じ）も付ける。
  * スナップショットを一つ読むのに約0.3秒（--raw なら約0.01秒）。シードごとに別のプロセスで並列に計算する（--jobs）。
  */
-import { cpus } from 'os';
-import { spawn } from 'child_process';
-import { existsSync, readdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { cpus } from 'node:os';
+import { spawn } from 'node:child_process';
+import { existsSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { parseArgs, KIND_NAMES } from './common';
 import { decodeState, readState } from './lib/state';
 import { pool, readMeta, snapsOf } from './lib/runs';
@@ -122,7 +122,7 @@ async function main() {
     }) })), +(a.jobs || cpus().length)));
   }
   const A = (v: number[]) => (!v.length ? NaN : agg === 'max' ? Math.max(...v) : agg === 'last' ? v[v.length - 1] : agg === 'sum' ? v.reduce((x, y) => x + y, 0) : v.reduce((x, y) => x + y, 0) / v.length);
-  const fx = (v: number) => (isFinite(v) ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : '—');
+  const fx = (v: number) => (Number.isFinite(v) ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : '—');
   const L = [`# ${named?.label ?? expr}`, '', `式：\`${expr}\`、${d0}〜${d1 === 9999 ? '' : d1}日目、シードごとのまとめ：${agg}`, ''];
   L.push(`| シード | ${runs.map((r) => `${r}（${agg}）`).join(' | ')} | ${runs.map((r) => `${r}（日ごと）`).join(' | ')} |`, `|---|${runs.map(() => '---:').join('|')}|${runs.map(() => '---').join('|')}|`);
   const seeds = res[0].map((x) => x.seed);

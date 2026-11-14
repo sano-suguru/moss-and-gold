@@ -11,7 +11,7 @@
  * 荷（食べ物）を掠め取って暗がりへ逃げる。最後尾の冒険者が気づいて「！」、一行は振り返る。
  * 状態：17 つける（lure 最後尾の冒険者、lureAt 出た step 番号、gait 0 以上はつけている更新の回数、-1 駆け寄る）→ 16 逃げ帰る。
  */
-import { Camp, Cr, DAY_TICKS_ECO, Ecology, Job, Kind, Party, SPEC, ih, sq } from '../ecology';
+import { type Camp, type Cr, DAY_TICKS_ECO, Ecology, Job, Kind, type Party, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 盗みに出る集落の、蓄えの乏しさ（蓄えの目安に対する割合） */
@@ -203,7 +203,7 @@ export function goblinSnatch(this: Ecology, c: Cr): boolean {
     c.gait = 0;
     return this.goblinRaid(c);
   };
-  if (!cp || cp.kind !== 0) {
+  if (cp?.kind !== 0) {
     c.st = 0;
     c.lure = 0;
     return false;
@@ -339,7 +339,7 @@ function edgeSpot(eco: Ecology, c: Cr, fx: number, fy: number): [number, number]
 export function goblinRaid(this: Ecology, c: Cr): boolean {
   const s = SPEC[Kind.Goblin];
   const cp = this.campOf(c);
-  if (!cp || cp.kind !== 0) {
+  if (cp?.kind !== 0) {
     c.st = 0;
     c.lure = 0;
     return false;

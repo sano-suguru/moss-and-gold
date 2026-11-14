@@ -1,9 +1,6 @@
 /** Ecology のメソッド：群れ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
-import { lineOfSight, TILE } from '../mapgen';
-import { JOB_NAMES } from '../names';
-import type { World } from '../world';
+import { type Cr, Ecology, GROUPED, Kind, SPEC, TIER, ih, sq } from '../ecology';
+import { TILE } from '../mapgen';
 
 export function groupKey(this: Ecology, c: Cr): string | null {
   if (c.gkAt === this.step) return c.gk;
@@ -115,7 +112,6 @@ export function heedAlarm(this: Ecology, c: Cr): boolean {
 
 /** 群れの分家と合流（通常速度で1分ごと） */
 export function tendGroups(this: Ecology): void {
-  const m = this.w.map;
   // 大ネズミ：巣穴が8匹を超えたら、若い3匹が新しい巣穴へ分かれる
   for (const b of this.burrows.slice()) {
     const res = this.list.filter((c) => c.k === Kind.Rat && !c.dead && c.hx === b.x && c.hy === b.y);

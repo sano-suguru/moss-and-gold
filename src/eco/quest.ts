@@ -18,7 +18,7 @@
  * 噂の種になる魔物：冒険者が敵とみなす魔物のうち、アンデッド（祓いの噂）・ゴブリン（盗みの噂）・竜の仲間（竜の噂）を除いたもの。
  * 見かけただけで噂になるのは強さ10以上、仲間が石化しかけたり倒されたりすれば強さ6以上（どの種も同じ決まり）。
  */
-import { Cr, Ecology, Job, Kind, Party, STR, ih } from '../ecology';
+import { type Cr, Ecology, Job, Kind, type Party, STR, ih } from '../ecology';
 import { NAMES } from '../names';
 import { GOBLIN_HUNT_AT } from './aim';
 import { TILE } from '../mapgen';

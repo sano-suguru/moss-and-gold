@@ -5,7 +5,7 @@
  * ビルドしたものは runs/.cache/bin/<ツール名>-<中身のハッシュ>.js に置き、中身が同じなら再ビルドしない。
  * --ref <git の参照> を最初に置くと、そのコミットの src/ でビルドする（ログの出し方は作業ツリーのツールのもの）。
  */
-import { spawn } from 'child_process';
+import { spawn } from 'node:child_process';
 import { bin } from './lib/bins.mjs';
 
 const argv = process.argv.slice(2);

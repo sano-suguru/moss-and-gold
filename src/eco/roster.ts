@@ -11,7 +11,7 @@
  * 倒れた者は名簿から外れ、同じ職業の新人（見習い）が加わる。位は帰還の回数で上がる（2回で熟練、4回で歴戦、7回で英雄）。
  * 位が上がると強さも少し上がる（RANK_MUL。英雄で頭打ち）。墓標（Ecology.graves）は20を超えたら古いものから崩れて消える。
  */
-import { Cr, Ecology, Job, Kind, Party, STR, ih, sq } from '../ecology';
+import { type Cr, Ecology, Job, Kind, type Party, STR, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { ADV_NAMES, JOB_NAMES } from '../names';
 import { isJobItem } from './armor';

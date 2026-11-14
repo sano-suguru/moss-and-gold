@@ -1,9 +1,6 @@
 /** Ecology のメソッド：ドワーフ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
-import { lineOfSight, TILE } from '../mapgen';
-import { JOB_NAMES } from '../names';
-import type { World } from '../world';
+import { type Cr, DAY_TICKS_ECO, Ecology, HUNT6, type Hold, Kind, type Pile, SPEC, ih, sq } from '../ecology';
+import { TILE } from '../mapgen';
 
 /** ドワーフが嗅ぎつける宝：まだ誰のものでもない、閉じた空洞や奥にある古い宝の山 */
 export function dwarfTarget(this: Ecology): number {
@@ -14,7 +11,7 @@ export function dwarfTarget(this: Ecology): number {
   for (const p of this.piles) {
     const k = this.tileOf(p.x, p.y);
     if (k < 0) continue;
-    if (m.vault[k] && ((h && h.golem) || this.dwarfLore & 1)) continue;
+    if (m.vault[k] && (h?.golem || this.dwarfLore & 1)) continue;
     if (h && sq(p.x - (h.hk % m.w) * TILE) + sq(p.y - Math.floor(h.hk / m.w) * TILE) < 6 * TILE * 6 * TILE) continue;
     const v = p.gold - (h ? Math.abs(p.x / TILE - (h.hk % m.w)) + Math.abs(p.y / TILE - Math.floor(h.hk / m.w)) : 0) * 2;
     if (v > bv) {
@@ -449,8 +446,8 @@ export function dwarf(this: Ecology, c: Cr): void {
       else if (h.todo.length) h.todo.length = 0;
     } else {
       // 試し掘りの枝坑道を、ときどき先に
-      while (h.drift && h.drift.length && !m.solid[h.drift[0]]) h.drift.shift();
-      if (h.drift && h.drift.length && (c.id & 1) === 1 && [h.drift[0] + 1, h.drift[0] - 1, h.drift[0] + m.w, h.drift[0] - m.w].some((n) => !m.solid[n])) k = h.drift[0];
+      while (h.drift?.length && !m.solid[h.drift[0]]) h.drift.shift();
+      if (h.drift?.length && (c.id & 1) === 1 && [h.drift[0] + 1, h.drift[0] - 1, h.drift[0] + m.w, h.drift[0] - m.w].some((n) => !m.solid[n])) k = h.drift[0];
       else {
         const tp = this.piles.find((p) => p.id === h.target);
         if (tp) k = this.shaftNext(h, tp);

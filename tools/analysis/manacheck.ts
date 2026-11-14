@@ -15,7 +15,7 @@ while (w.tick < +(process.argv[3] || 3) * DAY_TICKS) {
   }
   d0 = d; prev = snap();
 }
-let maxv = 0, sum = 0, n = 0; for (let k = 0; k < w.mana.length; k++) { if (w.mana[k] > maxv) maxv = w.mana[k]; if (w.mana[k] > 0) { sum += w.mana[k]; n++; } }
+let maxv = 0, n = 0; for (let k = 0; k < w.mana.length; k++) { if (w.mana[k] > maxv) maxv = w.mana[k]; if (w.mana[k] > 0) n++; }
 console.log('終わり', (w.tick / DAY_TICKS).toFixed(2), 'ずれ', drift(), '土', w.soilMana(), '生き物', e.heldMana(), '湧いた', w.manaBorn, '逃げた', w.manaLeaked, '薄れた', w.manaFaded, '最大', maxv, 'マナのあるマス', n);
 // 入口からの道のり別の、土のマナの平均
 {

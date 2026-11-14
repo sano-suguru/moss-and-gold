@@ -14,8 +14,7 @@
  * 状態：溜めているあいだは run に技の番号（−1 血吸い、−2 コウモリの群れ、−3 霧の歩み。−4 は霧の歩みの一撃のあと、元いた所（tx, ty）へ戻るのを待っている）、血を吸っているあいだは run に残りの回数（正の数）、
  * 狙う相手の番号は aim に持つ（どちらもセーブに入る）。技を溜めはじめた時刻は cast（使ったあとの間に使う。三つの技で共通）。
  */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { CR_EVERY, Cr, Ecology, Job, Kind, SPEC, sq } from '../ecology';
+import { CR_EVERY, type Cr, Ecology, Job, Kind, SPEC, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import type { Skill } from './skill';
 

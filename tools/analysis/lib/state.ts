@@ -1,8 +1,8 @@
 /**
  * 状態（ゲームのセーブデータと同じ形の JSON）のシリアライズと読み書き。checkpoint.json と、スナップショットのキャッシュ（*.json.gz）で使う。
  */
-import { gunzipSync, gzipSync } from 'zlib';
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { gunzipSync, gzipSync } from 'node:zlib';
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { World } from './engine';
 
 const b64 = (u: Uint8Array) => Buffer.from(u.buffer, u.byteOffset, u.byteLength).toString('base64');

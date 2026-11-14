@@ -1,12 +1,9 @@
 /** Ecology のメソッド：生き物の様子（情報パネルのため。シミュレーションには関わらない）、見た目のための印（描画専用。シミュレーションの判断には使わない）、演出のデモ（#fxdemo。シミュレーションは実行しない）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq, STONE_FULL } from '../ecology';
-import { lineOfSight, TILE } from '../mapgen';
-import { JOB_NAMES } from '../names';
+import { type Cr, DAY_TICKS_ECO, Ecology, Job, Kind, type Party, SPEC, TIER, ih, sq, STONE_FULL } from '../ecology';
+import { TILE } from '../mapgen';
 import { heroTitle } from './roster';
 import { ARMOR_LOW } from './armor';
 import { ITEM_NAMES } from './inspect';
-import type { World } from '../world';
 
 /** 触れた場所のいちばん近い生き物（死骸は除く） */
 export function pick(this: Ecology, wx: number, wy: number): Cr | null {

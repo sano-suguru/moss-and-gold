@@ -10,8 +10,8 @@
  * ドラゴンに焼かれたコボルト、コボルトの去り方（starving 一匹ずつ飢えて / abandoned 住処ごと）、大ネズミの飢え死に、
  * 大ネズミの来た数と去り方（dispersed）、大ネズミが最後に生きているか、四つの保存則のずれ
  */
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { parseArgs, KIND_NAMES, countsAsStuck } from './common';
 import { DAY_TICKS } from '../../src/world';
 import { generate } from '../../src/mapgen';
@@ -29,7 +29,7 @@ const median = (a: number[]) => {
   const s = [...a].sort((x, y) => x - y);
   return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
 };
-const f1 = (v: number) => (isFinite(v) ? v.toFixed(1) : '—');
+const f1 = (v: number) => (Number.isFinite(v) ? v.toFixed(1) : '—');
 
 interface M { seed: string; warrens: number; dur: number[]; ended: number[]; advKob: number; fireKob: number; kobStarveExit: number; kobAbandon: number; kobStarveDeath: number; kobArr: number; kobBorn: number; kobLast: number; kobMed: number; ratStarve: number; ratArr: number; ratBorn: number; ratDisp: number; ratLast: number; ratMax: number; ratGone: boolean; drift: number; ratMoves: number; rich: number; ratNear: number; ratNearKnown: number; endFood: number; endAlone: number; endRaid: number; endDragon: number; gobArr: number; orcArr: number; camps: number; campDur: number[]; gobBorn: number; gobMax: number; gobLast: number; gobGone: boolean; gobEnd: Record<string, number>; gobAdv: number; gobByKob: number; kobByGob: number; advDeaths: number; gobStarveExit: number; gobAbandonExit: number; gobStarveDeath: number; gobByOrc: number; gobByOther: number; vassals: number; tributes: number; tributeFood: number; lairDur: number[]; ratShaftArr: number; ratMouthArr: number; ratStarveShaft: number; orcStarveExit: number; storeMean: number; storeMax: number; storePos: number; storeKnown: boolean; ratReenter: number; ratZero: number; slimeMax: number; slimeLast: number; slimeGone: boolean; slimeZero: number; slimeAfter5: number; slimeStarve: number; slimeBorn: number; splitDur: number[]; splitStore: number; stuck: number; stuckNoPath: number; stuckAdv: number; unbury: number; hitch: number; hitchSec: number; hitchLong: number; hitchOsc: number; hitchNear: number; hitchKnown: boolean; hitchKind: Record<number, number>; mo: Record<string, number>; starveLoss: number[]; zeroShare: number[]; firstDay: number[]; wildArr: number; sprung: number; kindsMean: number; kindsMin: number; kindShare: number[]; links: Map<string, number> }
 /** にぎわいで数えない種：冒険者とドワーフ（人の側。来訪の多さに数字が引っ張られないよう、モンスターと分ける） */
@@ -280,7 +280,7 @@ const sum = (ms: M[], f: (m: M) => number) => ms.reduce((a, m) => a + f(m), 0);
  * metric は下の METRICS の名前（8シードまとめた値）。目安に届いたかどうかを表にする
  */
 const halves = (ms: M[]): [M[], M[]] => {
-  const o = [...ms].sort((a, b) => (isFinite(b.rich) ? b.rich : -1) - (isFinite(a.rich) ? a.rich : -1));
+  const o = [...ms].sort((a, b) => (Number.isFinite(b.rich) ? b.rich : -1) - (Number.isFinite(a.rich) ? a.rich : -1));
   return [o.slice(0, Math.ceil(o.length / 2)), o.slice(Math.ceil(o.length / 2))];
 };
 const METRICS: Record<string, (ms: M[]) => number> = {
@@ -339,8 +339,8 @@ const METRICS: Record<string, (ms: M[]) => number> = {
   richWarrenMedian: (ms) => median(halves(ms)[0].flatMap((m) => m.dur)),
   poorKobArr: (ms) => sum(halves(ms)[1], (m) => m.kobArr),
   poorEndFood: (ms) => sum(halves(ms)[1], (m) => m.endFood),
-  kindsMean: (ms) => median(ms.map((m) => m.kindsMean).filter(isFinite)),
-  kindsMin: (ms) => Math.min(...ms.map((m) => m.kindsMin).filter(isFinite)),
+  kindsMean: (ms) => median(ms.map((m) => m.kindsMean).filter(Number.isFinite)),
+  kindsMin: (ms) => Math.min(...ms.map((m) => m.kindsMin).filter(Number.isFinite)),
   links: (ms) => median(ms.map((m) => linkCount(m))),
   links2: (ms) => median(ms.map((m) => linkCount(m, undefined, 2))),
 };
@@ -415,27 +415,25 @@ if (args.goals) {
 // シードの豊かさの順（最後に並べた実行結果）
 {
   const last = all[all.length - 1];
-  if (last.some((m) => isFinite(m.rich))) {
+  if (last.some((m) => Number.isFinite(m.rich))) {
     L.push(`## シードの豊かさの順（${names[names.length - 1]}）`, '', '豊かさ＝開いた地表の横穴から歩いて行ける範囲（道のり100マス）の床1マスあたりの、食べられる苔とキノコ（20以上の群落の、根元12を除いた分）。5日目以降のゲーム内の1/4日ごとのサンプルの平均。', '', '| シード | 豊かさ | 住処の日数の中央値 / 最長 / できた数 | 来たコボルト / 中で生まれた | 終わり方：蓄え / 1匹 / 襲われた / 竜 |', '|---|---:|---:|---:|---:|');
-    for (const m of [...last].sort((a, b) => (isFinite(b.rich) ? b.rich : -1) - (isFinite(a.rich) ? a.rich : -1))) L.push(`| ${m.seed} | ${f1(m.rich)} | ${f1(median(m.dur))} / ${f1(Math.max(0, ...m.dur))} / ${m.warrens} | ${m.kobArr} / ${m.kobBorn} | ${m.endFood} / ${m.endAlone} / ${m.endRaid} / ${m.endDragon} |`);
+    for (const m of [...last].sort((a, b) => (Number.isFinite(b.rich) ? b.rich : -1) - (Number.isFinite(a.rich) ? a.rich : -1))) L.push(`| ${m.seed} | ${f1(m.rich)} | ${f1(median(m.dur))} / ${f1(Math.max(0, ...m.dur))} / ${m.warrens} | ${m.kobArr} / ${m.kobBorn} | ${m.endFood} / ${m.endAlone} / ${m.endRaid} / ${m.endDragon} |`);
     L.push('');
   }
 }
 L.push('## にぎわい', '', '同時にいるモンスターの種の数（冒険者・ドワーフを除く。1匹以上いれば数える）。5日目以降のゲーム内の1/4日ごとのサンプルで数える。', '');
-tbl('同時にいるモンスターの種の数（平均 / 最小）', (m) => `${f1(m.kindsMean)} / ${isFinite(m.kindsMin) ? m.kindsMin : '—'}`, (ms) => `平均の中央値 ${f1(METRICS.kindsMean(ms))} / 最小 ${isFinite(METRICS.kindsMin(ms)) ? METRICS.kindsMin(ms) : '—'}`);
-{
-  // にぎわいの内訳：種ごとに、いたサンプルの割合（全シードの平均％）と、一度でもいたシードの数
-  L.push('### にぎわいの内訳：種ごとに、いたサンプルの割合', '', `各列は「全シードの平均（％） / 一度でもいたシードの数」。${all.length >= 2 ? '「⚠ 減」「✚ 増」は、最初と最後の実行結果で、いたシードの数が大きく変わった種（3以上かつ元の半分以上）。' : ''}`, '', `| 種 | ${names.join(' | ')} |`, `|---|${names.map(() => '---:').join('|')}|`);
-  for (const k of MONSTER_KINDS) {
-    const cell = (ms: M[]) => {
-      const v = ms.map((m) => m.kindShare[k]).filter(isFinite);
-      return v.length ? `${f1(v.reduce((a, b) => a + b, 0) / v.length)} / ${v.filter((x) => x > 0).length}` : '—';
-    };
-    const f = all.length >= 2 ? seedShift(kindSeeds(all[0], k), kindSeeds(all[all.length - 1], k)) : '';
-    L.push(`| ${KIND_NAMES[k]}${f ? ` ${f}` : ''} | ${all.map(cell).join(' | ')} |`);
-  }
-  L.push('');
+tbl('同時にいるモンスターの種の数（平均 / 最小）', (m) => `${f1(m.kindsMean)} / ${Number.isFinite(m.kindsMin) ? m.kindsMin : '—'}`, (ms) => `平均の中央値 ${f1(METRICS.kindsMean(ms))} / 最小 ${Number.isFinite(METRICS.kindsMin(ms)) ? METRICS.kindsMin(ms) : '—'}`);
+// にぎわいの内訳：種ごとに、いたサンプルの割合（全シードの平均％）と、一度でもいたシードの数
+L.push('### にぎわいの内訳：種ごとに、いたサンプルの割合', '', `各列は「全シードの平均（％） / 一度でもいたシードの数」。${all.length >= 2 ? '「⚠ 減」「✚ 増」は、最初と最後の実行結果で、いたシードの数が大きく変わった種（3以上かつ元の半分以上）。' : ''}`, '', `| 種 | ${names.join(' | ')} |`, `|---|${names.map(() => '---:').join('|')}|`);
+for (const k of MONSTER_KINDS) {
+  const cell = (ms: M[]) => {
+    const v = ms.map((m) => m.kindShare[k]).filter(Number.isFinite);
+    return v.length ? `${f1(v.reduce((a, b) => a + b, 0) / v.length)} / ${v.filter((x) => x > 0).length}` : '—';
+  };
+  const f = all.length >= 2 ? seedShift(kindSeeds(all[0], k), kindSeeds(all[all.length - 1], k)) : '';
+  L.push(`| ${KIND_NAMES[k]}${f ? ` ${f}` : ''} | ${all.map(cell).join(' | ')} |`);
 }
+L.push('');
 L.push('## 関わり', '', 'どの種がどの種に何をしたかの組み合わせ（向きあり、同じ種どうしは除く）。命のやりとり（倒した。死因は分けない）と、命を取らない関わり（盗んだ・取り立てた・従えた・夜襲した・あさった）。画面で結果が見えたものだけを、範囲内のログすべてから数える（忍び寄る・つける・待ち伏せにつくといった試みの始まりや、避ける・退くは数えない）。', '');
 tbl('起きた組み合わせの数：全部 / 命のやりとり / 命を取らない（括弧内は2回以上起きたもの）', (m) => `${linkCount(m)}（${linkCount(m, undefined, 2)}） / ${linkCount(m, true)}（${linkCount(m, true, 2)}） / ${linkCount(m, false)}（${linkCount(m, false, 2)}）`, (ms) => `中央値 ${f1(METRICS.links(ms))}（${f1(METRICS.links2(ms))}）`);
 {

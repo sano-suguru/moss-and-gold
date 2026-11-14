@@ -136,7 +136,7 @@ export const CHECKS: Check[] = [
     ...RUN_ARMOR,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'shed').length);
-      return { ok: sum(n) >= 20, value: rs.filter((r, i) => n[i]).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、') || '0' };
+      return { ok: sum(n) >= 20, value: rs.filter((_r, i) => n[i]).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、') || '0' };
     },
   },
   {
@@ -300,7 +300,7 @@ export const CHECKS: Check[] = [
     test: (rs) => {
       const st = rs.map((r) => r.settle.filter((x) => x.k === 12 && x.ev === 'stalk').length);
       const rob = rs.map((r) => r.settle.filter((x) => x.k === 12 && x.ev === 'rob' && x.how === 'snatch').length);
-      return { ok: sum(rob) >= 4, value: `${sum(rob)}回（つけた ${sum(st)}回。${rs.filter((r, i) => rob[i]).map((r) => `${r.seed} ${rob[rs.indexOf(r)]}`).join('、')}）` };
+      return { ok: sum(rob) >= 4, value: `${sum(rob)}回（つけた ${sum(st)}回。${rs.filter((_r, i) => rob[i]).map((r) => `${r.seed} ${rob[rs.indexOf(r)]}`).join('、')}）` };
     },
   },
   {
@@ -861,7 +861,7 @@ export const CHECKS: Check[] = [
     ...RUN_WIDE,
     test: (rs) => {
       const n = rs.map((r) => r.stuck.filter((x) => countsAsStuck(x) && x.k === 12).length);
-      return { ok: sum(n) <= 45, value: `${sum(n)}回（${rs.filter((r, i) => n[i]).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、')}）` };
+      return { ok: sum(n) <= 45, value: `${sum(n)}回（${rs.filter((_r, i) => n[i]).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、')}）` };
     },
   },
   {

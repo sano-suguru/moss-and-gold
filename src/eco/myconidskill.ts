@@ -19,7 +19,7 @@
  * 胞子でうたた寝した時刻（tick）は人の Cr.sporeAt（どちらもセーブに入る）。
  * マイコニドの actT は根を下ろすまでの時計にも使う（src/eco/myconid.ts）。胞子を吐いた回に 0 に戻る（以前の見えない胞子と同じ）。
  */
-import { Cr, Ecology, Kind, sq } from '../ecology';
+import { type Cr, Ecology, Kind, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import type { Skill } from './skill';
 

@@ -10,9 +10,9 @@
  * 高速化：シミュレーションのコード（src の world, ecology, mapgen, rng, names）とこのファイルが前回と同じなら、
  * シーンは作り直さない（描画だけ直したときは、スクリーンショットを撮るだけになる。--fresh で必ず作り直す）。シードごとに別のプロセスで並列に作る。
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { createHash } from 'crypto';
-import { spawn } from 'child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { DAY_TICKS, World } from '../../src/world';
 
 type Cam = { x: number; y: number; zoom: number };

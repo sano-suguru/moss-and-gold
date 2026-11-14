@@ -1,11 +1,8 @@
 /** Ecology のメソッド：ユーティリティ、生き物の空間グリッド（近くの相手を探す）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq, STONE_FULL, STONE_SLOW } from '../ecology';
-import { lineOfSight, TILE } from '../mapgen';
-import { JOB_NAMES } from '../names';
+import { type Cr, DIR16, Ecology, Kind, SPEC, TIER, ih, sq, STONE_FULL, STONE_SLOW } from '../ecology';
+import { TILE } from '../mapgen';
 import { VAMP_SCATTER } from './vampire';
 import { BURST_R } from './myconidskill';
-import type { World } from '../world';
 
 export function record(this: Ecology, kind: 'deaths' | 'births' | 'exits' | 'moves' | 'settle', e: never): void {
   const a = this.stats[kind] as unknown[];
@@ -219,7 +216,7 @@ export function findPathAvoid(this: Ecology, c: Cr, from: number, to: number, av
     const y = (cur / m.w) | 0;
     for (let d = 0; d < 4; d++) {
       const n = d === 0 ? (x + 1 < m.w ? cur + 1 : -1) : d === 1 ? (x > 0 ? cur - 1 : -1) : d === 2 ? (y + 1 < m.h ? cur + m.w : -1) : y > 0 ? cur - m.w : -1;
-      if (n < 0 || this.bmark[n] === g || !pass.ok(n) || (avoid && avoid(n))) continue;
+      if (n < 0 || this.bmark[n] === g || !pass.ok(n) || avoid?.(n)) continue;
       this.bmark[n] = g;
       this.bprev[n] = cur;
       q[qt++] = n;
@@ -381,7 +378,6 @@ export function stepOk(this: Ecology, c: Cr, x0: number, y0: number, x1: number,
  */
 export function litW(this: Ecology, k: number, day: number): number {
   if (k < 0) return 0;
-  const m = this.w.map;
   let v = this.w.moss[k] / 255 + this.w.fungus[k] / 400 + Math.min(1, this.w.mana[k] / 40) * 0.6;
   v -= (this.w.lightBase[k] * day) / 600;
   if (this.fireNearTile(k)) v -= 1;

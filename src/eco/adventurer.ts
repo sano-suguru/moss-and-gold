@@ -1,12 +1,10 @@
 /** Ecology のメソッド：冒険者（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Note, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq, STONE_FULL } from '../ecology';
+import { CELL, type Cr, DAY_TICKS_ECO, Ecology, GOLD_CAP, ItemKind, Job, Kind, type Note, type Party, type Pile, SPEC, STR, TIER, TORCH_FUEL, ih, sq, STONE_FULL } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
 import { ARMOR_REMNANT, ARMOR_REMNANT_KIN, isJobItem } from './armor';
 import { BONE_SP } from './undead';
-import type { World } from '../world';
 import { SKILL_HUNTER_RAIN, SKILL_PRIEST_HAMMER, SKILL_SLAYER_CLEAVE, SKILL_THIEF_THROW, SKILL_WARRIOR_SLASH, SKILL_WIZARD_MISSILE, type Skill } from './skill';
 import { HP_PER_STR } from './combat';
 import { HERO_SKILL_MANA, HERO_SKILL_R } from './salamander';
@@ -147,7 +145,6 @@ export function seenBy(this: Ecology, c: Cr, lights: Cr[], o: Cr): boolean {
 }
 
 export function updateParties(this: Ecology): void {
-  const m = this.w.map;
   this.rosterStep();
   for (const p of this.parties) {
     const alive = p.members.map((id) => this.byId.get(id)).filter((c): c is Cr => !!c && !c.dead);
@@ -1114,7 +1111,7 @@ export function dropItem(this: Ecology, x: number, y: number, kind: number, fuel
   // 古い燃えさしから片づける（道具が増えすぎないように）
   if (this.gear.length > 160) {
     const i = this.gear.findIndex((o) => o.kind === ItemKind.Stub);
-    const [gone] = this.gear.splice(i >= 0 ? i : 0, 1);
+    const [gone] = this.gear.splice(Math.max(i, 0), 1);
     // 片づけた武具に宿っていた未練は、薄れて消えたことにする（マナの保存則）
     if (isJobItem(gone.kind) && gone.fuel > 0) this.w.manaFaded += gone.fuel;
   }

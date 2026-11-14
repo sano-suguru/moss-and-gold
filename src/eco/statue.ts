@@ -1,9 +1,6 @@
 /** Ecology のメソッド：石像（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
-import { lineOfSight, TILE } from '../mapgen';
-import { JOB_NAMES } from '../names';
-import type { World } from '../world';
+import { type Cr, Ecology, Kind, STR, type Statue, ih } from '../ecology';
+import { TILE } from '../mapgen';
 
 /** 生き物を、その瞬間の姿のまま石像に変える。by は石にした種（バジリスクの睨みなら17、トロールが光の筋を浴びたなら −1） */
 export function petrify(this: Ecology, c: Cr, by = -1): void {

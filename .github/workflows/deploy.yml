@@ -1,13 +1,13 @@
 # 確かめて、Cloudflare Workers（静的アセット）へ公開する。
 #
 # - PR（作ったとき・push したとき）：
-#     check   … npm ci → typecheck → npm test → npm run check（失敗すれば PR のチェックが赤）
+#     check   … npm ci → typecheck → lint → npm test → npm run check（失敗すれば PR のチェックが赤）
 #     preview … npm run build → wrangler versions upload（本番には出さないバージョン）→ プレビューの URL を PR にコメント
 #               （同じ PR では一つのコメントを書き換える。URL はバージョンごとのものと、PR ごとに変わらない pr-<番号> のエイリアス。
 #                書き換える直前に、そのコミットが今も PR の先頭かを確かめ、先頭でなければ書き換えない）
 #               フォークからの PR では Secrets を使えないので、プレビューは作らない。
 #               PR が閉じられたら（マージしたときも）、プレビューのバージョンは preview-cleanup.yml が消す。
-# - main への push：typecheck → npm test → npm run build → wrangler deploy（本番）→ 閉じた PR のプレビューの残りを消す
+# - main への push：typecheck → lint → npm test → npm run build → wrangler deploy（本番）→ 閉じた PR のプレビューの残りを消す
 #               （マージの直後は PR のプレビューがいちばん新しいバージョンで消せないので、本番の公開のあとに消す）
 #
 # 要るもの：リポジトリの Secrets に CLOUDFLARE_API_TOKEN と CLOUDFLARE_ACCOUNT_ID。無ければ公開だけ飛ばす。
@@ -44,6 +44,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm test
       - name: main のシミュレーションのキャッシュを取得する（あれば。無ければ check が0日目から実行する）
         env:
@@ -149,6 +150,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm test # npm run check は PR で済んでいる
       - run: npm run build
       - name: 本番へ公開

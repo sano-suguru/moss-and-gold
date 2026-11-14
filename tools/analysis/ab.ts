@@ -17,14 +17,14 @@
  * --base を省くと HEAD（コミット前の変更と比べる）。--seeds 8 / 16 は固定のシードの組。--jobs は並列に実行する数（既定は CPU の数）。
  * 比較は <out>/compare.md（シードごとの差と、その分布・ばらつきの目安。compare.ts の --paired）。
  */
-import { cpus } from 'os';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs';
-import { spawn } from 'child_process';
-import { join } from 'path';
+import { cpus } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { join } from 'node:path';
 import { parseArgs } from './common';
 import { defaultAdv, getBin, pool } from './lib/runs';
 import { dirName, runSets } from './lib/batchrun';
-import { parseSeeds, PRESETS, SEEDS8 } from './lib/seeds';
+import { parseSeeds, PRESETS } from './lib/seeds';
 
 const a = parseArgs(process.argv.slice(2));
 const preset = a.preset ? PRESETS[a.preset] : undefined;

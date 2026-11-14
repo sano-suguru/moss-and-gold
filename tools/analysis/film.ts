@@ -11,9 +11,9 @@
  * --pure 作業ツリーで0日目から実行したスナップショットだけを使う（無ければ0日目から実行する。ベースのスナップショットから続けると、変えた挙動の起きる時刻がずれるときに）、
  * --dy カメラを縦にずらす量（px、負で上。寄って撮るとき体の真ん中へ）、--run <実行結果のフォルダ>（その実行の日次スナップショットから始める）、--name 出力の名前、--title 見出し、--out 出力先（既定 build/img。コミットしない）、--lit 確認用の明かり、--cols 1行のフレーム数（既定 3）
  */
-import { mkdirSync, writeFileSync } from 'fs';
-import { execFileSync } from 'child_process';
-import { join } from 'path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
 import { DAY_TICKS, tick } from './lib/engine';
 import { openAt } from './lib/open';
 import { encodeState } from './lib/state';

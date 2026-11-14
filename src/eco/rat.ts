@@ -1,11 +1,8 @@
 /** Ecology のメソッド：大ネズミ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { BLOOD, Burrow, CELL, CR_EVERY, Camp, Colony, Cr, DAY_TICKS_ECO, DIR16, DWARF_STR, Ecology, FLEE_AT, GOLD_CAP, GROUPED, HUNT0, HUNT1, HUNT2, HUNT3, HUNT4, HUNT5, HUNT6, HUNT_ORC, Hold, Item, ItemKind, JOB_STR, Job, Kind, Lore, MAX_WISPS, NB4, Party, Pile, Rumors, SPEC, STR, Spec, Statue, TIER, TIER_MUL, TORCH_FUEL, Trap, Warren, Web, ih, sq } from '../ecology';
-import { lineOfSight, TILE } from '../mapgen';
-import { JOB_NAMES } from '../names';
-import type { World } from '../world';
+import { type Burrow, type Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, ih, sq } from '../ecology';
+import { TILE } from '../mapgen';
 
-export function rat(this: Ecology, c: Cr, day: number): void {
+export function rat(this: Ecology, c: Cr, _day: number): void {
   const s = SPEC[Kind.Rat];
   // 動いている大トカゲ（と、見回りで歩いてくるバジリスク）に気づいたら逃げる
   let threat: Cr | null = null;
@@ -218,10 +215,14 @@ export function ratMarch(this: Ecology, c: Cr): void {
     c.tx = 0;
   };
   // 長くかかりすぎたか、ひどく腹が減ったら、列を離れる（それぞれ新しい巣穴へ帰る）
-  if (this.step - c.tx > 2500 || c.hungry > s.starve * 0.5) return done();
+  if (this.step - c.tx > 2500 || c.hungry > s.starve * 0.5) {
+    done();
+    return;
+  }
   if (sq(c.hx - c.x) + sq(c.hy - c.y) < 1.2 * TILE * 1.2 * TILE) {
     c.act = 0;
-    return done();
+    done();
+    return;
   }
   // 冒険者やドワーフが近く（3マス）にいれば、列のまま、まず離れる（以前は列のまま足もとを通って払われていた）
   let man: Cr | null = null;
