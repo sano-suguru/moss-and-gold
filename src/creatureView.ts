@@ -511,7 +511,7 @@ export class CreatureView {
           break;
         }
         case 'slashwave': {
-          // 戦士の飛ぶ斬撃（src/eco/adventurer.ts）：三日月形の斬撃の波（src/sprites.ts の fxCrescent2）。
+          // 戦士の飛ぶ斬撃（src/eco/adventurer.ts）：三日月形の斬撃の波（fxCrescent2）。
           // 振り抜きの引き伸ばされた弧から三日月にまとまって前へ飛び（4 tick）、止まった所で細くなって光の破片に砕けて散る。
           // 走った長さが当たった範囲（2体まで貫いて止まる）。最初に当たった者には、斬撃が通るときに火花が散る
           const len = r.rad ?? dist;
@@ -536,7 +536,7 @@ export class CreatureView {
           break;
         }
         case 'greatsword': {
-          // 竜殺しの光の大剣（src/eco/adventurer.ts）：光の大剣（src/sprites.ts の fxGreatBlade の柄と鍔・刀身の一節・切っ先をつないだもの）が竜殺しの手から伸び、
+          // 竜殺しの光の大剣（src/eco/adventurer.ts）：光の大剣（fxGreatBlade の柄と鍔・刀身の一節・切っ先をつないだもの）が竜殺しの手から伸び、
           // 扇の片側から反対側へゆっくり薙ぎ払う。うしろに薄れていく残像の剣が弧を描く。刀身の長さが当たる範囲
           const R = r.rad ?? 88;
           const H = r.half ?? 1.3;
@@ -565,7 +565,7 @@ export class CreatureView {
           break;
         }
         case 'cross': {
-          // 僧侶のハンマー（src/eco/adventurer.ts）：打った所に光の十字架（src/sprites.ts の fxHolyCross）。衝撃の閃光から、地面を縦横に光が走り（当たる範囲そのもの、腕3マス）、
+          // 僧侶のハンマー（src/eco/adventurer.ts）：打った所に光の十字架（fxHolyCross）。衝撃の閃光から、地面を縦横に光が走り（当たる範囲そのもの、腕3マス）、
           // 光の十字架が立ち上がって砕け、光の粒が立ちのぼる
           if (age < 16) {
             const f = Math.min(7, age < 2 ? age : 2 + Math.floor((age - 2) / 2));
@@ -579,7 +579,7 @@ export class CreatureView {
           break;
         }
         case 'missile': {
-          // 魔法使いのマジックミサイル（src/eco/adventurer.ts）：白い芯の紫の魔力の弾（src/sprites.ts の fxMissileHead）が、
+          // 魔法使いのマジックミサイル（src/eco/adventurer.ts）：白い芯の紫の魔力の弾（fxMissileHead）が、
           // 杖からまず左右へ分かれて飛び出し、それから曲がって狙った相手を追いかける。通り道に沿って、細くなっていく紫の帯の尾（fxMissileDisc を密に重ねたもの）を引き、
           // 尾から魔力の粒がこぼれる。届くと紫に弾ける（fxMissileBurst）。4発は少しずつずれて飛び出す
           const fly = r.fly ?? 8;
@@ -662,7 +662,7 @@ export class CreatureView {
         }
         case 'armorsweep':
         case 'minosweep': {
-          // ミノタウロスの斧の薙ぎ払い（src/eco/charge.ts。リビングアーマーの武器の大振りは同じ形を未練の青白い光で）：鉄の銀から暗い赤へ移る重い軌跡の帯（src/sprites.ts の fxMinoSweep を扇の外の縁に沿って並べたもの）が、
+          // ミノタウロスの斧の薙ぎ払い（src/eco/charge.ts。リビングアーマーの武器の大振りは同じ形を未練の青白い光で）：鉄の銀から暗い赤へ移る重い軌跡の帯（fxMinoSweep を扇の外の縁に沿って並べたもの）が、
           // 扇の片側から反対側へ3 tick で走り、通ったあとは細く暗くなって消える（一本の太い帯。二重にすると虹の縞に見えた）。帯の外の縁までがおよそ当たる範囲
           const R = r.rad ?? 64;
           const H = r.half ?? 1.1;
@@ -704,7 +704,7 @@ export class CreatureView {
           break;
         }
         case 'minoimpact': {
-          // 突進が当たった所の衝撃（src/sprites.ts の fxMinoImpact）：はね飛ばしは白い閃光と砂色の輪、戦士か僧侶が受け止めたら金の火花、壁なら大きな茶の輪と岩のかけら
+          // 突進が当たった所の衝撃（fxMinoImpact）：はね飛ばしは白い閃光と砂色の輪、戦士か僧侶が受け止めたら金の火花、壁なら大きな茶の輪と岩のかけら
           if (age < 9) push(r.dx, r.dy, 4, false, A.fx(`mimpact:${r.col}:${Math.min(5, Math.floor(age * 0.7))}`), 0, 4);
           if (age < 5) dyn.push({ x: r.dx, y: r.dy - 8, r: 40, i: 0.45 * damp * (1 - age / 5), c: r.col === 1 ? 1 : 0 });
           if (once) spray(r.col === 2 ? 0 : 1, r.col === 1 ? 1 : 6, 6, 1.3, 1.4);
@@ -741,7 +741,7 @@ export class CreatureView {
           break;
         }
         case 'armorbash': {
-          // リビングアーマーの盾の体当たり（src/eco/charge.ts）：走るあいだ、鎧の前に未練の青白い光の壁（src/sprites.ts の fxShieldWall）が立つ
+          // リビングアーマーの盾の体当たり（src/eco/charge.ts）：走るあいだ、鎧の前に未練の青白い光の壁（fxShieldWall）が立つ
           const m = eco.byId.get(r.aid);
           const fly = r.fly ?? 14;
           if (m && !m.dead && age <= fly + 2) {
@@ -755,7 +755,7 @@ export class CreatureView {
           break;
         }
         case 'drain': {
-          // コウモリの噛みつき（src/eco/view.ts の attackStyle。演出の長さ fly を持たない）：噛んだ所に爪あとが走り、
+          // コウモリの噛みつき（attackStyle。演出の長さ fly を持たない）：噛んだ所に爪あとが走り、
           // 小さな血のしずくが三つ、弧を描いてコウモリの方へ戻っていく
           if (r.fly === undefined) {
             if (age < 6) push(r.dx, r.dy, lift, flip, A.fx(`claw2:${r.col}:${f6(age)}`), 0, 4);
@@ -768,7 +768,7 @@ export class CreatureView {
             break;
           }
           // ヴァンパイアの血吸い（src/eco/vampskill.ts）。吸っているあいだ（20 tick）だけ描き、切れたら消える。
-          // アクション RPG のライフスティールの形：相手の体から、つやのある血の玉（src/sprites.ts の fxBloodOrb）が不規則な間隔で
+          // アクション RPG のライフスティールの形：相手の体から、つやのある血の玉（fxBloodOrb）が不規則な間隔で
           // にじみ出て、最初はゆっくり、ヴァンパイアに近づくほど速く吸い寄せられる（速くなるほど、うしろの尾 fxBloodDisc が長く伸びる）。
           // 弧のふくらむ向きと大きさは玉ごとに変える（等間隔・左右対称だと、撃っているように見えるため）。
           // 玉が届くたびに、ヴァンパイアの手もとへ赤い輪が縮んで吸い込まれ、胸もとの赤い明かりが強まる
@@ -851,7 +851,7 @@ export class CreatureView {
           break;
         }
         case 'batreturn': {
-          // コウモリの群れの戻り（src/eco/attack.ts の resolveVolleys）：噛みついたコウモリが、足に赤い血の玉をつかんで、
+          // コウモリの群れの戻り（resolveVolleys）：噛みついたコウモリが、足に赤い血の玉をつかんで、
           // 打たれた者からヴァンパイアのもとへ、ゆるい弧を描いて飛んで戻る。着くと、ヴァンパイアのまわりが赤く光る
           const fly = r.fly ?? 10;
           const v = eco.byId.get(r.aid);
@@ -885,7 +885,7 @@ export class CreatureView {
           break;
         }
         case 'roar': {
-          // オークの雄叫び（src/eco/orcskill.ts）：オークのまわりに、赤橙ののこぎり歯の音の波（src/sprites.ts の fxRoarArc を輪に並べたもの）が、
+          // オークの雄叫び（src/eco/orcskill.ts）：オークのまわりに、赤橙ののこぎり歯の音の波（fxRoarArc を輪に並べたもの）が、
           // 4 tick おきに三重に広がる（いちばん外の波が届く所が、雄叫びの届く所）。足もとから土ぼこりが立ち、まわりが一瞬赤く照らされる
           const R = r.rad ?? 80;
           for (let w = 0; w < 3; w++) {
@@ -907,7 +907,7 @@ export class CreatureView {
           break;
         }
         case 'wail': {
-          // ゴーストの金切り声（src/eco/ghostskill.ts）：ゴーストのまわりに、青白くうねる音の波（src/sprites.ts の fxWailArc を輪に並べたもの）が、
+          // ゴーストの金切り声（src/eco/ghostskill.ts）：ゴーストのまわりに、青白くうねる音の波（fxWailArc を輪に並べたもの）が、
           // 3 tick おきに四重に広がる（いちばん外の波が届く所が、金切り声の届く所）。まわりが一瞬、冷たく青白く照らされる
           const R = r.rad ?? 48;
           for (let w = 0; w < 4; w++) {
@@ -928,7 +928,7 @@ export class CreatureView {
           break;
         }
         case 'sporecloud': {
-          // マイコニドの眠りの胞子（src/eco/myconidskill.ts）：傘から藤色の胞子の塊（src/sprites.ts の fxSporeCloud）がふくらみ、
+          // マイコニドの眠りの胞子（src/eco/myconidskill.ts）：傘から藤色の胞子の塊（fxSporeCloud）がふくらみ、
           // そのまわりへ小さな塊（fxSporePuff）が輪になって広がって、届く所（半径 rad）で漂ってから薄れる。光る粒（fxSporeMote）が雲の中をゆっくり舞い上がる。
           // 倒れて弾けたとき（col 1）は、地面の近くからぱっと散る。まわりがほのかに藤色に照らされる
           const R = r.rad ?? 32;
@@ -961,7 +961,7 @@ export class CreatureView {
           break;
         }
         case 'axethrow': {
-          // オークの投げ斧（src/eco/orcskill.ts）：回る斧（src/sprites.ts の fxThrownAxe。刃の通った跡つき）が、鎖を引いて手から狙った所へ弧を描いて飛び、
+          // オークの投げ斧（src/eco/orcskill.ts）：回る斧（fxThrownAxe。刃の通った跡つき）が、鎖を引いて手から狙った所へ弧を描いて飛び、
           // 届いたら、オークが鎖をたぐって、斧は引きずられるように（だんだん速く）手元へ戻る。鎖は鉄の輪（fxChainLink）を交互に並べ、飛ぶあいだはたるみ、たぐるときはぴんと張る
           const m = eco.byId.get(r.aid);
           if (!m || m.dead) break;
@@ -1026,7 +1026,7 @@ export class CreatureView {
           break;
         }
         case 'slinghit': {
-          // 小石が届いた所：当たれば白い閃光から石のかけらと土ぼこりが散る（src/sprites.ts の fxStoneHit）。外れれば床で跳ねて転がり、土ぼこりが立つ
+          // 小石が届いた所：当たれば白い閃光から石のかけらと土ぼこりが散る（fxStoneHit）。外れれば床で跳ねて転がり、土ぼこりが立つ
           if (r.col === 1) {
             if (age < 8) push(r.dx, r.dy + 0.1, 9, false, A.fx(`stonehit:${Math.min(3, age >> 1)}`), 0, 4);
             if (age < 3) dyn.push({ x: r.dx, y: r.dy - 9, r: 14, i: 0.25 * damp * (1 - age / 3), c: 0 });
@@ -1042,7 +1042,7 @@ export class CreatureView {
           break;
         }
         case 'axehit': {
-          // 投げ斧が届いた所：当たれば白い芯から橙の火花のくさびが八方へ（src/sprites.ts の fxAxeHit）、外れれば床を打った土ぼこりとひび
+          // 投げ斧が届いた所：当たれば白い芯から橙の火花のくさびが八方へ（fxAxeHit）、外れれば床を打った土ぼこりとひび
           if (r.col === 1) {
             if (age < 8) push(r.dx, r.dy + 0.1, 9, false, A.fx(`axehit:${Math.min(3, Math.floor(age / 2))}`), 0, 4);
             if (age < 4) dyn.push({ x: r.dx, y: r.dy - 9, r: 26, i: 0.4 * damp * (1 - age / 4), c: 1 });
@@ -1057,7 +1057,7 @@ export class CreatureView {
           break;
         }
         case 'armorshatter': {
-          // リビングアーマーが砕け散る（src/eco/armor.ts の scatterArmor）：武具の鉄の破片が回りながら外へ飛び散って床に落ち、青白い未練が立ちのぼって消える。
+          // リビングアーマーが砕け散る（scatterArmor）：武具の鉄の破片が回りながら外へ飛び散って床に落ち、青白い未練が立ちのぼって消える。
           // 砕けた武具は床に残らない（次の甲冑の材料にならない）
           if (age >= 26) break;
           const n = (r.n ?? 3) * 3;
@@ -1127,7 +1127,7 @@ export class CreatureView {
           break;
         }
         case 'bless': {
-          // 僧侶に清められた骨が崩れる（src/eco/roster.ts の blessCrumble）：骨の形の金の光が地面に満ち、金の光の粒になって立ちのぼり、細って消える。
+          // 僧侶に清められた骨が崩れる（blessCrumble）：骨の形の金の光が地面に満ち、金の光の粒になって立ちのぼり、細って消える。
           // 足もとに金の輪が一度広がり、聖印の光が一つ昇る
           const f = Math.floor(age / 5);
           if (f < 8) push(r.dx, r.dy + 0.05, 0, false, A.fx(`bdust:${r.size}:${f}`), 0, 4);
@@ -1172,7 +1172,7 @@ export class CreatureView {
           if (once) spray(1, 0, 3, 0.5, 0.6);
           break;
         case 'chill':
-          // ゴーストの冷たい手（src/eco/ghostskill.ts）など：触れた所に霜の結晶が弾け（src/sprites.ts の fxFrost）、氷のかけらが散る
+          // ゴーストの冷たい手（src/eco/ghostskill.ts）など：触れた所に霜の結晶が弾け（fxFrost）、氷のかけらが散る
           if (age < 12) push(r.dx, r.dy, lift, false, A.fx(`frost:${Math.min(5, age >> 1)}`), 0, 4);
           if (age < 4) dyn.push({ x: r.dx, y: r.dy - lift, r: 26, i: 0.35 * damp * (1 - age / 4), c: 7 });
           if (once) {
@@ -1275,7 +1275,7 @@ export class CreatureView {
   private youngFaceL = new Map<number, boolean>();
   /**
    * 名簿の冒険者の姿と位を、生き物の番号ごとに覚えておく（描画専用。セーブしない）。
-   * 倒れた冒険者は次の生き物の更新で名簿から外れる（src/eco/roster.ts の rosterStep）ので、そのあとの倒れる動き・亡骸・眷属を、生前の姿のまま描くため
+   * 倒れた冒険者は次の生き物の更新で名簿から外れる（rosterStep）ので、そのあとの倒れる動き・亡骸・眷属を、生前の姿のまま描くため
    */
   private heroLooks = new Map<number, { look: number; rank: number }>();
   private heroLooksEco: Ecology | null = null;
@@ -1338,7 +1338,7 @@ export class CreatureView {
       case Kind.Dragon: return A.named(['dragonH', 'dragonY', 'dragon', 'dragonB'][Math.min(3, orig)], dir, act, f, v);
       // 姿のわからない冒険者（石像、丸のみにされる獲物など）：職ごとの既定の見た目（orig が職）
       case Kind.Adventurer: return A.hero(orig, false, ADV_DEFAULT_LOOK[orig] ?? ADV_DEFAULT_LOOK[0], ADV_DEFAULT_RANK, dir, act, f);
-      // 冒険者のほかの人型の骨（sp = BONE_SP + 生前の種。src/eco/undead.ts の raiseBones）は、生前の種ごとの大きさの骨
+      // 冒険者のほかの人型の骨（sp = BONE_SP + 生前の種。raiseBones）は、生前の種ごとの大きさの骨
       case Kind.Skeleton: return orig >= BONE_SP ? A.named('bskel', dir, act, f, Math.max(0, BONE_KINDS.indexOf(orig - BONE_SP))) : A.named('skel', dir, act, f, v);
       case Kind.Lich: return A.named('lich', dir, act, f);
       case Kind.Dwarf: return A.named('dwarf', dir, act, f, v);
@@ -1429,7 +1429,7 @@ export class CreatureView {
     }
     // 物資の置き場：木箱と寝具（食料が減ると中身が減り、空になれば残骸）
     for (const o of eco.caches) if (inView(o.x, o.y, 24)) pushSprite(o.x, o.y + 6, 0, false, A.supply(o.food <= 0 ? 0 : o.food < 60 ? 1 : 2), 0, 2);
-    // ヴァンパイアの住処：棺（昼は蓋が閉じて中で眠り、夜は蓋がずれて空）と、まわりに残る血の跡（src/eco/vampire.ts の vampCoffin）
+    // ヴァンパイアの住処：棺（昼は蓋が閉じて中で眠り、夜は蓋がずれて空）と、まわりに残る血の跡（vampCoffin）
     for (const v of eco.list) {
       if (v.k !== Kind.Vampire || v.dead || !(v.hx || v.hy) || !inView(v.hx, v.hy, 40)) continue;
       for (let i = 0; i < 5; i++) {
@@ -1669,7 +1669,7 @@ export class CreatureView {
           else pushSprite(x + (hsh(i, si) - 0.5) * 8, y, 0, false, A.speck(3, Math.floor((ph - 0.85) / 0.15 * 4)), 0, 2);
         }
       }
-      // 天井のしずく（src/world.ts の dripAt）：天井から水滴が落ち、床で小さく跳ねて輪に広がる。間隔はしずくごとに少しずつ違う
+      // 天井のしずく（dripAt）：天井から水滴が落ち、床で小さく跳ねて輪に広がる。間隔はしずくごとに少しずつ違う
       for (const k of w.drips) {
         const x = (k % mm.w) * 16 + 4 + Math.floor(hsh(k, 41) * 8);
         const y = Math.floor(k / mm.w) * 16 + 6 + Math.floor(hsh(k, 43) * 6);
@@ -1836,13 +1836,13 @@ export class CreatureView {
         if (mk.m === '?' && listening.has(c.id)) continue;
         pushSprite(c.x + 5, c.y, 22 + pop + Ecology.bodySize(c.k) * 0.6, false, A.mark(mk.m), 0, 2);
       }
-      // オークの威嚇（src/eco/orc.ts の orcWary、st 20）：唸って武器を打ち鳴らしているあいだずっと、頭の上に「！」が跳ねる
+      // オークの威嚇（orcWary、st 20）：唸って武器を打ち鳴らしているあいだずっと、頭の上に「！」が跳ねる
       for (const c of eco.list) {
         if (c.k !== Kind.Orc || c.st !== 20 || c.dead || !inView(c.x, c.y, 20)) continue;
         const hop = Math.abs(Math.sin(t * 9 + c.id)) * 2.5;
         pushSprite(c.x + 5, c.y, 24 + hop + Ecology.bodySize(c.k) * 0.6, false, A.mark('!'), 0, 2);
       }
-      // 聞き耳の「？」：立ち止まって耳を澄ませているあいだずっと、皆の頭の上に（前は出た瞬間の2秒だけで、見落としやすかった）
+      // 聞き耳の「？」：立ち止まって耳を澄ませているあいだずっと、皆の頭の上に（出た瞬間だけでは見落とす）
       for (const id of listening) {
         const c = byId.get(id);
         if (!c || c.dead || c.sleep || !inView(c.x, c.y, 20)) continue;
@@ -1918,9 +1918,8 @@ export class CreatureView {
     // 生き物は足元の位置で前後を決める
     this.order.length = 0;
     for (const c of eco.list) {
-      // コウモリの群れにばらけたヴァンパイア：姿の代わりに、14匹のコウモリが、飛ぶ向きの後ろへ尾を引いて住処へ飛ぶ（src/eco/vampire.ts の vampScatter）。
+      // コウモリの群れにばらけたヴァンパイア：姿の代わりに、14匹のコウモリが、飛ぶ向きの後ろへ尾を引いて住処へ飛ぶ（vampScatter）。
       // ばらけた直後（生き物の更新12回まで）は、ヴァンパイアのいた所から四方へはじけ、それから尾の形に寄り集まる。
-      // （以前は8匹が半径4〜14px に固まり、石像の色で描いていたので、小さな灰色の点にしか見えなかった）
       if (c.k === Kind.Vampire && c.st === VAMP_SCATTER && !c.dead) {
         const a = eco.moveAlpha(c, alpha);
         const x = c.px + (c.x - c.px) * a;
@@ -2007,7 +2006,7 @@ export class CreatureView {
     // 物音に耳を澄ます一行：前に出た前衛だけが構える
     for (const p of eco.parties) if ((p.listenT ?? 0) > eco.step && p.listenBy) braced.set(p.listenBy, 2);
     this.pruneHeroLooks(eco);
-    // 刃をすり抜けたばかりのゴースト：揺らぐ向き（打った者の向きと直角）と経過（src/eco/ghostskill.ts の ghostPhase）
+    // 刃をすり抜けたばかりのゴースト：揺らぐ向き（打った者の向きと直角）と経過（ghostPhase）
     const ghostPhaseAt = new Map<number, { age: number; sx: number; sy: number }>();
     for (const r of eco.fxAttacks) {
       if (r.style !== 'phase') continue;
@@ -2031,7 +2030,7 @@ export class CreatureView {
       let dir = cdir === 0 || eco.isHidden(c) ? 0 : cdir === 1 ? 1 : 2;
       let flip = cdir === 3;
       // 幼竜と若い竜には横向きの絵しかない。上下へ動くときも、横にどちらへ動いているかで左右を決め、
-      // 一時停止中やロード直後で動きが分からなければ、飛んでいる竜は行き先の側を向き、それ以外は直前の左右を保つ（以前は上下の向きのとき必ず右を向き、左上へ飛ぶと右を向いたまま後ろへ滑って見えた）
+      // 一時停止中やロード直後で動きが分からなければ、飛んでいる竜は行き先の側を向き、それ以外は直前の左右を保つ
       const youngDragon = sp === Kind.Dragon && c.sp < 2 && c.elite !== 8;
       if (youngDragon) {
         if (c.dir === 2 || c.dir === 3) flip = c.dir === 3;
@@ -2065,7 +2064,7 @@ export class CreatureView {
       } else if (act === 1 && c.x === c.px && c.y === c.py && eco.gaitPaused(c)) {
         // 歩き方の止まる番（大ネズミの「止まってあたりをうかがう」、一行の先頭が見回す、など）で、この更新ではその場から動いていない。
         // 行動の多くは移動のあとで「着いていなければ歩く姿」と姿を決め直すので、act は歩く姿のままになっている。
-        // 本当に止まっているので立ち姿で描く（以前は、その場で足を動かし続けて引っかかって見えた）
+        // 本当に止まっているので立ち姿で描く（歩く姿だと、その場で足を動かして引っかかって見える）
         act = 0;
         f = Math.floor(t * 2.6 + seed) & 3;
       } else if (act === 1) {
@@ -2098,8 +2097,7 @@ export class CreatureView {
           }
         } else if (c.caught) lift = 6;
       }
-      // 炎に焼かれている者（描画専用）：燃える床の上にいる間と、炎に焼かれてから3秒ほど、体のまわりから火の粉が舞い上がる（src/eco/fire.ts の burnHurt）。
-      // （以前は、焼かれても傷を受けたときの白い光が出るだけで、燃える床で少しずつ焼かれていることが見えなかった）
+      // 炎に焼かれている者（描画専用）：燃える床の上にいる間と、炎に焼かれてから3秒ほど、体のまわりから火の粉が舞い上がる（burnHurt）。
       if (!c.dead && sp !== Kind.Dragon) {
         const tk = eco.tileOf(c.x, c.y);
         const onFire = tk >= 0 && eco.w.burn[tk] > 0 && !eco.airborne(c);
@@ -2170,7 +2168,7 @@ export class CreatureView {
             pushSprite(x + Math.cos(a) * rr, yy + Math.sin(a) * rr * 0.5 + 0.06, lift + bh * 0.8 + (i % 3) * 3, Math.sin(a) > 0, A.index(1, 2, 1, (Math.floor(t) + i) & 3), 0, 2);
           }
         } else {
-          // 霧の歩みの溜め：溜めが進むほど、足もとから灰紫の影の霧（src/sprites.ts の fxShadowPuff）が湧いて体を包み、小さなコウモリが体からはがれて舞い上がる
+          // 霧の歩みの溜め：溜めが進むほど、足もとから灰紫の影の霧（fxShadowPuff）が湧いて体を包み、小さなコウモリが体からはがれて舞い上がる
           const p = Math.max(0, Math.min(1, (SKILL_VAMP_MIST.windup + c.actT + alpha) / SKILL_VAMP_MIST.windup));
           // 足もとに広がる影の霧の塊（溜めが進むほど大きく）と、体の手前と左右を立ちのぼる霧の玉
           pushSprite(x, yy + 3, 1, false, A.fx(`scloud:${Math.min(2, Math.floor(p * 3))}`), 0, 2);
@@ -2221,7 +2219,7 @@ export class CreatureView {
           pushSprite(x + Math.cos(a) * 7, yy + Math.sin(a) * 2 + 0.07, lift + bh - 3 + Math.sin(a) * 1.5, false, A.fx(`sporemote:${(Math.floor(t / 3) + i) & 3}`), 0, 2);
         }
       }
-      // 毒の者（src/eco/attack.ts の poisonTick）：体のまわりから緑の泡が立ちのぼる（描画専用）
+      // 毒の者（poisonTick）：体のまわりから緑の泡が立ちのぼる（描画専用）
       if (!c.dead && c.poison > 0) {
         const t = eco.w.tick + alpha;
         const bh = Ecology.bodySize(sp) * 0.8 + 4;
@@ -2338,7 +2336,7 @@ export class CreatureView {
           pushSprite(x + Math.cos(a) * fh * 0.5, yy + 0.1, lift + 2 + ((i * 3 + Math.floor(t * 4)) % Math.max(2, Math.round(fh * 0.8))), false, A.fx('bit:3:7:0'), 0, 4);
         }
       }
-      // 床から養分を吸うスライム：吸う一口ごと（生き物の更新10回に1回）に、まわりの床から緑の粒が体へ吸い込まれる（src/eco/slime.ts の slimeCanSip）
+      // 床から養分を吸うスライム：吸う一口ごと（生き物の更新10回に1回）に、まわりの床から緑の粒が体へ吸い込まれる（slimeCanSip）
       if (sp === Kind.Slime && !c.dead && c.elite !== 6 && eco.slimeCanSip(c)) {
         const age = ((((eco.step - (c.id % 10)) % 10) + 10) % 10) + alpha * 0.5;
         if (age < 5) {
@@ -2364,11 +2362,11 @@ export class CreatureView {
       }
       const bright = sp === Kind.Wisp && c.glow > 90 ? 1 : 0;
       // 隠れている者（ほかの生き物には気づかれない）：眺める人には、暗く沈んだ影の姿と光る目で見せる
-      // 身をひそめている者（コボルトとゴブリンの隠れ方と、逃げて巣や住みかの中へ身を隠した者。src/eco/combat.ts の denHidden）：暗がりに沈んで目だけが光る
+      // 身をひそめている者（コボルトとゴブリンの隠れ方と、逃げて巣や住みかの中へ身を隠した者。denHidden）：暗がりに沈んで目だけが光る
       const hidden = eco.isHidden(c) || (c.flee > 0 && c.act === 0 && sp !== Kind.Wisp && sp !== Kind.Ghost && eco.denHidden(c));
       const isCorpse = c.dead === 1 && c.actT >= 4 && sp !== Kind.Wisp && sp !== Kind.Slime && sp !== Kind.Ghost && sp !== Kind.Myconid;
       const eliteName = ['', 'firespirit', 'pknight', '', '', '', 'wspirit', 'lspirit', '', 'mlord'][c.elite] ?? '';
-      // 冒険者は、名簿の人でも、名簿から外れた亡骸や眷属でも、手描きの体で描く（src/sprites.ts の heroSprite。姿は advLook）
+      // 冒険者は、名簿の人でも、名簿から外れた亡骸や眷属でも、手描きの体で描く（heroSprite。姿は advLook）
       const adv = sp === Kind.Adventurer ? this.advLook(eco, c, csp) : null;
       let frame = adv
         ? isCorpse
@@ -2419,13 +2417,13 @@ export class CreatureView {
           }
         }
       }
-      // 僧侶に清められた亡骸：数秒に一度、祈りのときと同じ聖印の光が、薄れながら亡骸から立ちのぼる（もう起き上がらない印。描画専用。src/eco/roster.ts の blessBrace）
+      // 僧侶に清められた亡骸：数秒に一度、祈りのときと同じ聖印の光が、薄れながら亡骸から立ちのぼる（もう起き上がらない印。描画専用。blessBrace）
       if (isCorpse && c.st === 99) {
         const ph = (t * 0.2 + c.id * 0.37) % 1;
         if (ph < 0.45) pushSprite(x, yy, 6 + ph * 40, false, A.pray(1 + Math.min(2, Math.floor(ph * 6.7))), 0, 2);
       }
       // 清められて崩れる前の骨：祈る間にだんだん金色に光り（シェーダーの kind 7）、金の粒が立ちのぼりはじめる。
-      // 祈りの終わりに金の光の粒になって崩れる（drawAttacks の 'bless'。src/eco/roster.ts の blessBrace・blessCrumble）
+      // 祈りの終わりに金の光の粒になって崩れる（drawAttacks の 'bless'。blessBrace・blessCrumble）
       let holy = 0;
       if (isCorpse && c.st === CRUMBLING) {
         holy = Math.min(1, Math.max(0.05, (eco.step - c.lureAt) / KIN_STOP));
@@ -2528,13 +2526,13 @@ export class CreatureView {
           yy += ph.sy * 3 * k;
         }
       }
-      // バジリスクの睨みで石化しかけている者（src/eco/basilisk.ts の basiliskGaze）：進みに比例して、その姿のまま石の色へ寄せる（shaders.ts の kind 8）
+      // バジリスクの睨みで石化しかけている者（basiliskGaze）：進みに比例して、その姿のまま石の色へ寄せる（shaders.ts の kind 8）
       const stoneT = !isCorpse && c.stone > 0 && !hidden && veil !== 2 && !thrallOf ? Math.min(1, c.stone / STONE_FULL) : 0;
       if (holy > 0) pushSprite(x, yy, lift, flip, frame, holy, 7, (c.id * 0.6180339) % 1);
       else if (stoneT > 0) pushSprite(x, yy, lift, flip, frame, stoneT, (veil === 3 ? 20 : flash) + 8, (c.id * 0.6180339) % 1);
       else pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0) + (thrallOf && !hidden && veil !== 2 ? 6 : 0), (c.id * 0.6180339) % 1);
       if (armorGear) for (const g of armorGear) if (g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
-      // バジリスクの睨みの溜め（src/eco/basilisk.ts の gazeStart）：目が黄緑に光り、溜めが進むほど強まって、溜め終わる手前で目のまわりに光の輪が広がる（描画専用）。
+      // バジリスクの睨みの溜め（gazeStart）：目が黄緑に光り、溜めが進むほど強まって、溜め終わる手前で目のまわりに光の輪が広がる（描画専用）。
       // 目のある向き（横向きは前の端の上、前向きは顔の左右）にだけ描く。後ろ向きは目が見えない
       // 見つめている間（c.run が −6）は、目のまわりの光の輪を出し続ける
       if (sp === Kind.Basilisk && !c.dead && ((c.run === -1 && c.act === 2 && c.actT < 0) || c.run === -6) && dir !== 1 && !hidden && veil !== 2) {
@@ -2636,7 +2634,7 @@ export class CreatureView {
         }
         if (c.sleep === 3) pushSprite(x + (flip ? -2 : 2), yy, lift + fh * 0.72, false, A.sleep('eye', Math.floor(t * 2)), 0, 2);
       }
-      // ドラゴンの炎の柱：口元から（その先の扇の中の床には、燃える床と同じ炎を描く。src/renderer.ts の updateFx）
+      // ドラゴンの炎の柱：口元から（その先の扇の中の床には、燃える床と同じ炎を描く。updateFx）
       if (sp === Kind.Dragon && act === 2 && c.ref2 > 0 && !c.dead && dir !== 1) {
         if (youngDragon) {
           // 若い竜：小さな炎を、若い竜の口元（体の中心から前へ約27px、上へ約24px）から

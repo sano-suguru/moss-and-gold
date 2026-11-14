@@ -10,7 +10,7 @@ import { ARMOR_HAND_MAX } from './armor';
 export function str(this: Ecology, c: Cr): number {
   if (c.k === Kind.Adventurer) return JOB_STR[c.sp] * TIER_MUL[c.init] * this.rankMul(c) * (c.sp === Job.Thief && c.act === 2 ? 1.6 : 1);
   // スケルトンは生前の装備で強さが決まる。武器を拾ったゴブリンとオークは強くなる
-  // 冒険者のほかの人型の骨は、生前の強さの7割（2以上。src/eco/undead.ts の raiseBones）
+  // 冒険者のほかの人型の骨は、生前の強さの7割（2以上。raiseBones）
   if (c.k === Kind.Skeleton) return c.sp >= BONE_SP ? Math.max(2, Math.round(STR[c.sp - BONE_SP] * 0.7)) : c.init ? JOB_STR[c.sp] * 1.2 : 3;
   if (c.k === Kind.Dwarf) return DWARF_STR[c.sp];
   if (c.k === Kind.Thrall) return thrallStr(c);
@@ -122,7 +122,7 @@ export function hunt(this: Ecology, c: Cr, R: number, kinds: Kind[], speed: numb
     if (c.k === Kind.Goblin && this.inKoboldLand(o.x, o.y)) return;
     // （夜襲に出る大物は、3割ほど飢えていれば、細った焚き火のそばの獲物も狙う。src/eco/night.ts）
     if (Ecology.FEARS_FIRE.has(c.k) && c.sinceMeal < SPEC[c.k].starve * 0.85 && this.fireDaunts(c, o.x, o.y)) return;
-    // 知性ある者と狡猾な者は、自分の2倍より強い相手には挑まない（以前は1.1倍・1.6倍で、大物どうしがほとんどぶつからなかった）
+    // 知性ある者と狡猾な者は、自分の2倍より強い相手には挑まない（倍率を小さくすると、大物どうしがほとんどぶつからない）
     const ts = this.str(o) * (o.hp > 0 ? o.hp / this.maxHp(o) : 1);
     if (tier >= 2 && ts > me * 2) return;
     // 焚き火で眠っている冒険者は、近くにいるものとして好んで狙う（寝込みを襲う）
@@ -166,7 +166,7 @@ export const HP_PER_STR = 9;
 
 /** 体力の上限（強さに比例） */
 export function maxHp(this: Ecology, c: Cr): number {
-  // リビングアーマー（空の鎧）は固い。固さは体になった武具の数で決まり、手に取った武器と盾は打撃（強さ）だけを上げる（src/eco/armor.ts の armorHp）
+  // リビングアーマー（空の鎧）は固い。固さは体になった武具の数で決まり、手に取った武器と盾は打撃（強さ）だけを上げる（armorHp）
   if (c.k === Kind.Armor) return this.armorHp(c);
   return Math.round(4 + this.str(c) * HP_PER_STR);
 }
@@ -194,7 +194,7 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1, fx = true): boolean
   // バジリスクの見つめから目を背けている者は、相手を見ずに打つので、傷が半分（src/eco/basilisk.ts）
   if (a.avert > this.w.tick) dmg *= 0.5;
   d.hp -= dmg;
-  // 大物の溜め（突進など）は、体力の上限の2割を超える重い一撃を受けたときだけ止まる（src/eco/charge.ts の breakWindup）
+  // 大物の溜め（突進など）は、体力の上限の2割を超える重い一撃を受けたときだけ止まる（breakWindup）
   if (d.k !== Kind.Adventurer && d.act === 2 && d.actT < 0 && d.hp > 0 && dmg > this.maxHp(d) * 0.2) this.breakWindup(d);
   // リビングアーマーは、倒れずに強い一打を受けると、手の武器を落とす（src/eco/armor.ts）
   if (d.k === Kind.Armor && d.hp > 0) this.armorShed(d, dmg, a);
@@ -242,7 +242,7 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
   if (d.flee <= 0 && this.str(d) > 0 && !asleep && !(d.k === Kind.Ghost && a.k !== Kind.Adventurer && a.k !== Kind.Dwarf)) {
     d.act = 2;
     d.actT = 0;
-    // コウモリに群がられている者の打ち返しは弱い（src/eco/vampire.ts の batPinned）
+    // コウモリに群がられている者の打ち返しは弱い（batPinned）
     if (this.strike(d, a, this.batPinned(d) ? 0.4 : 0.8)) {
       this.die(a, 'fight', d.k);
       if (d.k === Kind.Vampire) this.vampClaim(d, a);
@@ -286,7 +286,7 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
   const closeFoe = c.k === Kind.Kobold && f && !f.dead && sq(f.x - c.x) + sq(f.y - c.y) < 6 * TILE * 6 * TILE;
   // 住みかへ帰る道の途中に相手がいる（住みかへの向きと相手への向きがほぼ同じ）とき、相手が8マスの内なら住みかへは向かわない。
   // 相手が3マスより離れていればその場で身をひそめ、近ければ離れる向きへ動く（下）。
-  // （以前は相手の方へ帰っては離れるのを、距離の境目で更新ごとに繰り返し、5分以上その場で行き来していた。はじまりの洞窟のコボルト）
+  // （帰っては離れるのを距離の境目で繰り返して、その場で行き来しないように）
   if ((c.hx || c.hy) && f && !f.dead && !closeFoe && sq(c.hx - c.x) + sq(c.hy - c.y) > 20 * 20) {
     const fd = Math.sqrt(sq(f.x - c.x) + sq(f.y - c.y)) || 1;
     const hd = Math.sqrt(sq(c.hx - c.x) + sq(c.hy - c.y)) || 1;
@@ -310,8 +310,7 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
   }
   if (f && !f.dead) {
     // 住みかのそば（20px の内）まで逃げ帰っていて、相手が2マスより離れていれば、住みかで身を縮めてじっとする。
-    // （以前はそこでも相手から離れる向きへ一歩ずつ動いたので、行き止まりにある住みかでは壁に押しつけたまま足を動かし続けた。
-    //  seed27 では、住処のそばで休む冒険者への警戒（heedAlarm）が続き、コボルト10匹ほどが4〜6分足踏みしていた）
+    // （離れる向きへ動き続けると、行き止まりの住みかで壁に押しつけたまま足踏みする）
     // 巣や住みかへ逃げ帰った者は、その中へ身を隠す（denHidden。画面では暗がりに沈んで目だけが光る）。隠れている間は、すぐそばまで来た者にしか気づかれない
     if ((c.hx || c.hy) && sq(c.hx - c.x) + sq(c.hy - c.y) <= 20 * 20 && sq(f.x - c.x) + sq(f.y - c.y) > 2 * TILE * 2 * TILE) {
       this.cower(c, f);
@@ -320,8 +319,7 @@ export function woundsAndFlight(this: Ecology, c: Cr): boolean {
     this.fleeFrom(c, f, sp);
   } else if ((c.hx || c.hy) && c.hungry < SPEC[c.k].starve * 0.5) {
     // 物音におびえて（相手のいないまま）巣へ逃げ帰った者は、逃げる時間が切れるまで巣のそばで身をひそめる。
-    // （以前は巣の20px の内に着いたとたんに逃げるのをやめて餌探しへ戻り、次の物音でまた逃げ帰るのを、更新ごとに繰り返していた。
-    //  seed35 では、リザードマンが大ネズミを狩り続ける巣穴のそばで、大ネズミが何匹も巣の縁で行ったり来たりしていた）
+    // （着いたとたんに餌探しへ戻ると、次の物音でまた逃げ帰るのを繰り返し、巣の縁で行ったり来たりする）
     c.act = 0;
   } else c.flee = 0;
   return true;

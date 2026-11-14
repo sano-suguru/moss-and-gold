@@ -290,8 +290,8 @@ export class World {
     const m = this.map;
     const M = this.mana;
     const T = this.manaTmp;
-    // 湧き口（深部・地底の裂け目・宝物庫・溶岩のそば）。マナは冒険者の技や死からも生まれるようになったので（src/eco/salamander.ts の deedMana）、
-    // 湧き口と岩盤からのしみ出しは以前の半分にする（以前はマナが多すぎて、マナを条件にする判定の多くが、ほぼどこでも満たされていた）
+    // 湧き口（深部・地底の裂け目・宝物庫・溶岩のそば）。マナは冒険者の技や死からも生まれるようになったので（deedMana）、
+    // 湧き口と岩盤からのしみ出しは控えめにする（多すぎると、マナを条件にする判定の多くが、ほぼどこでも満たされる）
     for (const [k, n] of this.manaSources()) {
       M[k] += n;
       this.manaBorn += n;
@@ -676,7 +676,7 @@ export class World {
           if (x < 3 || y < 4 || x >= m.w - 3 || y >= m.h - 3) continue;
           const k = y * m.w + x;
           if (m.solid[k] || m.lava[k] || this.water[k] > 20 || m.paved[k] || occupied.has(k)) continue;
-          // コボルトの住処の横穴（入口から奥まで）は行き止まりでも埋めない（以前は掘り出した土で自分たちの住処の奥を埋めていた）
+          // コボルトの住処の横穴（入口から奥まで）は行き止まりでも埋めない（掘り出した土で自分たちの住処の奥を埋めてしまう）
           if (this.eco.inWarrenTunnel(k)) continue;
           const o = [k - m.w, k + 1, k + m.w, k - 1].map((q) => !m.solid[q]);
           const n4 = o.filter(Boolean).length;

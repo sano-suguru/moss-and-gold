@@ -178,7 +178,7 @@ function watchWalk(): void {
     let a = hitchWalk.get(c.id);
     if (!a) hitchWalk.set(c.id, (a = [0, 0]));
     // 歩き方の止まる番でその場から動いていない者は、描画で立ち姿になるので歩いていないとみなす（src/creatureView.ts）
-    // （古いバージョンのソースとも組み合わせて使うので、どのバージョンにもある gaitOf で見る。src/eco/move.ts の gaitPaused と同じ）
+    // （古いバージョンのソースとも組み合わせて使うので、どのバージョンにもある gaitOf で見る。gaitPaused と同じ）
     if (c.act === 1 && !(c.x === c.px && c.y === c.py && w.eco.gaitOf(c).every((v: number) => v === 0))) a[0]++;
     a[1]++;
   }

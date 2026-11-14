@@ -183,7 +183,7 @@ function leftWater(e: Ecology, c: Cr): boolean {
 }
 
 /**
- * 渇きを進める（生き物の更新ごとに、代謝と同じく必ず呼ぶ。src/eco/step.ts の metabolism。行動を決める流れの途中で増やすと、
+ * 渇きを進める（生き物の更新ごとに、代謝と同じく必ず呼ぶ。metabolism。行動を決める流れの途中で増やすと、
  * 手前の処理でその回の行動が決まることの多い種（追い払いをする大ネズミなど）は、ほとんど渇かなかった）
  */
 export function thirstTick(this: Ecology, c: Cr): void {

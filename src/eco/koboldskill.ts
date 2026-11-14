@@ -10,7 +10,7 @@
  *   当たった冒険者は、投げてきたコボルトに気づいてそちらを向き、頭の上に「!」が出る。ただ、逃げるコボルトを追って倒しには行かない
  *   （打ってきた相手として覚えさせると、逃げても追って射かけ、16シード×25日で、冒険者に倒されるコボルトが116→516匹、
  *    コボルトが画面にいる割合が63.9→54.0%に減り、住みついた群れの減ったオークも来る数が572→444に減った）。
- *   焚き火で野営している一行に当たれば、一行が飛び起きる（src/eco/night.ts の campHit）。起きているあいだに STONED_LEAVE 回当てられたら、
+ *   焚き火で野営している一行に当たれば、一行が飛び起きる（campHit）。起きているあいだに STONED_LEAVE 回当てられたら、
  *   その場で焚き火を消して発つ（起きている期間が終わるのを待つと、当たるたびに期間が延び、seed7 では10回以上当てられてから発っていた）。
  *   （はじめは野営の一行が当てられても気づかず、住処のそばで野営されると、出入りのたびに逃げては戻って投げ、seed7 では盗賊1人に6分ほどで59回当たっていた）
  *   使ったあと30秒は投げない（そのあいだに一行に出会えば、今までどおり、すぐに逃げる）。
@@ -19,7 +19,7 @@
  * （以前のコボルトは、一行に気づくと何もせずに逃げるだけで、冒険者との関わりは画面にほとんど出なかった。
  *  main の16シード×3〜25日で、冒険者に気づいて逃げ出したのは14シードの7千回ほど、その時の距離はほとんどが4〜8マスで、見通しはすべて利いていた）
  *
- * 状態：溜めているあいだは run に −1、狙う相手は aim（どちらもセーブに入る）。小石が当たるのは、少し後で当たる攻撃（src/eco/attack.ts の queueVolley・resolveVolleys）で扱う。
+ * 状態：溜めているあいだは run に −1、狙う相手は aim（どちらもセーブに入る）。小石が当たるのは、少し後で当たる攻撃（queueVolley・resolveVolleys）で扱う。
  */
 import { type Cr, Ecology, Job, Kind, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
@@ -115,7 +115,7 @@ export function koboldSling(this: Ecology, c: Cr, t: Cr): void {
 }
 
 /**
- * 小石が届いた（src/eco/attack.ts の resolveVolleys から）。届いた所（半径 r）にいる冒険者のうち、狙った者を先に、なければいちばん近い者に当たる。
+ * 小石が届いた（resolveVolleys から）。届いた所（半径 r）にいる冒険者のうち、狙った者を先に、なければいちばん近い者に当たる。
  * 傷は小さく、倒れはしない。打ってきた相手としては覚えさせない（foe と hitAt は変えない）。技を溜めていれば止まる
  */
 export function stoneLands(this: Ecology, a: Cr, v: { x: number; y: number; r: number; mul: number; tgt?: number }): void {
@@ -144,7 +144,7 @@ export function stoneLands(this: Ecology, a: Cr, v: { x: number; y: number; r: n
     // 投げてきたコボルトに気づいて、そちらを向く。打ってきた相手（foe・hitAt）としては覚えさせない（逃げるコボルトを追って倒しには行かない）
     this.setDir(o, a.x - o.x, a.y - o.y);
     this.markNotice(o, a, '!');
-    // 野営の一行は飛び起きる。起きているあいだに当てられた回数を数える（重なれば焚き火を消して発つ。src/eco/night.ts の campWatch）
+    // 野営の一行は飛び起きる。起きているあいだに当てられた回数を数える（重なれば焚き火を消して発つ。campWatch）
     const p = this.parties.find((q) => q.id === o.party);
     if (p && (p.camp ?? -1) >= 0) {
       this.campHit(o, a);

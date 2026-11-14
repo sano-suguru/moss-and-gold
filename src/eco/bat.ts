@@ -6,7 +6,7 @@ import { BAT_CALLED, PIN_R } from './vampire';
 export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
   const night = day <= 0 && (phase > 0.79 || phase < 0.18);
   const s = SPEC[Kind.Bat];
-  // ヴァンパイアに呼ばれて、外を回って入り直すところ（src/eco/vampire.ts の batCalled）
+  // ヴァンパイアに呼ばれて、外を回って入り直すところ（batCalled）
   if (c.st === BAT_CALLED) {
     this.batCalled(c);
     return;
@@ -66,7 +66,7 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
   if (lord && !lord.dead && lord.k === Kind.Vampire && !c.away) {
     if (c.st === 0 || c.st === 2) c.st = 1;
     c.act = 1;
-    // 主が獲物を決めていれば、その上を旋回して居場所を示し（偵察）、主が近づくと獲物に群がる（足止め。src/eco/vampire.ts の batPinned）。
+    // 主が獲物を決めていれば、その上を旋回して居場所を示し（偵察）、主が近づくと獲物に群がる（足止め。batPinned）。
     // 決めていなければ、主の周りを回る。腹が半分を切ったコウモリは、主が獲物に近づくまでは、主の近くの苔を食べに行く（batForage）
     const prey = lord.ref ? this.byId.get(lord.ref) : undefined;
     const hunt = !!prey && !prey.dead && sq(prey.x - lord.x) + sq(prey.y - lord.y) < sq(40 * TILE);
@@ -91,8 +91,7 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
     } else {
       // 主の周りを、四つの輪に分かれて渦を巻く。どの輪も、輪に沿って生き物の更新1回に約1.1px で回る（外の輪ほどゆっくり一周する）。
       // 回る点が岩の中なら、輪を縮めて主へ寄せる（通路の中で群れが壁ぎわに張りつかないように）。
-      // （以前は半径20〜36px の三つの輪を、更新1回に0.02（一周に約1分）で回っていたので、従うコウモリが十数匹いると、
-      //  主の真上でほとんど動かない塊になり、押し合っているように見えた。はじまりの洞窟では、ほぼ歩く姿のまま止まった引っかかりとして数えられていた）
+      // （ゆっくり回ると、十数匹が主の真上でほとんど動かない塊になり、押し合っているように見える）
       const r0 = 18 + (c.id % 4) * 9;
       const a = (this.step * (1.1 / r0) + c.id * 1.7) % 6.283;
       let r = r0;
@@ -151,8 +150,7 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
     if (this.goTo(c, gx, gy, s.speed)) c.ref = 0;
   } else if (c.tx || c.ty) {
     // ねぐらのまわりに苔が見つからなければ、その夜は縦穴から外へ餌を取りに出る（外へ出るコウモリと同じ。昼に戻る）。
-    // 以前は、ねぐらのそばで更新のたびに向きを選び直して飛び、ほとんど進まずにその場で震えて引っかかって見えていた
-    // （16シードの12日目では、コウモリの引っかかりの4分の3がこれ。半分以上は満腹で、残りは飢えていた）
+    // （ねぐらのそばに留まると、更新のたびに向きを選び直して、その場で震えて見える）
     c.st = 2;
     c.ref = 0;
   } else this.batRoam(c);

@@ -297,7 +297,7 @@ export function partyStr(this: Ecology, p: Party): number {
 
 /**
  * 一行が見積もる相手の強さ：強さに残りの体力の割合を掛ける。リビングアーマー（空の鎧）は、体力が強さのわりに大きい
- * （ふつうは 4 + 強さ×HP_PER_STR、鎧は体の武具の数で決まる。src/eco/combat.ts の maxHp、src/eco/armor.ts の armorHp）ので、
+ * （ふつうは 4 + 強さ×HP_PER_STR、鎧は体の武具の数で決まる。maxHp、armorHp）ので、
  * ふつうの種と比べた体力の比を見積もりに掛ける。
  * 入れないと、武具を取り込んで強くなった鎧に一行が挑みつづけ、宝物庫の入口で次々に倒されていた（倒れた者の武具をまた鎧が取り込む）
  */
@@ -563,14 +563,13 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   // 気づける遠さ（見通しが利くことが条件）：
   //   打ってきた相手は、暗がりでも NOTICE_HIT まで（打たれたら気づく。オークの投げ斧のように、灯りの外から打つ敵がいるので）。
   //   一行の灯りの輪の中か、明るい床にいる相手は NOTICE_LIT まで。暗がりの敵（雑魚は除く）は、すぐそば（NOTICE_DARK。盗賊は夜目が利いて3マス）なら気配で気づく。
-  //   （以前は、打たれても相手が暗がりにいれば向き直らなかった。
-  //    灯りの中の相手を10マス先まで見えるようにも試したが、16シード×25日で、ヴァンパイアの血吸いが 62→16 回、ゴブリンの夜の盗みが 35→15 回に減ったので、5.5マスのままにした）
+  //   （NOTICE_LIT を10マスほどに広げると、ヴァンパイアの血吸いやゴブリンの夜の盗みが大きく減る）
   if (!foe)
     this.nearby(c.x, c.y, NOTICE_HIT / TILE + 1, (o) => {
       if (o.dead || o.away) return;
       const attacked = o.id === c.foe && this.w.tick - c.hitAt < 150;
       // 目標でない住民（住処・集落・村・縄張りの者）には、自分たちから戦いを始めない
-      // 威嚇して退くオーク（src/eco/orc.ts の orcWary）も追わない
+      // 威嚇して退くオーク（orcWary）も追わない
       const enemy = (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)) || (o.k === Kind.Gargoyle && o.act !== 0) || (o.k === Kind.Mimic && c.sp === Job.Thief) || (c.sp === Job.Hunter && p.aim === 3 && !!p.aimK && o.k === p.aimK);
       const minor = MINOR.includes(o.k) && (o.k !== Kind.Bat || o.st === 0 || o.foe === c.id);
       if (!enemy && !minor && !attacked) return;
@@ -592,10 +591,10 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       }
     });
   // 手強い敵に気づいたら、一行に知らせる（かなわない相手は、見張りの判断で引き返す）
-  // （以前は一行の1.2倍より強い相手には知らせず、皆で向かわなかった。いまは強さに関わらず皆で向かい、負けそうなら退く）
+  // （強さに関わらず皆で向かい、負けそうなら退く）
   // 暗がりから血を吸うヴァンパイア（灯りの中に見えていない）には、打たれて気づいても、一行で暗がりへ踏み込まない。
   // 吸われた者はヴァンパイアの方を向いて構え、届く技のある者は撃ち返す（src/eco/vampskill.ts の血吸い。
-  // 打たれたら気づくようにしたとき、一行が暗がりへ詰め寄ってヴァンパイアを追い払い、血吸いが16シード×25日で62→13回に減った）
+  // 一行で詰め寄ると、ヴァンパイアを追い払ってしまい、血吸いがほとんど見られなくなる）
   const darkVamp = !!foe && (foe as Cr).k === Kind.Vampire && !this.seenBy(c, lights, foe as Cr);
   if (foe && !darkVamp && !MINOR.includes((foe as Cr).k) && !p.engage && (p.retreatUntil ?? 0) <= this.step) {
     p.engage = (foe as Cr).id;
@@ -614,14 +613,12 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     const reach = JOB_REACH[c.sp] * TILE;
     if (skill) {
       // 職業の技（src/eco/skill.ts）：届く距離に敵がいれば溜め、溜め終わった回に放つ。使ったあとの間は溜め直さない。
-      // （以前は、近接の職は体が触れるくらい（1マス弱）でしか打てず、魔法使いは生き物の更新4回ごとに、狩人は3回に1回ほど、溜めなしで撃ち続けていた。
-      //  8シード×12日で、近接の一打ちを受ける前に死んだ大物が6割、魔法使いが打たれたのは25時間に1回、狩人は0回）
       if (ready) {
         c.act = 2;
         c.actT = 0;
-        // 技を放つと、その場にマナが生まれる（冒険者の活動がダンジョンにマナを持ち込む。src/eco/salamander.ts の deedMana）
+        // 技を放つと、その場にマナが生まれる（冒険者の活動がダンジョンにマナを持ち込む。deedMana）
         if (!c.away) this.deedMana(c.x, c.y, HERO_SKILL_MANA[c.sp] ?? 2, HERO_SKILL_R);
-        // 関係のない小物（大ネズミ・スライムなど）は、狙った相手か自分を襲ってきた相手でなければ巻き込まない（src/eco/attack.ts の advMinorOk）
+        // 関係のない小物（大ネズミ・スライムなど）は、狙った相手か自分を襲ってきた相手でなければ巻き込まない（advMinorOk）
         const who = (o: Cr) => o.k !== Kind.Adventurer && o.k !== Kind.Dwarf && (o === f || o.foe === c.id || (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)));
         const fl = Math.sqrt(fd2) || 1;
         const ux = (f.x - c.x) / fl;
@@ -774,7 +771,6 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       const d0 = Math.sqrt(d2);
       this.goTo(c, sx, sy, s.speed);
       // 席のそば（1.5マスの内）まで来て、眠る仲間や壁の角に阻まれてほとんど近づけなければ、その場に座る
-      // （以前は席へ入れないまま、眠る仲間の脇で歩く姿のまま押し返され続け、seed27 では2分近く足踏みしていた）
       if (!(d0 < 24 && d0 - Math.hypot(sx - c.x, sy - c.y) < 0.2)) return;
     }
     c.act = 0;
@@ -822,7 +818,6 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   let ox = [0, -14, 14, -8, 8][idx % 5];
   let oy = -[0, 10, 10, 22, 22][idx % 5];
   // 並ぶ位置が壁の中なら、左右を入れ替えた位置、先頭に寄せた位置、先頭の真後ろの順に、立てる床で先頭と歩いてつながる所にする
-  // （以前は先頭が壁ぎわを歩くと並ぶ位置が壁の中に入り、そこへまっすぐ向かって壁に押しつけたまま足踏みしていた。1回5〜7秒、1日に800回ほど）
   {
     const lk = this.tileOf(leader.x, leader.y);
     const ok = (dx: number, dy: number) => {
@@ -1062,7 +1057,7 @@ export function dropBelongings(this: Ecology, c: Cr): void {
     });
     return;
   }
-  // （冒険者のほかの人型の骨（sp = BONE_SP + 生前の種）は、職業の道具を持たない。src/eco/undead.ts の raiseBones）
+  // （冒険者のほかの人型の骨（sp = BONE_SP + 生前の種）は、職業の道具を持たない。raiseBones）
   if (c.k === Kind.Skeleton && c.init && c.sp < BONE_SP) {
     this.dropJobItems(c);
     c.init = 0;
@@ -1174,7 +1169,7 @@ export function eachLight(this: Ecology, fn: LightFn): void {
   // 鍛冶場の火と坑道のランプ、冒険者の焚き火
   const mw = this.w.map.w;
   for (const cp of this.camps) if (cp.id >= 0 && (cp.fuel ?? 0) > 0) fn(cp.x, cp.y + 6, 140, 1.25, 1.0, 0.58, 0.26);
-  // 冒険者の焚き火は、休みの最後の3分の1で細って、光の輪が小さく暗くなる（src/eco/night.ts の campFire）
+  // 冒険者の焚き火は、休みの最後の3分の1で細って、光の輪が小さく暗くなる（campFire）
   for (const p of this.parties) {
     if ((p.camp ?? -1) < 0) continue;
     const f = this.campFire(p);

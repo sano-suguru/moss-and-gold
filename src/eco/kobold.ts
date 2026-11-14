@@ -262,7 +262,7 @@ export function kobold(this: Ecology, c: Cr): void {
     if (c.st === 4 || c.st === 13) c.st = 0;
     return;
   }
-  // 腹いっぱいの者は、蓄えが足りなければ住処へ持ち帰る（集めに出た者が腹を満たしたあとも。以前は1回の更新だけ住処へ向かって、そのまま忘れていた）
+  // 腹いっぱいの者は、蓄えが足りなければ住処へ持ち帰る（集めに出た者が腹を満たしたあとも）
   // 持ち帰る道中（st 13）は、歩くうちに腹がこなれても、半分を超えて残っていれば運び込む
   if (wr && !c.hungry && c.food > s.cap * (c.st === 13 ? 0.55 : 0.75) && home < 30 * TILE * 30 * TILE && (wr.store ?? 0) < this.storeGoal(wr) && (c.st === 0 || c.st === 4 || c.st === 13)) {
     c.st = 13;
@@ -287,14 +287,14 @@ export function kobold(this: Ecology, c: Cr): void {
     if (c.hungry && c.st !== 4) c.st = 3;
     // 集めに出た者は、まず住処の畑で育ったキノコを摘む（腹に入れて持ち帰り、蓄えにする）。
     // 住処と歩いてつながっていない畑（岩の角をはさんで斜めにしか接していないマスなど）は摘みに行かない
-    // （以前は seed18 で、そうした畑のマスの手前の角で、集めに出たコボルトが入れ替わりながら1日以上足踏みしていた）
+    // （手前の角で足踏みし続けるので）
     if (c.st === 4 && wr && !c.hungry) {
       let fk = -1;
       let fv = 49;
       const r0 = this.regionOf(this.tileOf(wr.x, wr.y));
       const m0 = this.w.map;
       // ほかのコボルトが立っているか、摘みに向かっている畑のマスは選ばない（空いたマスがなければ、集めに出るのをやめる）。
-      // （以前は皆がいちばん育ったマスを選び、3マスしかない畑の1マスに6匹ほどが群がって、狭い住処の中で歩く姿のまま詰まっていた。abc・かしたれ）
+      // （皆が同じマスを選ぶと、狭い住処の中で詰まる）
       const taken = (k: number) => {
         const kx = (k % m0.w) * TILE + 8;
         const ky = Math.floor(k / m0.w) * TILE + 8;
@@ -374,7 +374,7 @@ export function kobold(this: Ecology, c: Cr): void {
     if (c.st === 4) c.st = 0;
     if (!c.hungry) c.st = 0;
   }
-  // 住処のない者は、立ち止まっては、ふつうに近い速さで少し歩いて探す（src/eco/move.ts の stroll）
+  // 住処のない者は、立ち止まっては、ふつうに近い速さで少し歩いて探す（stroll）
   if (!wr) {
     this.stroll(c, 4, 73, 0.9);
     return;
@@ -425,7 +425,7 @@ export function kobold(this: Ecology, c: Cr): void {
     this.goTo(c, wr.x, wr.y, s.speed);
   } else {
     // たいてい立ち止まり、ときどき、ふつうに近い速さで数歩うろつく。
-    // （以前は60回のうち20回、ふつうの速さの0.4倍で歩き、脚を動かしながら3秒で半タイルも進まず、足踏みして見えていた）
+    // （ゆっくり歩き続けると、脚を動かしながら進まず、足踏みして見える）
     c.act = c.actT % 60 < 40 ? 0 : 1;
     if (c.act === 1) {
       const j = DIR16[ih(c.id, this.step >> 4, 74) & 15];
@@ -829,7 +829,7 @@ export function checkTraps(this: Ecology): void {
 export function watchWarrens(this: Ecology): void {
   for (const wr of this.warrens) {
     if (wr.id < 0) continue;
-    // 近づいてくる強い相手：冒険者の一行、若い竜と成竜、トロール、ミノタウロス、見回りで歩いてくるバジリスク（src/eco/basilisk.ts の basiliskPatrol）
+    // 近づいてくる強い相手：冒険者の一行、若い竜と成竜、トロール、ミノタウロス、見回りで歩いてくるバジリスク（basiliskPatrol）
     let near: Cr | null = null;
     let nd = 1e18;
     let threat = 0;

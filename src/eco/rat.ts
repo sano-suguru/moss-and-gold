@@ -10,7 +10,7 @@ export function rat(this: Ecology, c: Cr, _day: number): void {
   let wary: Cr | null = null;
   this.nearby(c.x, c.y, 3, (o) => {
     if (o.dead) return;
-    // バジリスクは見回りのあいだだけ（gait が 1〜3。src/eco/basilisk.ts の basiliskPatrol）。狩りで忍び寄るときまで逃げると、獲物が取れなくなる
+    // バジリスクは見回りのあいだだけ（gait が 1〜3。basiliskPatrol）。狩りで忍び寄るときまで逃げると、獲物が取れなくなる
     const scary = (o.k === Kind.Lizard && o.act !== 0) || (o.k === Kind.Zombie && o.act !== 0) || o.k === Kind.Ghost || (o.k === Kind.Basilisk && o.gait > 0) || ((o.k === Kind.Kobold || o.k === Kind.Goblin || o.k === Kind.Lizardman || o.k === Kind.Orc || o.k === Kind.Minotaur) && o.hungry > 0);
     if (!scary) return;
     const d = sq(o.x - c.x) + sq(o.y - c.y);
@@ -18,8 +18,7 @@ export function rat(this: Ecology, c: Cr, _day: number): void {
     else if (d < 40 * 40) wary = o;
   });
   // 逃げる距離の外でも、40px の内の怖い相手が、次に向かう道筋の点の方向にいれば、近づかずにその場で様子をうかがう
-  // （以前は26px の境目で、相手から離れる一歩と、相手の方を通る道筋へ戻る一歩を更新ごとに繰り返し、その場で行ったり来たりしていた。
-  //  seed35 では巣穴へ帰る大ネズミが40秒以上）
+  // （そうしないと、26px の境目で、離れる一歩と道筋へ戻る一歩を繰り返して、その場で行ったり来たりする）
   if (!threat && wary) {
     const p = this.paths.get(c.id);
     const wp = p && p.pi < p.path.length ? p.path[p.pi] : -1;
@@ -49,7 +48,7 @@ export function rat(this: Ecology, c: Cr, _day: number): void {
     c.act = 1;
     c.st = 0;
     // 目当ての苔へ向かう途中でおびえたら、その苔はあきらめて別の苔を探す
-    // （以前は、細い通路にいるゴーストやクモにおびえては同じ苔へ戻り、を繰り返して苔のそばで飢えていた）
+    // （同じ苔へ戻ると、細い通路のゴーストやクモにおびえるのを繰り返して飢える）
     if (c.ref > 0) {
       c.gait = c.ref;
       c.ref = 0;
@@ -77,7 +76,7 @@ export function rat(this: Ecology, c: Cr, _day: number): void {
   if (c.hungry > 150 && this.step % 20 === c.id % 20 && this.ratDisperse(c)) return;
   if (c.st === 0) {
     // 巣穴への道筋が見つからない（遠すぎる、ふさがった）なら、はぐれ者になって食べ物を探す。
-    // 近くの巣穴には、群れの見直し（tendGroups）で加わる（以前は、届かない巣穴へまっすぐ歩いては壁に当たり続けていた）
+    // 近くの巣穴には、群れの見直し（tendGroups）で加わる
     // 巣穴へ帰る・休む（巣穴のまわりに散らばって）
     const ox = ((c.id % 5) - 2) * 6;
     const oy = (((c.id >> 3) % 3) - 1) * 5;
@@ -114,8 +113,7 @@ export function rat(this: Ecology, c: Cr, _day: number): void {
     }
     // 目指す苔が食べ尽くされていたら、すぐに選び直す。道筋が見つからなかった所は避ける
     const cur = c.ref - 1;
-    // 道筋の見つからなかった目当てはあきらめる（以前は、道筋を探した直後の生き物の更新4回分しか見ておらず、その間ほかのことをしていると、
-    // 届かない目当てへまっすぐ歩いて壁に当たり続け、そばの苔に気づかずに飢えていた）
+    // 道筋の見つからなかった目当てはあきらめる（届かない目当てへまっすぐ歩いて壁に当たり続けないように）
     const pp = this.paths.get(c.id);
     const noPath = !!pp && pp.path.length === 0 && cur >= 0 && pp.gk === cur;
     if (cur >= 0 && (Math.max(this.w.moss[cur], this.w.fungus[cur]) < 20 || noPath)) {
@@ -123,8 +121,7 @@ export function rat(this: Ecology, c: Cr, _day: number): void {
       c.ref = 0;
     }
     // 腹を空かせて目当てへ向かう途中でも、生き物の更新10回に1回まわりを見直し、歩いて12マス以内に、目当てまでの残りの道のりより近い食べ物があれば替える
-    // （以前は目当てがまだ食べられる限り選び直さず、道のりの長い目当て（まっすぐなら近くても回り道）へ向かう途中で、
-    //  近くの苔やキノコの前を通っても気づかずに飢えていた。seed30 の19日目に飢え死にした19匹の多くは、死んだ所から道のり10マス以内に食べ物があった）
+    // （選び直さないと、回り道の長い目当てへ向かう途中で、近くの苔やキノコの前を通っても気づかずに飢える）
     if (c.hungry > 0 && c.ref > 0 && this.step % 10 === c.id % 10) {
       const goal = c.ref - 1;
       const gp = this.paths.get(c.id);
@@ -150,7 +147,6 @@ export function rat(this: Ecology, c: Cr, _day: number): void {
       }
       // それでも見つからなければ、腹の具合に関わらず、歩いて24マス以内のいちばん近い食べ物、次に地図全体の土地勘から歩いて行ける豊かな群落を目指す。
       // どこにも無ければ、その場でうずくまって休む（しばらくして探し直す）
-      // （以前は、その場で一歩ずつでたらめな向きへ歩き続け、苔の尽きた巣穴のそばで大ネズミが固まって足踏みしていた）
       if (t < 0) t = this.nearestEdible(c, 24);
       if (t < 0) t = this.nearestForage(c.x, c.y, 200, c.gait - 1);
       c.ref = t >= 0 ? t + 1 : 0;
@@ -224,7 +220,7 @@ export function ratMarch(this: Ecology, c: Cr): void {
     done();
     return;
   }
-  // 冒険者やドワーフが近く（3マス）にいれば、列のまま、まず離れる（以前は列のまま足もとを通って払われていた）
+  // 冒険者やドワーフが近く（3マス）にいれば、列のまま、まず離れる（足もとを通ると払われる）
   let man: Cr | null = null;
   this.nearby(c.x, c.y, 3, (o) => {
     if (!man && !o.dead && !o.away && (o.k === Kind.Adventurer || o.k === Kind.Dwarf) && sq(o.x - c.x) + sq(o.y - c.y) < 3 * TILE * 3 * TILE) man = o;
@@ -370,7 +366,7 @@ export function nearestEdibleD(this: Ecology, c: Cr, max: number): [number, numb
   const d = this.walkDist(this.tileOf(c.x, c.y), max);
   const W = this.w.map.w;
   // 避けたい目当て（おびえて逃げた目当て、道筋の見つからなかった目当て）は、まわり1マスも避ける
-  // （以前はそのマスだけを避けたので、ゴーストの居座る苔の群落で、隣のマスを目当てにしては近づいておびえる、を繰り返して飢えていた）
+  // （そのマスだけだと、ゴーストの居座る群落で、隣のマスを目当てにしてはおびえるのを繰り返して飢える）
   const ax = c.gait > 0 ? (c.gait - 1) % W : -9;
   const ay = c.gait > 0 ? Math.floor((c.gait - 1) / W) : -9;
   let best = -1;
@@ -387,7 +383,6 @@ export function nearestEdibleD(this: Ecology, c: Cr, max: number): [number, numb
 export function ratDisperse(this: Ecology, c: Cr): boolean {
   const m = this.w.map;
   // 出ていく途中で飢えが7割を越えたらあきらめる（st 8）ので、すでに越えている者は出ていこうとしない
-  // （以前は出ていこうとしては次の更新であきらめ、そのたびに目当ての苔を忘れて選び直し、苔のそばで行ったり来たりして飢えていた）
   if (c.hungry > SPEC[Kind.Rat].starve * 0.7) return false;
   // 歩いて10マス以内に食べられる苔かキノコがあれば出ていかない（いくつかの点を選んで調べるやり方では、まばらな苔を見落としていた）
   {
@@ -418,7 +413,7 @@ export function ratDisperse(this: Ecology, c: Cr): boolean {
       ey = my;
     }
   }
-  // 着ける口がなければ出ていかない（以前は口がなくても出ていく群れにして、目当てを忘れさせていた）
+  // 着ける口がなければ出ていかない
   if (ex < 0) return false;
   const group: Cr[] = [c];
   this.nearby(c.x, c.y, 12, (o) => {

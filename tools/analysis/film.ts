@@ -1,5 +1,5 @@
 /**
- * 動きを連続フレームで撮るためのシーンを作る（CLAUDE.md の「画面に見えること」：動きは連続フレームで撮る）。
+ * 動きを連続フレームで撮るためのシーンを作る（撮り方は .claude/skills/visual-check）。
  * キャッシュにあるスナップショット（lib/open.ts）から始めて、決まった tick ごとにゲームのセーブと同じ形を書き出し、tools/gallery/film.mjs がゲーム画面でスクリーンショットを撮って一枚に並べる。
  *
  *   npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 --name adv-enter

@@ -218,7 +218,7 @@ export function minoRun(this: Ecology, c: Cr): void {
     hit.push(o);
   });
   hit.sort((p, q) => (p.x - x0) * ux + (p.y - y0) * uy - ((q.x - x0) * ux + (q.y - y0) * uy) || p.id - q.id);
-  // 突進で倒した獲物のうち、まだ食べていなければ最初の1体を食べる（寝床まで引きずる。src/eco/monsters.ts の dragToLair）
+  // 突進で倒した獲物のうち、まだ食べていなければ最初の1体を食べる（寝床まで引きずる。dragToLair）
   // リビングアーマーは食べない（倒すだけ。slay が決める）
   let ate = c.feed > 0 || c.k === Kind.Armor;
   const fed0 = c.feed;
@@ -375,7 +375,7 @@ export function golemSkill(this: Ecology, c: Cr): boolean {
   if (quake) {
     c.run = 0;
     // 跳ねる衝撃波：向きの線の上に、HOP_GAP おきに HOP_N 回、HOP_DT tick ずつ間を置いて落ちる。それぞれ落ちたときに、輪の中（半径 HOP_R）にいる者に当たって怯ませる
-    // （矢の雨と同じ、少し後で当たる攻撃。src/eco/attack.ts の resolveVolleys）。見通しの利かない所（壁の向こう）には落ちない
+    // （矢の雨と同じ、少し後で当たる攻撃。resolveVolleys）。見通しの利かない所（壁の向こう）には落ちない
     const m = this.w.map;
     let n = 0;
     for (let i = 1; i <= HOP_N; i++) {

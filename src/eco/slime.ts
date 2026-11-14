@@ -64,9 +64,7 @@ export function slime(this: Ecology, c: Cr): void {
       const d = sq(o.x - c.x) + sq(o.y - c.y);
       if (d >= bd) continue;
       // 一つの死骸には、生きているスライムが3匹まで群がる（それより多いと、残りはほかの死骸を探す）。
-      // 以前は死骸の ref に1匹だけ予約を書いていた。その予約は、予約したスライムが死んでも消えなかった。
-      // そのうえ、生きていたときの番号（集落や巣穴など）も死骸に残っていたので、どのスライムも食べられない死骸ができた。
-      // 新しいスライムは死骸の近くで生まれるので、食べられない死骸のそばで生まれては飢え死にする、を繰り返していた
+      // （死骸の予約が残ると、どのスライムも食べられない死骸ができ、そのそばで生まれては飢え死にするのを繰り返す）
       let eaters = 0;
       this.nearby(o.x, o.y, 11, (q) => {
         if (q !== c && q.k === Kind.Slime && !q.dead && q.ref === o.id) eaters++;
@@ -108,7 +106,6 @@ export function slime(this: Ecology, c: Cr): void {
   } else {
     // 死骸がなければ、湿って養分の溜まった床から養分を少しずつ吸って生きる（生き物の更新10回ごとに1。床の養分が体に移るだけなので、養分の総量は変わらない）。
     // 吸うだけでは、食べた物は SLIME_SIP までしか溜まらず、体は育たない。育って二つに分かれるには死骸を食べる。
-    // 以前は食べ物が死骸だけで、死骸を食べ尽くすと続かず、スライムが画面から消えている時間が長かった
     if (this.slimeCanSip(c) && this.step % 10 === c.id % 10) {
       this.w.nutr[k]--;
       c.food++;
@@ -163,7 +160,6 @@ export function spawnSlimes(this: Ecology): void {
   if (ih(this.step, 1, 53) % 3 !== 0) return;
   const m = this.w.map;
   // 腐ったもの（死骸）の近く（6マス以内）の、湿って養分の溜まった開いた床だけで生まれる。
-  // 以前は水たまり（water 30 以上）だけで、水たまりのそばに死骸の無いシード（seed4・seed6 など）では、ほとんど生まれなかった
   const near = new Uint8Array(m.w * m.h);
   for (const d of this.corpses) {
     const cx = Math.floor(d.x / TILE);

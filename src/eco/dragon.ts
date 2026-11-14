@@ -387,7 +387,7 @@ export function dragon(this: Ecology, c: Cr, _day: number): void {
       } else if (c.sp > 0 && d < 3 * TILE && !this.breathCovers(c, p.x, p.y)) {
         if (!this.dragonStepBack(c, p.x, p.y) && d < 20) this.fight(c, p);
       } else if (c.sp > 0 && d < (c.sp === 1 ? 5 : 6) * TILE && lineOfSight(m, c.x, c.y, p.x, p.y) && this.breathCovers(c, p.x, p.y)) {
-        // （炎は口元から上下左右に吐くので、炎の扇に入る向きにいる相手にだけ吐く。斜めにいる相手には寄っていく。src/eco/fire.ts の breathCovers）
+        // （炎は口元から上下左右に吐くので、炎の扇に入る向きにいる相手にだけ吐く。斜めにいる相手には寄っていく。breathCovers）
         c.act = 2;
         c.actT = 0;
         c.ref2 = c.sp === 1 ? 7 : 12;
@@ -434,7 +434,7 @@ export function dragon(this: Ecology, c: Cr, _day: number): void {
     } else c.act = 1;
     return;
   }
-  // 獲物が見つからないうちは、立ち止まっては、ふつうに近い速さで歩いて探す（src/eco/move.ts の stroll）
+  // 獲物が見つからないうちは、立ち止まっては、ふつうに近い速さで歩いて探す（stroll）
   this.stroll(c, 5, 132, 0.9);
 }
 

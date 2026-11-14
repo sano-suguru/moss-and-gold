@@ -4,7 +4,7 @@
  * 見せたい瞬間：
  *  1. 同じ顔がまた来る：冒険者ごとに姿（髪の色、肌の色、体つき、頭の形、身につける色）が決まっていて、何度来ても同じ姿。
  *  2. 装備が良くなる：生きて帰るたびに位が上がり（見習い→熟練→歴戦→英雄）、位ごとに装備が目に見えて変わる
- *     （熟練で盾や胸に紋章、歴戦でマント、英雄で武器がほのかに光る。描画は src/sprites.ts の heroSprite）。
+ *     （熟練で盾や胸に紋章、歴戦でマント、英雄で武器がほのかに光る。描画は heroSprite）。
  *  3. 墓標が立つ：熟練以上の冒険者が倒れた所に小さな墓標。のちの一行がそばを通ると、一度立ち止まって墓標の方を向き、僧侶がいれば祈る。
  *
  * 名簿（Ecology.roster）は12人。一行は名簿から組む（職業の決め方と目標の決め方は今までどおり。中にいる者は選ばない）。
@@ -161,7 +161,7 @@ export function rankMul(this: Ecology, c: Cr): number {
 
 /**
  * その職業の者が一行を率いられるか：名簿に空いている（中にいない、傷を癒やしていない）その職業の者がいるか、名簿に空きがあって新人を雇えるか。
- * 率いる者がいない依頼は、その一行のくじから外す（src/eco/quest.ts の pickQuest）。
+ * 率いる者がいない依頼は、その一行のくじから外す（pickQuest）。
  * （名簿の上限を超えて新人を雇うと、英雄の最後の遠征（名簿が上限以下のときだけ）が16シード×25日で106→51に減った）
  */
 export function canLead(this: Ecology, job: number): boolean {
@@ -360,7 +360,7 @@ export function graveBrace(this: Ecology, p: Party, lead: Cr): void {
  * ヴァンパイアの眷属にもならない（src/eco/step.ts、src/eco/vampire.ts）。亡骸は骨になっても残り、聖印の光が立ちのぼる。
  * 冒険者の亡骸が見えなければ、冒険者でない亡骸にも祈る（以前は冒険者の亡骸だけが相手で、冒険者が倒れにくくなると、祈りの場面がまとめて減った）：
  *  - 人型（ゴブリン・コボルト・オーク・ドワーフ・リザードマン）の亡骸のうち、起き上がりうる所（暗く、足もとにマナがあり、死者が多いかリッチが近い。
- *    src/eco/step.ts の decay と同じ条件）にあるもの（riseSpot）。肉の残る亡骸は、清められると残ったまま起き上がらなくなる（聖印の光が立ちのぼる）。
+ *    decay と同じ条件）にあるもの（riseSpot）。肉の残る亡骸は、清められると残ったまま起き上がらなくなる（聖印の光が立ちのぼる）。
  *  - 倒されたスケルトン・ゾンビ・リッチの残骸（場所を問わない）。
  *  骨（人型の骨と、アンデッドの残骸）は、祈る間に金色に光り、祈りの終わりに金の光の粒になって立ちのぼって消える（blessCrumble）。
  *  冒険者でない亡骸の前で止まる長さは冒険者の亡骸の半分（KIN_STOP）で、一行ごとに生き物の更新 KIN_GAP 回に1回まで
@@ -404,7 +404,7 @@ export function blessBrace(this: Ecology, p: Party, lead: Cr): void {
     const undead = BLESS_REMAINS.includes(o.k);
     if (!undead && !BONE_KINDS.includes(o.k)) continue;
     if (o.lure && this.byId.get(o.lure)?.k === Kind.Vampire) continue;
-    // アンデッド祓いの一行は、目標を果たすまでリッチの残骸を崩さない（果たしたとき、そばのリッチの残骸を見て杖を戦利品にする。src/eco/loot.ts の takeTrophy）
+    // アンデッド祓いの一行は、目標を果たすまでリッチの残骸を崩さない（果たしたとき、そばのリッチの残骸を見て杖を戦利品にする。takeTrophy）
     if (o.k === Kind.Lich && p.aim === 4 && !p.aimEnd) continue;
     if (!seen(o) || (!undead && !this.riseSpot(o.x, o.y)) || !safe()) continue;
     const bones = undead || this.corpseStage(o) === 2;
@@ -428,7 +428,7 @@ export function riseSpot(this: Ecology, x: number, y: number): boolean {
 
 /**
  * 清められた骨が崩れる（step.ts の decay から。祈り始めてから生き物の更新 KIN_STOP 回たったら）：金の光の粒になって立ちのぼり、消える。
- * 残っていた養分は足もとの土へ、体のマナも土へ還す（保存則のため）。描画は src/creatureView.ts の drawAttacks の 'bless'
+ * 残っていた養分は足もとの土へ、体のマナも土へ還す（保存則のため）。描画は drawAttacks の 'bless'
  */
 export function blessCrumble(this: Ecology, c: Cr): boolean {
   if (c.st !== CRUMBLING || this.step - c.lureAt < KIN_STOP) return false;

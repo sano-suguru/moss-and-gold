@@ -10,9 +10,9 @@
  *     （以前は武具が床に散らばり、また次の甲冑の材料になって、同じ武具から何度でも甲冑が立ち上がった）。
  *
  * 未練：冒険者が倒れると、落とした職業の道具（剣・盾・杖・鎚矛・短剣・聖印・リュート・弓・大剣）に、持ち主の未練としてマナが宿る
- * （床の道具の fuel。1つにつき ARMOR_REMNANT。新しいマナの湧き口として world.manaBorn に足す。src/eco/adventurer.ts の dropJobItems）。
+ * （床の道具の fuel。1つにつき ARMOR_REMNANT。新しいマナの湧き口として world.manaBorn に足す。dropJobItems）。
  * ドワーフ（戦士の斧（床では鎚矛）と盾、鍛冶屋の金槌（鎚矛））と、武器を拾ったゴブリン・オークが倒れたときも、落とした武具に未練が宿る
- * （ドワーフは ARMOR_REMNANT、ゴブリン・オークは ARMOR_REMNANT_KIN。src/eco/adventurer.ts の dropBelongings）。
+ * （ドワーフは ARMOR_REMNANT、ゴブリン・オークは ARMOR_REMNANT_KIN。dropBelongings）。
  * 甲冑が打たれて落とした武器と、清められた武具（fuel −1）は、もうマナを吸わない（未練の抜けた武具）。
  * 床の職業の道具は、足もとの土のマナが濃い（ARMOR_SOAK_MIN 以上）と、生き物の更新 ARMOR_SOAK_EVERY 回ごとに1ずつ、ARMOR_BIRTH_MANA まで吸って溜める
  * （土から道具へ移すだけで、総量は変わらない。未練の薄れた古い武具でも、マナの濃い所に置かれていれば、また溜まっていく）。
@@ -134,7 +134,7 @@ export function armorFoe(this: Ecology, o: Cr): boolean {
 
 /** 床の武具に宿るマナ：足もとの土が濃ければ吸って溜め、少しずつ薄れる（生き物の更新ごと。updateItems から） */
 export function fadeRemnant(this: Ecology, it: Item): void {
-  // 僧侶に清められた武具（fuel −1）は、もうマナを吸わない（src/eco/roster.ts の blessBrace）
+  // 僧侶に清められた武具（fuel −1）は、もうマナを吸わない（blessBrace）
   if (!isJobItem(it.kind) || it.fuel < 0) return;
   // 吸うのは甲冑が立ち上がる量まで（甲冑の数が上限のあいだ、湧き口のそばの武具がマナを溜め続けないように）
   if (it.fuel < ARMOR_BIRTH_MANA && this.step % ARMOR_SOAK_EVERY === it.id % ARMOR_SOAK_EVERY) {
@@ -251,7 +251,7 @@ export function pickArmorPost(this: Ecology, c: Cr): void {
       return;
     }
   }
-  // 未練の持ち場：生まれた場所のまわりだけを見回る（以前は生まれた場所と宝物庫を行き来し、宝物庫の入口に何体も集まって一行を次々に倒していた）
+  // 未練の持ち場：生まれた場所のまわりだけを見回る（宝物庫まで行き来すると、入口に何体も集まって一行を次々に倒す）
   const posts: [number, number][] = [];
   let tx = c.hx;
   let ty = c.hy;

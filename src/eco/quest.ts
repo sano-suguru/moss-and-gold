@@ -6,14 +6,14 @@
  *
  * 依頼は噂から毎回つくる（状態を持たない）。重さは噂の強さそのもので、一行は重さに比例したくじで一つ引き受け、
  * 依頼に合う職業が率いる（ゴブリン退治は戦士、竜退治と竜の寝床への道探しは竜殺し、魔物の狩りは狩人、祓いは僧侶、宝探しは盗賊）。
- * 率いる職業の者が名簿に空いていなければ、名簿に空きがあればその職業の新人を雇い、空きもなければその依頼は引かない（src/eco/roster.ts の canLead）。
+ * 率いる職業の者が名簿に空いていなければ、名簿に空きがあればその職業の新人を雇い、空きもなければその依頼は引かない（canLead）。
  * 依頼を受けた一行が中にいる間（目標を終えていない間）は、その依頼は掲示から外れる。
  * 果たして生きて帰ればその噂が鎮まり、果たせずに帰れば噂はそのまま残る（宝探しだけは、持ち帰った金貨がそのまま噂を強める）。
  *
  * 魔物の噂（種ごと）：
  *
  * 生きて帰った冒険者が、見かけた大物と、受けた被害（仲間が石化しかけた・倒された）を町に伝え、その種の噂が強まる。
- * 噂は種ごとに強さと最後に知られた場所を持ち、日ごとに薄れる（src/eco/salamander.ts の onDayEvents）。
+ * 噂は種ごとに強さと最後に知られた場所を持ち、日ごとに薄れる（onDayEvents）。
  *
  * 噂の種になる魔物：冒険者が敵とみなす魔物のうち、アンデッド（祓いの噂）・ゴブリン（盗みの噂）・竜の仲間（竜の噂）を除いたもの。
  * 見かけただけで噂になるのは強さ10以上、仲間が石化しかけたり倒されたりすれば強さ6以上（どの種も同じ決まり）。
@@ -129,7 +129,7 @@ export function carryBeastRumors(this: Ecology, p: Party, mul: number): void {
     } else if (!this.list.some((o) => o.k === h[0] && !o.dead && !o.away)) continue;
     const n = Math.min(left, h[1]);
     left -= n;
-    // 分析用：被害の噂を持ち帰った（一行で一度。tools/analysis/lib/moments.ts の petriQuest）
+    // 分析用：被害の噂を持ち帰った（一行で一度。petriQuest）
     if (!(p.hurtTold ??= []).includes(h[0])) {
       p.hurtTold.push(h[0]);
       this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'hurtTold', how: h[0], n, x: h[2], y: h[3] } as never);
@@ -269,7 +269,7 @@ export function questName(this: Ecology, a: number, k: number, plain = false): s
 }
 
 /**
- * 依頼を果たした一行の最後の一人が帰ったところで、その噂を、依頼が出る強さの半分まで下げる（一行で一度だけ。src/eco/adventurer.ts の leaveDungeon）。
+ * 依頼を果たした一行の最後の一人が帰ったところで、その噂を、依頼が出る強さの半分まで下げる（一行で一度だけ。leaveDungeon）。
  * 次の目撃や被害があるまで、同じ依頼は出ない（以前は ×0.2〜0.3 で、帰る者が多いと鎮めたあとも依頼が残った）。宝探しと道探しは鎮めない
  */
 export function calmQuest(this: Ecology, p: Party): void {
