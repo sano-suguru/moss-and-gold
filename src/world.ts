@@ -290,7 +290,7 @@ export class World {
     const m = this.map;
     const M = this.mana;
     const T = this.manaTmp;
-    // 湧き口（深部・地底の裂け目・宝物庫・溶岩のそば）。マナは冒険者の技や死からも生まれるようになったので（src/eco/salamander.ts の deedMana）、
+    // 湧き口（深部・地底の裂け目・宝物庫・溶岩のそば）。マナは冒険者の技や死からも生まれるようになったので（deedMana）、
     // 湧き口と岩盤からのしみ出しは控えめにする（多すぎると、マナを条件にする判定の多くが、ほぼどこでも満たされる）
     for (const [k, n] of this.manaSources()) {
       M[k] += n;

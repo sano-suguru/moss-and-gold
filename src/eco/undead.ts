@@ -5,7 +5,7 @@ import { TILE } from '../mapgen';
 /**
  * 骨になって起き上がる人型（冒険者のほか）。ゴブリン・コボルト・オーク・ドワーフ・リザードマンの亡骸も、暗く死者の多い所で骨になったあと、
  * 骨が寄り集まって起き上がる（以前は冒険者の亡骸だけが起き上がり、冒険者が倒れにくくなると、アンデッドの場面がまとめて減った）。
- * 冒険者以外のスケルトンは、sp に BONE_SP + 生前の種を持つ（強さと骨の大きさが生前の種で決まる。src/eco/combat.ts の str、src/sprites.ts の beastSkeleton）
+ * 冒険者以外のスケルトンは、sp に BONE_SP + 生前の種を持つ（強さと骨の大きさが生前の種で決まる。str、beastSkeleton）
  */
 export const BONE_KINDS: number[] = [Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Dwarf, Kind.Lizardman];
 export const BONE_SP = 100;
@@ -100,7 +100,7 @@ export function undeadRise(this: Ecology, c: Cr): boolean {
   c.hp = this.maxHp(c);
   c.act = 0;
   c.actT = 0;
-  // 変わった瞬間：紫のマナの光が弾けて輪が広がる（描画は src/creatureView.ts の grow。竜が育つときと同じ）
+  // 変わった瞬間：紫のマナの光が弾けて輪が広がる（描画は grow。竜が育つときと同じ）
   this.fxAttacks.push({ t: this.w.tick, style: 'grow', col: 4, size: 2, ax: c.x, ay: c.y, dx: c.x, dy: c.y, did: -1, aid: c.id, big: true, kill: false });
   if (this.fxAttacks.length > 160) this.fxAttacks.splice(0, 60);
   this.log(c.x, c.y, `濃いマナを吸い続けた骨が、{k:${Kind.Lich}}になった`);

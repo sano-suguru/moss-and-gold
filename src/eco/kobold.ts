@@ -374,7 +374,7 @@ export function kobold(this: Ecology, c: Cr): void {
     if (c.st === 4) c.st = 0;
     if (!c.hungry) c.st = 0;
   }
-  // 住処のない者は、立ち止まっては、ふつうに近い速さで少し歩いて探す（src/eco/move.ts の stroll）
+  // 住処のない者は、立ち止まっては、ふつうに近い速さで少し歩いて探す（stroll）
   if (!wr) {
     this.stroll(c, 4, 73, 0.9);
     return;
@@ -829,7 +829,7 @@ export function checkTraps(this: Ecology): void {
 export function watchWarrens(this: Ecology): void {
   for (const wr of this.warrens) {
     if (wr.id < 0) continue;
-    // 近づいてくる強い相手：冒険者の一行、若い竜と成竜、トロール、ミノタウロス、見回りで歩いてくるバジリスク（src/eco/basilisk.ts の basiliskPatrol）
+    // 近づいてくる強い相手：冒険者の一行、若い竜と成竜、トロール、ミノタウロス、見回りで歩いてくるバジリスク（basiliskPatrol）
     let near: Cr | null = null;
     let nd = 1e18;
     let threat = 0;

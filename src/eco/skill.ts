@@ -62,7 +62,7 @@ export function skillStep(this: Ecology, c: Cr, s: Skill, breakOnHit = true): 'c
   // 経過が 0 の攻撃の姿は、溜め終わりのときだけ（攻撃で経過を 0 にした回は、次の更新のはじめに 1 へ増えている）。
   // 念のため、溜めはじめてからの時刻でも確かめる
   if (c.act !== 2 || c.actT > 0 || this.w.tick - c.cast > (s.windup + 1) * CR_EVERY) return '';
-  // 大物の溜めは、打たれただけでは止まらない（重い一撃を受けたときだけ、src/eco/combat.ts の strike が止める）
+  // 大物の溜めは、打たれただけでは止まらない（重い一撃を受けたときだけ、strike が止める）
   if (breakOnHit && c.hitAt > c.cast) {
     c.act = 0;
     c.actT = 0;

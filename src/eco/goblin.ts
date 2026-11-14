@@ -248,7 +248,7 @@ export function watchCamps(this: Ecology): void {
         }
       }
     this.nearby(cp.x, cp.y, 14, (o) => {
-      // 若い竜と成竜、トロール、ミノタウロス、見回りで歩いてくるバジリスク（src/eco/basilisk.ts の basiliskPatrol）
+      // 若い竜と成竜、トロール、ミノタウロス、見回りで歩いてくるバジリスク（basiliskPatrol）
       if (o.dead || o.away || !((o.k === Kind.Dragon && o.sp >= 1) || o.k === Kind.Troll || o.k === Kind.Minotaur || (o.k === Kind.Basilisk && o.gait > 0))) return;
       const d = sq(o.x - cp.x) + sq(o.y - cp.y);
       if (d < nd) {
@@ -264,7 +264,7 @@ export function watchCamps(this: Ecology): void {
     }
     const a = near as Cr;
     const members = this.campMembers(cp);
-    // オークに従う集落：起きている見張りが一行に気づいたら、縄張りのオークを起こす（眠っていたオークが飛び起きて駆けつける。src/eco/orc.ts の meetParty）。
+    // オークに従う集落：起きている見張りが一行に気づいたら、縄張りのオークを起こす（眠っていたオークが飛び起きて駆けつける。meetParty）。
     // （一行は昼に来ることが多く、夜に動くオークは眠ったままで、集落が守られなかった）
     if (party && (cp.lx || cp.ly)) {
       const sentry = members.find((c) => c.sleep <= 0 && c.flee <= 0 && sq(c.x - a.x) + sq(c.y - a.y) < 14 * TILE * 14 * TILE);
@@ -560,7 +560,7 @@ export function goblin(this: Ecology, c: Cr): void {
     if (c.st === 4) c.st = 0;
     if (!c.hungry) c.st = 0;
   }
-  // 集落のない者と、近くに食べ物の見つからない腹ぺこの者は、立ち止まっては、ふつうに近い速さで少し歩いて探す（src/eco/move.ts の stroll）
+  // 集落のない者と、近くに食べ物の見つからない腹ぺこの者は、立ち止まっては、ふつうに近い速さで少し歩いて探す（stroll）
   if (!cp || c.hungry > 0) {
     this.stroll(c, 4, 92, 0.9);
     return;

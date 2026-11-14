@@ -165,7 +165,7 @@ export function minoTarget(this: Ecology, c: Cr, R: number): Cr | null {
 }
 
 /**
- * 狩り（src/eco/combat.ts の hunt）で獲物 p に向かうミノタウロスが、技を使うか。使ったら（溜めはじめたら）true。
+ * 狩り（hunt）で獲物 p に向かうミノタウロスが、技を使うか。使ったら（溜めはじめたら）true。
  * 4マスの内なら斧の薙ぎ払い、4〜8マスで見通しが利けば突進
  */
 export function minoEngage(this: Ecology, c: Cr, p: Cr, d2: number): boolean {
@@ -218,7 +218,7 @@ export function minoRun(this: Ecology, c: Cr): void {
     hit.push(o);
   });
   hit.sort((p, q) => (p.x - x0) * ux + (p.y - y0) * uy - ((q.x - x0) * ux + (q.y - y0) * uy) || p.id - q.id);
-  // 突進で倒した獲物のうち、まだ食べていなければ最初の1体を食べる（寝床まで引きずる。src/eco/monsters.ts の dragToLair）
+  // 突進で倒した獲物のうち、まだ食べていなければ最初の1体を食べる（寝床まで引きずる。dragToLair）
   // リビングアーマーは食べない（倒すだけ。slay が決める）
   let ate = c.feed > 0 || c.k === Kind.Armor;
   const fed0 = c.feed;
@@ -252,7 +252,7 @@ export function minoRun(this: Ecology, c: Cr): void {
     this.fxAttacks.push({ t: this.w.tick, style: 'minoimpact', col: 2, size: 2, ax: c.x, ay: c.y, dx: c.x + ux * 10, dy: c.y + uy * 10, did: -1, aid: c.id, big: true, kill: false });
     stop = true;
   }
-  // 獲物を食べたら、突進はそこで終わる（次の更新から食べる。src/eco/move.ts の feeding）
+  // 獲物を食べたら、突進はそこで終わる（次の更新から食べる。feeding）
   if (c.feed !== fed0) stop = true;
   if (stop || c.run <= 0 || L < 4) this.minoRunEnd(c);
 }
@@ -375,7 +375,7 @@ export function golemSkill(this: Ecology, c: Cr): boolean {
   if (quake) {
     c.run = 0;
     // 跳ねる衝撃波：向きの線の上に、HOP_GAP おきに HOP_N 回、HOP_DT tick ずつ間を置いて落ちる。それぞれ落ちたときに、輪の中（半径 HOP_R）にいる者に当たって怯ませる
-    // （矢の雨と同じ、少し後で当たる攻撃。src/eco/attack.ts の resolveVolleys）。見通しの利かない所（壁の向こう）には落ちない
+    // （矢の雨と同じ、少し後で当たる攻撃。resolveVolleys）。見通しの利かない所（壁の向こう）には落ちない
     const m = this.w.map;
     let n = 0;
     for (let i = 1; i <= HOP_N; i++) {
@@ -416,7 +416,7 @@ export function golemSkill(this: Ecology, c: Cr): boolean {
 }
 
 /**
- * 持ち場のゴーレムが、技を使うか（溜めはじめたら true）。foe は入口を通ろうとする者か宝を抱えた者（src/eco/monsters.ts の golem）。
+ * 持ち場のゴーレムが、技を使うか（溜めはじめたら true）。foe は入口を通ろうとする者か宝を抱えた者（golem）。
  * 3マスの内に相手がいれば振り下ろし。そうでなければ、入口から8マスの内で入口の方を向いて近づいてくる者か宝を抱えた者に、地割れ
  */
 export function golemEngage(this: Ecology, c: Cr, foe: Cr | null): boolean {

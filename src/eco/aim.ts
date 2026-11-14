@@ -61,7 +61,7 @@ export function chooseAim(this: Ecology, p: Party, q: Quest): void {
     // その集落がすでに捨てられていれば、その近くの別の集落（場所を知らなければ当て推量で探す）
     let best: Camp | null = this.camps.find((cp) => cp.id >= 0 && cp.kind === 0 && r.goblinCamp && cp.id === r.goblinCamp) ?? null;
     // オークに従う集落があれば、そちらを先に選ぶ（オークがゴブリンを従えていることは、外の世界にも噂として届いていて、場所も知られている）。
-    // 一行がオークの縄張りに踏み込み、オークが吠えて集落のゴブリンを呼ぶ場面になる（src/eco/orc.ts の meetParty）
+    // 一行がオークの縄張りに踏み込み、オークが吠えて集落のゴブリンを呼ぶ場面になる（meetParty）
     const vassal = best?.lx ? null : this.camps.filter((cp) => cp.id >= 0 && cp.kind === 0 && (cp.lx || cp.ly) && this.list.some((o) => o.k === Kind.Orc && !o.dead && !o.away && o.hx === cp.lx && o.hy === cp.ly)).sort((a, b) => sq(a.x - (r.goblinCampX || r.goblinX)) + sq(a.y - (r.goblinCampY || r.goblinY)) - (sq(b.x - (r.goblinCampX || r.goblinX)) + sq(b.y - (r.goblinCampY || r.goblinY))) || a.id - b.id)[0];
     if (vassal) best = vassal;
     const known = !!best;
@@ -89,7 +89,7 @@ export function chooseAim(this: Ecology, p: Party, q: Quest): void {
     }
   }
   if (q.a === 2 || q.a === 6) {
-    // 相手の竜と寝床への道は、依頼の一覧と同じ判定で決める（src/eco/quest.ts の questDragonCr・dragonWayKnown）
+    // 相手の竜と寝床への道は、依頼の一覧と同じ判定で決める（questDragonCr・dragonWayKnown）
     const d = this.questDragonCr();
     if (d && d.k === Kind.Dragon) {
       // ドラゴン：寝床までの道が町で知られている（前の一行が見つけて持ち帰った）ときだけ、竜退治を目標にする

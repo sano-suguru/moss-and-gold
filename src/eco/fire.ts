@@ -30,7 +30,7 @@ export function scorchMoss(this: Ecology, k: number): void {
 /** 燃える床の上にいる者が受けるダメージ（生き物の更新4回ごとに、最大の体力のこの割合。逃げ遅れると数回で倒れる） */
 const FLOOR_BURN = 0.2;
 /** ドラゴンの炎の扇の中にいる者が、炎を吐く間に生き物の更新ごとに受けるダメージ（ドラゴンの強さに対する割合の幅。居続けると打ち合いの2〜3回分） */
-// （体力を 4 + 強さ×5 から 4 + 強さ×9 にしたとき（src/eco/combat.ts の HP_PER_STR）、炎の傷も同じ割合で重くした：0.4 → 0.72）
+// （体力を 4 + 強さ×5 から 4 + 強さ×9 にしたとき（HP_PER_STR）、炎の傷も同じ割合で重くした：0.4 → 0.72）
 const BREATH_MIN = 0.72;
 const BREATH_RANGE = 0.72;
 /** 焼かれた記録（settle.jsonl の burn）を新しく残すまでの、前に傷を受けてからの間（tick。生き物の更新100回） */
@@ -40,7 +40,7 @@ const FIREPROOF = [Kind.Dragon, Kind.Golem, Kind.Worm, Kind.Ghost, Kind.Salamand
 
 /**
  * 炎で傷を負う（燃える床とドラゴンの炎から）。体力が尽きれば焼け死ぬ（手を下した種は by）。
- * やられそうになったヴァンパイアは、ばらけられるならコウモリの群れにばらけて逃げる（src/eco/vampire.ts の vampCanScatter）
+ * やられそうになったヴァンパイアは、ばらけられるならコウモリの群れにばらけて逃げる（vampCanScatter）
  */
 export function burnHurt(this: Ecology, o: Cr, dmg: number, by: number): void {
   if (o.hp <= 0) o.hp = this.maxHp(o);

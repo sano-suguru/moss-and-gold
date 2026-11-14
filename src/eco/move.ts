@@ -615,7 +615,7 @@ export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
     mx *= f;
     my *= f;
   }
-  // クモの巣の糸に足を取られる者（強さ2〜5の地面を行く者。src/eco/spider.ts の webEffect）は、巣の中では半分の速さ
+  // クモの巣の糸に足を取られる者（強さ2〜5の地面を行く者。webEffect）は、巣の中では半分の速さ
   if (this.webs.length && (mx || my) && this.webEffect(c) === 2 && this.inWeb(c)) {
     mx *= 0.5;
     my *= 0.5;
@@ -925,7 +925,7 @@ export function die(this: Ecology, c: Cr, cause = '', by = -1): void {
     }
     this.record('deaths', { t: this.w.tick, id: c.id, k: c.k, cause, by, x: Math.round(c.x), y: Math.round(c.y), ...(near !== undefined ? { near } : {}), ...(c.k === Kind.Rat && c.st === 11 ? { march: 1 } : {}), ...(this.inCamp(c) ? { camp: 1 } : {}) } as never);
     this.noteDeath(c, cause, by);
-    // 冒険者が倒れた所では、マナが立ちのぼる（src/eco/salamander.ts の heroDeathMana）
+    // 冒険者が倒れた所では、マナが立ちのぼる（heroDeathMana）
     this.heroDeathMana(c);
     // 魔物に倒された冒険者は、一行の被害として覚えられる（生き残りが町へ帰れば、その種の噂になる。src/eco/quest.ts）
     // （倒した個体は、最後に打ってきた相手（foe。src/eco/combat.ts）の種が合えばその者、合わなければ分からない（-1））

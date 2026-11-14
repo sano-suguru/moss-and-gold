@@ -213,7 +213,7 @@ export function isLit(this: Ecology, o: Cr): boolean {
 export function canSense(this: Ecology, c: Cr, o: Cr): boolean {
   if ((o.st === 7 || o.st === 12) && this.isHidden(o) && !this.atDoorOf(c, o)) return false;
   const d2 = sq(o.x - c.x) + sq(o.y - c.y);
-  // 逃げて巣や住みかの中へ身を隠した者には、すぐそば（1.2マス）まで来ないと気づかない（src/eco/combat.ts の denHidden）
+  // 逃げて巣や住みかの中へ身を隠した者には、すぐそば（1.2マス）まで来ないと気づかない（denHidden）
   if (o.flee > 0 && o.act === 0 && d2 > 1.2 * TILE * 1.2 * TILE && this.denHidden(o)) return false;
   const T2 = TILE * TILE;
   const sense = Ecology.SENSE[c.k] ?? 'night';
@@ -242,7 +242,7 @@ export function fires(this: Ecology): [number, number, number][] {
   if (this.fireStep === this.step) return this.fireList;
   const m = this.w.map;
   const out: [number, number, number][] = [];
-  // 冒険者の焚き火は、休みの最後の3分の1で細る（怖さの届く範囲が4マスから約1.5マスへ。src/eco/night.ts の campFire）
+  // 冒険者の焚き火は、休みの最後の3分の1で細る（怖さの届く範囲が4マスから約1.5マスへ。campFire）
   for (const p of this.parties) if ((p.camp ?? -1) >= 0) out.push([((p.camp as number) % m.w) * TILE + 8, Math.floor((p.camp as number) / m.w) * TILE + 8, 4 * TILE * this.campFire(p)]);
   for (const cp of this.camps) if (cp.id >= 0 && (cp.fuel ?? 0) > 0) out.push([cp.x, cp.y + 10, 4 * TILE]);
   const gx = m.entrance.x * TILE + 16;

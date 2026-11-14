@@ -11,7 +11,7 @@
  *   直線（line）：中心から向きの方へ長さ r、幅 2w の帯（戦士の飛ぶ斬撃。max 体まで貫く）
  *   十字（cross）：中心から縦横に腕 r、幅 2w（僧侶のハンマーの十字架の爆発）
  * 壁の向こうの者には当たらない（中心から見通しの利く者だけ）。
- * 画面には、形そのものを一つのエフェクトで出す（src/creatureView.ts の sweep と wave）。打たれた者それぞれには、ふつうの打たれた光（fxHits）が出る。
+ * 画面には、形そのものを一つのエフェクトで出す（sweep と wave）。打たれた者それぞれには、ふつうの打たれた光（fxHits）が出る。
  */
 import { BLOOD, type Cr, Ecology, Kind, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
@@ -165,12 +165,12 @@ export function resolveVolleys(this: Ecology): void {
     // マジックミサイルが届く前に、撃った魔法使いが倒れたとき。seed41 では5日目に体力が NaN になったゴーレムが、25日目までに冒険者を8人倒していた）
     const a = this.byId.get(v.a);
     if (!a || a.dead) continue;
-    // 大グモの糸：打たずに、届いた所の一人を縛る（src/eco/spiderskill.ts の silkLands）
+    // 大グモの糸：打たずに、届いた所の一人を縛る（silkLands）
     if (v.bind) {
       this.silkLands(a, v);
       continue;
     }
-    // コボルトの小石：冒険者にだけ、小さな傷を負わせる（打ってきた相手としては覚えさせない。src/eco/koboldskill.ts の stoneLands）
+    // コボルトの小石：冒険者にだけ、小さな傷を負わせる（打ってきた相手としては覚えさせない。stoneLands）
     if (a.k === Kind.Kobold) {
       this.stoneLands(a, v);
       continue;
@@ -182,7 +182,7 @@ export function resolveVolleys(this: Ecology): void {
       continue;
     }
     // 落ちる攻撃：打った者と同じ種には当たらない（冒険者の矢はドワーフにも当たらない）。霊とウィスプはすり抜ける
-    // （オークの投げ斧は、従う集落のゴブリンにも当たらない。src/eco/orcskill.ts の axeHits）
+    // （オークの投げ斧は、従う集落のゴブリンにも当たらない。axeHits）
     const who = (o: Cr) => o.k !== a.k && !(a.k === Kind.Adventurer && (o.k === Kind.Dwarf || !advMinorOk(o, a, v.tgt ?? 0))) && !(a.k === Kind.Vampire && (o.k === Kind.Bat || o.k === Kind.Thrall)) && !(a.k === Kind.Orc && !this.axeHits(a, o)) && o.k !== Kind.Ghost && o.k !== Kind.Wisp;
     let first = true;
     let axeHit = 0;
@@ -212,7 +212,7 @@ export function resolveVolleys(this: Ecology): void {
       // 分析用：ゴーレムの跳ねる衝撃波に打たれた冒険者（lib/moments.ts が、一度の技で2人以上かを数える）
       if (a.k === Kind.Golem && o.k === Kind.Adventurer) this.record('settle', { t: this.w.tick, k: Kind.Golem, ev: 'quakeHit', id: a.id, at: a.cast, n: o.sp, x: Math.round(o.x), y: Math.round(o.y) } as never);
     });
-    // 投げ斧が届いた所：当たれば火花、外れれば床に打ちつけた土ぼこり（src/creatureView.ts の axehit）
+    // 投げ斧が届いた所：当たれば火花、外れれば床に打ちつけた土ぼこり（axehit）
     if (a.k === Kind.Orc) {
       this.fxAttacks.push({ t: this.w.tick, style: 'axehit', col: axeHit ? 1 : 0, size: 1, ax: a.x, ay: a.y, dx: v.x, dy: v.y, did: -1, aid: a.id, big: false, kill: false });
       if (this.fxAttacks.length > 160) this.fxAttacks.splice(0, 60);

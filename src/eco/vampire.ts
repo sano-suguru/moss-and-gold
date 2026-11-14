@@ -50,7 +50,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
   }
   // 火の明かり（松明、焚き火、かがり火）にも近寄らない：明かりの輪の2マス外までに入ったら、火から離れる。
   // 明かりの中ではコウモリにばらけて逃げられないので、松明を掲げた冒険者に追い詰められると倒される（vampCanScatter）。
-  // 冒険者の焚き火が細っていれば、その焚き火は怖がらない（src/eco/night.ts の weakCampAt）
+  // 冒険者の焚き火が細っていれば、その焚き火は怖がらない（weakCampAt）
   for (const f of this.fires()) {
     const R = f[2] + 2 * TILE;
     const d2 = sq(c.x - f[0]) + sq(c.y - f[1]);
@@ -154,7 +154,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       // 大ネズミは、飢えが進んでから（3割を超えてから）狙う。小さな獲物ばかり狩って、大ネズミが絶える日が増えていた
       if (o.k === Kind.Rat && c.sinceMeal < s.starve * 0.3) return false;
       if (lightAt(this.tileOf(o.x, o.y)) > 60) return false;
-      // 火（松明、焚き火、かがり火）の明かりの輪の3マス外までにいる獲物は狙わない。冒険者の焚き火は、細るのを待つ（src/eco/night.ts の campFire）。
+      // 火（松明、焚き火、かがり火）の明かりの輪の3マス外までにいる獲物は狙わない。冒険者の焚き火は、細るのを待つ（campFire）。
       // ヴァンパイアは明かりの輪の2マス外までに入ると火から離れて獲物をあきらめるので、火のそばの獲物を選ぶと、近づいては追い返されるのを繰り返す
       for (const f of this.fires()) if (sq(o.x - f[0]) + sq(o.y - f[1]) < sq(f[2] + 3 * TILE) && !this.weakCampAt(f[0], f[1])) return false;
       // 起きている冒険者のそば（7マス以内）にいる、冒険者でない獲物は狙わない。ヴァンパイアは起きている冒険者に近づくと退いて獲物をあきらめるので、
@@ -201,7 +201,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       if (this.vampEngage(c, [], p)) return;
       c.act = 1;
       if (sq(p.x - c.x) + sq(p.y - c.y) < 11 * 11) {
-        // 一口では食べず、打ち合って仕留める（src/eco/combat.ts の hunt と同じ）
+        // 一口では食べず、打ち合って仕留める（hunt と同じ）
         // 分析用：コウモリに群がられて足止めされた獲物に、ヴァンパイアが打ちかかった（獲物ごとに1回）
         if (this.batPinned(p) && c.gait !== p.id) {
           c.gait = p.id;
@@ -234,7 +234,7 @@ export function vampire(this: Ecology, c: Cr, day: number): void {
       }
       return;
     }
-    // 近くに獲物がいなければ、マナが減っているとき、近くのウィスプを吸う（マナで命をつなぐ大物の一つ。src/eco/monsters.ts の sipWisp）。
+    // 近くに獲物がいなければ、マナが減っているとき、近くのウィスプを吸う（マナで命をつなぐ大物の一つ。sipWisp）。
     // ヴァンパイアは苔の豊かな所から離れた縦穴のねぐらのそばに湧き、湧くときも棺で眠るときも足もとのマナがほとんど無い（seed4・seed35 で0）ので、これが主なマナの取り方。
     // 日の光か溶岩の照り返しの明るい所と、火の明かりの輪の3マス外までにいるウィスプは狙わない（近づくと光を嫌って離れ、行き来し続ける）
     if (this.sipWisp(c, (o) => {
@@ -455,7 +455,7 @@ const RAISE_R = 70;
 
 /**
  * 倒れた冒険者を眷属にする：夜、住処から70マス以内の歩いて行ける所に、骨になる前の冒険者の亡骸があれば、いちばん近いものへ歩いて行き、
- * かがみ込んで血を短く吸い、眷属として起き上がる印を付ける（src/eco/thrall.ts の vampClaim。少しして起き上がる）。
+ * かがみ込んで血を短く吸い、眷属として起き上がる印を付ける（vampClaim。少しして起き上がる）。
  * ヴァンパイア自身が倒した者でなくてよい（冒険者を倒す数を増やさずに、倒れた冒険者が眷属になる場面を見せる。以前は25日で6シードほどだった）。
  * 冒険者が倒れるのは、ヴァンパイアのいない間や、昼（棺で眠っている間）、住処から遠い所が多いので、倒れてからの長さでは絞らず（骨になる前なら選ぶ）、
  * 遠さは住処から70マス以内と、遠出（45マス）より広くとる（住処から45マス・倒れて半日以内に絞ると25日で5回ほどだった。
@@ -504,7 +504,7 @@ export function vampRaiseFallen(this: Ecology, c: Cr, day: number): boolean {
   if (sq(d.x - c.x) + sq(d.y - c.y) < 11 * 11) {
     c.ref2 = 0;
     if (this.vampClaim(c, d)) {
-      // 血を短く吸う（src/eco/senses.ts の feeding。印を付けた亡骸からは生き物の更新15回で離れる）
+      // 血を短く吸う（feeding。印を付けた亡骸からは生き物の更新15回で離れる）
       c.feed = d.id;
       c.act = 2;
       c.actT = 0;
@@ -652,7 +652,7 @@ const lordCache = new WeakMap<Ecology, { step: number; id: number }>();
 
 /**
  * o がコウモリに群がられて足止めされているか：ヴァンパイアが o を獲物に決めていて、8マス以内（PIN_R）まで近づき、
- * 従えるコウモリが2匹以上 o にまとわりついている（20px 以内）。足止めされた者は逃げられず（src/eco/step.ts）、打ち返しも弱い（src/eco/combat.ts の fight）
+ * 従えるコウモリが2匹以上 o にまとわりついている（20px 以内）。足止めされた者は逃げられず（src/eco/step.ts）、打ち返しも弱い（fight）
  */
 export function batPinned(this: Ecology, o: Cr): boolean {
   // （獲物の種は問わない：眷属を連れたヴァンパイアが狙うオークとドワーフも、群がられれば足止めされる）

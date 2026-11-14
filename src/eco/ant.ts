@@ -55,7 +55,7 @@ export function ant(this: Ecology, c: Cr): void {
     this.tryMove(c, j[0] * s.speed * 0.6, j[1] * s.speed * 0.6);
     return;
   }
-  // 住みかの印（逃げるときに逃げ帰る先。src/eco/combat.ts の woundsAndFlight）を巣に合わせる。
+  // 住みかの印（逃げるときに逃げ帰る先。woundsAndFlight）を巣に合わせる。
   // 巣を作りに来たアリは、生み出されたとき住みかの印が入ってきた地表の口のままだったので、傷を負うと巣ではなく
   // ダンジョンの入口までマップを横切って逃げていた（abc・seed27 の12日目では、働きアリの8割ほど）。すでにずれているアリもここで直す
   if (c.hx !== col.x || c.hy !== col.y) {
@@ -106,7 +106,7 @@ export function ant(this: Ecology, c: Cr): void {
     const reach = (x: number, y: number) => (home < 0 || this.regionOf(this.tileOf(x, y)) === home) && !farm(x, y);
     let bd = 14 * TILE * 14 * TILE;
     for (const o of this.corpses) {
-      // 同じ更新の中で食べ尽くされた死骸と、ゾンビとして起き上がった者を除く（src/eco/monsters.ts の troll と同じ）
+      // 同じ更新の中で食べ尽くされた死骸と、ゾンビとして起き上がった者を除く（troll と同じ）
       if (o.dead !== 1 || o.units <= 0) continue;
       const d = sq(o.x - col.x) + sq(o.y - col.y);
       if (d < bd && reach(o.x, o.y)) {

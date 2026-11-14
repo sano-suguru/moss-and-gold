@@ -10,7 +10,7 @@ import { ARMOR_HAND_MAX } from './armor';
 export function str(this: Ecology, c: Cr): number {
   if (c.k === Kind.Adventurer) return JOB_STR[c.sp] * TIER_MUL[c.init] * this.rankMul(c) * (c.sp === Job.Thief && c.act === 2 ? 1.6 : 1);
   // スケルトンは生前の装備で強さが決まる。武器を拾ったゴブリンとオークは強くなる
-  // 冒険者のほかの人型の骨は、生前の強さの7割（2以上。src/eco/undead.ts の raiseBones）
+  // 冒険者のほかの人型の骨は、生前の強さの7割（2以上。raiseBones）
   if (c.k === Kind.Skeleton) return c.sp >= BONE_SP ? Math.max(2, Math.round(STR[c.sp - BONE_SP] * 0.7)) : c.init ? JOB_STR[c.sp] * 1.2 : 3;
   if (c.k === Kind.Dwarf) return DWARF_STR[c.sp];
   if (c.k === Kind.Thrall) return thrallStr(c);
@@ -166,7 +166,7 @@ export const HP_PER_STR = 9;
 
 /** 体力の上限（強さに比例） */
 export function maxHp(this: Ecology, c: Cr): number {
-  // リビングアーマー（空の鎧）は固い。固さは体になった武具の数で決まり、手に取った武器と盾は打撃（強さ）だけを上げる（src/eco/armor.ts の armorHp）
+  // リビングアーマー（空の鎧）は固い。固さは体になった武具の数で決まり、手に取った武器と盾は打撃（強さ）だけを上げる（armorHp）
   if (c.k === Kind.Armor) return this.armorHp(c);
   return Math.round(4 + this.str(c) * HP_PER_STR);
 }
@@ -194,7 +194,7 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1, fx = true): boolean
   // バジリスクの見つめから目を背けている者は、相手を見ずに打つので、傷が半分（src/eco/basilisk.ts）
   if (a.avert > this.w.tick) dmg *= 0.5;
   d.hp -= dmg;
-  // 大物の溜め（突進など）は、体力の上限の2割を超える重い一撃を受けたときだけ止まる（src/eco/charge.ts の breakWindup）
+  // 大物の溜め（突進など）は、体力の上限の2割を超える重い一撃を受けたときだけ止まる（breakWindup）
   if (d.k !== Kind.Adventurer && d.act === 2 && d.actT < 0 && d.hp > 0 && dmg > this.maxHp(d) * 0.2) this.breakWindup(d);
   // リビングアーマーは、倒れずに強い一打を受けると、手の武器を落とす（src/eco/armor.ts）
   if (d.k === Kind.Armor && d.hp > 0) this.armorShed(d, dmg, a);
@@ -242,7 +242,7 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
   if (d.flee <= 0 && this.str(d) > 0 && !asleep && !(d.k === Kind.Ghost && a.k !== Kind.Adventurer && a.k !== Kind.Dwarf)) {
     d.act = 2;
     d.actT = 0;
-    // コウモリに群がられている者の打ち返しは弱い（src/eco/vampire.ts の batPinned）
+    // コウモリに群がられている者の打ち返しは弱い（batPinned）
     if (this.strike(d, a, this.batPinned(d) ? 0.4 : 0.8)) {
       this.die(a, 'fight', d.k);
       if (d.k === Kind.Vampire) this.vampClaim(d, a);

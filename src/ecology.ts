@@ -92,7 +92,7 @@ export interface Party {
   members: number[];
   /**
    * 魔物から受けた被害：[種, 回数, x, y, 個体の番号（分からなければ -1）, そのうち石化の回数]。仲間が見つめで石化しかけたとき（src/eco/basilisk.ts）と、
-   * 強さ6以上の魔物に倒されたとき（src/eco/move.ts の die）に足す。生きて帰れば、その種の噂が強まる（src/eco/quest.ts）
+   * 強さ6以上の魔物に倒されたとき（die）に足す。生きて帰れば、その種の噂が強まる（src/eco/quest.ts）
    */
   hurt?: number[][];
   /** 一度の探索で見かけた大物（強さ10以上の魔物）：[種, x, y]（生きて帰れば、その種の噂になる） */
@@ -283,7 +283,7 @@ export interface Rumors {
   undead: number;
   dragon: number;
   /**
-   * 魔物の噂（種ごと）：[種, 強さ, x, y, 評判]（強さは依頼の重さ、評判は来訪の頻度に入る分。src/eco/quest.ts の beastTotal）。種の番号の順に並べる（くじで順にたどるので、ロードし直しても同じ順に）。
+   * 魔物の噂（種ごと）：[種, 強さ, x, y, 評判]（強さは依頼の重さ、評判は来訪の頻度に入る分。beastTotal）。種の番号の順に並べる（くじで順にたどるので、ロードし直しても同じ順に）。
    * 生還者が見かけた大物と、受けた被害（石化・死者）から強まり、日ごとに薄れる（src/eco/quest.ts）
    */
   beasts: number[][];
@@ -584,7 +584,7 @@ export interface Cr {
   /** 最後にマイコニドの胞子でうたた寝した時刻（tick。src/eco/myconidskill.ts）：そのあとしばらくは胞子に慣れて眠らない */
   sporeAt: number;
   /**
-   * 石化の進み（src/eco/basilisk.ts の basiliskGaze）：バジリスクと目が合っている間に増え、STONE_FULL に達すると石像になる。
+   * 石化の進み（basiliskGaze）：バジリスクと目が合っている間に増え、STONE_FULL に達すると石像になる。
    * 進むほど体が灰色になり、歩みが鈍る（tryMove）。生き物の更新 STONE_DECAY_EVERY 回ごとに1ずつ戻る（src/eco/step.ts）
    */
   stone: number;
@@ -796,7 +796,7 @@ export class Ecology {
   paths = new Map<number, { gx: number; gy: number; gk: number; at: number; path: number[]; pi: number; stall: number; miss: number }>();
   /**
    * 退く先：生き物の id →［x, y, この生き物の更新の通し番号までに着けなければやめる, 退き終えたあとの休みの長さ（生き物の更新の回数）］。
-   * 人の気配などから離れるとき、一歩ずつ押し返すのではなく、離れた所を一つ決めて着くまで歩く（src/eco/senses.ts の retreatTo・retreatStep）。
+   * 人の気配などから離れるとき、一歩ずつ押し返すのではなく、離れた所を一つ決めて着くまで歩く（retreatTo・retreatStep）。
    * 退き終えたら x を NaN にして、休みの終わりの更新の通し番号を持つ（その間は同じ理由で退かない）。セーブする
    */
   retreats = new Map<number, [number, number, number, number]>();
@@ -956,8 +956,8 @@ export class Ecology {
   static FEARS_FIRE = new Set<number>([Kind.Rat, Kind.Lizard, Kind.Spider, Kind.Bat, Kind.Ant, Kind.Troll, Kind.Basilisk, Kind.Minotaur]);
   /**
    * マナで命をつなぐ大物（マナから湧く種）。体は養分の側の獲物を食べて保つが、胃が空のまま飢えの猶予（SPEC.starve）を過ぎても、
-   * 体のマナを燃やして生き延びる（MANA_BURN_EVERY 回ごとに1。src/eco/step.ts の metabolism）。マナは、休んでいる間に足もとの土から吸い（MANA_REST_EVERY 回ごとに1）、
-   * 減ってくると近くのウィスプを吸って補う（src/eco/monsters.ts の sipWisp）。マナが尽きると、ほかの種と同じく飢え死にする
+   * 体のマナを燃やして生き延びる（MANA_BURN_EVERY 回ごとに1。metabolism）。マナは、休んでいる間に足もとの土から吸い（MANA_REST_EVERY 回ごとに1）、
+   * 減ってくると近くのウィスプを吸って補う（sipWisp）。マナが尽きると、ほかの種と同じく飢え死にする
    */
   // ヴァンパイアもマナから湧くので、同じく体のマナで命をつなぐ（外から来ていたころは、横穴から住処へ歩く道中で獲物に出会えたが、
   // 住処の場に湧くようになって、飢えて去るのが増えた：8シード×25日で 8 → 16）

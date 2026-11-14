@@ -14,7 +14,7 @@ const S = +opt('scale', '4');
 mkdirSync('build/img', { recursive: true });
 buildSync({ entryPoints: ['src/sprites.ts'], bundle: true, format: 'cjs', outfile: 'build/sprites-heroes.cjs', platform: 'node', logLevel: 'silent' });
 const SP = require(process.cwd() + '/build/sprites-heroes.cjs');
-// 職の名前は src/sprites.ts の HERO_JOBS（職の番号の順）から読み、ここには表に出す日本語の名前だけを同じ順で持つ
+// 職の名前は HERO_JOBS（職の番号の順）から読み、ここには表に出す日本語の名前だけを同じ順で持つ
 const JOB_JA = ['戦士', '魔法使い', '盗賊', '僧侶', '吟遊詩人', '狩人', '竜殺し'];
 if (SP.HERO_JOBS.length !== JOB_JA.length) throw new Error(`職の数（${SP.HERO_JOBS.length}）と日本語の名前の数（${JOB_JA.length}）が合わない`);
 const JOBS = SP.HERO_JOBS.map((j, i) => [j, JOB_JA[i]]);

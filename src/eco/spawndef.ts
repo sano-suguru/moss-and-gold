@@ -1,5 +1,5 @@
 /**
- * 魔物の湧き方の表（src/eco/generate.ts の generate が見る）。
+ * 魔物の湧き方の表（generate が見る）。
  *
  * 勇者のくせになまいきだ シリーズの構造に寄せて、野の魔物はダンジョンの中の資源（土の養分とマナ）から湧く。
  * 一行が一つの種の湧き方：どちらの資源から（side）、どの段か（tier）、いつ判定するか（every・phase・cool・minDay）、
@@ -183,7 +183,7 @@ function spiderSite(e: Ecology): number {
 export const SPAWN_DEFS: SpawnDef[] = [
   // ---- 土の養分から湧く種 ----
   // コウモリ：夕暮れに、まわり（±10マス）に苔の豊かな縦穴のねぐらへ、2匹ずつ湧く（ねぐらごとに20匹まで）。生き物の更新ごとには見ず、
-  // 夕暮れの出来事（src/eco/salamander.ts の onDayEvents）から、縦穴ごとに generateOne で呼ぶ。土ぼこりは出さない（天井のねぐらに現れる）。
+  // 夕暮れの出来事（onDayEvents）から、縦穴ごとに generateOne で呼ぶ。土ぼこりは出さない（天井のねぐらに現れる）。
   {
     k: Kind.Bat, side: 'nutr', every: 0, phase: 0, cool: 0, minDay: 0,
     cap: () => 260,
@@ -404,7 +404,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
     },
     log: `コウモリの群れを従えて、{k:${Kind.Vampire}}が暗がりのマナから現れた`,
   },
-  // ワーム：深部で眠る大物。最初からいて（src/eco/salamander.ts の seed）、倒されると、深部のまわりの土の養分からまた湧く
+  // ワーム：深部で眠る大物。最初からいて（seed）、倒されると、深部のまわりの土の養分からまた湧く
   // （生き物の更新600回ごとに4つに1つのくじ。前に湧いてから2日はあける）。
   // 湧き直さないと、冒険者が深部へ行く回数が増えるほど、ワームが画面から消える日が増える
   {

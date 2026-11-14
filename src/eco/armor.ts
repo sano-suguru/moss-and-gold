@@ -10,9 +10,9 @@
  *     （以前は武具が床に散らばり、また次の甲冑の材料になって、同じ武具から何度でも甲冑が立ち上がった）。
  *
  * 未練：冒険者が倒れると、落とした職業の道具（剣・盾・杖・鎚矛・短剣・聖印・リュート・弓・大剣）に、持ち主の未練としてマナが宿る
- * （床の道具の fuel。1つにつき ARMOR_REMNANT。新しいマナの湧き口として world.manaBorn に足す。src/eco/adventurer.ts の dropJobItems）。
+ * （床の道具の fuel。1つにつき ARMOR_REMNANT。新しいマナの湧き口として world.manaBorn に足す。dropJobItems）。
  * ドワーフ（戦士の斧（床では鎚矛）と盾、鍛冶屋の金槌（鎚矛））と、武器を拾ったゴブリン・オークが倒れたときも、落とした武具に未練が宿る
- * （ドワーフは ARMOR_REMNANT、ゴブリン・オークは ARMOR_REMNANT_KIN。src/eco/adventurer.ts の dropBelongings）。
+ * （ドワーフは ARMOR_REMNANT、ゴブリン・オークは ARMOR_REMNANT_KIN。dropBelongings）。
  * 甲冑が打たれて落とした武器と、清められた武具（fuel −1）は、もうマナを吸わない（未練の抜けた武具）。
  * 床の職業の道具は、足もとの土のマナが濃い（ARMOR_SOAK_MIN 以上）と、生き物の更新 ARMOR_SOAK_EVERY 回ごとに1ずつ、ARMOR_BIRTH_MANA まで吸って溜める
  * （土から道具へ移すだけで、総量は変わらない。未練の薄れた古い武具でも、マナの濃い所に置かれていれば、また溜まっていく）。
@@ -41,7 +41,7 @@
  * 取り込み：8マスの内の、見通しの利く床の武具。武器と盾は手に（ARMOR_HAND_MAX 個まで）、杖・聖印・リュート・弓は体に（ARMOR_BODY_MAX 個まで）。
  * 前に取り込んでから、未練の宿った武具なら ARMOR_GATHER_GAP 回、宿っていない武具なら ARMOR_ABSORB_GAP 回の更新が経っていれば取り込む。
  * 襲う相手：武具を持つ侵入者（冒険者、ドワーフ、武器を拾ったゴブリン・オーク）。アンデッド、獣や虫、他の番人は襲わない（番人の側も甲冑を襲わない）。
- * 賢さは本能だけで、逃げない。強さ（打撃）は6に、手に取り込んだ武器と盾1つごとに +3（ARMOR_HAND_MAX 個まで。src/eco/combat.ts の str）。
+ * 賢さは本能だけで、逃げない。強さ（打撃）は6に、手に取り込んだ武器と盾1つごとに +3（ARMOR_HAND_MAX 個まで。str）。
  * 体力（固さ）は体になった武具の数で決まる（armorHp）。剣や盾を拾うと打撃が重くなり、杖や聖印を体に取り込むと固くなる。
  * 倒れずに強い一打を受けると、最後に手に取った武器か盾を1つ床に落とし、打撃が下がる（armorShed）。落ちた武具にマナは宿っていないので、
  * 拾い直すのは ARMOR_ABSORB_GAP 回の更新おき。その前に冒険者やゴブリンに拾われることもある。強くなり続けず、打ち合うたびに強さが行き来する。
@@ -134,7 +134,7 @@ export function armorFoe(this: Ecology, o: Cr): boolean {
 
 /** 床の武具に宿るマナ：足もとの土が濃ければ吸って溜め、少しずつ薄れる（生き物の更新ごと。updateItems から） */
 export function fadeRemnant(this: Ecology, it: Item): void {
-  // 僧侶に清められた武具（fuel −1）は、もうマナを吸わない（src/eco/roster.ts の blessBrace）
+  // 僧侶に清められた武具（fuel −1）は、もうマナを吸わない（blessBrace）
   if (!isJobItem(it.kind) || it.fuel < 0) return;
   // 吸うのは甲冑が立ち上がる量まで（甲冑の数が上限のあいだ、湧き口のそばの武具がマナを溜め続けないように）
   if (it.fuel < ARMOR_BIRTH_MANA && this.step % ARMOR_SOAK_EVERY === it.id % ARMOR_SOAK_EVERY) {
@@ -347,7 +347,7 @@ export function absorbItem(this: Ecology, c: Cr, it: Item): void {
 
 /**
  * 崩れる：体と手の武具が砕け散る（dropBelongings から。体のマナは die の releaseMana で土へ還る）。砕けた武具は床に残らず、次の甲冑の材料にならない。
- * 画面には、武具の破片が飛び散り、青白い未練が立ちのぼって消える（src/creatureView.ts の armorshatter）
+ * 画面には、武具の破片が飛び散り、青白い未練が立ちのぼって消える（armorshatter）
  */
 export function scatterArmor(this: Ecology, c: Cr): void {
   const kit = this.armorKit.get(c.id);

@@ -297,7 +297,7 @@ export function partyStr(this: Ecology, p: Party): number {
 
 /**
  * 一行が見積もる相手の強さ：強さに残りの体力の割合を掛ける。リビングアーマー（空の鎧）は、体力が強さのわりに大きい
- * （ふつうは 4 + 強さ×HP_PER_STR、鎧は体の武具の数で決まる。src/eco/combat.ts の maxHp、src/eco/armor.ts の armorHp）ので、
+ * （ふつうは 4 + 強さ×HP_PER_STR、鎧は体の武具の数で決まる。maxHp、armorHp）ので、
  * ふつうの種と比べた体力の比を見積もりに掛ける。
  * 入れないと、武具を取り込んで強くなった鎧に一行が挑みつづけ、宝物庫の入口で次々に倒されていた（倒れた者の武具をまた鎧が取り込む）
  */
@@ -569,7 +569,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       if (o.dead || o.away) return;
       const attacked = o.id === c.foe && this.w.tick - c.hitAt < 150;
       // 目標でない住民（住処・集落・村・縄張りの者）には、自分たちから戦いを始めない
-      // 威嚇して退くオーク（src/eco/orc.ts の orcWary）も追わない
+      // 威嚇して退くオーク（orcWary）も追わない
       const enemy = (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)) || (o.k === Kind.Gargoyle && o.act !== 0) || (o.k === Kind.Mimic && c.sp === Job.Thief) || (c.sp === Job.Hunter && p.aim === 3 && !!p.aimK && o.k === p.aimK);
       const minor = MINOR.includes(o.k) && (o.k !== Kind.Bat || o.st === 0 || o.foe === c.id);
       if (!enemy && !minor && !attacked) return;
@@ -616,9 +616,9 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       if (ready) {
         c.act = 2;
         c.actT = 0;
-        // 技を放つと、その場にマナが生まれる（冒険者の活動がダンジョンにマナを持ち込む。src/eco/salamander.ts の deedMana）
+        // 技を放つと、その場にマナが生まれる（冒険者の活動がダンジョンにマナを持ち込む。deedMana）
         if (!c.away) this.deedMana(c.x, c.y, HERO_SKILL_MANA[c.sp] ?? 2, HERO_SKILL_R);
-        // 関係のない小物（大ネズミ・スライムなど）は、狙った相手か自分を襲ってきた相手でなければ巻き込まない（src/eco/attack.ts の advMinorOk）
+        // 関係のない小物（大ネズミ・スライムなど）は、狙った相手か自分を襲ってきた相手でなければ巻き込まない（advMinorOk）
         const who = (o: Cr) => o.k !== Kind.Adventurer && o.k !== Kind.Dwarf && (o === f || o.foe === c.id || (ENEMY.includes(o.k) && !this.spareResident(p, c, o) && !this.orcYields(p, o)));
         const fl = Math.sqrt(fd2) || 1;
         const ux = (f.x - c.x) / fl;
@@ -1057,7 +1057,7 @@ export function dropBelongings(this: Ecology, c: Cr): void {
     });
     return;
   }
-  // （冒険者のほかの人型の骨（sp = BONE_SP + 生前の種）は、職業の道具を持たない。src/eco/undead.ts の raiseBones）
+  // （冒険者のほかの人型の骨（sp = BONE_SP + 生前の種）は、職業の道具を持たない。raiseBones）
   if (c.k === Kind.Skeleton && c.init && c.sp < BONE_SP) {
     this.dropJobItems(c);
     c.init = 0;
@@ -1169,7 +1169,7 @@ export function eachLight(this: Ecology, fn: LightFn): void {
   // 鍛冶場の火と坑道のランプ、冒険者の焚き火
   const mw = this.w.map.w;
   for (const cp of this.camps) if (cp.id >= 0 && (cp.fuel ?? 0) > 0) fn(cp.x, cp.y + 6, 140, 1.25, 1.0, 0.58, 0.26);
-  // 冒険者の焚き火は、休みの最後の3分の1で細って、光の輪が小さく暗くなる（src/eco/night.ts の campFire）
+  // 冒険者の焚き火は、休みの最後の3分の1で細って、光の輪が小さく暗くなる（campFire）
   for (const p of this.parties) {
     if ((p.camp ?? -1) < 0) continue;
     const f = this.campFire(p);

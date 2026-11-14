@@ -48,20 +48,20 @@ export function update(this: Ecology, _tick: number, day: number, phase: number)
       this.metabolism(c);
       continue;
     }
-    // ヴァンパイアは、昼は住処の棺の中で眠る（src/eco/vampire.ts の vampCoffin）
+    // ヴァンパイアは、昼は住処の棺の中で眠る（vampCoffin）
     if (c.k === Kind.Vampire && this.vampCoffin(c)) {
       // 棺で眠っている間も、休んでいる間と同じく足もとの土からマナを吸う（下の restSoak より先に continue するので、ここで呼ぶ）
       this.restSoak(c);
       this.metabolism(c);
       continue;
     }
-    // コウモリの群れにばらけたヴァンパイアは、住処へ飛ぶだけ（src/eco/vampire.ts の vampFly）
+    // コウモリの群れにばらけたヴァンパイアは、住処へ飛ぶだけ（vampFly）
     if (c.k === Kind.Vampire && c.st === VAMP_SCATTER) {
       this.vampFly(c);
       this.metabolism(c);
       continue;
     }
-    // ヴァンパイアのコウモリに群がられている間は、もがくだけで逃げられない（src/eco/vampire.ts の batPinned）
+    // ヴァンパイアのコウモリに群がられている間は、もがくだけで逃げられない（batPinned）
     if (this.batPinned(c)) {
       c.act = 1;
       c.flee = 0;
@@ -308,7 +308,7 @@ export function metabolism(this: Ecology, c: Cr): void {
   if (c.sleep > 0 && this.step % 2 === 0) return;
   c.sinceMeal++;
   // ねぐらで眠るコウモリは代謝を落とす。ヴァンパイアに従うコウモリも、主の力で、ねぐらで眠るときと同じく腹が減りにくい（5分の1）。
-  // 従うコウモリは外へ餌を取りに出ないので、野生のコウモリと同じ減り方では1日ほどで、3分の1でもシードによっては飢え死にしていた（src/eco/bat.ts の batForage）
+  // 従うコウモリは外へ餌を取りに出ないので、野生のコウモリと同じ減り方では1日ほどで、3分の1でもシードによっては飢え死にしていた（batForage）
   const meta = c.k === Kind.Bat && (c.st === 0 || c.ref2) ? s.meta * 5 : s.meta;
   if (c.k === Kind.Bat && c.st === 0 && this.step % 5 !== 0) {
     if (c.food === 0) return;
@@ -317,7 +317,7 @@ export function metabolism(this: Ecology, c: Cr): void {
     if (c.food > 0) {
       c.food--;
       if (c.away) this.exported++;
-      // ねぐらで眠る野のコウモリの糞は、ねぐらの下の暗がりに溜まる（src/eco/bat.ts の batDropping）
+      // ねぐらで眠る野のコウモリの糞は、ねぐらの下の暗がりに溜まる（batDropping）
       else if (c.k === Kind.Bat && c.st === 0 && !c.ref2) this.batDropping(c);
       else this.deposit(c.x, c.y, 1);
       c.hungry = 0;
@@ -382,7 +382,7 @@ export function decay(this: Ecology, c: Cr): void {
   }
   // ヴァンパイアの印の付いた亡骸は、眷属として起き上がる（src/eco/thrall.ts）
   if (this.raiseThrall(c)) return;
-  // 僧侶に清められた骨は、祈りの終わりに金の光の粒になって崩れる（src/eco/roster.ts の blessCrumble）
+  // 僧侶に清められた骨は、祈りの終わりに金の光の粒になって崩れる（blessCrumble）
   if (this.blessCrumble(c)) return;
   // 何もされなければ、死骸はとてもゆっくり朽ちて土に返る。骨はさらに長く残る（ミノタウロスの縄張りの骨は、その4倍。寝床に骨が積もる）
   const stage = this.corpseStage(c);
@@ -405,8 +405,8 @@ export function decay(this: Ecology, c: Cr): void {
       return;
     }
   }
-  // 冒険者のほかの人型（ゴブリン・コボルト・オーク・ドワーフ・リザードマン）の亡骸も、骨になったあと、死者の多い暗い所で起き上がる（src/eco/undead.ts の raiseBones）。
-  // 僧侶に清められた亡骸（src/eco/roster.ts の blessBrace）は起き上がらない
+  // 冒険者のほかの人型（ゴブリン・コボルト・オーク・ドワーフ・リザードマン）の亡骸も、骨になったあと、死者の多い暗い所で起き上がる（raiseBones）。
+  // 僧侶に清められた亡骸（blessBrace）は起き上がらない
   const blessed = c.st === BLESSED || c.st === CRUMBLING;
   if (BONE_KINDS.includes(c.k) && !blessed && stage === 2 && c.actT > 1500 && this.step % 50 === c.id % 50 && this.counts[Kind.Skeleton] < BONE_CAP) {
     const k = this.tileOf(c.x, c.y);

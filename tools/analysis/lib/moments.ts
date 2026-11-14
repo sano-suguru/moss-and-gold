@@ -362,7 +362,7 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     dragonSlain: d.filter((x) => x.k === K.Dragon && x.by === K.Adventurer).length,
     dragonBurn: d.filter((x) => x.cause === 'burned' && x.by === K.Dragon).length,
     flyerBurn: d.filter((x) => x.cause === 'burned' && x.by === K.Dragon && (x.k === K.Bat || x.k === K.Wyvern || x.k === K.Wisp)).length,
-    // 焼かれた記録（settle の burn。続けて焼かれても1回。src/eco/fire.ts の burnHurt）のうち、その者の死（deaths の id）が200 tick（生き物の更新100回）の内に無いもの
+    // 焼かれた記録（settle の burn。続けて焼かれても1回。burnHurt）のうち、その者の死（deaths の id）が200 tick（生き物の更新100回）の内に無いもの
     burnEscape: (() => {
       const died = new Map<number, number[]>();
       for (const x of d) if (x.id !== undefined) (died.get(x.id) ?? died.set(x.id, []).get(x.id)!).push(x.t);
@@ -388,7 +388,7 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     bsBedMove: ev(K.Basilisk, 'bedMove').length,
     bsScare: ev(K.Rat, 'fleeBasilisk').length,
     minoDrag: ev(K.Minotaur, 'drag').length,
-    // 湧きの記録（src/eco/generate.ts の settle 'gen'。群れごとに1回）
+    // 湧きの記録（settle 'gen'。群れごとに1回）
     soilBirth: s.filter((x) => x.ev === 'gen' && x.how === 'nutr' && x.k !== K.Bat).length,
     heroMana: ev(K.Adventurer, 'heroMana').length,
     wispSip: d.filter((x) => x.cause === 'sipped').length,
@@ -436,7 +436,7 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     drinkKinds: new Set(s.filter((x) => x.ev === 'drink').map((x) => x.k)).size,
     waterCrowd: s.filter((x) => x.ev === 'waterCrowd').length,
     armorSlain: d.filter((x) => x.k === K.Armor && (x.by === K.Adventurer || x.by === 28)).length,
-    // 入口側と切り離されていた住みか（コボルトの住処、ゴブリン・リザードマンの集落、アリの巣）が、入口側の洞窟とつながった（src/eco/islands.ts の markJoined）
+    // 入口側と切り離されていた住みか（コボルトの住処、ゴブリン・リザードマンの集落、アリの巣）が、入口側の洞窟とつながった（markJoined）
     joined: s.filter((x) => x.ev === 'joined').length,
     joinedDig: s.filter((x) => x.ev === 'joined' && x.how === 1).length,
   };

@@ -82,7 +82,7 @@ function look(): Hit | null {
     return null;
   }
   if (find === 'bless') {
-    // 冒険者の亡骸の前で祈っている一行（僧侶が清める。src/eco/roster.ts の blessBrace）
+    // 冒険者の亡骸の前で祈っている一行（僧侶が清める。blessBrace）
     const p = e.parties.find((q: any) => q.braceK === 5 && (q.braceT ?? 0) > e.step);
     if (p) return { cam: { x: p.braceX, y: p.braceY, zoom }, marks: [], title: '亡骸の前で祈る一行' };
   }

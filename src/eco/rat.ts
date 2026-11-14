@@ -10,7 +10,7 @@ export function rat(this: Ecology, c: Cr, _day: number): void {
   let wary: Cr | null = null;
   this.nearby(c.x, c.y, 3, (o) => {
     if (o.dead) return;
-    // バジリスクは見回りのあいだだけ（gait が 1〜3。src/eco/basilisk.ts の basiliskPatrol）。狩りで忍び寄るときまで逃げると、獲物が取れなくなる
+    // バジリスクは見回りのあいだだけ（gait が 1〜3。basiliskPatrol）。狩りで忍び寄るときまで逃げると、獲物が取れなくなる
     const scary = (o.k === Kind.Lizard && o.act !== 0) || (o.k === Kind.Zombie && o.act !== 0) || o.k === Kind.Ghost || (o.k === Kind.Basilisk && o.gait > 0) || ((o.k === Kind.Kobold || o.k === Kind.Goblin || o.k === Kind.Lizardman || o.k === Kind.Orc || o.k === Kind.Minotaur) && o.hungry > 0);
     if (!scary) return;
     const d = sq(o.x - c.x) + sq(o.y - c.y);

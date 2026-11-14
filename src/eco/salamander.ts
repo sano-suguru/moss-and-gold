@@ -426,7 +426,7 @@ export function heldMana(this: Ecology): number {
   for (const c of this.list) if (c.dead !== 2) s += c.mana;
   // 床の武具に宿る未練（src/eco/armor.ts）
   for (const it of this.gear) if (isJobItem(it.kind)) s += Math.max(0, it.fuel);
-  // （僧侶に清められた武具は fuel を −1 にしているので、数えない。src/eco/roster.ts の blessGearNear）
+  // （僧侶に清められた武具は fuel を −1 にしているので、数えない。blessGearNear）
   return s;
 }
 

@@ -142,7 +142,7 @@ export function basiliskGaze(this: Ecology, c: Cr): boolean {
     return false;
   }
   c.act = 2;
-  // 見つめている間は目が光る（暗がりでも、8マスの内の冒険者から見える：src/eco/adventurer.ts の seenBy）
+  // 見つめている間は目が光る（暗がりでも、8マスの内の冒険者から見える：seenBy）
   c.glow = Math.max(c.glow, 30);
   this.setDir(c, o.x - c.x, o.y - c.y);
   // 目が合っているか：相手が背けておらず、バジリスクのほうを向いている。生き物の更新 STARE_LOST 回のあいだ目が合わなければ、見つめるのをやめる

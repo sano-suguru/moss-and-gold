@@ -6,7 +6,7 @@ import { BAT_CALLED, PIN_R } from './vampire';
 export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
   const night = day <= 0 && (phase > 0.79 || phase < 0.18);
   const s = SPEC[Kind.Bat];
-  // ヴァンパイアに呼ばれて、外を回って入り直すところ（src/eco/vampire.ts の batCalled）
+  // ヴァンパイアに呼ばれて、外を回って入り直すところ（batCalled）
   if (c.st === BAT_CALLED) {
     this.batCalled(c);
     return;
@@ -66,7 +66,7 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
   if (lord && !lord.dead && lord.k === Kind.Vampire && !c.away) {
     if (c.st === 0 || c.st === 2) c.st = 1;
     c.act = 1;
-    // 主が獲物を決めていれば、その上を旋回して居場所を示し（偵察）、主が近づくと獲物に群がる（足止め。src/eco/vampire.ts の batPinned）。
+    // 主が獲物を決めていれば、その上を旋回して居場所を示し（偵察）、主が近づくと獲物に群がる（足止め。batPinned）。
     // 決めていなければ、主の周りを回る。腹が半分を切ったコウモリは、主が獲物に近づくまでは、主の近くの苔を食べに行く（batForage）
     const prey = lord.ref ? this.byId.get(lord.ref) : undefined;
     const hunt = !!prey && !prey.dead && sq(prey.x - lord.x) + sq(prey.y - lord.y) < sq(40 * TILE);
