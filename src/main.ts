@@ -1,5 +1,5 @@
 import { MAP_H, MAP_W, TILE } from './mapgen';
-import { Camera, Input, deviceScale } from './input';
+import { type Camera, Input, deviceScale } from './input';
 import { MAX_LIGHTS, MAX_SHAFTS, Renderer, newLights, newShafts } from './renderer';
 import { load, packBits, packI32, packU8, save, unpackBits, unpackI32, unpackU8, type SaveData } from './save';
 import { buildAtlas } from './atlas';

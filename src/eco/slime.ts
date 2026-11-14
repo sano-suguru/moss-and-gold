@@ -1,5 +1,5 @@
 /** Ecology のメソッド：スライム（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, DIR16, Ecology, Kind, SPEC, STR, ih, sq } from '../ecology';
+import { type Cr, DIR16, Ecology, Kind, SPEC, STR, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 一つの死骸に群がって食べられるスライムの数 */
@@ -53,7 +53,7 @@ export function slime(this: Ecology, c: Cr): void {
   }
   // 死骸の匂いをたどる
   let target: Cr | null = this.byId.get(c.ref) ?? null;
-  if (!target || target.dead !== 1 || target.units <= 0) {
+  if (target?.dead !== 1 || target.units <= 0) {
     target = null;
     let bd = 160 * 160;
     for (const o of this.corpses) {

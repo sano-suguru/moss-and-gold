@@ -1,5 +1,5 @@
 /** Ecology のメソッド：ウィスプ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, DIR16, Ecology, Kind, NB4, SPEC, ih, sq } from '../ecology';
+import { type Cr, DIR16, Ecology, Kind, NB4, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 export function wisp(this: Ecology, c: Cr, day: number): void {
@@ -64,7 +64,7 @@ export function wisp(this: Ecology, c: Cr, day: number): void {
     c.vy = (c.vy / sp) * max;
   }
   // 間引いたぶん（Ecology.WISP_EVERY 回ぶん）動いて食べる
-  const K = Ecology.WISP_EVERY > 1 ? Ecology.WISP_EVERY : 1;
+  const K = Math.max(Ecology.WISP_EVERY, 1);
   this.tryMove(c, c.vx * K, c.vy * K);
   if (!(c.act === 2 && c.actT < 4)) c.act = sp > 0.15 ? 1 : 0;
   if (ih(c.id, this.step, 2) % 2 === 0 && c.food < SPEC[Kind.Wisp].cap && this.eatMoss(c, K)) {

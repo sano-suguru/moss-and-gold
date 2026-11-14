@@ -9,8 +9,8 @@
  * 色はスプライトそのもの（ゲームのライティングは当てない）。背景は洞窟の床に近い暗い灰色。
  */
 import { buildSync } from 'esbuild';
-import { createRequire } from 'module';
-import { mkdirSync, writeFileSync } from 'fs';
+import { createRequire } from 'node:module';
+import { mkdirSync, writeFileSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const argv = process.argv.slice(2);
 const opt = (k, d) => (argv.includes('--' + k) ? argv[argv.indexOf('--' + k) + 1] : d);

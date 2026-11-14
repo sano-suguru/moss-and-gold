@@ -1,5 +1,5 @@
 /** Ecology のメソッド：ジャイアントアント（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Colony, Cr, DIR16, Ecology, Kind, SPEC, ih, sq } from '../ecology';
+import { type Colony, type Cr, DIR16, Ecology, Kind, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 export function pickNest(this: Ecology): number {

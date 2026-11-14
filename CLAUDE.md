@@ -55,12 +55,12 @@ npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 
 npm install                       # 初回のみ（クラウドのセッションでは SessionStart フックが入れる）
 npm test                          # 決定性・保存則・ロード後の再現性など（約10秒。TEST_FULL=1 で0日目から）
 npm run typecheck                 # 使っていない変数・引数もエラー（tsconfig の noUnusedLocals / noUnusedParameters。要る引数は名前を _ で始める）
-npm run lint                      # Biome（使っていない import・変数、const にできる let。ルールは biome.json。フォーマッタは使わない）
+npm run lint                      # Biome の推奨ルール一式（警告もエラー）。このリポジトリで意図して書いている形とぶつかるものだけ止めている（biome.json）。フォーマッタは使わない
 npm run build                     # dist/index.html（外部依存なしの1ファイル。dist はコミットしない）
 npm run dev                       # 開発サーバー（http://localhost:8000/。src を書き換えると作り直して、ページを読み込み直す）
 ```
 
-lint の自動修正は `npx biome lint --write`（使っていない import の削除は `--unsafe` も要る）。
+lint の自動修正は `npx biome lint --write`（使っていない import の削除などは `--unsafe` も要る。`--unsafe` の修正は `a && a.b` を `a?.b` にするなど意味が変わりうるので、src に当てたら ab で出力が変わらないか確かめる）。
 
 通常の作業の流れ：
 

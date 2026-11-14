@@ -1,5 +1,5 @@
 /** Ecology のメソッド：コウモリ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, DIR16, Ecology, Kind, SPEC, ih, sq } from '../ecology';
+import { type Cr, DIR16, Ecology, Kind, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 import { BAT_CALLED, PIN_R } from './vampire';
 

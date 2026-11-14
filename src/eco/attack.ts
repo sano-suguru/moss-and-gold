@@ -13,7 +13,7 @@
  * 壁の向こうの者には当たらない（中心から見通しの利く者だけ）。
  * 画面には、形そのものを一つのエフェクトで出す（src/creatureView.ts の sweep と wave）。打たれた者それぞれには、ふつうの打たれた光（fxHits）が出る。
  */
-import { BLOOD, Cr, Ecology, Kind, sq } from '../ecology';
+import { BLOOD, type Cr, Ecology, Kind, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { SWARM_SIP } from './vampskill';
 

@@ -1,6 +1,6 @@
 /** 竜の寝床・深部・物資の置き場の、入口から歩いた道のりを、日次スナップショットから出す（三歩目の調査）。node tools/analysis/launch.mjs lairdist --runs runs/ab-x/new --day 25 */
-import { existsSync, readdirSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { decodeState, readState } from './lib/state';
 import { snapsOf } from './lib/runs';
 const argv = process.argv.slice(2);

@@ -15,7 +15,7 @@
  * 状態：溜めているあいだは run に −1、吐いたあと（糸が飛ぶ間と、噛みつきに行く間）は run に残りの回数、狙う相手は aim（どれもセーブに入る）。
  * 糸が届くのは、少し後で当たる攻撃（src/eco/attack.ts の queueVolley・resolveVolleys。Volley.bind）で扱う。
  */
-import { CR_EVERY, Cr, Ecology, Kind, sq } from '../ecology';
+import { CR_EVERY, type Cr, Ecology, Kind, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import type { Skill } from './skill';
 

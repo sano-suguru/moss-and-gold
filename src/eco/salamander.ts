@@ -1,5 +1,5 @@
 /** Ecology のメソッド：サラマンダー（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Burrow, MOSS_R, Cr, DAY_TICKS_ECO, DIR16, Ecology, Kind, MAX_WISPS, SPEC, ih, sq } from '../ecology';
+import { type Burrow, MOSS_R, type Cr, DAY_TICKS_ECO, DIR16, Ecology, Kind, MAX_WISPS, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 import { isJobItem } from './armor';
 import { SPAWN_DEFS } from './spawndef';

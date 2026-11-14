@@ -1,5 +1,5 @@
 /** Ecology のメソッド：眠り（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, DAY_TICKS_ECO, Ecology, Job, Kind, SPEC, ih, sq } from '../ecology';
+import { type Cr, DAY_TICKS_ECO, Ecology, Job, Kind, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 見張り：群れが休む間、一匹は起きている。ゲーム内の2時間ごとに交代する（群れの中で順番に） */

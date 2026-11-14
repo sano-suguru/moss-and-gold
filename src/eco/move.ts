@@ -1,5 +1,5 @@
 /** Ecology のメソッド：ユーティリティ、生き物の空間グリッド（近くの相手を探す）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, DIR16, Ecology, Kind, SPEC, TIER, ih, sq, STONE_FULL, STONE_SLOW } from '../ecology';
+import { type Cr, DIR16, Ecology, Kind, SPEC, TIER, ih, sq, STONE_FULL, STONE_SLOW } from '../ecology';
 import { TILE } from '../mapgen';
 import { VAMP_SCATTER } from './vampire';
 import { BURST_R } from './myconidskill';
@@ -216,7 +216,7 @@ export function findPathAvoid(this: Ecology, c: Cr, from: number, to: number, av
     const y = (cur / m.w) | 0;
     for (let d = 0; d < 4; d++) {
       const n = d === 0 ? (x + 1 < m.w ? cur + 1 : -1) : d === 1 ? (x > 0 ? cur - 1 : -1) : d === 2 ? (y + 1 < m.h ? cur + m.w : -1) : y > 0 ? cur - m.w : -1;
-      if (n < 0 || this.bmark[n] === g || !pass.ok(n) || (avoid && avoid(n))) continue;
+      if (n < 0 || this.bmark[n] === g || !pass.ok(n) || (avoid?.(n))) continue;
       this.bmark[n] = g;
       this.bprev[n] = cur;
       q[qt++] = n;

@@ -3,8 +3,8 @@
  *   node tools/analysis/rosterlog.mjs runs/ab-x/new [--days 5,10,15,20,25]
  * 各位の人数（日ごと）、英雄が生まれた日、倒れた数（位ごと）、引退（六歩目）、傷の残った帰還、新人の数、墓標、遠征の延べ人数と再訪。
  */
-import { readdirSync, readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 const dir = process.argv[2];
 const di = process.argv.indexOf('--days');
 const days = (di > 0 ? process.argv[di + 1] : '5,10,15,20,25').split(',').map(Number);

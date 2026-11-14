@@ -11,9 +11,9 @@
  * 同じソース・同じシードを前に実行していれば再実行せずに使い、日数が足りなければ再開して続きを実行する（分けて実行しても結果は同じ）。
  * 並列に --jobs（既定は CPU の数）個、時間のかかるシードから実行する。終わったら各フォルダに report.md を作り、<out>/summary.md を書く。
  */
-import { cpus } from 'os';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { cpus } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { generate } from '../../src/mapgen';
 import { KIND_NAMES, parseArgs } from './common';
 import { defaultAdv, getBin } from './lib/runs';
@@ -59,7 +59,7 @@ const rd = (dir: string, f: string) =>
         .map((l) => JSON.parse(l))
     : [];
 const name = (k: number) => KIND_NAMES[k] ?? `種${k}`;
-const fx = (v: number | null | undefined, d = 1) => (v === null || v === undefined || !isFinite(v) ? '—' : v.toFixed(d));
+const fx = (v: number | null | undefined, d = 1) => (v === null || v === undefined || !Number.isFinite(v) ? '—' : v.toFixed(d));
 const median = (a: number[]) => {
   if (!a.length) return NaN;
   const s = [...a].sort((x, y) => x - y);
@@ -150,7 +150,7 @@ function summarizeSeed(i: number): SeedSum | null {
   const nM = samples.find((x) => x.mouths)?.mouths.length ?? 0;
   const mouthKinds: number[] = readMouthKinds(cfg.seeds[i]);
   for (let j = 0; j < nM; j++) {
-    const open0 = samples.find((x) => x.mouths && x.mouths[j]);
+    const open0 = samples.find((x) => x.mouths?.[j]);
     s.mouths.push(`${MOUTH_NAMES[mouthKinds[j]] ?? '口'} ${open0 ? (open0 === samples[0] ? 'はじめから' : `${fx(open0.day, 2)}日`) : '閉じたまま'}`);
   }
   for (const x of samples) for (const sp of x.dragons ?? []) if (s.dragon[sp] === null) s.dragon[sp] = x.day;
@@ -249,7 +249,7 @@ function writeSummary() {
   for (const [key, label] of SETTLE_NAMES)
     L.push(row(label, (s) => {
       const st = s.settle.get(key);
-      if (!st || !st.n) return '—';
+      if (!st?.n) return '—';
       return `${st.n}件 / 中央 ${fx(median(st.dur))}日・最長 ${fx(Math.max(...st.dur))}日 / 残 ${st.live}`;
     }));
   L.push('');

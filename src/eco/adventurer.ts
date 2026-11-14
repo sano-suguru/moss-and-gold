@@ -1,5 +1,5 @@
 /** Ecology のメソッド：冒険者（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { CELL, Cr, DAY_TICKS_ECO, Ecology, GOLD_CAP, ItemKind, Job, Kind, Note, Party, Pile, SPEC, STR, TIER, TORCH_FUEL, ih, sq, STONE_FULL } from '../ecology';
+import { CELL, type Cr, DAY_TICKS_ECO, Ecology, GOLD_CAP, ItemKind, Job, Kind, type Note, type Party, type Pile, SPEC, STR, TIER, TORCH_FUEL, ih, sq, STONE_FULL } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
@@ -1111,7 +1111,7 @@ export function dropItem(this: Ecology, x: number, y: number, kind: number, fuel
   // 古い燃えさしから片づける（道具が増えすぎないように）
   if (this.gear.length > 160) {
     const i = this.gear.findIndex((o) => o.kind === ItemKind.Stub);
-    const [gone] = this.gear.splice(i >= 0 ? i : 0, 1);
+    const [gone] = this.gear.splice(Math.max(i, 0), 1);
     // 片づけた武具に宿っていた未練は、薄れて消えたことにする（マナの保存則）
     if (isJobItem(gone.kind) && gone.fuel > 0) this.w.manaFaded += gone.fuel;
   }

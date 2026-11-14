@@ -5,9 +5,9 @@
  * --one で遠征ごとに1フレーム（灯りの下）だけ（傷の姿など）。
  * 灯りの下：いちばん近い灯り（松明・光の呪文）から1.5マスの内。暗がり：3.5マスより遠く、日の光や光る苔にも照らされていない。
  */
-import { mkdirSync, writeFileSync } from 'fs';
-import { execFileSync } from 'child_process';
-import { join } from 'path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
 import { DAY_TICKS, tick } from './lib/engine';
 import { openAt } from './lib/open';
 import { encodeState } from './lib/state';

@@ -15,7 +15,7 @@
  *   ゲーム内の時間で決まった間隔（WH_EVERY tick ごと）にだけ作り直し、一覧をセーブに入れる（ロードし直しても同じ一覧になるように）。
  * - 水を飲みはじめたとき、その水場のまわりに3種以上いれば、水場ごとに生き物の更新 CROWD_GAP 回に1回だけ、賑わいとして記録する（分析用）。
  */
-import { CR_EVERY, Cr, Ecology, Kind, SPEC, STR, sq } from '../ecology';
+import { CR_EVERY, type Cr, Ecology, Kind, SPEC, STR, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 水を飲む種 */

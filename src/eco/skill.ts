@@ -7,7 +7,7 @@
  * 画面は、経過が負の数のあいだ「構えたまま」のコマで描く（src/creatureView.ts）。
  * 技を溜めはじめた時刻（tick）は Cr.cast に持ち、セーブに入れる（使ったあとの間と、溜めの途中で打たれたかの判定に使う）。
  */
-import { CR_EVERY, Cr, Ecology } from '../ecology';
+import { CR_EVERY, type Cr, Ecology } from '../ecology';
 
 /** 技の速さ：溜めと、使ったあとの間（どちらも生き物の更新の回数） */
 export interface Skill {

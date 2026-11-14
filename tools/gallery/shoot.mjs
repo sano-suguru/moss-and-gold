@@ -8,10 +8,10 @@
 //   node tools/gallery/shoot.mjs --no-shoot         撮らずに一覧画像だけ作り直す
 //   node tools/gallery/shoot.mjs --fresh            シーンを必ず作り直す（通常はシミュレーションのコードが同じなら前回のシーンを使う）
 //   シーンの作成（build/scenes.js）は、ここから呼ぶ（npm run gallery -- の後ろのオプションがここに届くように）
-import { createRequire } from 'module';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { execFileSync } from 'child_process';
-import { join, resolve } from 'path';
+import { createRequire } from 'node:module';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { join, resolve } from 'node:path';
 const { chromium } = createRequire(import.meta.url)('playwright');
 
 const ROOT = resolve('.');

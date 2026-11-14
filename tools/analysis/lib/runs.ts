@@ -12,10 +12,10 @@
  * キャッシュの無効化は規則だけで決まる：バージョン（中身のハッシュ）が違えば別の場所なので使わない。同じバージョン・同じシード・同じ開始点なら、
  * 実行した日数が足りなければ続きから再開し（--resume。分けて実行しても結果は同じ）、足りていればそのまま使う。
  */
-import { spawn } from 'child_process';
-import { createHash } from 'crypto';
-import { cpSync, existsSync, linkSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
-import { dirname, join, relative, resolve } from 'path';
+import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { cpSync, existsSync, linkSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { DAY_TICKS } from './engine';
 import { readState, writeState } from './state';
 
@@ -102,7 +102,7 @@ export function secPerDay(seed: string): number {
   return ticks ? (secs / ticks) * DAY_TICKS : 4;
 }
 
-export interface Logger { (s: string): void }
+export type Logger = (s: string) => void
 
 function spawnNode(args: string[], quiet = true): Promise<void> {
   return new Promise((res, rej) => {

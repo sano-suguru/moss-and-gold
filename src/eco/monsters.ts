@@ -1,5 +1,5 @@
 /** Ecology のメソッド：ミノタウロス、トロール、ガーゴイル、ミミック、ゴーレム、ワーム（バジリスクは src/eco/basilisk.ts）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, DIR16, Ecology, HUNT3, HUNT4, Kind, NB4, SPEC, STR, ih, sq } from '../ecology';
+import { type Cr, DIR16, Ecology, HUNT3, HUNT4, Kind, NB4, SPEC, STR, ih, sq } from '../ecology';
 import { LAIR_R, lineOfSight, TILE } from '../mapgen';
 
 /** (x, y) がミノタウロスの縄張り（寝床から LAIR_R マスの内）か。x, y はピクセル */

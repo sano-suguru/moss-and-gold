@@ -5,7 +5,7 @@
  * 覚え書き（Ecology.notes）は情報パネルのためだけのもので、シミュレーションの判断には使わない。セーブには入れる（ロードし直しても同じ説明が出るように）。
  * 物が消えても覚え書きはすぐには消さず、数が増えたときに、もう無い物の分をまとめて捨てる（いつ捨てるかは覚え書きの数だけで決まるので、決定的）。
  */
-import { Cr, Ecology, Kind, Note, Party } from '../ecology';
+import { type Cr, Ecology, Kind, type Note, type Party } from '../ecology';
 import { heroTitle } from './roster';
 
 /** 覚え書きの数がこれを超えたら、もう無い物の分を捨てる */

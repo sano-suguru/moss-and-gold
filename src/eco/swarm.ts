@@ -16,7 +16,7 @@
  *
  * 密度を動かすのは生き物の更新 SWARM_EVERY 回に1回（苔と同じ40 tick ごと）。食べるのは生き物ごとの更新の中（graze）。
  */
-import { Cr, Ecology, Kind, SPEC, ih } from '../ecology';
+import { type Cr, Ecology, Kind, SPEC, ih } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 区画の大きさ（タイル） */

@@ -1,5 +1,5 @@
 /** Ecology のメソッド：大ネズミ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Burrow, Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, ih, sq } from '../ecology';
+import { type Burrow, type Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 export function rat(this: Ecology, c: Cr, _day: number): void {
@@ -215,10 +215,14 @@ export function ratMarch(this: Ecology, c: Cr): void {
     c.tx = 0;
   };
   // 長くかかりすぎたか、ひどく腹が減ったら、列を離れる（それぞれ新しい巣穴へ帰る）
-  if (this.step - c.tx > 2500 || c.hungry > s.starve * 0.5) return done();
+  if (this.step - c.tx > 2500 || c.hungry > s.starve * 0.5) {
+    done();
+    return;
+  }
   if (sq(c.hx - c.x) + sq(c.hy - c.y) < 1.2 * TILE * 1.2 * TILE) {
     c.act = 0;
-    return done();
+    done();
+    return;
   }
   // 冒険者やドワーフが近く（3マス）にいれば、列のまま、まず離れる（以前は列のまま足もとを通って払われていた）
   let man: Cr | null = null;

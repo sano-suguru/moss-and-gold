@@ -4,8 +4,8 @@
  * 色はスプライトそのもの（ゲームのライティングは当てない）。姿は職業ごとに固定の二人分（外見のビット `look`）を、正面・横・後ろで並べる。墓標も添える。
  */
 import { buildSync } from 'esbuild';
-import { createRequire } from 'module';
-import { mkdirSync, writeFileSync } from 'fs';
+import { createRequire } from 'node:module';
+import { mkdirSync, writeFileSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const argv = process.argv.slice(2);
 const opt = (k, d) => (argv.includes('--' + k) ? argv[argv.indexOf('--' + k) + 1] : d);

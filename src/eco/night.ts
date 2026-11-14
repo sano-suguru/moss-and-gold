@@ -18,7 +18,7 @@
  * 眠る一行に忍び寄っているオークは唸らない。一行が起こされたら、一行の皆の強さで見極め、かなわなければ唸って退く（src/eco/orc.ts の orcWary）。
  * ヴァンパイアは眠っている者を好んで血を吸う。眠っている者への最初の一打ちは1.5倍で、その打ち合いでは打ち返されない（寝込みの一打ち、nightHit）。
  */
-import { Cr, Ecology, Job, Kind, Party, SPEC, ih, sq } from '../ecology';
+import { type Cr, Ecology, Job, Kind, type Party, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 起こされてから、敵が見えなくなっても構えている長さ（生き物の更新の回数。通常速度で約30秒） */

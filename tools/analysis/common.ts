@@ -1,5 +1,5 @@
 /** 分析ツールで共通に使うもの（種などの名前、引数の解析、PNG の書き出し） */
-import { deflateSync } from 'zlib';
+import { deflateSync } from 'node:zlib';
 import { NAMES } from '../../src/names';
 
 export const KIND_NAMES = NAMES;

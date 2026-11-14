@@ -9,7 +9,7 @@
     "build": "node build.mjs",
     "dev": "node build.mjs --dev",
     "typecheck": "tsc -p .",
-    "lint": "biome lint",
+    "lint": "biome lint --error-on-warnings",
     "test": "esbuild test/determinism.ts --bundle --platform=node --outfile=build/test.js --log-level=warning && node build/test.js",
     "export-sprites": "esbuild tools/export-sprites.ts --bundle --platform=node --outfile=build/export.js --log-level=warning && node build/export.js",
     "sim": "node tools/analysis/launch.mjs sim",

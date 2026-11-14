@@ -57,7 +57,7 @@ function binomTwoSided(k: number, n: number): number {
 
 /** a[i] と b[i] は同じシードの値（NaN のものは除く） */
 export function paired(a: number[], b: number[], seeds: string[]): Paired {
-  const idx = a.map((_, i) => i).filter((i) => isFinite(a[i]) && isFinite(b[i]));
+  const idx = a.map((_, i) => i).filter((i) => Number.isFinite(a[i]) && Number.isFinite(b[i]));
   const d = idx.map((i) => b[i] - a[i]);
   const n = d.length;
   const mean = n ? d.reduce((x, y) => x + y, 0) / n : NaN;
@@ -89,7 +89,7 @@ export function paired(a: number[], b: number[], seeds: string[]): Paired {
   };
 }
 
-const f = (v: number, dg = 1) => (isFinite(v) ? (Number.isInteger(v) ? String(v) : v.toFixed(dg)) : '—');
+const f = (v: number, dg = 1) => (Number.isFinite(v) ? (Number.isInteger(v) ? String(v) : v.toFixed(dg)) : '—');
 /** 差の分布を1行の文字で描いた図（シードごとの差を小さい順に、0 の位置に |） */
 export function strip(d: number[]): string {
   if (!d.length) return '';

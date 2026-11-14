@@ -1,5 +1,5 @@
 /** Ecology のメソッド：死の気配（ゴーストが現れる）、ゾンビ、ゴースト、スケルトンとリッチ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, DIR16, Ecology, Item, ItemKind, Job, Kind, SPEC, STR, ih, sq } from '../ecology';
+import { type Cr, DIR16, Ecology, type Item, ItemKind, Job, Kind, SPEC, STR, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /**

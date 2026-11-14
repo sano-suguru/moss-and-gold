@@ -1,5 +1,5 @@
 /** Ecology のメソッド：人の気配（危険の勾配）、気づき方、火を怖がる、光に寄る、弱い生き物の害、食べる時間、物音（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { CELL, Cr, Ecology, Job, Kind, Party, SPEC, STR, ih, sq } from '../ecology';
+import { CELL, type Cr, Ecology, Job, Kind, type Party, SPEC, STR, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 
 export function updatePresenceBase(this: Ecology): void {
@@ -495,7 +495,7 @@ export function pester(this: Ecology, c: Cr): boolean {
       if (o.k !== Kind.Adventurer) return false;
       {
         const p = this.parties.find((q) => q.id === o.party);
-        if (!p || p.goal !== 0 || (p.camp ?? -1) >= 0 || p.engage) return false;
+        if (p?.goal !== 0 || (p.camp ?? -1) >= 0 || p.engage) return false;
         if (p.members.some((id) => this.byId.get(id)?.sp === Job.Wizard) && ih(c.id, this.step, 215) % 3 !== 0) return false;
         if (ih(c.id, o.id ^ (this.step >> 6), 216) % 8 !== 0) return false;
         p.tx = c.x;
@@ -528,7 +528,7 @@ export function feeding(this: Ecology, c: Cr): boolean {
   // 6マスの内まで歩み寄ってから寝床へ引きずる（以前は18pxより遠いと食べるのをやめ、薙ぎ払いで仕留めた獲物の8割を一口も食べずに離れていた）。
   // 死骸は倒れてから生き物の更新900回で腐りかけになる（corpseStage）ので、行き着けなくても歩き続けはしない
   const walkTo = !!d && d.dead === 1 && d2 > 18 * 18 && c.k === Kind.Minotaur && this.corpseStage(d) === 0 && d2 < 6 * TILE * 6 * TILE;
-  if (!d || d.dead !== 1 || d.units <= 0 || c.food >= s.cap || (this.w.tick - c.hitAt < 30 && c.foe !== d.id) || (d2 > 18 * 18 && !walkTo)) {
+  if (d?.dead !== 1 || d.units <= 0 || c.food >= s.cap || (this.w.tick - c.hitAt < 30 && c.foe !== d.id) || (d2 > 18 * 18 && !walkTo)) {
     c.feed = 0;
     return false;
   }

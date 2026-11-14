@@ -3,12 +3,12 @@
 // セーブからの再現性の確認は、決まった途中のスナップショット（test/fixtures/kashitare-d5.json.gz：かしたれの5日目）から始める。
 // TEST_FULL=1 npm test なら、もとのとおり0日目から6日実行してから確かめる（約30秒）。
 // 子は `node build/test.js <部分>` で、親は結果を集めて、もとと同じ順に表示する。
-import { spawn } from 'child_process';
+import { spawn } from 'node:child_process';
 import { generate, MAP_W, MAP_H } from '../src/mapgen';
 import { World, DAY_TICKS } from '../src/world';
 import { crLights, LIGHT_ELITE, LIGHT_KIND } from '../src/eco/adventurer';
 import { decodeState, encodeState, readState } from '../tools/analysis/lib/state';
-import { join } from 'path';
+import { join } from 'node:path';
 
 function fnv(a: ArrayLike<number>): number {
   let h = 2166136261;

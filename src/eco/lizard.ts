@@ -1,5 +1,5 @@
 /** Ecology のメソッド：大トカゲ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, Ecology, Kind, SPEC, ih, sq } from '../ecology';
+import { type Cr, Ecology, Kind, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 export function lizard(this: Ecology, c: Cr, day: number): void {

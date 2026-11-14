@@ -381,7 +381,7 @@ function batRoost(f){
  P.push(D(5,12,COL.red),D(7,12,COL.red),D(6,11,RAMP.bat[0]));
  return {...raster(13,17,P),ax:6,ay:16};
 }
-function batDead(f){
+function batDead(_f){
  const P=[];
  P.push(PL([[9,5],[3,3],[0.5,6],[3,5.5],[8,6.5]],'memD',1,{ol:1}),PL([[11,5],[16,2.5],[19.5,4.5],[16.5,5.5],[12,6.5]],'mem',2,{ol:1}));
  P.push(E(10,5.5,2.4,1.8,'bat',{ol:1}),E(12.6,5.2,1.6,1.4,'bat',{ol:1}),D(13,5,COL.K));
@@ -715,7 +715,7 @@ function mushrooms(n,seed){
 
 
 // ===== 段階5b-1：ゴブリン、オーク、リザードマン、ミノタウロス =====
-function gobHead(dir,P,x,y,dead,open,k){
+function gobHead(dir,P,x,y,dead,open,_k){
  const ey=dead?RAMP.gob[0]:[230,200,60];
  if(dir==='side'){
   P.push(PL([[x-1.6,y-0.6],[x-6,y-2.6],[x-1.8,y+1.6]],'gob',2,{ol:1}));
@@ -728,7 +728,7 @@ function gobHead(dir,P,x,y,dead,open,k){
  P.push(E(x,y+0.4,3.6,3.3,'gob',{ol:1}));
  if(dir==='down'){P.push(GD(x-1.6,y-0.2,ey),GD(x+1.6,y-0.2,ey),D(x-1.6,y-1.2,RAMP.gob[0]),D(x+1.6,y-1.2,RAMP.gob[0]),E(x,y+1.4,0.9,1.2,'gob',{flat:4}));P.push(open?D(x,y+3,COL.gum):D(x-0.6,y+2.8,RAMP.gob[0]),open?D(x-1,y+3,COL.white):D(x+0.6,y+2.8,RAMP.gob[0]))}
 }
-function club(dir,P,hx,hy,sw,rest,k){
+function club(dir,P,hx,hy,sw,rest,_k){
  if(dir==='up'&&rest)return;
  let tx,ty;
  if(rest){tx=hx+(dir==='side'?-3:1);ty=hy-5}else{tx=hx+(dir==='side'?1+sw*2.5:0.6);ty=hy-5.6+Math.abs(sw)*1.5}
@@ -741,7 +741,7 @@ function goblin(dir,act,f,v=0){
  return fr;
 }
 
-function orcHead(dir,P,x,y,dead,open,k){
+function orcHead(dir,P,x,y,dead,open,_k){
  const ey=dead?RAMP.orc[0]:[230,70,50];
  if(dir==='side'){
   P.push(E(x-0.6,y-2.4,2.6,1.6,'leather',{flat:1}));
@@ -766,7 +766,7 @@ function axe(dir,P,hx,hy,sw,rest,k){
  P.push(PL([[bx,by-2.4*k],[bx+3*k,by-3.2*k],[bx+3.6*k,by],[bx+3*k,by+2.6*k],[bx,by+1.6*k]],'iron',3,{ol:1}),D(bx+3.2*k,by,RAMP.iron[4]));
 }
 /** 斧を投げたあとの手：握った鎖が拳から垂れ下がる（斧は鎖の先に出ている。src/eco/orcskill.ts） */
-function chainHeld(dir,P,hx,hy,sw,rest,k){
+function chainHeld(dir,P,hx,hy,_sw,rest,k){
  if(dir==='up'&&rest)return;
  for(let i=0;i<4;i++)P.push(D(hx+(dir==='side'?0.7*i:0.25*i),hy+1+i*1.3*k,RAMP.iron[i%2?3:1]));
 }
@@ -775,7 +775,7 @@ function orc(dir,act,f,v=0){
  return humanoid(dir,act,f,{s:1.3,skin:'orc',skinD:'orcD',cloth:'leather',head:orcHead,tool:v===1?sword:v===2?chainHeld:axe,off:v===1?shieldOff:null,leg:5,bw:4,bh:3.6,hh:9,limb:1.25});
 }
 
-function lzmHead(dir,P,x,y,dead,open,k){
+function lzmHead(dir,P,x,y,dead,open,_k){
  const ey=dead?RAMP.lzm[0]:[240,210,70];
  if(dir==='side'){
   P.push(PL([[x-2.4,y-2.4],[x-3.6,y-4],[x-1,y-2.8]],'lzmD',2,{ol:1}));
@@ -788,7 +788,7 @@ function lzmHead(dir,P,x,y,dead,open,k){
  P.push(E(x,y+0.4,3.2,3,'lzm',{ol:1}));
  if(dir==='down'){P.push(C(x,y+1.6,x,y+4.4,1.7,'lzm'),E(x,y+3.4,1.4,1,'lzmB',{flat:3}),GD(x-2,y-0.6,ey),GD(x+2,y-0.6,ey),D(x-0.6,y+4.6,RAMP.lzm[0]),D(x+0.6,y+4.6,RAMP.lzm[0]));if(open)P.push(D(x,y+5.4,COL.gum))}
 }
-function spear(dir,P,hx,hy,sw,rest,k){
+function spear(dir,P,hx,hy,sw,rest,_k){
  if(dir==='up'&&rest){P.push(LN(hx,hy+2,hx+1,hy-9,'wood',2,{no:1}));return}
  let tx,ty;
  if(rest){tx=hx+(dir==='side'?1:0.5);ty=hy-10}else if(dir==='side'){tx=hx+5+sw*3;ty=hy-2+sw}else{tx=hx;ty=hy+5}
@@ -798,7 +798,7 @@ function spear(dir,P,hx,hy,sw,rest,k){
 }
 function lizardman(dir,act,f){return humanoid(dir,act,f,{s:1.1,skin:'lzm',skinD:'lzmD',cloth:'reed',head:lzmHead,tool:spear,leg:5.4,bw:3.2,bh:3.4,hh:8.6,tail:7,tailR:1.2})}
 
-function bullHead(dir,P,x,y,dead,open,k){
+function bullHead(dir,P,x,y,dead,open,_k){
  const ey=dead?RAMP.bull[0]:[240,60,40];
  if(dir==='side'){
   P.push(C(x-1,y-2.4,x-4.2,y-4.4,1.1,'horn'),C(x-4.2,y-4.4,x-2.6,y-7,0.8,'horn'));
@@ -883,7 +883,7 @@ function reedHut(){
 
 
 // ===== 段階5b-2：トロール、バジリスク、ガーゴイル、ヴァンパイア =====
-function trollHead(dir,P,x,y,dead,open,k){
+function trollHead(dir,P,x,y,dead,open,_k){
  const ey=dead?RAMP.trl[0]:[230,190,60];
  if(dir==='side'){
   P.push(E(x+0.6,y+3.6,3.8,2,'trlD',{ol:1}));
@@ -971,7 +971,7 @@ function gargoyle(dir,act,f){
  return {...fr,ax:cx,ay:24};
 }
 
-function vampHead(dir,P,x,y,dead,open,k){
+function vampHead(dir,P,x,y,dead,open,_k){
  const ey=dead?RAMP.pale[0]:[255,60,60];
  if(dir==='side'){
   P.push(E(x,y+0.4,3.2,3.4,'pale',{ol:1}),C(x+2,y+0.8,x+3.4,y+1.6,0.9,'pale'),PL([[x-3.2,y-1],[x-2.6,y-3.4],[x+2.4,y-3.4],[x+1.6,y-1.6],[x-1,y-1.6],[x-2,y+2]],'cape',2,{ol:1}));
@@ -1072,7 +1072,7 @@ function golem(dir,act,f){
  // 胴：上が広い台形。ブロックの継ぎ目
  P.push(PL([[7,14+bob],[39,14+bob],[34,33+bob],[12,33+bob]],'gst',2,{ol:1}));
  P.push(PL([[8,14+bob],[38,14+bob],[37,17+bob],[9,17+bob]],'gst',4));
- [[9,21],[11,27]].forEach(([x,y],i)=>P.push(LN(x,y+bob,46-x,y+bob,'gst',0,{no:1})));
+ [[9,21],[11,27]].forEach(([x,y],_i)=>P.push(LN(x,y+bob,46-x,y+bob,'gst',0,{no:1})));
  [[18,14,18,21],[28,14,28,21],[14,21,14,27],[23,21,23,27],[32,21,32,27],[19,27,19,33],[27,27,27,33]].forEach(([a,b,c,d])=>P.push(LN(a,b+bob,c,d+bob,'gst',0,{no:1})));
  // 頭：肩に沈んだ小さな塊と、細い目の溝
  blk(18,6+bob,28,15+bob,2);
@@ -1235,7 +1235,7 @@ function wormMound(v,big,hard){
  for(let i=0;i<(big?7:4);i++){const b=i*2.4+v;setPx(fr,Math.round(cx+Math.cos(b)*(R+1.5)),Math.round(cy+Math.sin(b)*(R*0.55+1)),RM[2],false)}
  return {...fr,ax:Math.round(cx),ay:H-1};
 }
-function wormSeg(kind,f){
+function wormSeg(kind,_f){
  const P=[],W=28,H=24,cx=14,base=20;
  const r=kind===1?6:10;
  P.push(E(cx,base-r*0.8,r,r*0.8,'flesh',{ol:1}));
@@ -1416,7 +1416,7 @@ function dragon(dir,act,f){
  }
  const back=dir==='up';
  const lf=[2,0,-2,0][step];
- const legs=(xs,yTop,yFoot,thick,m,lift)=>{for(const [x,l] of xs){P.push(E(x,yTop,thick+2,thick+1.6,m,{ol:1}),C(x,yTop+2,x+(x<50?-1:1),yFoot-2+l,thick,m),PL([[x-thick-1,yFoot-3+l],[x+thick+1,yFoot-3+l],[x+thick+1,yFoot+l],[x-thick-1,yFoot+l]],m,2,{ol:1}));for(let i=-1;i<=1;i++)P.push(D(x+i*2,yFoot+1+l,RAMP.horn[3]))}};
+ const legs=(xs,yTop,yFoot,thick,m,_lift)=>{for(const [x,l] of xs){P.push(E(x,yTop,thick+2,thick+1.6,m,{ol:1}),C(x,yTop+2,x+(x<50?-1:1),yFoot-2+l,thick,m),PL([[x-thick-1,yFoot-3+l],[x+thick+1,yFoot-3+l],[x+thick+1,yFoot+l],[x-thick-1,yFoot+l]],m,2,{ol:1}));for(let i=-1;i<=1;i++)P.push(D(x+i*2,yFoot+1+l,RAMP.horn[3]))}};
  if(!back){
   // 正面（こちらへ向かう）：胸を張り、首をS字に持ち上げて、頭は肩より高い位置からこちらを見下ろす
   const hd=at?[0,2,3,2][q]:0,op=at&&q>0;
@@ -1492,7 +1492,7 @@ function fireBreath(dir,f,drop=24,jetOnly=false){
  const smoke=(x,y,i)=>{x=Math.round(x);y=Math.round(y);if(x<0||y<0||x>=W||y>=H)return;const p=y*W+x;if(px[p*4+3])return;const c=SMK[i];px[p*4]=c[0];px[p*4+1]=c[1];px[p*4+2]=c[2];px[p*4+3]=255;mat[p]='smoke'};
  // 炎の舌一本：根元は太く明るく、上へ行くほど細く赤く、揺れながらちぎれる
  const tongue=(bx,by,h,w,ph)=>{
-  for(let y=0;y<h;y++){const v=y/h,ww=w*(1-Math.pow(v,1.25))+0.4,sx=Math.sin(y*0.42+ph+q*1.3)*v*2.2;
+  for(let y=0;y<h;y++){const v=y/h,ww=w*(1-v ** 1.25)+0.4,sx=Math.sin(y*0.42+ph+q*1.3)*v*2.2;
    if(v>0.7&&hz(Math.round(bx),y,Math.round(ph*10)+q)<0.35)continue;
    for(let x=-ww;x<=ww;x+=1){const e=Math.abs(x)/ww;put(bx+x+sx,by-y,Math.floor(v*2.8+e*1.3-0.2),true)}}
   // 先端からちぎれた炎と煙
@@ -1504,7 +1504,7 @@ function fireBreath(dir,f,drop=24,jetOnly=false){
   // 熾火の床
   for(let i=0;i<L;i++){const u=i/L,r=zr(u);for(let z=-r;z<=r;z+=1){const nn=hz(i>>1,Math.round(z)+30,q*5+3);if(nn<u*0.7+0.15)continue;const [x,y]=screen(u,z);put(x,y,nn>0.85?2:nn>0.6?3:4)}}
   // 炎の舌：当たった所ほど高く密に、先へ行くほど低くまばらに。奥から手前へ
-  const src=[];for(let k=0;k<n;k++){const u=Math.pow(hz(k,q,31),1.4),z=(hz(k,q,32)*2-1)*zr(u)*0.9;src.push([u,z])}
+  const src=[];for(let k=0;k<n;k++){const u=hz(k,q,31) ** 1.4,z=(hz(k,q,32)*2-1)*zr(u)*0.9;src.push([u,z])}
   src.push([0,0],[0.04,-zr(0.04)*0.5],[0.04,zr(0.04)*0.5]);
   src.sort((a,b)=>screen(a[0],a[1])[1]-screen(b[0],b[1])[1]);
   src.forEach(([u,z],k)=>{const [x,y]=screen(u,z);const h=hmax*(1-u*0.65)*(0.55+0.55*hz(k,q,33));tongue(x,y,h,1.6+(1-u)*1.8,k*1.7)});
@@ -1566,18 +1566,18 @@ function staffOf(){return(dir,P,hx,hy,sw,rest,k)=>{
  P.push(LN(tx-1.2*k,ty-0.6*k,tx-0.6*k,ty-2.6*k,'wood',2,{no:1}),LN(tx+1.2*k,ty-0.6*k,tx+0.6*k,ty-2.6*k,'wood',2,{no:1}));
  P.push(D(tx,ty-1.8*k,ORB),D(tx-1,ty-1.8*k,ORB2),D(tx+1,ty-1.8*k,ORB2),D(tx,ty-2.8*k,ORB2),D(tx,ty-0.8*k,ORB2));
 }}
-function shieldOff(dir,P,x,y,k,q){
+function shieldOff(dir,P,x,y,k,_q){
  if(dir==='up'){P.push(E(x,y,3.6*k,4*k,'wood',{ol:1}),C(x-3*k,y,x+3*k,y,0.5*k,'iron',{flat:2}),E(x,y,1.2*k,1.2*k,'iron',{flat:3}));return}
  if(dir==='side'){P.push(E(x-0.6*k,y,1.8*k,4*k,'wood',{ol:1}),LN(x-0.6*k,y-3.6*k,x-0.6*k,y+3.6*k,'iron',2,{no:1}));return}
  P.push(E(x,y,3.6*k,4*k,'tabard',{ol:1}),E(x,y,2.6*k,3*k,'tabard',{flat:3}));
  P.push(LN(x,y-3*k,x,y+3*k,'goldT',3,{no:1}),LN(x-2.2*k,y-0.6*k,x+2.2*k,y-0.6*k,'goldT',3,{no:1}),E(x,y-0.6*k,0.9*k,0.9*k,'iron',{flat:4}));
 }
-function symbolOff(dir,P,x,y,k,q){
+function symbolOff(dir,P,x,y,k,_q){
  if(dir==='up')return;
  P.push(LN(x,y-2.4*k,x,y+2.4*k,'goldT',3,{no:1}),LN(x-1.6*k,y-0.8*k,x+1.6*k,y-0.8*k,'goldT',3,{no:1}),D(x,y-0.8*k,RAMP.goldT[4]));
 }
 /** 顔：k に合わせて大きさを変える。style で兜・帽子・頭巾・髪 */
-function humanHead(style){return(dir,P,x,y,dead,open,k)=>{
+function humanHead(style){return(dir,P,x,y,dead,_open,k)=>{
  const side=dir==='side',back=dir==='up',K=k;
  const ec=dead?RAMP.hskin[1]:COL.K;
  if(style==='hat'&&!back){P.push(C(x-1.4*K+(side?1.6*K:0),y+2*K,x+(side?2.4*K:0),y+7.6*K,1.6*K,'beard'),C(x+1.4*K+(side?1.6*K:0),y+2*K,x+(side?2*K:0),y+7*K,1.4*K,'beard'))}
@@ -1629,7 +1629,7 @@ function robeCape(color,trim){return(dir,P,cx,sh,hip,feet,q,mv,k)=>{
 }}
 /** 胴の飾り：職業ごとの装備 */
 const DECOR={
- warrior:(v,P,cx,hip,sh,bw,bh,k)=>{
+ warrior:(v,P,cx,hip,sh,bw,_bh,k)=>{
   // 陣羽織と紋章、ベルトと留め金
   if(v==='side'){P.push(PL([[cx-1.6*k,sh+0.6*k],[cx+2.4*k,sh+0.6*k],[cx+2.2*k,hip+1.6*k],[cx-1.2*k,hip+1.6*k]],'tabard',2,{ol:1}),LN(cx-2.2*k,hip-0.6*k,cx+2.6*k,hip-0.6*k,'leather',2,{no:1}),D(cx+1.8*k,hip-0.6*k,RAMP.goldT[3]));return}
   P.push(PL([[cx-2.2*k,sh+0.6*k],[cx+2.2*k,sh+0.6*k],[cx+2*k,hip+2*k],[cx,hip+2.6*k],[cx-2*k,hip+2*k]],'tabard',2,{ol:1}));
@@ -1637,18 +1637,18 @@ const DECOR={
   P.push(LN(cx-bw,hip-0.6*k,cx+bw,hip-0.6*k,'leather',2,{no:1}));
   if(v==='down')P.push(E(cx,hip-0.6*k,0.8*k,0.6*k,'goldT',{flat:3}));
  },
- wizard:(v,P,cx,hip,sh,bw,bh,k)=>{
+ wizard:(v,P,cx,hip,sh,bw,_bh,k)=>{
   // 腰の帯と薬袋、胸の留め金
   P.push(LN(cx-bw*0.9,hip-1.2*k,cx+bw*0.9,hip-1.2*k,'goldT',2,{no:1}));
   if(v!=='up')P.push(E(cx+(v==='side'?-1.6:2)*k,hip,1.1*k,1.3*k,'leather',{ol:1}),D(cx,sh+0.6*k,RAMP.goldT[4]));
  },
- thief:(v,P,cx,hip,sh,bw,bh,k)=>{
+ thief:(v,P,cx,hip,sh,bw,_bh,k)=>{
   // 斜めがけの革帯、腰の小袋、短い外套
   if(v==='up'){P.push(PL([[cx-bw-0.4*k,sh],[cx+bw+0.4*k,sh],[cx+bw+0.8*k,hip],[cx-bw-0.8*k,hip]],'hood',2,{ol:1}));return}
   P.push(LN(cx-bw*0.9,sh+0.4*k,cx+bw*0.8,hip-0.8*k,'boot',2,{no:1}),D(cx+bw*0.2,sh+2*k,RAMP.goldT[2]));
   P.push(LN(cx-bw,hip-0.6*k,cx+bw,hip-0.6*k,'boot',2,{no:1}),E(cx+(v==='side'?-1.4:-1.8)*k,hip+0.4*k,1*k,1.2*k,'leather',{ol:1}),E(cx+(v==='side'?0.6:1.6)*k,hip+0.2*k,0.9*k,1*k,'leather',{ol:1}));
  },
- priest:(v,P,cx,hip,sh,bw,bh,k)=>{
+ priest:(v,P,cx,hip,sh,bw,_bh,k)=>{
   // 青い肩掛け、胸の聖印、縄帯
   if(v==='up'){P.push(PL([[cx-1.6*k,sh],[cx+1.6*k,sh],[cx+1.2*k,sh+3*k],[cx-1.2*k,sh+3*k]],'stole',2,{ol:1}));return}
   if(v==='side'){P.push(LN(cx+1.2*k,sh,cx+1.6*k,hip+3*k,'stole',3,{no:1}),LN(cx-1.6*k,hip-0.8*k,cx+2.2*k,hip-0.8*k,'goldT',1,{no:1}));return}
@@ -1709,7 +1709,7 @@ function luteOff(dir,P,x,y,k,q){
  P.push(D(bx-0.6*k+(q%2),by+0.8*k,RAMP.hskin[3]));
 }
 /** 手に下げた弓（手前に描く） */
-function bowOff(dir,P,x,y,k,q){
+function bowOff(dir,P,x,y,k,_q){
  if(dir==='up')return;
  const bx=x+(dir==='side'?2.2*k:-0.8*k);
  P.push(C(bx,y-6.4*k,bx-1.4*k,y-3*k,0.55*k,'wood'),C(bx-1.4*k,y-3*k,bx-1.4*k,y+3*k,0.55*k,'wood'),C(bx-1.4*k,y+3*k,bx,y+6.4*k,0.55*k,'wood'));
@@ -1739,19 +1739,19 @@ function greatsword(dir,P,hx,hy,sw,rest,k){
  P.push(LN(hx,hy,tx,ty,'plate',4,{no:1}),LN(hx+nx,hy+ny,tx+nx,ty+ny,'plate',2,{no:1}),D(tx,ty,RAMP.plate[4]));
  P.push(LN(hx-nx*2.4*k,hy-ny*2.4*k,hx+nx*2.4*k,hy+ny*2.4*k,'bardY',2,{no:1}),D(hx-ux/L*2*k,hy-uy/L*2*k,RAMP.bardY[3]));
 }
-function quiver(v,P,cx,hip,sh,bw,bh,k){
+function quiver(v,P,cx,hip,sh,bw,_bh,k){
  // 背の矢筒（後ろ姿と横向きで見える）と、狩人の腰帯
  if(v==='up'||v==='side'){const x=cx+(v==='side'?-2.4:1.4)*k;P.push(C(x,sh-1*k,x-0.6*k,hip,1*k,'leather'));[0,1,2].forEach(i=>P.push(D(x-0.6*k+i*0.8*k,sh-2.2*k-i*0.4,RAMP.beard[3])))}
  if(v!=='up')P.push(LN(cx-bw,hip-0.6*k,cx+bw,hip-0.6*k,'boot',2,{no:1}),E(cx+1.6*k,hip+0.2*k,0.9*k,1.1*k,'leather',{ol:1}));
 }
-function bardDecor(v,P,cx,hip,sh,bw,bh,k){
+function bardDecor(v,P,cx,hip,sh,bw,_bh,k){
  // 二色に分かれた胴衣と、金の飾り
  if(v==='up')return;
  if(v==='side'){P.push(LN(cx-1*k,sh+0.6*k,cx-1*k,hip,'bardY',2,{no:1}));return}
  P.push(PL([[cx,sh+0.4*k],[cx+bw,sh+0.4*k],[cx+bw*0.9,hip],[cx,hip]],'bardY',2));
  P.push(LN(cx-bw,hip-0.6*k,cx+bw,hip-0.6*k,'boot',2,{no:1}),D(cx,sh+1.2*k,RAMP.bardY[4]),D(cx,sh+2.6*k,RAMP.bardY[4]));
 }
-function slayerDecor(v,P,cx,hip,sh,bw,bh,k){
+function slayerDecor(v,P,cx,hip,sh,bw,_bh,k){
  // 胸当ての稜線、腰の草摺、背の赤い外套（後ろ姿）
  if(v==='up'){P.push(PL([[cx-bw-0.6*k,sh-0.4*k],[cx+bw+0.6*k,sh-0.4*k],[cx+bw+1.4*k,hip+3*k],[cx-bw-1.4*k,hip+3*k]],'tabard',2,{ol:1}));return}
  if(v==='side'){P.push(LN(cx+1.4*k,sh+0.6*k,cx+1.6*k,hip-1*k,'plate',4,{no:1}),PL([[cx-2.2*k,hip-0.8*k],[cx+2.4*k,hip-0.8*k],[cx+2.6*k,hip+1.8*k],[cx-2.4*k,hip+1.8*k]],'plate',2,{ol:1}));return}
@@ -1766,7 +1766,7 @@ function headBard(dir,P,x,y,dead,open,k){
  P.push(E(x,y-2.2*K,5.2*K,1.4*K,'bardR',{ol:1}),PL([[x-3*K,y-2.4*K],[x+3*K,y-2.4*K],[x+2.4*K,y-5.4*K],[x-2.6*K,y-5.4*K]],'bardR',2,{ol:1}));
  P.push(C(x+(side?-2:2)*K,y-4.6*K,x+(side?-6:5.4)*K,y-8.4*K,0.7*K,'bardY'),D(x+(side?-6.4:5.8)*K,y-8.8*K,RAMP.bardY[4]));
 }
-function headHunter(dir,P,x,y,dead,open,k){
+function headHunter(dir,P,x,y,dead,_open,k){
  const side=dir==='side',back=dir==='up',K=k;
  P.push(E(x+(side?0.5*K:0),y+0.4*K,3.2*K,3.4*K,'hskin',{ol:1}));
  // 緑の頭巾（後ろへ垂れる尖り）
@@ -1776,7 +1776,7 @@ function headHunter(dir,P,x,y,dead,open,k){
  const ec=dead?RAMP.hskin[1]:COL.K;
  if(side)P.push(D(x+1.6*K,y+0.4*K,ec));else P.push(D(x-1.3*K,y+0.4*K,ec),D(x+1.3*K,y+0.4*K,ec));
 }
-function headSlayer(dir,P,x,y,dead,open,k){
+function headSlayer(dir,P,x,y,_dead,_open,k){
  const side=dir==='side',back=dir==='up',K=k;
  // 角のついた大兜（顔は面頬の細い隙間だけ）
  P.push(E(x+(side?0.4*K:0),y,3.8*K,4.2*K,'plate',{ol:1}));
@@ -1819,7 +1819,7 @@ function heroCape(mat,trim,flutter,len=1,wide=1){return(dir,P,cx,sh,hip,feet0,q,
  if(trim)P.push(LN(cx-w-fl,feet-1.2*k,cx+w+fl,feet-1.2*k,trim,3,{no:1}),LN(cx-w-fl,feet-1.2*k,cx-w+0.4*k,sh-0.8*k,trim,3,{no:1}),LN(cx+w+fl,feet-1.2*k,cx+w-0.4*k,sh-0.8*k,trim,3,{no:1}));
 }}
 /** 盾：見習いは小さな木の盾、熟練からは身につける色に金の十字、英雄は白金の縁 */
-function heroShield(pc,rank){return(dir,P,x,y,k,q)=>{
+function heroShield(pc,rank){return(dir,P,x,y,k,_q)=>{
  const s=rank===0?0.78:rank>=2?1.1:1,rim=rank>=3?'regal':'goldT';
  if(dir==='up'){P.push(E(x,y,3.6*k*s,4*k*s,'wood',{ol:1}),C(x-3*k*s,y,x+3*k*s,y,0.5*k,'iron',{flat:2}),E(x,y,1.2*k,1.2*k,'iron',{flat:3}));return}
  if(dir==='side'){P.push(E(x-0.6*k,y,1.8*k*s,4*k*s,rank?pc:'wood',{ol:1}),LN(x-0.6*k,y-3.6*k*s,x-0.6*k,y+3.6*k*s,rank?rim:'wood',2,{no:1}));return}
@@ -1920,7 +1920,7 @@ function crestBase(job,rank,dir){
  return [side?-0.4:0.4,side?-0.4:0.4,-4.6];
 }
 /** 見習いの背負い袋：丸めた毛布を背に（正面からも肩の上に両端が見える） */
-function noviceRoll(dir,P,cx,sh,hip,feet,q,mv,k){
+function noviceRoll(dir,P,cx,sh,hip,_feet,q,mv,k){
  const bob=mv?[0,0.4,0,0.4][q]*k:0;
  if(dir==='side'){P.push(PL([[cx-1.6*k,sh-0.2*k],[cx-5*k,sh+0.2*k],[cx-5*k,hip-0.4*k],[cx-1.6*k,hip]],'leather',2,{ol:1}),E(cx-3.4*k,sh-1.2*k+bob,2.6*k,1.5*k,'drab',{ol:1}),LN(cx-5.4*k,sh-1.2*k+bob,cx-1.6*k,sh-1.2*k+bob,'drab',1,{no:1}));return}
  if(dir==='up'){P.push(PL([[cx-3*k,sh],[cx+3*k,sh],[cx+3.2*k,hip+0.4*k],[cx-3.2*k,hip+0.4*k]],'leather',2,{ol:1}),LN(cx-3*k,sh+2*k,cx+3*k,sh+2*k,'boot',2,{no:1}));}
@@ -2051,7 +2051,7 @@ function pxShieldBack(g){
 }
 PXW.shieldBack=[0,1,2,3].map(r=>pxShieldBack(PXW.shield[r]));
 /** 鉄の脛当て（歴戦から）：足の型の靴を鉄の明暗に置き換える */
-const pxSteelLegs=g=>g&&g.map(r=>r.replace(/[Bbv]/g,ch=>({B:'3',b:'2',v:'1'})[ch]));
+const pxSteelLegs=g=>g?.map(r=>r.replace(/[Bbv]/g,ch=>({B:'3',b:'2',v:'1'})[ch]));
 const pxPad=k=>'.'.repeat(Math.max(0,k));
 /** 型の中の柄（c）の位置。剣を手に合わせて置くのに使う */
 function pxGrip(g){for(let y=0;y<g.length;y++){const x=g[y].indexOf('c');if(x>=0)return [x,y]}return [0,0]}
@@ -3680,7 +3680,7 @@ function pxHero(job,dir,act,f,torch,L,rank,pc,hairM,opts={}){
  const base={steel:armored?(novice?'hqLeather':'hqDark'):hero?'hqPlate':novice?'hqDrab':'hqSteel',hair:hairM,skin:skinM,pc:novice?'hqDrab':pc,gold:novice?'hqWood':'hqGold',leather:'hqLeather',boot:'hqBoot',wood:'hqWood',cloth};
  const sk=RAMP[skinM][3],fix={E:[opts.shut?RAMP[skinM][1]:[30,24,44],skinM],e:[opts.shut?RAMP[skinM][1]:PX_EYE[L.hair%PX_EYE.length],skinM],p:[[Math.round(sk[0]*0.7+232*0.3),Math.round(sk[1]*0.7+104*0.3),Math.round(sk[2]*0.7+100*0.3)],skinM],w:[[236,246,255],'wisp']};
  if(dead)return pxDeath(job,f,L,rank,pc,hairM);
- const hv=J.head[d],head=opts.noCape&&side&&J.deadHead&&J.deadHead[rank]||(hv.length===4?hv[rank]:hv.length===2?hv[novice?0:1]:hv[0]);
+ const hv=J.head[d],head=opts.noCape&&side&&J.deadHead?.[rank]||(hv.length===4?hv[rank]:hv.length===2?hv[novice?0:1]:hv[0]);
  let legs=PXW.legs[side?'s':'d'][mv?q:1];
  if(armored&&rank>=2)legs=pxSteelLegs(legs);
  const sw1=mv?[1,0,-1,0][q]:0;
@@ -3702,9 +3702,9 @@ function pxHero(job,dir,act,f,torch,L,rank,pc,hairM,opts={}){
  // 帽子の先・羽根（見習いの魔法使いと僧侶は頭巾なので付けない）
  if(J.tip&&!(novice&&J.head[d].length===2)&&(!J.tipR||J.tipR[rank]))P.push({g:J.tip[d],x:ux+J.tipAt[d][0],y:uy+J.tipAt[d][1],mats:base});
  // 竜殺しの角と肩当て（位ごと）。兜や体に重なる所の輪郭は、黒にせず暗い段にする
- const hn=J.horns&&J.horns[d][rank];
+ const hn=J.horns?.[d][rank];
  if(hn)P.push({g:hn.g,x:ux+hn.x,y:uy+hn.y,mats:base,soft:'n'});
- const pd=J.pauldron&&J.pauldron[rank];
+ const pd=J.pauldron?.[rank];
  if(pd&&!side){const w=pd.g[0].length;P.push({g:pd.g,x:ux+pd.x,y:uy+pd.y,mats:base,soft:'1'},{g:pd.g.map(r=>[...r].reverse().join('')),x:ux+14-pd.x-w,y:uy+pd.y,mats:base,soft:'1'})}
  // 魔法使いのひげ（名簿の頭の形 1）：顎から胸へ垂れる
  if(J.beard&&L.head===1&&!back)P.push({g:J.beard[d],x:ux,y:uy+10,mats:base});
@@ -3715,7 +3715,7 @@ function pxHero(job,dir,act,f,torch,L,rank,pc,hairM,opts={}){
  if(hero)for(let p=0;p<W*H;p++)if(fr.mat[p]==='hqGold')fr.mat[p]='glw';
  // 頭の飾りの基準：頭の型のまん中の列で、いちばん上の点（帽子や頭巾の上の縁）。cb は crestBase の代わりのずれ（頭の型ごと。J.crestAt）
  const cx=(head[0].length-14)/2+(side?5:6);let top=0;while(top<head.length-1&&head[top][cx]==='.'&&head[top][cx+1]==='.')top++;
- const ca=J.crestAt&&J.crestAt[d]&&J.crestAt[d][rank];
+ const ca=J.crestAt?.[d]?.[rank];
  return {...fr,ax:PX_FX+7,ay:H-PX_FB,hd:{d:dir,x:ux+7,y:uy-(head.length-11)+top+4.4,k:1,cb:ca?[ca[0],ca[0],-4.4+ca[1]]:[0,0,-4.4]}};
 }
 /** 1コマの絵の、塗られた範囲を切り出す */
@@ -3803,10 +3803,10 @@ function heroSprite(job,dir,act,f,torch,look,rank){
  // ---- 見習い：鎧と飾りを外して古着に ----
  if(rank===0){
   o.hunch=0.5;
-  if(job==='warrior'){Object.assign(o,{skin:'leather',skinD:'leather',cloth:'leather',pad:null,head:noviceHead('cap'),tool:noviceClub,limb:1});o.decor=(v,P,cx,hip,sh,bw,bh,k)=>{if(v!=='up')P.push(LN(cx-bw,hip-0.6*k,cx+bw,hip-0.6*k,'boot',2,{no:1}),LN(cx-bw*0.8,sh+0.6*k,cx+bw*0.6,hip-0.8*k,'drab',1,{no:1}))}}
-  else if(job==='wizard'){Object.assign(o,{skin:'drab',skinD:'drab',cloth:'drab',head:noviceHead('hood'),cape:robeCape('drab','drab')});o.decor=(v,P,cx,hip,sh,bw,bh,k)=>{P.push(LN(cx-bw*0.9,hip-1.2*k,cx+bw*0.9,hip-1.2*k,'wood',2,{no:1}))}}
-  else if(job==='priest'){Object.assign(o,{skin:'drab',skinD:'drab',cloth:'drab',cape:robeCape('drab','drab')});o.decor=(v,P,cx,hip,sh,bw,bh,k)=>{P.push(LN(cx-bw,hip-0.8*k,cx+bw,hip-0.8*k,'wood',1,{no:1}),LN(cx+0.6*k,hip-0.8*k,cx+1*k,hip+2.2*k,'wood',1,{no:1}))}}
-  else if(job==='slayer'){Object.assign(o,{skin:'leather',skinD:'leather',cloth:'leather',hand:'leather',boot:'boot',head:noviceHead('cap'),s:1.48,bw:o.bw*0.92});o.decor=(v,P,cx,hip,sh,bw,bh,k)=>{if(v!=='up')P.push(LN(cx-bw,hip-0.6*k,cx+bw,hip-0.6*k,'boot',2,{no:1}))}}
+  if(job==='warrior'){Object.assign(o,{skin:'leather',skinD:'leather',cloth:'leather',pad:null,head:noviceHead('cap'),tool:noviceClub,limb:1});o.decor=(v,P,cx,hip,sh,bw,_bh,k)=>{if(v!=='up')P.push(LN(cx-bw,hip-0.6*k,cx+bw,hip-0.6*k,'boot',2,{no:1}),LN(cx-bw*0.8,sh+0.6*k,cx+bw*0.6,hip-0.8*k,'drab',1,{no:1}))}}
+  else if(job==='wizard'){Object.assign(o,{skin:'drab',skinD:'drab',cloth:'drab',head:noviceHead('hood'),cape:robeCape('drab','drab')});o.decor=(_v,P,cx,hip,_sh,bw,_bh,k)=>{P.push(LN(cx-bw*0.9,hip-1.2*k,cx+bw*0.9,hip-1.2*k,'wood',2,{no:1}))}}
+  else if(job==='priest'){Object.assign(o,{skin:'drab',skinD:'drab',cloth:'drab',cape:robeCape('drab','drab')});o.decor=(_v,P,cx,hip,_sh,bw,_bh,k)=>{P.push(LN(cx-bw,hip-0.8*k,cx+bw,hip-0.8*k,'wood',1,{no:1}),LN(cx+0.6*k,hip-0.8*k,cx+1*k,hip+2.2*k,'wood',1,{no:1}))}}
+  else if(job==='slayer'){Object.assign(o,{skin:'leather',skinD:'leather',cloth:'leather',hand:'leather',boot:'boot',head:noviceHead('cap'),s:1.48,bw:o.bw*0.92});o.decor=(v,P,cx,hip,_sh,bw,_bh,k)=>{if(v!=='up')P.push(LN(cx-bw,hip-0.6*k,cx+bw,hip-0.6*k,'boot',2,{no:1}))}}
   // 形の印：背に丸めた毛布の背負い袋（ローブの者も法衣の上に背負う）
   o.cape=noviceRoll;
  }
@@ -4015,7 +4015,7 @@ function graveMarker(rank,color){
  return {...fr,ax:8,ay:15};
 }
 /** スケルトン：骨の体に、拾った生前の装備。gear: none|warrior|thief|priest|hunter|bard|slayer */
-function skelHead(helm){return(dir,P,x,y,dead,open,k)=>{
+function skelHead(helm){return(dir,P,x,y,_dead,open,k)=>{
  const side=dir==='side',back=dir==='up',K=k;
  P.push(E(x+(side?0.4*K:0),y,3.1*K,3.2*K,'bone',{ol:1}));
  if(!back){
@@ -4033,7 +4033,7 @@ function skelHead(helm){return(dir,P,x,y,dead,open,k)=>{
  if(helm==='crown'){P.push(PL([[x-3*K,y-2*K],[x-3*K,y-4.6*K],[x-1.6*K,y-3.4*K],[x,y-5.2*K],[x+1.6*K,y-3.4*K],[x+3*K,y-4.6*K],[x+3*K,y-2*K]],'bardY',2,{ol:1}),D(x,y-3*K,RAMP.gemR[3]))}
 }}
 const SKEYE=[200,120,255];
-function ribs(v,P,cx,hip,sh,bw,bh,k){
+function ribs(v,P,cx,hip,sh,bw,_bh,k){
  if(v==='up'){P.push(LN(cx,sh,cx,hip,'bone',1,{no:1}));return}
  for(let i=0;i<3;i++)P.push(LN(cx-bw*0.8,sh+(1+i*1.4)*k,cx+bw*0.8,sh+(1+i*1.4)*k,'boot',1,{no:1}));
  P.push(LN(cx,sh+0.6*k,cx,hip,'bone',4,{no:1}));
@@ -4060,7 +4060,7 @@ function beastSkeleton(kind,dir,act,f){
  }[kind];
  return humanoid(dir,act,f,{...base,...o});
 }
-function lichCape(dir,P,cx,sh,hip,feet,q,mv,k){
+function lichCape(dir,P,cx,sh,_hip,feet,q,mv,k){
  const sw=mv?[-1,0,1,0][q]:0,L=dir==='side'?-3.8*k:-4.4*k,Rr=dir==='side'?3.4*k:4.4*k;
  // 裾がぼろぼろに裂けたローブ
  const pts=[[cx-3*k,sh],[cx+3*k,sh],[cx+Rr+sw*0.4,feet-1]];
@@ -4104,7 +4104,7 @@ function vampMist(f){
  const fr=raster(W,H,P);
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=y*W+x;if(!fr.px[p*4+3])continue;const d=Math.hypot(x-11,(y-9)/0.7)/r;if(hz(x,y,q+70)<q*0.2+d*0.4)fr.px[p*4+3]=0}
  // 赤い粒（裏地の色）
- const red=RAMP.capeR[3-q>0?3-q:0];
+ const red=RAMP.capeR[Math.max(3-q,0)];
  for(let i=0;i<4-q;i++){const x=Math.round(11+Math.cos(i*2.3+q)*r*0.6),y=Math.round(9+Math.sin(i*2.3+q)*r*0.4);setPx(fr,x,y,red,q<2)}
  return {...fr,ax:11,ay:13};
 }
@@ -4112,7 +4112,7 @@ function vampMist(f){
 // ===== 段階7c：ドワーフと、その住みか =====
 const LAMP=[[255,246,200],[255,222,140],[240,180,90]];
 const BEARDS={miner:'dbeard',smith:'dbeardK',warrior:'dbeardW'};
-function dwarfHead(role){return(dir,P,x,y,dead,open,k)=>{
+function dwarfHead(role){return(dir,P,x,y,dead,_open,k)=>{
  const side=dir==='side',back=dir==='up',K=k,bd=BEARDS[role];
  // 大きな頭
  P.push(E(x+(side?0.4*K:0),y+0.2*K,3.9*K,3.7*K,'hskin',{ol:1}));
@@ -4176,18 +4176,18 @@ function dAxe(dir,P,hx,hy,sw,rest,k){
  P.push(PL([[bx,by-2.2*k],[bx+2.8*k,by-3*k],[bx+3.4*k,by],[bx+2.8*k,by+2.4*k],[bx,by+1.4*k]],'iron',3,{ol:1}),D(bx+3*k,by,RAMP.iron[4]));
  P.push(PL([[bx,by-1.6*k],[bx-2*k,by-2.2*k],[bx-2.2*k,by+1.6*k],[bx,by+1.2*k]],'iron',2,{ol:1}));
 }
-function lanternOff(dir,P,x,y,k,q){
+function lanternOff(dir,P,x,y,k,_q){
  // 手に提げたランタン（灯る）
  const lx=x+(dir==='side'?1.2*k:0),ly=y+2.6*k;
  P.push(LN(x,y,lx,ly-2*k,'iron',1,{no:1}),E(lx,ly,1.5*k,1.9*k,'iron',{ol:1}));
  P.push(D(lx,ly,LAMP[0]),D(lx,ly-1,LAMP[1]),D(lx-1,ly,LAMP[2]),D(lx+1,ly,LAMP[1]),D(lx,ly+1,LAMP[2]));
 }
-function dShield(dir,P,x,y,k,q){
+function dShield(dir,P,x,y,k,_q){
  if(dir==='side'){P.push(E(x-0.6*k,y,1.6*k,3.4*k,'iron',{ol:1}));return}
  P.push(E(x,y,3.2*k,3.2*k,'iron',{ol:1}),E(x,y,2.4*k,2.4*k,'wood',{flat:3}),E(x,y,0.9*k,0.9*k,'goldT',{flat:4}));
  if(dir==='down')P.push(LN(x-1.4*k,y-1.4*k,x+1.4*k,y+1.4*k,'goldT',2,{no:1}),LN(x-1.4*k,y+1.4*k,x+1.4*k,y-1.4*k,'goldT',2,{no:1}));
 }
-function dwarfDecor(role){return(v,P,cx,hip,sh,bw,bh,k)=>{
+function dwarfDecor(role){return(v,P,cx,hip,sh,bw,_bh,k)=>{
  // 太い革帯と金の留め金。鍛冶屋は革の前掛け
  if(role==='smith'&&v!=='up')P.push(PL([[cx-bw*0.8,sh+1.4*k],[cx+bw*0.8,sh+1.4*k],[cx+bw*0.9,hip+2.4*k],[cx-bw*0.9,hip+2.4*k]],'apron',2,{ol:1}));
  P.push(LN(cx-bw,hip-0.8*k,cx+bw,hip-0.8*k,'leather',3,{no:1}),LN(cx-bw,hip-0.4*k,cx+bw,hip-0.4*k,'leather',2,{no:1}));
@@ -4791,7 +4791,7 @@ function fxCrescent2(d,f){
   const cv=cover/16;
   if(cv<0.5){ if(cv>=0.19)setPx(fr,x,y,CRES[Math.min(5,4+(shade>1?1:0))],false); continue; }
   const dep=dsum/cover,ph=ph0/cover;
-  const th=Math.max(0.9,K*(1-Math.pow(Math.abs(ph)/span,2)));
+  const th=Math.max(0.9,K*(1-(Math.abs(ph)/span) ** 2));
   let i=dep<1.7?0:dep<th*0.5?1:dep<th*0.78?2:dep<th*0.93?3:4;
   if(Math.abs(ph-sheen)<0.16&&i>0)i--;       // 光の帯
   i=Math.min(5,i+shade);
@@ -5472,7 +5472,7 @@ function fxWailArc(d,f){
   const u=x*ca+y*sa+Rc-1,v=-x*sa+y*ca;
   if(Math.abs(v)>half)return -1;
   if(f>=4&&Math.floor((v+20)/3.2)%2===1)return -1; // 薄れるときはちぎれる
-  const taper=1-Math.pow(Math.abs(v)/half,2);
+  const taper=1-(Math.abs(v)/half) ** 2;
   const wav=Math.sin(v*0.42+f*0.9)*0.9*taper;  // うねり
   const r=Math.hypot(u,v)+wav;
   const t0=Rc-th*taper*0.5,t1=Rc+th*taper*0.5;
@@ -5562,7 +5562,7 @@ function fxRoarArc(d,f){
   const u=x*ca+y*sa+Rc-1,v=-x*sa+y*ca;       // 弓の中心（内側に Rc 離れた所）からの位置
   if(Math.abs(v)>half)return -1;
   if(f>=4&&Math.abs(v)>2.5&&Math.floor(Math.abs(v)/3.2)%2===1)return -1; // 薄れるときはちぎれる
-  const taper=1-Math.pow(Math.abs(v)/half,2);
+  const taper=1-(Math.abs(v)/half) ** 2;
   const saw=1-Math.abs((((v+20)/2.4)%2)-1);  // のこぎりの歯（0〜1）
   const r=Math.hypot(u,v);
   const t0=Rc-th*taper*0.5,t1=Rc+th*taper*0.5+1.8*saw*taper*(th/4.4);
@@ -5807,7 +5807,7 @@ function dragonlingSleep(stage,f){
  return {...fr,ax:Math.round(cx),ay:G};
 }
 /** 卵の殻のかけら（幼竜が生まれた場所に残る） */
-function eggShell(v){
+function eggShell(_v){
  const W=18,H=8,fr=blank(W,H),C1=[236,226,200],C2=[196,184,156],C3=[140,128,108];
  const bits=[[3,5,4],[8,6,5],[13,5,3]];
  bits.forEach(([x,y,w],i)=>{for(let dx=0;dx<w;dx++){setPx(fr,x+dx,y,dx===0?C3:C2,false);if(dx>0&&dx<w-1)setPx(fr,x+dx,y-1,C1,false)}if(i===1){setPx(fr,x+1,y-2,C1,false);setPx(fr,x+2,y-2,C2,false)}});
@@ -5873,7 +5873,7 @@ function fireSpirit(act,f){
  * 体になった武具と、取り込んだ武器・盾は、描画のときに床の道具の絵を芯のまわりに重ねる（下にぶら下がる・周りを巡る。src/creatureView.ts）
  */
 const ARMOR_EYE=[52,70,92],ARMOR_RUST=[[110,62,36],[140,84,48]];
-function armorHelm(eyes){return(dir,P,x,y,dead,open,k)=>{
+function armorHelm(eyes){return(dir,P,x,y,_dead,_open,k)=>{
  const side=dir==='side',back=dir==='up',K=k,o=side?0.4*K:0;
  // 天辺の平らな大兜：裾がわずかに広がり、目の高さに横長の覗き穴、その下に通気の穴
  P.push(PL([[x+o-3*K,y+2.6*K],[x+o-2.8*K,y-2.4*K],[x+o-2*K,y-3.2*K],[x+o+2*K,y-3.2*K],[x+o+2.8*K,y-2.4*K],[x+o+3*K,y+2.6*K]],'plate',2,{ol:1}));
@@ -6092,4 +6092,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxSporeCloud, fxSporePuff, fxSporeMote, fxSlingWhirl, fxSlingStone, fxStoneHit, fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxSporeCloud, fxSporePuff, fxSporeMote, fxSlingWhirl, fxSlingStone, fxStoneHit, fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, type bedroll, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };

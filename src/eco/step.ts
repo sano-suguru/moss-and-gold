@@ -1,6 +1,6 @@
 /** Ecology のメソッド：生き物の更新1回（step。src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 import { BONE_CAP, BONE_KINDS, KIN_RISE_MANA, KIN_ZOMBIE_CAP, KIN_ZOMBIES, ZOMBIE_KINDS } from './undead';
-import { Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, STR, ih, STONE_DECAY_EVERY } from '../ecology';
+import { type Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, STR, ih, STONE_DECAY_EVERY } from '../ecology';
 import { TILE } from '../mapgen';
 import { VAMP_SCATTER } from './vampire';
 import { BLESSED, CRUMBLING } from './roster';

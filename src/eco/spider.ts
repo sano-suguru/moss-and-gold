@@ -1,5 +1,5 @@
 /** Ecology のメソッド：大グモ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, DIR16, Ecology, Kind, SPEC, STR, Web, ih, sq } from '../ecology';
+import { type Cr, DIR16, Ecology, Kind, SPEC, STR, type Web, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 export function spider(this: Ecology, c: Cr, day: number): void {

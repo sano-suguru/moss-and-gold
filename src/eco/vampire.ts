@@ -1,5 +1,5 @@
 /** Ecology のメソッド：ヴァンパイア（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { CR_EVERY, Cr, DAY_TICKS_ECO, DIR16, Ecology, Job, Kind, SPEC, ih, sq } from '../ecology';
+import { CR_EVERY, type Cr, DAY_TICKS_ECO, DIR16, Ecology, Job, Kind, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** ヴァンパイアの状態（st）：コウモリの群れにばらけて飛んでいる */

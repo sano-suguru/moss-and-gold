@@ -1,5 +1,5 @@
 /** Ecology のメソッド：ゴブリン（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Camp, Cr, DAY_TICKS_ECO, DIR16, Ecology, HUNT0, Kind, SPEC, ih, sq } from '../ecology';
+import { type Camp, type Cr, DAY_TICKS_ECO, DIR16, Ecology, HUNT0, Kind, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /**
@@ -153,7 +153,7 @@ export function campStoreGoal(this: Ecology, cp: Camp): number {
 export function goblinHidden(this: Ecology, o: Cr): boolean {
   if (o.dead || o.st !== 7) return false;
   const cp = this.campOf(o);
-  if (!cp || cp.kind !== 0 || cp.hide !== 1) return false;
+  if (cp?.kind !== 0 || cp.hide !== 1) return false;
   if (sq(o.x - cp.x) + sq(o.y - cp.y) > 9 * TILE * 9 * TILE) return false;
   return !this.isLit(o);
 }

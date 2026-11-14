@@ -9,8 +9,8 @@
  *   mana.png      地形の上に、マナの濃さ（紫）を重ねたマップ
  *   births.png    地形の上に、生き物が現れた場所（入口・裂け目・中で生まれた）を重ねたマップ
  */
-import { existsSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { World } from '../../src/world';
 import { CAUSE_NAMES, KIND_NAMES, countsAsStuck, encodePng, parseArgs } from './common';
 

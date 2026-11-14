@@ -20,7 +20,7 @@
  *     輪と輪のあいだにいれば当たらない。向きは溜めはじめに決まる（Cr.kbx・kby に持つ）。
  *   どちらも重いが、冒険者を一撃では倒さない（体力の半分〜7割ほど）。冒険者は両方の予兆を見て避ける（戦士と僧侶は、振り下ろしからは下がらずに受ける）。
  */
-import { CR_EVERY, Cr, Ecology, HUNT3, Job, Kind, ih, sq } from '../ecology';
+import { CR_EVERY, type Cr, Ecology, HUNT3, Job, Kind, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { SKILL_ARMOR_BASH, SKILL_ARMOR_SWEEP, SKILL_GOLEM_QUAKE, SKILL_GOLEM_SLAM, SKILL_MINO_CHARGE, SKILL_MINO_SWEEP } from './skill';
 import { ItemKind } from '../ecology';

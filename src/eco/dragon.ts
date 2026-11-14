@@ -1,5 +1,5 @@
 /** Ecology のメソッド：ワイバーン、ドラゴン（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, DAY_TICKS_ECO, Ecology, Job, Kind, Pile, SPEC, STR, ih, sq } from '../ecology';
+import { type Cr, DAY_TICKS_ECO, Ecology, Job, Kind, type Pile, SPEC, STR, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 
 export function wyvern(this: Ecology, c: Cr): void {

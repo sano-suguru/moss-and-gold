@@ -1,5 +1,5 @@
 /** Ecology のメソッド：宝（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Ecology, Kind, Note, ih, sq } from '../ecology';
+import { Ecology, Kind, type Note, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 金貨をその場に落とす（近くに山があればそこに積む）。n は情報パネルに出すいきさつ（落とした者。判断には使わない） */

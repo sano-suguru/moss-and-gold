@@ -30,7 +30,7 @@ while (w.tick < days * DAY_TICKS) {
     if ((last.get(c.id)?.moved ?? 0) > 400) stats.stuck++;
     if (Math.hypot(c.x - c.hx, c.y - c.hy) < 30) stats.atHome++;
     if (c.flee > 0) stats.fleeing++;
-    (stats as any).lifeH = ((stats as any).lifeH ?? 0) + (w.tick - (c.bornAt > 0 ? c.bornAt : 0)) / 600;
+    (stats as any).lifeH = ((stats as any).lifeH ?? 0) + (w.tick - Math.max(c.bornAt, 0)) / 600;
     const fk = e.nearestForage(c.x, c.y, 200);
     (stats as any).forageDist = ((stats as any).forageDist ?? 0) + (fk >= 0 ? Math.hypot((fk % m.w) - c.x / 16, Math.floor(fk / m.w) - c.y / 16) : 999);
   }

@@ -3,8 +3,8 @@
  *   node tools/analysis/orcadv.mjs runs/ab-x/base runs/ab-x/new
  * シードごとに：冒険者に倒されたオーク、オークのいる日数（ゲーム内の1/4日ごとのサンプルでオークが1匹以上）、ゴブリンの集落のある日数、冒険者の死者、オークの威嚇
  */
-import { readFileSync, readdirSync, existsSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 const runs = process.argv.slice(2);
 const lines = (f) => (existsSync(f) ? readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []);
 const stat = (dir) => {
@@ -35,7 +35,7 @@ const stat = (dir) => {
 };
 const seeds = readdirSync(runs[0]).filter((f) => existsSync(join(runs[0], f, 'deaths.jsonl'))).sort();
 const keys = [['orcByAdv', '冒険者に倒されたオーク'], ['orcDays', 'オークのいる日数'], ['campDays', 'ゴブリンの集落のある日数'], ['advDead', '冒険者の死者'], ['bluff', 'オークの威嚇']];
-console.log(`| シード | ${keys.map(([, n]) => `${n}（${runs.map((r, i) => (i ? '後' : '前')).join(' → ')}）`).join(' | ')} |`);
+console.log(`| シード | ${keys.map(([, n]) => `${n}（${runs.map((_r, i) => (i ? '後' : '前')).join(' → ')}）`).join(' | ')} |`);
 console.log(`|---|${keys.map(() => '---').join('|')}|`);
 const tot = keys.map(() => runs.map(() => 0));
 for (const sd of seeds) {

@@ -1,5 +1,5 @@
 /** Ecology のメソッド：マイコニド（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { MOSS_R, Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, ih } from '../ecology';
+import { MOSS_R, type Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, ih } from '../ecology';
 import { TILE } from '../mapgen';
 
 export function maybeSpawnMyconid(this: Ecology, k: number, step: number): void {

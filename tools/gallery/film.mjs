@@ -1,8 +1,8 @@
 // tools/analysis/film.ts が書き出したフレームを、ゲーム画面（dist/index.html）でスクリーンショットに撮り、一枚に並べる（各フレームの下に、日と、先頭の生き物の情報パネルの内容）
 //   node tools/gallery/film.mjs build/film/<name>.json
-import { createRequire } from 'module';
-import { mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { join, resolve } from 'path';
+import { createRequire } from 'node:module';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 const { chromium } = createRequire(import.meta.url)('playwright');
 
 const sc = JSON.parse(readFileSync(process.argv[2], 'utf8'));

@@ -1,8 +1,8 @@
 // shot.ts が書き出したシーンを、ゲーム画面（dist/index.html）でスクリーンショットに撮る：そのまま、印つき、中央を切り出して3倍に拡大
 //   node tools/gallery/shot.mjs build/shots/<name>.json
-import { createRequire } from 'module';
-import { readFileSync } from 'fs';
-import { join, resolve } from 'path';
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 const { chromium } = createRequire(import.meta.url)('playwright');
 
 const sc = JSON.parse(readFileSync(process.argv[2], 'utf8'));
@@ -32,7 +32,7 @@ const big = await page.evaluate(async (b64) => {
   g.drawImage(im, 0, 0, c.width, c.height);
   return c.toDataURL('image/png').split(',')[1];
 }, crop.toString('base64'));
-(await import('fs')).writeFileSync(base + '-crop.png', Buffer.from(big, 'base64'));
+(await import('node:fs')).writeFileSync(base + '-crop.png', Buffer.from(big, 'base64'));
 // 印：ワールド座標を画面座標へ変換する（画面の中央がカメラの位置、拡大率を掛ける）
 await page.evaluate(({ marks, cam }) => {
   for (const mk of marks) {

@@ -6,7 +6,7 @@
  * 死骸や道具のいきさつ（何に倒されたか、誰が落としたか）は src/eco/notes.ts の覚え書きから。
  * 重なっているときは、生き物 → 死骸 → 金貨・道具 → 墓標・石像・置き場・集落・焚き火 の順に選ぶ（同じ段の中では指にいちばん近いもの）。
  */
-import { Cr, DAY_TICKS_ECO, Ecology, ItemKind, Kind, Note, sq } from '../ecology';
+import { type Cr, DAY_TICKS_ECO, Ecology, ItemKind, Kind, type Note, sq } from '../ecology';
 import { TILE } from '../mapgen';
 import { JOB_NAMES, NAMES, UNKNOWN } from '../names';
 import { TROPHY } from './loot';

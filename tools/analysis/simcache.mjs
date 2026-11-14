@@ -12,9 +12,9 @@
  * ビルドした sim ツールのハッシュ（binHash）ごとの、0日目から実行した結果 runs/.cache/run/<binHash>/a*\/<シード>/0/。
  * 中身のハッシュで決まる場所なので、取得したものは手元で実行したものと同じように使われる（規則は docs/rework-tools.md）。
  */
-import { execFileSync } from 'child_process';
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { bin, CACHE, ROOT } from './lib/bins.mjs';
 
 const TAG = 'sim-cache';

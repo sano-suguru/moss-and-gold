@@ -3,7 +3,7 @@
 //   node build.mjs --dev  → 開発サーバー（npm run dev）。src を書き換えると作り直し、開いているページを自動で読み込み直す。
 //                           ファイルは build/dev/ に書く。ポートは環境変数 PORT で決める（無ければ 8000、使用中なら 8000〜8999 の空きを esbuild が選ぶ）。
 import { build, context } from 'esbuild';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
 const opts = {
   entryPoints: ['src/main.ts'],

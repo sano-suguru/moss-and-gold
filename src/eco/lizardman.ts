@@ -1,5 +1,5 @@
 /** Ecology のメソッド：リザードマン（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, DIR16, Ecology, HUNT2, Kind, SPEC, ih, sq } from '../ecology';
+import { type Cr, DIR16, Ecology, HUNT2, Kind, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 export function waterNear(this: Ecology, x0: number, y0: number, R: number): number {

@@ -1,5 +1,5 @@
 /** Ecology のメソッド：生き物の様子（情報パネルのため。シミュレーションには関わらない）、見た目のための印（描画専用。シミュレーションの判断には使わない）、演出のデモ（#fxdemo。シミュレーションは実行しない）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, DAY_TICKS_ECO, Ecology, Job, Kind, Party, SPEC, TIER, ih, sq, STONE_FULL } from '../ecology';
+import { type Cr, DAY_TICKS_ECO, Ecology, Job, Kind, type Party, SPEC, TIER, ih, sq, STONE_FULL } from '../ecology';
 import { TILE } from '../mapgen';
 import { heroTitle } from './roster';
 import { ARMOR_LOW } from './armor';

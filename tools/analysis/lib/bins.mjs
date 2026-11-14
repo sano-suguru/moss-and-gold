@@ -10,11 +10,11 @@
  *   ベースと作業ツリーを、同じログの出力の仕方で比べるため。
  */
 import { build } from 'esbuild';
-import { createHash } from 'crypto';
-import { execFileSync } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
-import { dirname, join, resolve, sep } from 'path';
-import { fileURLToPath } from 'url';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 export const CACHE = join(ROOT, 'runs', '.cache');

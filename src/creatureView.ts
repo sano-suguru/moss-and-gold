@@ -262,7 +262,7 @@ export class CreatureView {
     for (const c of eco.list) {
       if (!c.feed || c.dead || c.act !== 2 || c.actT !== 0) continue;
       const d = eco.byId.get(c.feed);
-      if (!d || d.dead !== 1 || !inView(d.x, d.y, 20)) continue;
+      if (d?.dead !== 1 || !inView(d.x, d.y, 20)) continue;
       const b = this.bites.get(c.id);
       if (b && b.step === eco.step) continue;
       const L = Math.hypot(d.x - c.x, d.y - c.y) || 1;
@@ -281,7 +281,7 @@ export class CreatureView {
     for (const c of eco.list) {
       if (c.k !== Kind.Vampire || !c.feed || c.dead) continue;
       const d = eco.byId.get(c.feed);
-      if (!d || d.dead !== 1 || !inView(d.x, d.y, 30)) continue;
+      if (d?.dead !== 1 || !inView(d.x, d.y, 30)) continue;
       const [vx, vy] = pos(c);
       for (let i = 0; i < 8; i++) {
         const p = ((now * 0.06 + i / 8) % 1 + 1) % 1;
@@ -798,7 +798,7 @@ export class CreatureView {
             const bendMax = Math.min(L * 0.3, 3 + (hh(j, 3) % 7)) * side;
             const arcH = 3 + (hh(j, 4) % 4);
             const pos = (p: number) => {
-              const e = Math.pow(Math.max(0, p), 1.7);
+              const e = Math.max(0, p) ** 1.7;
               const bend = Math.sin(e * Math.PI) * bendMax;
               return [sx + (fx - sx) * e - ny * bend, sy + (fy - sy) * e + nx * bend, lift - 2 + e * 3 + Math.sin(e * Math.PI) * arcH];
             };
@@ -1832,7 +1832,7 @@ export class CreatureView {
         if (age > 18) continue;
         const c = byId.get(mk.id);
         if (!c || c.dead || !inView(c.x, c.y, 20)) continue;
-        const pop = age < 3 ? age : 3;
+        const pop = Math.min(age, 3);
         if (mk.m === '?' && listening.has(c.id)) continue;
         pushSprite(c.x + 5, c.y, 22 + pop + Ecology.bodySize(c.k) * 0.6, false, A.mark(mk.m), 0, 2);
       }
@@ -2250,7 +2250,7 @@ export class CreatureView {
             const p = Math.min(1, age / G);
             for (let i = 0; i < n; i++) {
               const ang = i * 2.399 + age * (0.1 + (i % 3) * 0.03) * (i % 2 ? 1 : -1);
-              const r = age < G ? 3 + Math.pow(1 - p, 1.4) * (30 + (i % 4) * 6) : Math.max(0, 6 - (age - G) * 0.3);
+              const r = age < G ? 3 + (1 - p) ** 1.4 * (30 + (i % 4) * 6) : Math.max(0, 6 - (age - G) * 0.3);
               const fade = age < G ? Math.min(3, Math.floor(p * 4 + (i % 2))) : Math.max(0, 2 - Math.floor((age - G) / 8));
               if (age >= G && r <= 0) continue;
               pushSprite(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r * 0.55, bh + Math.sin(i * 1.7 + age * 0.25) * 4 * (1 - p * 0.5), false, A.manaMote(fade), 0, 2);
@@ -2412,7 +2412,7 @@ export class CreatureView {
           if (h!.rank >= 3) pushSprite(x, yy - 0.05, 6, false, A.halo(0), 0, 2);
         }
         // 引退の前の最後の遠征の英雄：金の粒が二つ、ゆっくり立ちのぼる（「これが最後」。描画専用）
-        if (h && h.last && h.rank >= 3) {
+        if (h?.last && h.rank >= 3) {
           for (let i = 0; i < 2; i++) {
             const ph = (t * 0.35 + i * 0.5 + c.id * 0.13) % 1;
             pushSprite(x + Math.sin(ph * 6 + i * 3) * 6, yy, 6 + ph * 30, false, A.speck(1, Math.min(3, Math.floor(ph * 4))), 0, 2);

@@ -12,9 +12,9 @@
  *
  * 出力：<name>.png（そのまま）、<name>-marked.png（見たいものの位置に枠と名前）、<name>-crop.png（中央を切り出して、ドットのまま3倍に拡大）
  */
-import { execFileSync } from 'child_process';
-import { mkdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { DAY_TICKS, World } from '../../src/world';
 import { NAMES } from '../../src/names';
 

@@ -18,14 +18,14 @@
  * --pure（作業ツリーで0日目から実行したスナップショットだけを使う。なければ実行してキャッシュに置く）、--adv-max、--out 出力先のファイル。
  * 日（--day, --from, --to, --at）はゲーム内の日数（小数可）。どこから始めたか（どのバージョンの何日目のスナップショットか）を最初に表示する。
  */
-import { mkdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
-import { DAY_TICKS, tick, World } from './lib/engine';
-import { openAt, OpenOpts } from './lib/open';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { DAY_TICKS, tick, type World } from './lib/engine';
+import { openAt, type OpenOpts } from './lib/open';
 import { readState } from './lib/state';
 import { snapDir, snapsOf, SELF_SIM } from './lib/runs';
 import { CAUSE_NAMES, KIND_NAMES, encodePng, parseArgs } from './common';
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, readdirSync } from 'node:fs';
 
 const T = 16;
 const name = (k: number) => KIND_NAMES[k] ?? `種${k}`;

@@ -1,5 +1,5 @@
 /** Ecology のメソッド：群れ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Cr, Ecology, GROUPED, Kind, SPEC, TIER, ih, sq } from '../ecology';
+import { type Cr, Ecology, GROUPED, Kind, SPEC, TIER, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 export function groupKey(this: Ecology, c: Cr): string | null {

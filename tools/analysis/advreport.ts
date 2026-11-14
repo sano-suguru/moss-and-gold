@@ -3,8 +3,8 @@
  *   npm run advreport -- --runs runs/ab-x/base,runs/ab-x/new [--out runs/x.md]
  * ログ（settle.jsonl・deaths.jsonl）だけを読む（再実行しない）。
  */
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { PAIRED_HEAD, PAIRED_NOTE, paired, pairedRow } from './lib/stats';
 import { countMoments, momentTable } from './lib/moments';
 
@@ -25,12 +25,12 @@ function measure(dir: string): M {
   const m: M = {};
   const add = (k: string, v = 1) => (m[k] = (m[k] ?? 0) + v);
   const ev = (k: number, e: string) => s.filter((x) => x.k === k && x.ev === e);
-  m['盗みに出た'] = ev(K.Goblin, 'raid').length;
+  m.盗みに出た = ev(K.Goblin, 'raid').length;
   m['盗んだ（すべて）'] = ev(K.Goblin, 'rob').length;
   m['盗んだ（盗みに出た者）'] = ev(K.Goblin, 'rob').filter((x) => x.how === 'raid').length;
   m['盗んだ（灯りに潜んだ者）'] = ev(K.Goblin, 'rob').filter((x) => x.how !== 'raid').length;
-  m['盗みが見つかった'] = ev(K.Goblin, 'spotted').length;
-  m['盗んだ物を蓄えに入れた'] = ev(K.Goblin, 'loot').filter((x) => x.n > 0).length;
+  m.盗みが見つかった = ev(K.Goblin, 'spotted').length;
+  m.盗んだ物を蓄えに入れた = ev(K.Goblin, 'loot').filter((x) => x.n > 0).length;
   const enter = ev(K.Adventurer, 'enter');
   const arrive = ev(K.Adventurer, 'arrive');
   const aim = ev(K.Adventurer, 'aim');
@@ -44,29 +44,29 @@ function measure(dir: string): M {
     m[`全滅：${AIMS[a]}`] = end.filter((x) => x.how === a && x.reason === 'wiped').length;
   }
   m['竜退治：道を知って入った'] = enter.filter((x) => x.how === 2 && x.to === 1).length;
-  m['竜の寝床への道を持ち帰った'] = ev(K.Adventurer, 'way').length;
+  m.竜の寝床への道を持ち帰った = ev(K.Adventurer, 'way').length;
   m['ゴブリン退治：松明で隠れた者を見つけた'] = ev(K.Adventurer, 'reveal').length;
   // ゴブリン退治の一行が目指した集落の終わり方（一行が入ってからゲーム内の1日以内）
   for (const h of enter.filter((x) => x.how === 5)) {
     const fin = s.find((x) => x.k === K.Goblin && x.id === h.n && (x.ev === 'abandon' || x.ev === 'empty') && x.t >= h.t && x.t < h.t + 14400);
     add(`退治された集落の終わり：${fin ? (fin.ev === 'empty' ? '皆いなくなった' : `捨てた（${fin.reason}）`) : '続いた'}`);
   }
-  m['冒険者に倒されたゴブリン'] = de.filter((x) => x.k === K.Goblin && x.by === K.Adventurer).length;
-  m['冒険者に倒されたドラゴン'] = de.filter((x) => x.k === K.Dragon && x.by === K.Adventurer).length;
+  m.冒険者に倒されたゴブリン = de.filter((x) => x.k === K.Goblin && x.by === K.Adventurer).length;
+  m.冒険者に倒されたドラゴン = de.filter((x) => x.k === K.Dragon && x.by === K.Adventurer).length;
   m['冒険者に倒されたワイバーン・ワーム'] = de.filter((x) => (x.k === K.Wyvern || x.k === K.Worm) && x.by === K.Adventurer).length;
-  m['死んだ冒険者'] = de.filter((x) => x.k === K.Adventurer).length;
+  m.死んだ冒険者 = de.filter((x) => x.k === K.Adventurer).length;
   m['大ネズミの引っ越し（巣穴を移した）'] = read(join(dir, 'moves.jsonl')).filter((x) => x.k === K.Rat).length;
-  m['大ネズミの引っ越しの列'] = ev(K.Rat, 'march').length;
+  m.大ネズミの引っ越しの列 = ev(K.Rat, 'march').length;
   // 三歩目：見張りのうとうと、盗みの噂、物資の置き場
-  m['見張りがうとうとした'] = ev(K.Adventurer, 'doze').length;
+  m.見張りがうとうとした = ev(K.Adventurer, 'doze').length;
   m['盗んだ（見張りがうとうと中）'] = ev(K.Goblin, 'rob').filter((x) => x.doze === 1).length;
   m['物資の置き場を残した（新しく）'] = ev(K.Adventurer, 'cache').filter((x) => !x.merged).length;
-  m['物資の置き場に荷を足した'] = ev(K.Adventurer, 'cache').filter((x) => x.merged).length;
+  m.物資の置き場に荷を足した = ev(K.Adventurer, 'cache').filter((x) => x.merged).length;
   m['置き場の入口からの道のり（最大、マス）'] = Math.max(0, ...ev(K.Adventurer, 'cache').map((x) => x.how ?? 0));
-  m['置き場で補った食料'] = ev(K.Adventurer, 'supply').reduce((a, x) => a + x.n, 0);
+  m.置き場で補った食料 = ev(K.Adventurer, 'supply').reduce((a, x) => a + x.n, 0);
   m['置き場をあさった大ネズミ（回）'] = ev(K.Rat, 'cache').length;
-  m['列で歩いた大ネズミ'] = ev(K.Rat, 'march').reduce((a, x) => a + x.n, 0);
-  m['引っ越しの途中で死んだ大ネズミ'] = de.filter((x) => x.k === K.Rat && x.march).length;
+  m.列で歩いた大ネズミ = ev(K.Rat, 'march').reduce((a, x) => a + x.n, 0);
+  m.引っ越しの途中で死んだ大ネズミ = de.filter((x) => x.k === K.Rat && x.march).length;
   return m;
 }
 

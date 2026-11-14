@@ -1,6 +1,6 @@
 /** Ecology のメソッド：強さと戦い、飢えて去ること、傷と戦い（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 import { BONE_SP } from './undead';
-import { BLOOD, CR_EVERY, Cr, DAY_TICKS_ECO, DWARF_STR, Ecology, FLEE_AT, JOB_STR, Job, Kind, SPEC, STR, TIER, TIER_MUL, ih, sq } from '../ecology';
+import { BLOOD, CR_EVERY, type Cr, DAY_TICKS_ECO, DWARF_STR, Ecology, FLEE_AT, JOB_STR, Job, Kind, SPEC, STR, TIER, TIER_MUL, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 import { thrallStr } from './thrall';
 import { ARMOR_HAND_MAX } from './armor';

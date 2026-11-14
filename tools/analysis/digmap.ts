@@ -1,5 +1,5 @@
 /** 掘られたマスと岩の硬さのマップを PNG に描く（ドワーフの坑道の形を確認する） */
-import { writeFileSync } from 'fs';
+import { writeFileSync } from 'node:fs';
 import { DAY_TICKS, World } from '../../src/world';
 import { encodePng, parseArgs } from './common';
 const a = parseArgs(process.argv.slice(2));

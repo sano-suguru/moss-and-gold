@@ -2,8 +2,8 @@
 // 使い方: npm run export-sprites  → build/sprites/atlas.png と atlas.json（コミットしない。ソースから毎回同じものができる）
 // 見て確かめるためのもの。ゲームは src/sprites.ts から毎回ドット絵を作るので、PNG を手直ししてもゲームには戻らない
 // （アルファ 255 は体、254 は輪郭や目、253 はそれ自体が光る部分、252〜250 は光る・半透明などの材質の印）。
-import { mkdirSync, writeFileSync } from 'fs';
-import { deflateSync } from 'zlib';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { deflateSync } from 'node:zlib';
 import { ACTS, DIRS, SPECIES, buildAtlas } from '../src/atlas';
 
 const CRC = (() => {
@@ -65,8 +65,8 @@ for (const [name, nv] of [['zrat', 1], ['zlizard', 1], ['slime', 3], ['ghost', 1
   DIRS.forEach((d, di) => ACTS.forEach((ac, ai) => { for (let f = 0; f < 4; f++) for (let v = 0; v < nv; v++) index[`${name}/${d}/${ac}/${f}${nv > 1 ? '/' + (name === 'ant' ? ['empty', 'carrying'] : ['small', 'mid', 'large'])[v] : ''}`] = a.frames[a.named(name, di, ai, f, v)]; }));
 for (const [si, name] of [[1, 'bat'], [2, 'rat'], [3, 'lizard'], [4, 'spider'], [9, 'ant'], [10, 'kobold'], [11, 'salamander'], [12, 'goblin'], [13, 'orc'], [14, 'lizardman'], [15, 'minotaur'], [16, 'troll'], [17, 'basilisk'], [18, 'gargoyle'], [19, 'vampire'], [20, 'mimic'], [21, 'golem'], [23, 'wyvern'], [24, 'dragon'], [25, 'adventurer'], [26, 'skeleton'], [27, 'lich'], [28, 'dwarf']] as [number, string][])
   ['fresh', 'rotting', 'bones'].forEach((st, i) => { index[`corpse/${name}/${st}`] = a.frames[a.corpse(si, i)]; });
-index['web'] = a.frames[a.web];
-index['anthill'] = a.frames[a.anthill];
+index.web = a.frames[a.web];
+index.anthill = a.frames[a.anthill];
 index['goblin-camp'] = a.frames[a.camp];
 index['reed-hut'] = a.frames[a.hut];
 for (let sz = 0; sz < 3; sz++) for (let f = 0; f < 4; f++) index[`treasure/${['small', 'mid', 'large'][sz]}/${f}`] = a.frames[a.treasure(sz, f)];
@@ -74,6 +74,6 @@ index['worm-segment/body'] = a.frames[a.wormSeg(0)];
 index['worm-segment/tail'] = a.frames[a.wormSeg(1)];
 for (let kd = 0; kd < 11; kd++) for (let f = 0; f < 4; f++) index[`item/${['torch', 'stub', 'sword', 'shield', 'staff', 'mace', 'dagger', 'symbol', 'lute', 'bow', 'greatsword'][kd]}/${f}`] = a.frames[a.item(kd, f)];
 for (let f = 0; f < 4; f++) { index[`dragon-breath/side/${f}`] = a.frames[a.breath(false, f)]; index[`dragon-breath/down/${f}`] = a.frames[a.breath(true, f)]; }
-index['burrow'] = a.frames[a.burrow];
+index.burrow = a.frames[a.burrow];
 writeFileSync('build/sprites/atlas.json', JSON.stringify(index, null, 1));
 console.log(`build/sprites/atlas.png ${a.width}x${a.height}, ${Object.keys(index).length} frames`);

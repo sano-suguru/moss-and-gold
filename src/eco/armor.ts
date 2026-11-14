@@ -53,7 +53,7 @@
  * ref, ref2 最後に倒した相手と、その生き物の更新の通し番号（倒した相手の落とし物を取り込んだか＝「奪う」の判定）。lureAt 最後に取り込んだ生き物の更新の通し番号。
  * 持ち物は Ecology.armorKit。
  */
-import { Cr, DIR16, Ecology, Item, ItemKind, Kind, SPEC, STR, ih, sq } from '../ecology';
+import { type Cr, DIR16, Ecology, type Item, ItemKind, Kind, SPEC, STR, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 
 /** 冒険者とドワーフが倒れたとき、落とした職業の道具1つに宿る未練（マナ） */

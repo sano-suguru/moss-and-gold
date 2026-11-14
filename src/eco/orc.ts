@@ -1,5 +1,5 @@
 /** Ecology のメソッド：オーク（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { Camp, Cr, DAY_TICKS_ECO, DIR16, Ecology, HUNT_ORC, Kind, Party, SPEC, ih, sq } from '../ecology';
+import { type Camp, type Cr, DAY_TICKS_ECO, DIR16, Ecology, HUNT_ORC, Kind, type Party, SPEC, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { SKILL_ORC_ROAR } from './orcskill';
 
@@ -161,7 +161,7 @@ export function orcWary(this: Ecology, c: Cr): boolean {
           this.orcStartRoar(c);
           return true;
         }
-        return advance ? false : true;
+        return !advance;
       }
       return true;
     }
