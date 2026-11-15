@@ -138,6 +138,15 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // コボルトとゴブリンの戦（planWars）：蓄えの乏しい大きな群れが隣の住みかへ攻めに出る。縄張りの近いシードでしか起きないので、広いシードの組の合計で見る
+    name: 'コボルトかゴブリンの群れが相手の住みかへ攻めに出る（15シードで3回以上・2シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.ev === 'warGo').length);
+      return { ok: sum(n) >= 3 && n.filter((v) => v > 0).length >= 2, value: rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、') || 'なし' };
+    },
+  },
+  {
     // 冒険者の作り直しの一歩目：一行は目標を持って入り、目標に着くと構える（seed8・seed7 では10〜18日に何度も着く）
     name: '冒険者の一行が目標に着く（4シードで3回以上）',
     ...RUN_A,

@@ -126,6 +126,8 @@ export function zombie(this: Ecology, c: Cr): void {
     this.deposit(c.x, c.y, 1);
   }
   if (c.body <= Math.max(2, Math.floor(c.init * 0.3))) {
+    // 吸ったマナは土へ還す（亡骸に残すと、亡骸が食べ尽くされたときにマナが消える）
+    this.releaseMana(c);
     c.k = c.sp;
     c.units = c.body;
     c.body = 0;

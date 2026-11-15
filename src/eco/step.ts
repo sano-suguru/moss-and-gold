@@ -231,6 +231,8 @@ export function update(this: Ecology, _tick: number, day: number, phase: number)
   if (this.step % 50 === 15) this.updateCamps();
   if (this.step % 50 === 25) this.planRaids();
   if (this.step % 50 === 35) this.planSnatch();
+  if (this.step % 150 === 95) this.planWars();
+  this.tendWars();
   if (this.step % 50 === 45) this.planCacheRaids();
   if (this.step % 50 === 45) this.updateStatues(day);
   if (this.step % 50 === 47) this.armorBirths();

@@ -56,7 +56,7 @@ export function planRaids(this: Ecology): void {
       best = { p, fx, fy };
     }
     if (!best) continue;
-    const ready = members.filter((c) => c.flee <= 0 && c.sleep === 0 && !c.away && (c.st === 0 || c.st === 3 || c.st === 4) && c.hungry < SPEC[Kind.Goblin].starve * 0.6);
+    const ready = members.filter((c) => c.flee <= 0 && c.sleep === 0 && !c.away && (c.st === 0 || c.st === 3 || c.st === 4) && c.hungry < SPEC[Kind.Goblin].starve * 0.6 && !this.warOf(c));
     if (!ready.length) continue;
     // 袋の空いている者を先に（集めた物で袋がいっぱいの者は、盗んだ物を入れられない）
     ready.sort((a, b) => (a.units >= 10 ? 1 : 0) - (b.units >= 10 ? 1 : 0) || sq(a.x - best!.fx) + sq(a.y - best!.fy) - (sq(b.x - best!.fx) + sq(b.y - best!.fy)) || a.id - b.id);
@@ -114,7 +114,7 @@ export function planSnatch(this: Ecology): void {
       best = { p, t };
     }
     // 松明を持つ者は出ない（暗がりに紛れられない）
-    const ready = members.filter((c) => c.flee <= 0 && c.sleep === 0 && !c.away && c.torch <= 0 && (c.st === 0 || c.st === 3 || c.st === 4) && c.hungry < SPEC[Kind.Goblin].starve * 0.6 && c.units < 10);
+    const ready = members.filter((c) => c.flee <= 0 && c.sleep === 0 && !c.away && c.torch <= 0 && (c.st === 0 || c.st === 3 || c.st === 4) && c.hungry < SPEC[Kind.Goblin].starve * 0.6 && c.units < 10 && !this.warOf(c));
     if (!ready.length) continue;
     // 歩いて遠い（回り道で32マスより先の）一行は追わない
     if (best && this.walkDist(this.tileOf(cp.x, cp.y), 32)[this.tileOf(best.t.x, best.t.y)] < 0) best = null;

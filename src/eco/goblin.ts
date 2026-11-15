@@ -53,8 +53,9 @@ export function pickGoblinCamp(this: Ecology, avoid?: Camp, from?: [number, numb
     if (Math.abs(x - m.entrance.x) + y < 15) continue;
     // 通り道から15マスより近い所には住まない（40マスより遠い所は点を下げる）
     if (route[k] >= 0 && route[k] < 15) continue;
-    // コボルトの住処から15マス（コボルトが住処を守る範囲12マスの外に集落の真ん中を置く。10マスでは集落ごと縄張りの中に入り、群れで食べられていた）
-    if (this.warrens.some((o) => o.id >= 0 && Math.abs(o.x / TILE - x) + Math.abs(o.y / TILE - y) < 15)) continue;
+    // コボルトの住処から、まっすぐ測って18マス（コボルトが住処を守る範囲12マスの外に、集落のまわりで動く範囲ごと置く。
+    // 近すぎると、集落のまわりで動くゴブリンが縄張りに入って群れで倒され、分かれてできた集落がすぐ絶える）
+    if (this.warrens.some((o) => o.id >= 0 && sq(o.x / TILE - x) + sq(o.y / TILE - y) < 18 * 18)) continue;
     if (this.camps.some((o) => o.id >= 0 && o !== avoid && Math.abs(o.x / TILE - x) + Math.abs(o.y / TILE - y) < 30)) continue;
     if (avoid && Math.abs(avoid.x / TILE - x) + Math.abs(avoid.y / TILE - y) < 20) continue;
     const px = x * TILE + 8;
@@ -247,6 +248,14 @@ export function watchCamps(this: Ecology): void {
           party = true;
         }
       }
+    // 攻めてくるコボルトの群れ（warThreat）
+    const wt = this.warThreat(Kind.Goblin, cp);
+    if (wt && wt.d < nd) {
+      nd = wt.d;
+      near = wt.near;
+      threat = wt.threat;
+      party = false;
+    }
     this.nearby(cp.x, cp.y, 14, (o) => {
       // 若い竜と成竜、トロール、ミノタウロス、見回りで歩いてくるバジリスク（basiliskPatrol）
       if (o.dead || o.away || !((o.k === Kind.Dragon && o.sp >= 1) || o.k === Kind.Troll || o.k === Kind.Minotaur || (o.k === Kind.Basilisk && o.gait > 0))) return;
@@ -395,6 +404,8 @@ export function campOf(this: Ecology, c: Cr): Camp | undefined {
 
 export function goblin(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Goblin];
+  // コボルトの住処へ攻めに出ている（warStep）
+  if (this.warStep(c)) return;
   // 集落のそばを通る冒険者の一行に立ちふさがる（src/eco/standoff.ts）
   if (this.residentStand(c)) return;
   if (c.st === 10) {
@@ -439,7 +450,9 @@ export function goblin(this: Ecology, c: Cr): void {
           c.st = 0;
           return;
         }
-      } else if (d2 < 30 * TILE * 30 * TILE) {
+      } else if (d2 < 30 * TILE * 30 * TILE && (d2 < 10 * TILE * 10 * TILE || this.goblinForage(c, c.x, c.y, 6) < 0)) {
+        // 集落から遠い（10マスより先）ときは、すぐそば（6マス）に苔かキノコがあれば先にそれを食べる（下の、腹を空かせた者の採集へ進む）。
+        // 遠い蓄えを目指し続けると、分かれて遠くへ移る途中の群れが、足もとの苔を食べずに飢え死にする
         c.act = 1;
         this.goTo(c, camp.x, camp.y, s.speed);
         return;
@@ -538,8 +551,9 @@ export function goblin(this: Ecology, c: Cr): void {
         return;
       }
     }
-    // 腹を空かせた者は、その場で苔かキノコを食べる
-    const kk = cp ? this.goblinForage(c, cp.x, cp.y, R) : (() => {
+    // 腹を空かせた者は、その場で苔かキノコを食べる（集落から10マスより遠い者は、集落のまわりではなく自分のまわり6マスで探す）
+    const far = !!cp && sq(cp.x - c.x) + sq(cp.y - c.y) > 10 * TILE * 10 * TILE;
+    const kk = cp ? this.goblinForage(c, far ? c.x : cp.x, far ? c.y : cp.y, far ? 6 : R) : (() => {
       const k = this.findMoss(c, c.x, c.y, R, 91, this.step >> 7);
       return k >= 0 ? k : this.findFungus(c.x, c.y, R, c.id);
     })();

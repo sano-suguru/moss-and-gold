@@ -64,4 +64,5 @@ import './spiderskill';
 import './koboldskill';
 import './myconidskill';
 import './ghostskill';
+import './war';
 import './save';

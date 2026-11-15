@@ -104,10 +104,35 @@ export function heedAlarm(this: Ecology, c: Cr): boolean {
   if (c.k === Kind.Adventurer || c.k === Kind.Dwarf) return false;
   // 知性ある者は、かなわない相手には加勢しない
   if (tier >= 3 && this.str(foe) > this.str(c) * 2) return false;
+  // コボルトとゴブリンの、相手の種への加勢は限る（borderFoe）
+  if (this.borderFoe(c, foe, a.x, a.y)) return false;
   c.act = 1;
   if (sq(foe.x - c.x) + sq(foe.y - c.y) < 14 * 14) this.fight(c, foe);
   else this.goTo(c, foe.x, foe.y, SPEC[c.k].speed * 1.1);
   return true;
+}
+
+/**
+ * コボルトとゴブリンの間で、警戒に加勢しないか。true なら加勢しない。
+ * 加勢するのは、相手が自分の住みかの縄張り（12マス、defend と同じ）の中にいて、しかも打たれた所（ax, ay）のすぐそば（4マス）にいる者だけで、相手を囲むのは3匹まで。
+ * 自分の住みかへ攻めてきた戦の攻め手（warAttacker）には、縄張りの中の皆で加勢する。
+ * 追いかけたり群れの皆で加勢したりすると、打つたびに相手の群れへ警戒が跳ね返り、群れどうしの殺し合いがだらだら続く。
+ * 戦に加わっている者は、戦の動き（warStep）に従う
+ */
+export function borderFoe(this: Ecology, c: Cr, foe: Cr, ax: number, ay: number): boolean {
+  const kg = (c.k === Kind.Kobold && foe.k === Kind.Goblin) || (c.k === Kind.Goblin && foe.k === Kind.Kobold);
+  if (!kg) return false;
+  if (this.warOf(c)) return true;
+  const h = c.k === Kind.Kobold ? this.warrenOf(c) : this.campOf(c);
+  if (!h || sq(foe.x - h.x) + sq(foe.y - h.y) > 12 * TILE * 12 * TILE) return true;
+  if (this.warAttacker(foe, c.k, h)) return false;
+  if (sq(ax - c.x) + sq(ay - c.y) > 4 * TILE * 4 * TILE) return true;
+  // 相手のすぐそば（1.5マス）にもう2匹の仲間がいれば、加わらない（小競り合いは3匹まで）
+  let near = 0;
+  this.nearby(foe.x, foe.y, 2, (o) => {
+    if (o !== c && !o.dead && !o.away && o.k === c.k && o.flee <= 0 && sq(o.x - foe.x) + sq(o.y - foe.y) < 1.5 * TILE * 1.5 * TILE) near++;
+  });
+  return near >= 2;
 }
 
 /** 群れの分家と合流（通常速度で1分ごと） */
@@ -208,9 +233,10 @@ declare module '../ecology' {
     buildGroups: typeof buildGroups;
     raiseAlarm: typeof raiseAlarm;
     heedAlarm: typeof heedAlarm;
+    borderFoe: typeof borderFoe;
     tendGroups: typeof tendGroups;
     territory: typeof territory;
   }
 }
 
-Object.assign(Ecology.prototype, { groupKey, memoKey, groupKeyRaw, buildGroups, raiseAlarm, heedAlarm, tendGroups, territory });
+Object.assign(Ecology.prototype, { groupKey, memoKey, groupKeyRaw, buildGroups, raiseAlarm, heedAlarm, borderFoe, tendGroups, territory });

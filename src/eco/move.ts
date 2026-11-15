@@ -112,9 +112,18 @@ export function findPath(this: Ecology, c: Cr, from: number, to: number, near?: 
       if (p) return p;
     }
   }
-  // 盗みに出たゴブリンは、明るい所をできるだけ避けて、暗がりを進む
+  // 盗みに出たゴブリンは、明るい所をできるだけ避けて、暗がりを進む。
+  // 逃げ帰る者と待ち伏せに行く者は、暗がりの道がコボルトの縄張りを横切るなら、縄張りを避ける道を選ぶ（横切ると、縄張りを守るコボルトに囲まれて倒される）
   if (c.k === Kind.Goblin && (c.st === 16 || c.st === 18 || ((c.st === 15 || c.st === 17) && c.gait >= 0)) && from >= 0 && to >= 0) {
     const p = this.darkPath(c, from, to);
+    if (p && (c.st === 16 || c.st === 18) && this.warrens.some((o) => o.id >= 0)) {
+      const m = this.w.map;
+      const land = (k: number) => this.inKoboldLand((k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8);
+      if (!land(from) && !land(to) && p.some(land)) {
+        const q = this.findPathAvoid(c, from, to, land);
+        if (q) return q;
+      }
+    }
     if (p) return p;
   }
   // 冒険者は、目標でない住処・集落・縄張りのまわりをできるだけ避ける（避けては行けないときだけ通る）

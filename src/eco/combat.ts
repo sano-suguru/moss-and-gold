@@ -36,8 +36,12 @@ export function defend(this: Ecology, c: Cr, hx: number, hy: number, enemies: Ki
   if (sq(c.x - hx) + sq(c.y - hy) > 12 * TILE * 12 * TILE) return false;
   let foe: Cr | null = null;
   let bd = 3 * TILE * 3 * TILE;
+  // コボルトとゴブリンは、相手の種が縄張り（住みかから12マス）の中に入ったときだけ打つ。
+  // 縄張りの外の相手まで打つと、住みかが近いとき縄張りの縁で小競り合いが絶えない
+  const kg = c.k === Kind.Kobold || c.k === Kind.Goblin;
   this.nearby(c.x, c.y, 3, (o) => {
     if (o.dead || o.away || !enemies.includes(o.k) || !this.canSense(c, o)) return;
+    if (kg && (o.k === Kind.Kobold || o.k === Kind.Goblin) && sq(o.x - hx) + sq(o.y - hy) > 12 * TILE * 12 * TILE) return;
     const d = sq(o.x - c.x) + sq(o.y - c.y);
     if (d < bd) {
       bd = d;
