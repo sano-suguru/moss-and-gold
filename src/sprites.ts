@@ -5974,8 +5974,9 @@ function haulArt(kind){
   const cap=(cx,cy)=>{
    // 柄：笠の下から束ねた根元へ
    for(let y=cy+2;y<=8;y++){const x=Math.round(cx+(4-cx)*(y-cy-2)/(8-cy-2||1));setPx(fr,x,y,y>=7?St[2]:St[3],false)}
-   setPx(fr,cx-1,cy,Cp[3],false);setPx(fr,cx,cy,Cp[4],false);setPx(fr,cx+1,cy,Cp[3],false);
+   setPx(fr,cx-1,cy,Cp[3],false);setPx(fr,cx+1,cy,Cp[3],false);
    for(let x=cx-2;x<=cx+2;x++)setPx(fr,x,cy+1,x===cx-2||x===cx+2?Cp[1]:Cp[2],false);
+   // 笠のてっぺんは、床のキノコと同じくほのかに光る
    setPx(fr,cx,cy,[230,200,255],true);
   };
   cap(2,2);cap(6,2);cap(4,0);
@@ -5987,7 +5988,7 @@ function haulArt(kind){
  // 胴：肩の上で山なりに曲がった背（上が明るく、腹が暗い）
  for(let y=1;y<6;y++)for(let x=3;x<11;x++){const dx=(x-6.8)/4.2,dy=(y-3.2)/2.3;if(dx*dx+dy*dy>1)continue;setPx(fr,x,y,y<=2?F[3]:y>=5?F[1]:F[2],false)}
  // 垂れた頭：耳と閉じた目と、下を向いた鼻先
- setPx(fr,2,3,F[2],false);setPx(fr,1,4,F[2],false);setPx(fr,2,4,F[2],false);setPx(fr,1,5,F[2],false);setPx(fr,2,5,F[1],false);
+ setPx(fr,2,3,F[2],false);setPx(fr,2,4,F[2],false);setPx(fr,1,5,F[2],false);setPx(fr,2,5,F[1],false);
  setPx(fr,3,2,Pk[2],false);setPx(fr,1,4,F[0],false);setPx(fr,1,6,Pk[3],false);
  // 足先と、だらりと垂れた尾
  setPx(fr,5,6,Pk[1],false);setPx(fr,8,6,Pk[1],false);

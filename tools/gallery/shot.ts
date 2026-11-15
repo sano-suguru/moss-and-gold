@@ -17,7 +17,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DAY_TICKS, World } from '../../src/world';
 import { NAMES } from '../../src/names';
-import { SPEC } from '../../src/ecology';
+import { haulKind } from '../../src/haul';
 
 const argv = process.argv.slice(2);
 const opt = (k: string, d?: string) => (argv.includes('--' + k) ? argv[argv.indexOf('--' + k) + 1] : d);
@@ -73,16 +73,9 @@ function look(): Hit | null {
     return { cam: { x: Math.round(o.x), y: Math.round(o.y), zoom }, marks, title: 'オークが貢ぎ物を持ち帰る' };
   }
   if (find === 'haul' || find === 'gobhaul') {
-    // 蓄えの荷を運ぶ者（描画の CreatureView の goblinHauls と同じ条件）
-    const o = e.list.find((c: any) => {
-      if (c.dead || c.away || e.isHidden(c)) return false;
-      if (find === 'haul') return c.k === 10 && c.st === 13;
-      if (c.k !== 12 || c.act !== 1 || c.hungry || c.flee > 0 || (c.st >= 15 && c.st <= 17) || c.units >= 6 || c.gold > 0 || c.torch > 0 || c.party || c.food <= SPEC[12].cap * 0.75) return false;
-      const cp = e.campOf(c);
-      if (!cp || (cp.store ?? 0) >= e.campStoreGoal(cp)) return false;
-      const d2 = (cp.x - c.x) ** 2 + (cp.y - c.y) ** 2;
-      return d2 > 32 * 32 && d2 < 480 * 480;
-    });
+    // 蓄えの荷を運ぶ者（描画と同じ haulKind で選ぶ）
+    const want = find === 'haul' ? 0 : 1;
+    const o = e.list.find((c: any) => !e.isHidden(c) && haulKind(e, c) === want);
     if (!o) return null;
     const label = find === 'haul' ? 'キノコを運ぶコボルト' : 'ネズミを担ぐゴブリン';
     return { cam: { x: Math.round(o.x), y: Math.round(o.y), zoom }, marks: [{ x: o.x, y: o.y, label: `${label} ${o.id}`, color: '#ffd24a', size: 2 }], title: label };

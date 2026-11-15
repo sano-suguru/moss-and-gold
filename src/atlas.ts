@@ -949,7 +949,7 @@ export function buildAtlas(): Atlas {
     crown: () => crownFrame,
     chiefHelm: () => helmFrame,
     sack: () => sackFrame,
-    haul: (k) => haulFrames[k],
+    haul: (k) => haulFrames[Math.max(0, Math.min(haulFrames.length - 1, k))],
     goldSack: (z) => goldSackFrames[Math.max(0, Math.min(2, z))],
     trophy: (ty) => trophyFrames.get(ty) ?? trophyFrames.get('fang')!,
     mark: (k) => markFrames[k] ?? markFrames['!'],

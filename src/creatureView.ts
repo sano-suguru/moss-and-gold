@@ -1,5 +1,6 @@
 import type { Atlas } from './atlas';
-import { BLOOD, CR_EVERY, Ecology, GOLD_CAP, Kind, SPEC, STONE_FULL, type Cr } from './ecology';
+import { BLOOD, CR_EVERY, Ecology, GOLD_CAP, Kind, STONE_FULL, type Cr } from './ecology';
+import { haulKind } from './haul';
 import { TROPHY } from './eco/loot';
 import { ARMOR_BIRTH_MANA, ARMOR_LOW, ARMOR_RISE, isJobItem } from './eco/armor';
 import { CRUMBLING, KIN_STOP, RANK_AT, packLook, unpackLook } from './eco/roster';
@@ -1280,18 +1281,6 @@ export class CreatureView {
   private heroLooks = new Map<number, { look: number; rank: number }>();
   private heroLooksEco: Ecology | null = null;
 
-  /**
-   * 腹を満たして集落へ蓄えを運ぶ途中のゴブリンか（goblin の「腹いっぱいの者は、蓄えが足りなければ集落へ持ち帰る」と同じ条件。
-   * 袋を担ぐ者・金貨を運ぶ者・松明を持つ者や冒険者についた者・逃げている者・盗みに出た者・集落に着いた者は除く）
-   */
-  private goblinHauls(eco: Ecology, c: Cr): boolean {
-    if (c.act !== 1 || c.hungry || c.flee > 0 || (c.st >= 15 && c.st <= 17) || c.units >= 6 || c.gold > 0 || c.torch > 0 || c.party || c.food <= SPEC[Kind.Goblin].cap * 0.75) return false;
-    const camp = eco.campOf(c);
-    if (!camp || (camp.store ?? 0) >= eco.campStoreGoal(camp)) return false;
-    const d2 = (camp.x - c.x) ** 2 + (camp.y - c.y) ** 2;
-    return d2 > 32 * 32 && d2 < 480 * 480;
-  }
-
   /** 冒険者の姿と位：名簿の人 → 覚えている生前の姿 → 倒れた所の墓標（ロード直後の亡骸） → 職ごとの既定の見た目 */
   private advLook(eco: Ecology, c: Cr, job: number): { look: number; rank: number } {
     if (this.heroLooksEco !== eco) {
@@ -2513,10 +2502,9 @@ export class CreatureView {
       if (!isCorpse && sp === Kind.Goblin && c.units >= 6 && !hidden && !c.dead) pushSprite(x + (flip ? 5 : -5), yy + 0.05, lift + 10, flip, A.sack(), 0, 2);
       // 蓄えの荷：住処へ蓄えを運び込むコボルトは、畑で摘んだキノコの束を背負い、腹を満たして集落へ帰るゴブリンは、獲物の印にネズミを肩に担ぐ
       // （運ぶ食べ物は腹の中にあり、何を食べたかはセーブしないので、絵は種ごとに一つ。コボルトはたいていキノコ、ゴブリンはネズミが三〜五割で残りはキノコや苔）
-      if (!isCorpse && !hidden && !c.dead && c.sleep !== 2) {
-        if (sp === Kind.Kobold && c.st === 13) pushSprite(x + (flip ? 5 : -5), yy + 0.05, lift + 9, flip, A.haul(0), 0, 2);
-        else if (sp === Kind.Goblin && this.goblinHauls(eco, c)) pushSprite(x + (flip ? 7 : -7), yy + 0.05, lift + 12, flip, A.haul(1), 0, 2);
-      }
+      const hk = isCorpse || hidden ? -1 : haulKind(eco, c);
+      if (hk === 0) pushSprite(x + (flip ? 5 : -5), yy + 0.05, lift + 9, flip, A.haul(0), 0, 2);
+      else if (hk === 1) pushSprite(x + (flip ? 7 : -7), yy + 0.05, lift + 12, flip, A.haul(1), 0, 2);
       // 冒険者の荷：金貨の袋（持つ量に応じた大きさ）を背に担ぎ、目標を果たした一行の担ぐ者は戦利品を肩に
       if (!isCorpse && sp === Kind.Adventurer && !c.dead && c.sleep !== 2) {
         if (c.gold > 0) {
