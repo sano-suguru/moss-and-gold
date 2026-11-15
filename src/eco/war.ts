@@ -27,12 +27,16 @@ const WAR_LOSS = 0.4;
 /** 同じ住みかが次の戦に加わるまでの間（tick） */
 const WAR_COOL = 3 * DAY_TICKS_ECO;
 /** 集まるのを待つ長さと、攻めに向かう長さの上限（生き物の更新の回数） */
-const GATHER_STEPS = 150;
+const GATHER_STEPS = 300;
 const MARCH_STEPS = 1500;
 /** 冒険者の一行がこの距離（マス）の内にいる住みかは、攻めに出ず、攻められもしない */
 const PARTY_R = 20;
 /** 袋に詰める量の上限（一匹あたり） */
 const LOOT_CAP = 20;
+/** 攻める相手の住みかに要る蓄え（奪う物の無い住みかは狙わない） */
+const LOOT_MIN = 30;
+/** 行進で、仲間の真ん中より先に行きすぎたら待つ距離（マス） */
+const MARCH_LEAD = 2.5;
 
 export interface War {
   id: number;
@@ -106,7 +110,7 @@ export function planWars(this: Ecology): void {
       let best: Home | null = null;
       let bd = 1e9;
       for (const t of targets) {
-        if ((t.warT ?? 0) > tick) continue;
+        if ((t.warT ?? 0) > tick || (t.store ?? 0) < LOOT_MIN) continue;
         const d = dist[this.tileOf(t.x, t.y)];
         if (d < 0 || d >= bd) continue;
         const theirs = homeMembers(this, dk, t).filter((c) => !c.dead && !c.away).length;
@@ -213,14 +217,34 @@ export function warStep(this: Ecology, c: Cr): boolean {
       else this.goTo(c, f.x, f.y, sp * 1.2);
       return true;
     }
-    // 住みかの前（コボルトの住処なら横穴の入口）に着いたら蓄えを袋に詰め、皆で引き上げる
+    // 住みかの前（コボルトの住処なら横穴の入口）に着いたら、そばの攻め手が皆で蓄えを袋に詰め、引き上げる
     const [tx, ty] = frontOf(this, foeKind(w.ak), tgt);
     if (sq(tx - c.x) + sq(ty - c.y) < 1.5 * TILE * 1.5 * TILE) {
-      const take = Math.max(0, Math.min(tgt.store ?? 0, LOOT_CAP - c.units));
-      tgt.store = (tgt.store ?? 0) - take;
-      c.units += take;
-      w.loot += take;
+      for (const id of w.ids) {
+        const o = this.byId.get(id);
+        if (!o || o.dead || sq(tx - o.x) + sq(ty - o.y) > 4 * TILE * 4 * TILE) continue;
+        const take = Math.max(0, Math.min(tgt.store ?? 0, LOOT_CAP - o.units));
+        tgt.store = (tgt.store ?? 0) - take;
+        o.units += take;
+        w.loot += take;
+      }
       this.endWar(w, 1);
+      return true;
+    }
+    // 一団で進む：仲間の真ん中より、目当てに MARCH_LEAD マス以上近づいた者は立ち止まって待つ
+    let mx = 0;
+    let my = 0;
+    let n = 0;
+    for (const id of w.ids) {
+      const o = this.byId.get(id);
+      if (!o || o.dead) continue;
+      mx += o.x;
+      my += o.y;
+      n++;
+    }
+    if (n > 1 && Math.sqrt(sq(tx - mx / n) + sq(ty - my / n)) - Math.sqrt(sq(tx - c.x) + sq(ty - c.y)) > MARCH_LEAD * TILE) {
+      c.act = 0;
+      this.setDir(c, tx - c.x, ty - c.y);
       return true;
     }
     this.goTo(c, tx, ty, sp);
@@ -238,7 +262,7 @@ export function warStep(this: Ecology, c: Cr): boolean {
 }
 
 /** 戦を終わりにして、皆で引き上げる */
-export function endWar(this: Ecology, w: War, end: number): void {
+export function endWar(this: Ecology, w: War, end: number, why = ''): void {
   if (w.ph === 2) return;
   const dk = foeKind(w.ak);
   const tgt = this.warHome(dk, w.to);
@@ -256,7 +280,7 @@ export function endWar(this: Ecology, w: War, end: number): void {
     this.log(x, y, `{k:${w.ak}}が、{k:${dk}}の${place}の蓄えを奪って引き上げた`);
   } else if (end === 2) this.log(x, y, `{k:${w.ak}}は{k:${dk}}に押し返され、退いた`);
   else if (was === 1) this.log(x, y, `{k:${w.ak}}の群れは、攻めるのをやめて引き返した`);
-  this.record('settle', { t: this.w.tick, k: w.ak, id: w.id, ev: 'war', how: end, n: w.n0, lost: w.lost, loot: w.loot, to: w.to, x: Math.round(x), y: Math.round(y) } as never);
+  this.record('settle', { t: this.w.tick, k: w.ak, id: w.id, ev: 'war', how: end, n: w.n0, lost: w.lost, loot: w.loot, to: w.to, ...(why ? { why } : {}), x: Math.round(x), y: Math.round(y) } as never);
 }
 
 /** 戦の段階を進める（生き物の更新ごと。戦が無ければ何もしない） */
@@ -275,7 +299,7 @@ export function tendWars(this: Ecology): void {
     const home = this.warHome(w.ak, w.from);
     const tgt = this.warHome(foeKind(w.ak), w.to);
     if (!home || !tgt || !w.ids.length) {
-      this.endWar(w, 3);
+      this.endWar(w, 3, !home ? 'home' : !tgt ? 'gone' : 'none');
       continue;
     }
     if (w.lost >= Math.ceil(w.n0 * WAR_LOSS)) {
@@ -286,20 +310,20 @@ export function tendWars(this: Ecology): void {
     // 攻めに向かう途中で、冒険者・ドワーフ・大物（強さ12以上）が6マスの内に来るか、守る側でない者（オークなど）に仲間が打たれたら、戦をやめて引き返す。
     // （オークはあちこちをぶらつくので、そばを通っただけではやめない）
     if (w.ph === 1 && this.step % 5 === w.id % 5) {
-      let met = false;
+      let met = '';
       for (const c of members) {
         if (this.w.tick - c.hitAt < 10) {
           const f = this.byId.get(c.foe);
-          if (f && f.k !== foeKind(w.ak) && f.k !== w.ak) met = true;
+          if (f && f.k !== foeKind(w.ak) && f.k !== w.ak) met = `hit${f.k}`;
         }
         this.nearby(c.x, c.y, 6, (o) => {
           if (met || o.dead || o.away) return;
-          if (o.k === Kind.Adventurer || o.k === Kind.Dwarf || STR[o.k] >= 12) met = true;
+          if (o.k === Kind.Adventurer || o.k === Kind.Dwarf || STR[o.k] >= 12) met = `met${o.k}`;
         });
         if (met) break;
       }
       if (met) {
-        this.endWar(w, 3);
+        this.endWar(w, 3, met);
         continue;
       }
     }
@@ -313,7 +337,7 @@ export function tendWars(this: Ecology): void {
         this.log(fx, fy, `{k:${w.ak}}の群れが、{k:${foeKind(w.ak)}}の${place}へ攻めに出た`);
         this.record('settle', { t: this.w.tick, k: w.ak, id: w.id, ev: 'warGo', n: w.ids.length, to: w.to, x: Math.round(fx), y: Math.round(fy) } as never);
       }
-    } else if (this.step - w.pt >= MARCH_STEPS) this.endWar(w, 3);
+    } else if (this.step - w.pt >= MARCH_STEPS) this.endWar(w, 3, 'time');
   }
   this.wars = this.wars.filter((w) => w.ph !== 2 || w.ids.length > 0);
 }
