@@ -35,9 +35,9 @@ export function pickWarren(this: Ecology, avoid?: Warren, from?: [number, number
     if (walls < 2) continue;
     if (this.warrens.some((o) => Math.abs(o.x - x * TILE) + Math.abs(o.y - y * TILE) < 30 * TILE)) continue;
     if (avoid && Math.abs(avoid.x - x * TILE) + Math.abs(avoid.y - y * TILE) < 30 * TILE) continue;
-    // ゴブリンの集落からも、まっすぐ測って20マス離す（ゴブリンの集落の場所選びと同じ間合い。片方だけでは、集落のすぐそばに住処ができて殺し合っていた。
+    // ゴブリンの集落からも、まっすぐ測って18マス離す（ゴブリンの集落の場所選びと同じ間合い。片方だけでは、集落のすぐそばに住処ができて殺し合っていた。
     // 縦横の和で測ったり15マスにしたりすると、集落のまわりで動くゴブリンが縄張り（12マス）に入り、小競り合いが絶えない）
-    if (this.camps.some((o) => o.id >= 0 && o.kind === 0 && sq(o.x / TILE - x) + sq(o.y / TILE - y) < 20 * 20)) continue;
+    if (this.camps.some((o) => o.id >= 0 && o.kind === 0 && sq(o.x / TILE - x) + sq(o.y / TILE - y) < 18 * 18)) continue;
     const px = x * TILE + 8;
     const py = y * TILE + 8;
     if (danger.some(([dx, dy, r]) => sq(dx - px) + sq(dy - py) < r * TILE * r * TILE)) continue;
