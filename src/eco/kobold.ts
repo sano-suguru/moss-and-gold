@@ -296,8 +296,8 @@ export function kobold(this: Ecology, c: Cr): void {
       let fv = 49;
       const r0 = this.regionOf(this.tileOf(wr.x, wr.y));
       const m0 = this.w.map;
-      // ほかのコボルトが立っているか、摘みに向かっている畑のマスは選ばない（空いたマスがなければ、集めに出るのをやめる）。
-      // （皆が同じマスを選ぶと、狭い住処の中で詰まる）
+      // ほかのコボルトが立っているか、摘みに向かっている畑のマスは選ばない（空いたマスがなければ、畑はあきらめて野の苔やネズミを探す）。
+      // （皆が同じマスを選ぶと、狭い住処の中で詰まる。空きがないとき集めに出るのをやめると、次の更新でまた集めに出て、その場で足踏みし続ける）
       const taken = (k: number) => {
         const kx = (k % m0.w) * TILE + 8;
         const ky = Math.floor(k / m0.w) * TILE + 8;
@@ -313,11 +313,6 @@ export function kobold(this: Ecology, c: Cr): void {
           fv = this.w.fungus[k];
           fk = k;
         }
-      if (fk < 0 && this.farmTiles(wr).some((k) => this.w.fungus[k] > 49)) {
-        c.st = 0;
-        c.act = 0;
-        return;
-      }
       if (fk >= 0) {
         const m = this.w.map;
         c.act = 1;
