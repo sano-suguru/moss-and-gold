@@ -41,6 +41,7 @@ export const MOMENTS: Moment[] = [
   { key: 'armorSweep2', label: 'リビングアーマー：武器の大振りで2体以上を打った' },
   { key: 'partyRetreat', label: '冒険者の一行が戦いの途中でかなわず、一行ごと退いた' },
   { key: 'standoff', label: 'コボルトかゴブリンが、住処のそばを通る一行に立ちふさがって威嚇した' },
+  { key: 'koboGob', label: 'コボルトとゴブリン：縄張りの争いで相手を倒した（多すぎても、群れどうしの殺し合いが続いている）' },
   { key: 'orcClash', label: 'オークとのにらみ合いから戦いになった' },
   { key: 'orcRoar', label: 'オーク：雄叫びで小物を逃がすか、冒険者の後衛を怖ませた' },
   { key: 'orcWoken', label: 'オーク：集落の見張りに起こされて飛び起きた' },
@@ -254,6 +255,7 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
   const gulp = (by: number[]) => d.filter((y) => y.cause === 'eaten' && !y.slain && by.includes(y.by)).length;
   return {
     slainEat: d.filter((y) => y.cause === 'eaten' && y.slain === 1).length,
+    koboGob: d.filter((y) => (y.k === K.Kobold && y.by === K.Goblin) || (y.k === K.Goblin && y.by === K.Kobold)).length,
     vampArrive: b.filter((y) => y.k === K.Vampire).length,
     vampCall: ev(K.Vampire, 'callBats').length,
     vampScout: ev(K.Vampire, 'scout').length,

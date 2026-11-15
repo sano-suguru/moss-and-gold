@@ -104,10 +104,21 @@ export function heedAlarm(this: Ecology, c: Cr): boolean {
   if (c.k === Kind.Adventurer || c.k === Kind.Dwarf) return false;
   // 知性ある者は、かなわない相手には加勢しない
   if (tier >= 3 && this.str(foe) > this.str(c) * 2) return false;
+  // コボルトとゴブリンは、相手の種には自分の住みかの縄張り（12マス、defend と同じ）の中でだけ加勢する。
+  // 追いかけて加勢すると、打つたびに相手の群れへ警戒が跳ね返り、群れどうしの殺し合いが続く
+  if (this.borderFoe(c, foe)) return false;
   c.act = 1;
   if (sq(foe.x - c.x) + sq(foe.y - c.y) < 14 * 14) this.fight(c, foe);
   else this.goTo(c, foe.x, foe.y, SPEC[c.k].speed * 1.1);
   return true;
+}
+
+/** コボルトとゴブリンの間で、相手が自分の住みかの縄張り（12マス）の外にいるか（住みかの無い者は加勢しない） */
+export function borderFoe(this: Ecology, c: Cr, foe: Cr): boolean {
+  const kg = (c.k === Kind.Kobold && foe.k === Kind.Goblin) || (c.k === Kind.Goblin && foe.k === Kind.Kobold);
+  if (!kg) return false;
+  const h = c.k === Kind.Kobold ? this.warrenOf(c) : this.campOf(c);
+  return !h || sq(foe.x - h.x) + sq(foe.y - h.y) > 12 * TILE * 12 * TILE;
 }
 
 /** 群れの分家と合流（通常速度で1分ごと） */
@@ -208,9 +219,10 @@ declare module '../ecology' {
     buildGroups: typeof buildGroups;
     raiseAlarm: typeof raiseAlarm;
     heedAlarm: typeof heedAlarm;
+    borderFoe: typeof borderFoe;
     tendGroups: typeof tendGroups;
     territory: typeof territory;
   }
 }
 
-Object.assign(Ecology.prototype, { groupKey, memoKey, groupKeyRaw, buildGroups, raiseAlarm, heedAlarm, tendGroups, territory });
+Object.assign(Ecology.prototype, { groupKey, memoKey, groupKeyRaw, buildGroups, raiseAlarm, heedAlarm, borderFoe, tendGroups, territory });
