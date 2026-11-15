@@ -6,7 +6,7 @@
  *   npm run shot -- --seed abc --find kind:24 --day 6 --zoom 3 --lit
  *   npm run shot -- --seed abc --find xy:120,40 --day 10
  *
- * --find：warren（横穴を掘り終え罠が2つ以上の住処）、advcorpse（白骨になる前の冒険者の亡骸）、thralladv（ヴァンパイアの眷属になった冒険者）、advsleep（焚き火のそばで眠る冒険者）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、bless（冒険者の亡骸の前で祈る一行）、slimefeast（一つの死骸を2匹以上のスライムが食べている所）、kind:番号（その種の生き物）、xy:マスx,マスy
+ * --find：warren（横穴を掘り終え罠が2つ以上の住処）、advcorpse（白骨になる前の冒険者の亡骸）、thralladv（ヴァンパイアの眷属になった冒険者）、advsleep（焚き火のそばで眠る冒険者）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、haul（キノコの束を背負って住処へ運ぶコボルト）、gobhaul（腹を満たし、ネズミを担いで集落へ帰るゴブリン）、bless（冒険者の亡骸の前で祈る一行）、slimefeast（一つの死骸を2匹以上のスライムが食べている所）、kind:番号（その種の生き物）、xy:マスx,マスy
  * --day 探し始める日（既定 0）、--until 探すのをやめる日（既定 25）、--every 探す間隔（tick、既定 200）、--zoom 拡大率（既定 4）、--lit 確認用の明かり（#lit）、
  * --fog 霧をそのまま（既定は地図全体を見えたマスにする）、--name 出力の名前（既定は find から）、--out 出力先（既定 build/shots）
  *
@@ -17,6 +17,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DAY_TICKS, World } from '../../src/world';
 import { NAMES } from '../../src/names';
+import { haulKind } from '../../src/haul';
 
 const argv = process.argv.slice(2);
 const opt = (k: string, d?: string) => (argv.includes('--' + k) ? argv[argv.indexOf('--' + k) + 1] : d);
@@ -70,6 +71,14 @@ function look(): Hit | null {
     const marks: Mark[] = [{ x: o.x, y: o.y, label: `貢ぎ物 ${o.units}`, color: '#ffd24a', size: 2 }];
     if (cp) marks.push({ x: cp.x, y: cp.y, label: '従う集落', color: '#80ff9a', size: 2 });
     return { cam: { x: Math.round(o.x), y: Math.round(o.y), zoom }, marks, title: 'オークが貢ぎ物を持ち帰る' };
+  }
+  if (find === 'haul' || find === 'gobhaul') {
+    // 蓄えの荷を運ぶ者（描画と同じ haulKind で選ぶ）
+    const want = find === 'haul' ? 0 : 1;
+    const o = e.list.find((c: any) => !e.isHidden(c) && haulKind(e, c) === want);
+    if (!o) return null;
+    const label = find === 'haul' ? 'キノコを運ぶコボルト' : 'ネズミを担ぐゴブリン';
+    return { cam: { x: Math.round(o.x), y: Math.round(o.y), zoom }, marks: [{ x: o.x, y: o.y, label: `${label} ${o.id}`, color: '#ffd24a', size: 2 }], title: label };
   }
   if (find === 'gobhide' || find === 'camp') {
     for (const cp of e.camps) {

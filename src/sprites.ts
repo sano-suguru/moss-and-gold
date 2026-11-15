@@ -5964,6 +5964,37 @@ function tributeSack(){
  setPx(fr,3,1,T,false);setPx(fr,4,1,T,false);setPx(fr,5,1,T,false);setPx(fr,4,0,K,false);setPx(fr,2,5,T,false);setPx(fr,6,4,T,false);
  return {...fr,ax:4,ay:8};
 }
+/**
+ * 蓄えの荷：kind 0 はコボルトが背負って住処へ運ぶ、畑で摘んだキノコの束（紫の笠が三つ、根元を草のひもで縛る）。
+ * kind 1 はゴブリンが肩に担いで集落へ運ぶ獲物の印の、仕留めたネズミ（だらりと垂れた頭と尾）
+ */
+function haulArt(kind){
+ if(kind===0){
+  const fr=blank(9,9),St=RAMP.stem,Cp=RAMP.cap,R=RAMP.reed;
+  const cap=(cx,cy)=>{
+   // 柄：笠の下から束ねた根元へ
+   for(let y=cy+2;y<=8;y++){const x=Math.round(cx+(4-cx)*(y-cy-2)/(8-cy-2||1));setPx(fr,x,y,y>=7?St[2]:St[3],false)}
+   setPx(fr,cx-1,cy,Cp[3],false);setPx(fr,cx+1,cy,Cp[3],false);
+   for(let x=cx-2;x<=cx+2;x++)setPx(fr,x,cy+1,x===cx-2||x===cx+2?Cp[1]:Cp[2],false);
+   // 笠のてっぺんは、床のキノコと同じくほのかに光る
+   setPx(fr,cx,cy,[230,200,255],true);
+  };
+  cap(2,2);cap(6,2);cap(4,0);
+  // 根元を縛る草のひも
+  setPx(fr,3,6,R[3],false);setPx(fr,4,6,R[4],false);setPx(fr,5,6,R[2],false);
+  return {...pad1(fr),ax:5,ay:10};
+ }
+ const fr=blank(13,8),F=RAMP.fur,Pk=RAMP.pink;
+ // 胴：肩の上で山なりに曲がった背（上が明るく、腹が暗い）
+ for(let y=1;y<6;y++)for(let x=3;x<11;x++){const dx=(x-6.8)/4.2,dy=(y-3.2)/2.3;if(dx*dx+dy*dy>1)continue;setPx(fr,x,y,y<=2?F[3]:y>=5?F[1]:F[2],false)}
+ // 垂れた頭：耳と閉じた目と、下を向いた鼻先
+ setPx(fr,2,3,F[2],false);setPx(fr,2,4,F[2],false);setPx(fr,1,5,F[2],false);setPx(fr,2,5,F[1],false);
+ setPx(fr,3,2,Pk[2],false);setPx(fr,1,4,F[0],false);setPx(fr,1,6,Pk[3],false);
+ // 足先と、だらりと垂れた尾
+ setPx(fr,5,6,Pk[1],false);setPx(fr,8,6,Pk[1],false);
+ setPx(fr,11,4,Pk[2],false);setPx(fr,11,5,Pk[2],false);setPx(fr,12,6,Pk[2],false);setPx(fr,12,7,Pk[1],false);
+ return {...pad1(fr),ax:7,ay:9};
+}
 
 /** 描いた形のまわりに濃い縁取りをつける（小さな持ち物を背景から浮かせる） */
 /** 縁取りのために、まわりに1px の余白をつけて縁取る */
@@ -6094,4 +6125,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxSporeCloud, fxSporePuff, fxSporeMote, fxSlingWhirl, fxSlingStone, fxStoneHit, fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, HERO_JOBS, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxSporeCloud, fxSporePuff, fxSporeMote, fxSlingWhirl, fxSlingStone, fxStoneHit, fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, HERO_JOBS, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, haulArt, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, RAMP, COL, E, C, PL, LN, D, GD };
