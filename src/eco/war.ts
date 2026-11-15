@@ -8,7 +8,7 @@
  * ふだんの境の小競り合いは総力戦にしない（heedAlarm は、相手の種には打たれた者のすぐそばの仲間だけが加勢する）。
  * 群れごとぶつかるのは、ここで始まる戦のときだけ。
  *
- * 戦の段階（War.ph）：0 集まる、1 攻めに向かう・戦う、2 引き上げる。終わり方（War.end）：0 まだ、1 蓄えを奪った、2 押し返されて退いた、3 やめて引き返した。
+ * 戦の段階（War.ph）：0 集まる、1 攻めに向かう・戦う、2 引き上げる。終わり方（War.end）：0 まだ、1 蓄えを奪った、2 押し返されて退いた、3 やめて引き返した（着いたら蓄えが尽きていたときも）。
  */
 import { type Camp, type Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, STR, type Warren, sq } from '../ecology';
 import { TILE } from '../mapgen';
@@ -175,8 +175,17 @@ export function warThreat(this: Ecology, k: number, h: Home): { near: Cr; d: num
   return near ? { near, d: nd, threat } : null;
 }
 
-function leave(w: War, c: Cr): void {
+/**
+ * 列を離れる。奪った蓄えを袋に持ったままのコボルトは、腹に入る分を食べ、残りをその場に落とす
+ * （コボルトには袋の中身を蓄えに運ぶ動きが無いので、持ったままにすると蓄えにもならず描かれもしない。ゴブリンは集落へ持ち帰る動きがある）
+ */
+function leave(e: Ecology, w: War, c: Cr): void {
   w.ids = w.ids.filter((id) => id !== c.id);
+  if (c.k !== Kind.Kobold || c.units <= 0) return;
+  const t = Math.max(0, Math.min(c.units, SPEC[c.k].cap - c.food));
+  c.food += t;
+  e.deposit(c.x, c.y, c.units - t);
+  c.units = 0;
 }
 
 /** 戦に加わっている者の動き。true なら今は戦に従っている（kobold・goblin の初めに呼ぶ） */
@@ -186,7 +195,7 @@ export function warStep(this: Ecology, c: Cr): boolean {
   const home = this.warHome(w.ak, w.from);
   // 住みかが無くなったか、飢えかけたら列を離れる
   if (!home || c.hungry >= SPEC[c.k].starve * 0.6) {
-    leave(w, c);
+    leave(this, w, c);
     return false;
   }
   const sp = SPEC[c.k].speed;
@@ -220,6 +229,11 @@ export function warStep(this: Ecology, c: Cr): boolean {
     // 住みかの前（コボルトの住処なら横穴の入口）に着いたら、そばの攻め手が皆で蓄えを袋に詰め、引き上げる
     const [tx, ty] = frontOf(this, foeKind(w.ak), tgt);
     if (sq(tx - c.x) + sq(ty - c.y) < 1.5 * TILE * 1.5 * TILE) {
+      // 着いたときに蓄えが尽きていれば、奪う物が無いので引き返す
+      if ((tgt.store ?? 0) < 1) {
+        this.endWar(w, 3, 'empty');
+        return true;
+      }
       for (const id of w.ids) {
         const o = this.byId.get(id);
         if (!o || o.dead || sq(tx - o.x) + sq(ty - o.y) > 4 * TILE * 4 * TILE) continue;
@@ -237,7 +251,8 @@ export function warStep(this: Ecology, c: Cr): boolean {
     let n = 0;
     for (const id of w.ids) {
       const o = this.byId.get(id);
-      if (!o || o.dead) continue;
+      // 遠く離れた者（水を飲みに行った、引っかかった）は数えない（待ち続けて列ごと止まらないように）
+      if (!o || o.dead || sq(o.x - c.x) + sq(o.y - c.y) > 8 * TILE * 8 * TILE) continue;
       mx += o.x;
       my += o.y;
       n++;
@@ -254,7 +269,7 @@ export function warStep(this: Ecology, c: Cr): boolean {
   if (sq(home.x - c.x) + sq(home.y - c.y) < 1.5 * TILE * 1.5 * TILE) {
     home.store = (home.store ?? 0) + c.units;
     c.units = 0;
-    leave(w, c);
+    leave(this, w, c);
     return false;
   }
   this.goTo(c, home.x, home.y, w.end === 2 ? sp * 1.2 : sp);
@@ -295,19 +310,27 @@ export function tendWars(this: Ecology): void {
       else if (!o || o.dead) w.lost++;
     }
     w.ids = alive;
-    if (w.ph === 2) continue;
+    if (w.ph === 2) {
+      // 帰り道で住みかへ着けない者（崩落で道が断たれたなど）は、時間が来たら列を離れる
+      if (this.step - w.pt >= MARCH_STEPS)
+        for (const id of [...w.ids]) {
+          const o = this.byId.get(id);
+          if (o) leave(this, w, o);
+        }
+      continue;
+    }
     const home = this.warHome(w.ak, w.from);
     const tgt = this.warHome(foeKind(w.ak), w.to);
     if (!home || !tgt || !w.ids.length) {
       this.endWar(w, 3, !home ? 'home' : !tgt ? 'gone' : 'none');
       continue;
     }
-    if (w.lost >= Math.ceil(w.n0 * WAR_LOSS)) {
+    if (w.ph === 1 && w.lost >= Math.ceil(w.n0 * WAR_LOSS)) {
       this.endWar(w, 2);
       continue;
     }
     const members = w.ids.map((id) => this.byId.get(id) as Cr);
-    // 攻めに向かう途中で、冒険者・ドワーフ・大物（強さ12以上）が6マスの内に来るか、守る側でない者（オークなど）に仲間が打たれたら、戦をやめて引き返す。
+    // 攻めに向かう途中で、起きている冒険者・ドワーフ・大物（強さ12以上）が6マスの内に来るか、守る側でない者（オークなど）に仲間が打たれたら、戦をやめて引き返す。
     // （オークはあちこちをぶらつくので、そばを通っただけではやめない）
     if (w.ph === 1 && this.step % 5 === w.id % 5) {
       let met = '';
@@ -317,7 +340,8 @@ export function tendWars(this: Ecology): void {
           if (f && f.k !== foeKind(w.ak) && f.k !== w.ak) met = `hit${f.k}`;
         }
         this.nearby(c.x, c.y, 6, (o) => {
-          if (met || o.dead || o.away) return;
+          // 眠っている者、幼い竜、宝物庫を動かないゴーレムは数えない
+          if (met || o.dead || o.away || o.sleep > 0 || (o.k === Kind.Dragon && o.sp < 1) || o.k === Kind.Golem) return;
           if (o.k === Kind.Adventurer || o.k === Kind.Dwarf || STR[o.k] >= 12) met = `met${o.k}`;
         });
         if (met) break;

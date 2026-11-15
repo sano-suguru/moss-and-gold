@@ -363,7 +363,7 @@ export interface Camp {
   raids?: number;
   empty?: number;
   alone?: number;
-  /** 次に戦に加われる tick（攻めても攻められても。src/eco/war.ts） */
+  /** 次に戦に加われる tick（攻めても攻められても。planWars） */
   warT?: number;
   /** 従っているオークの縄張り（寝床の座標。0,0 なら従っていない）と、次に貢ぎ物を取り立てに来る tick */
   lx?: number;
@@ -439,7 +439,7 @@ export interface Warren {
   empty?: number;
   /** 1匹になった tick（2匹以上なら -1） */
   alone?: number;
-  /** 次に戦に加われる tick（攻めても攻められても。src/eco/war.ts） */
+  /** 次に戦に加われる tick（攻めても攻められても。planWars） */
   warT?: number;
 }
 
@@ -883,7 +883,7 @@ export class Ecology {
   groups = new Map<string, { key: string; k: number; type: number; hx: number; hy: number; members: Cr[] }>();
   /** 警戒：群れの仲間が襲われた（群れの識別キー → step 番号、襲ってきた相手、場所） */
   alarms = new Map<string, { t: number; foe: number; x: number; y: number }>();
-  /** コボルトとゴブリンの戦（src/eco/war.ts） */
+  /** コボルトとゴブリンの戦（planWars・tendWars） */
   wars: War[] = [];
 
   /** 群れの識別キーの文字列のキャッシュ（種と二つの数が同じなら同じ文字列。作り直しを減らすだけで、値は同じ） */

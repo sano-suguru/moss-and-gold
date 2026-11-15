@@ -301,7 +301,7 @@ export function planCacheRaids(this: Ecology): void {
     if ((cp.store ?? 0) >= this.campStoreGoal(cp) * CRAID_STORE) continue;
     const members = this.campMembers(cp);
     if (!members.length || members.some((c) => c.st >= 15 && c.st <= 18)) continue;
-    const ready = members.filter((c) => c.flee <= 0 && c.sleep === 0 && !c.away && (c.st === 0 || c.st === 3 || c.st === 4) && c.hungry < s.starve * 0.6 && c.units < 10);
+    const ready = members.filter((c) => c.flee <= 0 && c.sleep === 0 && !c.away && (c.st === 0 || c.st === 3 || c.st === 4) && c.hungry < s.starve * 0.6 && c.units < 10 && !this.warOf(c));
     if (!ready.length) continue;
     const wd = this.walkDist(this.tileOf(cp.x, cp.y), CRAID_R);
     let o: SupplyCache | undefined;

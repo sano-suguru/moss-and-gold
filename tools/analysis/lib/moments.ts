@@ -253,14 +253,21 @@ interface Rec {
   by?: number;
 }
 
-/** コボルトとゴブリンが互いに倒した数のうち、戦（攻めに出てから、終わって600 tick 後まで）の外のもの */
-function koboGobOutsideWar(s: Rec[], d: Rec[]): number {
+/**
+ * コボルトとゴブリンが互いに倒した数のうち、戦（攻めに出てから、終わって600 tick 後まで）の外のもの。
+ * 数える範囲より前に攻めに出た戦（pre の記録）と、実行の終わりにまだ続いている戦も、戦の内として除く
+ */
+function koboGobOutsideWar(pre: Rec[], s: Rec[], d: Rec[]): number {
   const go = new Map<number, number>();
   const spans: [number, number][] = [];
-  for (const y of s) {
+  for (const y of [...pre, ...s]) {
     if (y.ev === 'warGo') go.set(y.id, y.t);
-    else if (y.ev === 'war' && go.has(y.id)) spans.push([go.get(y.id) as number, y.t + 600]);
+    else if (y.ev === 'war' && go.has(y.id)) {
+      spans.push([go.get(y.id) as number, y.t + 600]);
+      go.delete(y.id);
+    }
   }
+  for (const t of go.values()) spans.push([t, Number.POSITIVE_INFINITY]);
   return d.filter((y) => ((y.k === K.Kobold && y.by === K.Goblin) || (y.k === K.Goblin && y.by === K.Kobold)) && !spans.some(([a, b]) => y.t >= a && y.t <= b)).length;
 }
 
@@ -281,7 +288,7 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     warGo: s.filter((y) => y.ev === 'warGo').length,
     warLoot: s.filter((y) => y.ev === 'war' && y.how === 1).length,
     warRepel: s.filter((y) => y.ev === 'war' && y.how === 2).length,
-    koboGob: koboGobOutsideWar(s, d),
+    koboGob: koboGobOutsideWar(pre, s, d),
     vampArrive: b.filter((y) => y.k === K.Vampire).length,
     vampCall: ev(K.Vampire, 'callBats').length,
     vampScout: ev(K.Vampire, 'scout').length,

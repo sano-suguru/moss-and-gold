@@ -54,7 +54,7 @@ export function pickGoblinCamp(this: Ecology, avoid?: Camp, from?: [number, numb
     // 通り道から15マスより近い所には住まない（40マスより遠い所は点を下げる）
     if (route[k] >= 0 && route[k] < 15) continue;
     // コボルトの住処から、まっすぐ測って18マス（コボルトが住処を守る範囲12マスの外に、集落のまわりで動く範囲ごと置く。
-    // 15マスでは、集落のまわりで動くゴブリンが縄張りに入って群れで倒され、分かれてできた集落が数時間で絶えた）
+    // 近すぎると、集落のまわりで動くゴブリンが縄張りに入って群れで倒され、分かれてできた集落がすぐ絶える）
     if (this.warrens.some((o) => o.id >= 0 && sq(o.x / TILE - x) + sq(o.y / TILE - y) < 18 * 18)) continue;
     if (this.camps.some((o) => o.id >= 0 && o !== avoid && Math.abs(o.x / TILE - x) + Math.abs(o.y / TILE - y) < 30)) continue;
     if (avoid && Math.abs(avoid.x / TILE - x) + Math.abs(avoid.y / TILE - y) < 20) continue;
