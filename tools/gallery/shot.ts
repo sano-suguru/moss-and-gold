@@ -77,7 +77,7 @@ function look(): Hit | null {
     const o = e.list.find((c: any) => {
       if (c.dead || c.away || e.isHidden(c)) return false;
       if (find === 'haul') return c.k === 10 && c.st === 13;
-      if (c.k !== 12 || c.act !== 1 || c.hungry || c.units >= 6 || c.gold > 0 || c.torch > 0 || c.party || c.food <= SPEC[12].cap * 0.75) return false;
+      if (c.k !== 12 || c.act !== 1 || c.hungry || c.flee > 0 || (c.st >= 15 && c.st <= 17) || c.units >= 6 || c.gold > 0 || c.torch > 0 || c.party || c.food <= SPEC[12].cap * 0.75) return false;
       const cp = e.campOf(c);
       if (!cp || (cp.store ?? 0) >= e.campStoreGoal(cp)) return false;
       const d2 = (cp.x - c.x) ** 2 + (cp.y - c.y) ** 2;

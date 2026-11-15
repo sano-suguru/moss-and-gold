@@ -1282,10 +1282,10 @@ export class CreatureView {
 
   /**
    * 腹を満たして集落へ蓄えを運ぶ途中のゴブリンか（goblin の「腹いっぱいの者は、蓄えが足りなければ集落へ持ち帰る」と同じ条件。
-   * 袋を担ぐ者・金貨を運ぶ者・松明を持つ者や冒険者についた者・集落に着いた者は除く）
+   * 袋を担ぐ者・金貨を運ぶ者・松明を持つ者や冒険者についた者・逃げている者・盗みに出た者・集落に着いた者は除く）
    */
   private goblinHauls(eco: Ecology, c: Cr): boolean {
-    if (c.act !== 1 || c.hungry || c.units >= 6 || c.gold > 0 || c.torch > 0 || c.party || c.food <= SPEC[Kind.Goblin].cap * 0.75) return false;
+    if (c.act !== 1 || c.hungry || c.flee > 0 || (c.st >= 15 && c.st <= 17) || c.units >= 6 || c.gold > 0 || c.torch > 0 || c.party || c.food <= SPEC[Kind.Goblin].cap * 0.75) return false;
     const camp = eco.campOf(c);
     if (!camp || (camp.store ?? 0) >= eco.campStoreGoal(camp)) return false;
     const d2 = (camp.x - c.x) ** 2 + (camp.y - c.y) ** 2;
@@ -2511,8 +2511,8 @@ export class CreatureView {
       if (!isCorpse && sp === Kind.Orc && c.units > 0 && !hidden) pushSprite(x + (flip ? 6 : -6), yy + 0.05, lift + 16, flip, A.sack(), 0, 2);
       // ゴブリンの袋：摘んだキノコや苔、冒険者から盗んだ食べ物を背負って集落へ持ち帰る
       if (!isCorpse && sp === Kind.Goblin && c.units >= 6 && !hidden && !c.dead) pushSprite(x + (flip ? 5 : -5), yy + 0.05, lift + 10, flip, A.sack(), 0, 2);
-      // 蓄えの荷：住処へ蓄えを運び込むコボルトは、畑で摘んだキノコの束を背負い、腹を満たして集落へ帰るゴブリンは、仕留めたネズミを肩に担ぐ
-      // （運ぶ食べ物は腹の中にあり、何を食べたかはセーブしないので、絵は種ごとに一つ。コボルトの運ぶ物は九割がたキノコ）
+      // 蓄えの荷：住処へ蓄えを運び込むコボルトは、畑で摘んだキノコの束を背負い、腹を満たして集落へ帰るゴブリンは、獲物の印にネズミを肩に担ぐ
+      // （運ぶ食べ物は腹の中にあり、何を食べたかはセーブしないので、絵は種ごとに一つ。コボルトはたいていキノコ、ゴブリンはネズミが三〜五割で残りはキノコや苔）
       if (!isCorpse && !hidden && !c.dead && c.sleep !== 2) {
         if (sp === Kind.Kobold && c.st === 13) pushSprite(x + (flip ? 5 : -5), yy + 0.05, lift + 9, flip, A.haul(0), 0, 2);
         else if (sp === Kind.Goblin && this.goblinHauls(eco, c)) pushSprite(x + (flip ? 7 : -7), yy + 0.05, lift + 12, flip, A.haul(1), 0, 2);
