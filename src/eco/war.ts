@@ -213,8 +213,9 @@ export function warStep(this: Ecology, c: Cr): boolean {
       else this.goTo(c, f.x, f.y, sp * 1.2);
       return true;
     }
-    // 住みかに着いたら蓄えを袋に詰め、皆で引き上げる
-    if (sq(tgt.x - c.x) + sq(tgt.y - c.y) < 1.2 * TILE * 1.2 * TILE) {
+    // 住みかの前（コボルトの住処なら横穴の入口）に着いたら蓄えを袋に詰め、皆で引き上げる
+    const [tx, ty] = frontOf(this, foeKind(w.ak), tgt);
+    if (sq(tx - c.x) + sq(ty - c.y) < 1.5 * TILE * 1.5 * TILE) {
       const take = Math.max(0, Math.min(tgt.store ?? 0, LOOT_CAP - c.units));
       tgt.store = (tgt.store ?? 0) - take;
       c.units += take;
@@ -222,7 +223,7 @@ export function warStep(this: Ecology, c: Cr): boolean {
       this.endWar(w, 1);
       return true;
     }
-    this.goTo(c, tgt.x, tgt.y, sp);
+    this.goTo(c, tx, ty, sp);
     return true;
   }
   // 引き上げる：蓄えを奪った者は荷を担いで歩き、押し返された者は急いで帰る
@@ -282,14 +283,18 @@ export function tendWars(this: Ecology): void {
       continue;
     }
     const members = w.ids.map((id) => this.byId.get(id) as Cr);
-    // 攻めに向かう途中で、冒険者・ドワーフ・大物（強さ12以上）が6マスの内に、オークが3マスの内に来たら、戦をやめて引き返す。
-    // （オークは従えるゴブリンの集落のまわりによくいるので、遠くに見えただけではやめない）
+    // 攻めに向かう途中で、冒険者・ドワーフ・大物（強さ12以上）が6マスの内に来るか、守る側でない者（オークなど）に仲間が打たれたら、戦をやめて引き返す。
+    // （オークはあちこちをぶらつくので、そばを通っただけではやめない）
     if (w.ph === 1 && this.step % 5 === w.id % 5) {
       let met = false;
       for (const c of members) {
+        if (this.w.tick - c.hitAt < 10) {
+          const f = this.byId.get(c.foe);
+          if (f && f.k !== foeKind(w.ak) && f.k !== w.ak) met = true;
+        }
         this.nearby(c.x, c.y, 6, (o) => {
           if (met || o.dead || o.away) return;
-          if (o.k === Kind.Adventurer || o.k === Kind.Dwarf || STR[o.k] >= 12 || (o.k === Kind.Orc && sq(o.x - c.x) + sq(o.y - c.y) < 3 * TILE * 3 * TILE)) met = true;
+          if (o.k === Kind.Adventurer || o.k === Kind.Dwarf || STR[o.k] >= 12) met = true;
         });
         if (met) break;
       }
