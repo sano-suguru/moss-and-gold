@@ -41,7 +41,10 @@ export const MOMENTS: Moment[] = [
   { key: 'armorSweep2', label: 'リビングアーマー：武器の大振りで2体以上を打った' },
   { key: 'partyRetreat', label: '冒険者の一行が戦いの途中でかなわず、一行ごと退いた' },
   { key: 'standoff', label: 'コボルトかゴブリンが、住処のそばを通る一行に立ちふさがって威嚇した' },
-  { key: 'koboGob', label: 'コボルトとゴブリン：縄張りの争いで相手を倒した（多すぎても、群れどうしの殺し合いが続いている）' },
+  { key: 'warGo', label: '戦：コボルトかゴブリンの群れが、相手の住みかへ攻めに出た' },
+  { key: 'warLoot', label: '戦：攻め手が相手の住みかの蓄えを奪って引き上げた' },
+  { key: 'warRepel', label: '戦：攻め手が押し返されて退いた' },
+  { key: 'koboGob', label: 'コボルトとゴブリン：戦の外で相手を倒した（多いと、だらだらした殺し合いが続いている）' },
   { key: 'orcClash', label: 'オークとのにらみ合いから戦いになった' },
   { key: 'orcRoar', label: 'オーク：雄叫びで小物を逃がすか、冒険者の後衛を怖ませた' },
   { key: 'orcWoken', label: 'オーク：集落の見張りに起こされて飛び起きた' },
@@ -241,6 +244,26 @@ const read = (dir: string, f: string, since: number) =>
         .filter((r) => !(typeof r.t === 'number' && r.t <= since))
     : [];
 
+/** ログの1行（使う項目だけ） */
+interface Rec {
+  t: number;
+  ev?: string;
+  id: number;
+  k: number;
+  by?: number;
+}
+
+/** コボルトとゴブリンが互いに倒した数のうち、戦（攻めに出てから、終わって600 tick 後まで）の外のもの */
+function koboGobOutsideWar(s: Rec[], d: Rec[]): number {
+  const go = new Map<number, number>();
+  const spans: [number, number][] = [];
+  for (const y of s) {
+    if (y.ev === 'warGo') go.set(y.id, y.t);
+    else if (y.ev === 'war' && go.has(y.id)) spans.push([go.get(y.id) as number, y.t + 600]);
+  }
+  return d.filter((y) => ((y.k === K.Kobold && y.by === K.Goblin) || (y.k === K.Goblin && y.by === K.Kobold)) && !spans.some(([a, b]) => y.t >= a && y.t <= b)).length;
+}
+
 /** 1回の実行（1シード）のログから、場面ごとの発生回数を数える。since（tick）より後のログだけ */
 export function countMoments(dir: string, since = -1): Record<string, number> {
   const s = read(dir, 'settle.jsonl', since);
@@ -255,7 +278,10 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
   const gulp = (by: number[]) => d.filter((y) => y.cause === 'eaten' && !y.slain && by.includes(y.by)).length;
   return {
     slainEat: d.filter((y) => y.cause === 'eaten' && y.slain === 1).length,
-    koboGob: d.filter((y) => (y.k === K.Kobold && y.by === K.Goblin) || (y.k === K.Goblin && y.by === K.Kobold)).length,
+    warGo: s.filter((y) => y.ev === 'warGo').length,
+    warLoot: s.filter((y) => y.ev === 'war' && y.how === 1).length,
+    warRepel: s.filter((y) => y.ev === 'war' && y.how === 2).length,
+    koboGob: koboGobOutsideWar(s, d),
     vampArrive: b.filter((y) => y.k === K.Vampire).length,
     vampCall: ev(K.Vampire, 'callBats').length,
     vampScout: ev(K.Vampire, 'scout').length,

@@ -10,6 +10,8 @@ const HAUL_FIGHT_TICKS = 100;
 /** 荷の絵の種類：0 キノコの束（住処へ蓄えを運ぶコボルト）、1 ネズミ（腹を満たして集落へ帰るゴブリン）、-1 描かない */
 export function haulKind(eco: Ecology, c: Cr): number {
   if (c.dead || c.away || c.sleep === 2 || c.flee > 0 || eco.w.tick - c.hitAt < HAUL_FIGHT_TICKS) return -1;
+  // 戦で奪った蓄えを担いで引き上げる者（warHauls）
+  if ((c.k === Kind.Kobold || c.k === Kind.Goblin) && eco.warHauls(c)) return c.k === Kind.Kobold ? 0 : 1;
   if (c.k === Kind.Kobold) return c.st === 13 ? 0 : -1;
   if (c.k === Kind.Goblin) return goblinHauls(eco, c) ? 1 : -1;
   return -1;

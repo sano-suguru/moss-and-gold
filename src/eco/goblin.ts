@@ -53,8 +53,9 @@ export function pickGoblinCamp(this: Ecology, avoid?: Camp, from?: [number, numb
     if (Math.abs(x - m.entrance.x) + y < 15) continue;
     // 通り道から15マスより近い所には住まない（40マスより遠い所は点を下げる）
     if (route[k] >= 0 && route[k] < 15) continue;
-    // コボルトの住処から15マス（コボルトが住処を守る範囲12マスの外に集落の真ん中を置く。10マスでは集落ごと縄張りの中に入り、群れで食べられていた）
-    if (this.warrens.some((o) => o.id >= 0 && Math.abs(o.x / TILE - x) + Math.abs(o.y / TILE - y) < 15)) continue;
+    // コボルトの住処から、まっすぐ測って15マス（コボルトが住処を守る範囲12マスの外に集落の真ん中を置く。10マスでは集落ごと縄張りの中に入り、群れで食べられていた。
+    // 縦横の和で測ると、斜めには11マスまで近づく）
+    if (this.warrens.some((o) => o.id >= 0 && sq(o.x / TILE - x) + sq(o.y / TILE - y) < 15 * 15)) continue;
     if (this.camps.some((o) => o.id >= 0 && o !== avoid && Math.abs(o.x / TILE - x) + Math.abs(o.y / TILE - y) < 30)) continue;
     if (avoid && Math.abs(avoid.x / TILE - x) + Math.abs(avoid.y / TILE - y) < 20) continue;
     const px = x * TILE + 8;
@@ -247,6 +248,14 @@ export function watchCamps(this: Ecology): void {
           party = true;
         }
       }
+    // 攻めてくるコボルトの群れ（warThreat）
+    const wt = this.warThreat(Kind.Goblin, cp);
+    if (wt && wt.d < nd) {
+      nd = wt.d;
+      near = wt.near;
+      threat = wt.threat;
+      party = false;
+    }
     this.nearby(cp.x, cp.y, 14, (o) => {
       // 若い竜と成竜、トロール、ミノタウロス、見回りで歩いてくるバジリスク（basiliskPatrol）
       if (o.dead || o.away || !((o.k === Kind.Dragon && o.sp >= 1) || o.k === Kind.Troll || o.k === Kind.Minotaur || (o.k === Kind.Basilisk && o.gait > 0))) return;
@@ -395,6 +404,8 @@ export function campOf(this: Ecology, c: Cr): Camp | undefined {
 
 export function goblin(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Goblin];
+  // コボルトの住処へ攻めに出ている（warStep）
+  if (this.warStep(c)) return;
   // 集落のそばを通る冒険者の一行に立ちふさがる（src/eco/standoff.ts）
   if (this.residentStand(c)) return;
   if (c.st === 10) {

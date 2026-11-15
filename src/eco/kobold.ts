@@ -35,8 +35,9 @@ export function pickWarren(this: Ecology, avoid?: Warren, from?: [number, number
     if (walls < 2) continue;
     if (this.warrens.some((o) => Math.abs(o.x - x * TILE) + Math.abs(o.y - y * TILE) < 30 * TILE)) continue;
     if (avoid && Math.abs(avoid.x - x * TILE) + Math.abs(avoid.y - y * TILE) < 30 * TILE) continue;
-    // ゴブリンの集落からも15マス離す（ゴブリンの集落の場所選びと同じ間合い。片方だけでは、集落のすぐそばに住処ができて殺し合っていた）
-    if (this.camps.some((o) => o.id >= 0 && o.kind === 0 && Math.abs(o.x / TILE - x) + Math.abs(o.y / TILE - y) < 15)) continue;
+    // ゴブリンの集落からも、まっすぐ測って15マス離す（ゴブリンの集落の場所選びと同じ間合い。片方だけでは、集落のすぐそばに住処ができて殺し合っていた。
+    // 縦横の和で測ると、斜めには11マスまで近づき、互いの縄張りが重なって小競り合いが絶えない）
+    if (this.camps.some((o) => o.id >= 0 && o.kind === 0 && sq(o.x / TILE - x) + sq(o.y / TILE - y) < 15 * 15)) continue;
     const px = x * TILE + 8;
     const py = y * TILE + 8;
     if (danger.some(([dx, dy, r]) => sq(dx - px) + sq(dy - py) < r * TILE * r * TILE)) continue;
@@ -176,6 +177,8 @@ export function warrenOf(this: Ecology, c: Cr): Warren | undefined {
 
 export function kobold(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Kobold];
+  // ゴブリンの集落へ攻めに出ている（warStep）
+  if (this.warStep(c)) return;
   // 住処のそばを通る冒険者の一行に立ちふさがる（src/eco/standoff.ts）
   if (this.residentStand(c)) return;
   // 住処へ向かう道中：冒険者が近くにいる間は身をひそめて待ち、離れてから進む
@@ -844,6 +847,13 @@ export function watchWarrens(this: Ecology): void {
           threat = this.partyStr(p);
         }
       }
+    // 攻めてくるゴブリンの群れ（warThreat）
+    const wt = this.warThreat(Kind.Kobold, wr);
+    if (wt && wt.d < nd) {
+      nd = wt.d;
+      near = wt.near;
+      threat = wt.threat;
+    }
     this.nearby(wr.x, wr.y, 14, (o) => {
       if (o.dead || o.away || !((o.k === Kind.Dragon && o.sp >= 1) || o.k === Kind.Troll || o.k === Kind.Minotaur || (o.k === Kind.Basilisk && o.gait > 0))) return;
       const d = sq(o.x - wr.x) + sq(o.y - wr.y);
