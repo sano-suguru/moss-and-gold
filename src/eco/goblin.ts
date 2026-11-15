@@ -450,7 +450,9 @@ export function goblin(this: Ecology, c: Cr): void {
           c.st = 0;
           return;
         }
-      } else if (d2 < 30 * TILE * 30 * TILE) {
+      } else if (d2 < 30 * TILE * 30 * TILE && (d2 < 10 * TILE * 10 * TILE || this.goblinForage(c, c.x, c.y, 6) < 0)) {
+        // 集落から遠い（10マスより先）ときは、すぐそば（6マス）に苔かキノコがあれば先にそれを食べる（下の、腹を空かせた者の採集へ進む）。
+        // 遠い蓄えを目指し続けると、分かれて遠くへ移る途中の群れが、足もとの苔を食べずに飢え死にする
         c.act = 1;
         this.goTo(c, camp.x, camp.y, s.speed);
         return;
@@ -549,8 +551,9 @@ export function goblin(this: Ecology, c: Cr): void {
         return;
       }
     }
-    // 腹を空かせた者は、その場で苔かキノコを食べる
-    const kk = cp ? this.goblinForage(c, cp.x, cp.y, R) : (() => {
+    // 腹を空かせた者は、その場で苔かキノコを食べる（集落から10マスより遠い者は、集落のまわりではなく自分のまわり6マスで探す）
+    const far = !!cp && sq(cp.x - c.x) + sq(cp.y - c.y) > 10 * TILE * 10 * TILE;
+    const kk = cp ? this.goblinForage(c, far ? c.x : cp.x, far ? c.y : cp.y, far ? 6 : R) : (() => {
       const k = this.findMoss(c, c.x, c.y, R, 91, this.step >> 7);
       return k >= 0 ? k : this.findFungus(c.x, c.y, R, c.id);
     })();
