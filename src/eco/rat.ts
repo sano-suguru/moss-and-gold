@@ -369,13 +369,17 @@ export function nearestEdibleD(this: Ecology, c: Cr, max: number): [number, numb
   // （そのマスだけだと、ゴーストの居座る群落で、隣のマスを目当てにしてはおびえるのを繰り返して飢える）
   const ax = c.gait > 0 ? (c.gait - 1) % W : -9;
   const ay = c.gait > 0 ? Math.floor((c.gait - 1) / W) : -9;
+  // 届いたマス（wdQ）だけを見る。いちばん近いマスが複数あれば、マスの番号の小さいほう
+  const reached = this.wdQ;
+  const n = this.wdN;
   let best = -1;
-  for (let q = 0; q < d.length; q++) {
-    if (d[q] < 0 || Math.max(this.w.moss[q], this.w.fungus[q]) < 20) continue;
+  for (let i = 0; i < n; i++) {
+    const q = reached[i];
+    if (Math.max(this.w.moss[q], this.w.fungus[q]) < 20) continue;
     if (Math.abs((q % W) - ax) <= 1 && Math.abs(Math.floor(q / W) - ay) <= 1) continue;
     // 立てないマス（大ネズミにとっての深い水）の苔は選ばない
     if (!this.tilePassable(c, q)) continue;
-    if (best < 0 || d[q] < d[best]) best = q;
+    if (best < 0 || d[q] < d[best] || (d[q] === d[best] && q < best)) best = q;
   }
   return [best, best >= 0 ? d[best] : -1];
 }
@@ -385,9 +389,10 @@ export function ratDisperse(this: Ecology, c: Cr): boolean {
   // 出ていく途中で飢えが7割を越えたらあきらめる（st 8）ので、すでに越えている者は出ていこうとしない
   if (c.hungry > SPEC[Kind.Rat].starve * 0.7) return false;
   // 歩いて10マス以内に食べられる苔かキノコがあれば出ていかない（いくつかの点を選んで調べるやり方では、まばらな苔を見落としていた）
-  {
-    const d = this.walkDist(this.tileOf(c.x, c.y), 10);
-    for (let q = 0; q < d.length; q++) if (d[q] >= 0 && Math.max(this.w.moss[q], this.w.fungus[q]) >= 20) return false;
+  this.walkDist(this.tileOf(c.x, c.y), 10);
+  for (let i = 0; i < this.wdN; i++) {
+    const q = this.wdQ[i];
+    if (Math.max(this.w.moss[q], this.w.fungus[q]) >= 20) return false;
   }
   if (this.findMoss(c, c.hx, c.hy, 10, 231) >= 0) return false;
   // まず中での引っ越しを試す（巣穴のまわりの苔が尽きていれば、苔の豊かな所へ群れごと移る）
