@@ -701,6 +701,11 @@ export function ih(a: number, b: number, c = 0): number {
 }
 
 export const MAX_WISPS = 1400;
+/**
+ * ウィスプが生まれうる苔の量。開いた洞窟の苔は生き物に食べられて200に届かないので、開いた床では WISP_MOSS_OPEN から生まれる。
+ * 閉じた空洞の苔は食べられずに茂るので200から（maybeSpawnWisp）
+ */
+export const WISP_MOSS_OPEN = 120;
 /** 群れを作りうる種（groupKeyRaw が null 以外を返しうる種） */
 export const GROUPED: boolean[] = [];
 for (const k of [Kind.Rat, Kind.Bat, Kind.Vampire, Kind.Orc, Kind.Ant, Kind.Kobold, Kind.Goblin, Kind.Lizardman, Kind.Adventurer, Kind.Dwarf]) GROUPED[k] = true;
