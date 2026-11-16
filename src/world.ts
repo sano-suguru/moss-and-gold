@@ -470,10 +470,11 @@ export class World {
       }
     }
     // 瓦礫は長い時間（およそ6日）をかけて、もとの姿に戻る。はじめからの床に積まれた瓦礫は崩れて土に返り、
-    // 掘った所に積まれた瓦礫は固まって岩に戻る（掘った所まで床に返すと、掘るたびに開いた場所だけが増え続ける）
+    // 掘った所の窪みや行き止まりの瓦礫は固まって岩に戻る（掘った所まで床に返すと、掘るたびに開いた場所だけが増え続ける）。
+    // 通路を塞いでいる瓦礫（rubblePlug）は、掘った所でも土に返る（固めると、塞がれた先の住みかが入口側から切り離されたままになる）
     for (let k = 0; k < m.rubble.length; k++) {
       if (!m.rubble[k] || ih(k * 13 + 306, step) % 864 !== 0) continue;
-      if (m.dug[k]) this.applyCompact(k);
+      if (m.dug[k] && !this.rubblePlug(k)) this.applyCompact(k);
       else this.applyWeather(k);
       terrain = true;
     }
@@ -741,6 +742,34 @@ export class World {
     for (let a = 0; a < 4; a++) {
       const b = (a + 1) % 4;
       if (o[a] && o[b] && !m.solid[k + (dys[a] + dys[b]) * m.w + dxs[a] + dxs[b]]) return true;
+    }
+    return false;
+  }
+
+  /**
+   * 瓦礫のマス k が通路を塞ぐ栓の一部か：k とつながった瓦礫のひとかたまりに接する床が、二つ以上の別々の洞窟の領域に分かれていれば true。
+   * 一つずつは道を切らない窪みに積んだ瓦礫（dumpSpoil）でも、積み重なると二マスの厚さの栓になって道を断つことがある
+   */
+  private rubblePlug(k: number): boolean {
+    const m = this.map;
+    const seen = new Set<number>([k]);
+    const st = [k];
+    let reg = -1;
+    while (st.length) {
+      const c = st.pop() as number;
+      for (const q of [c - m.w, c + 1, c + m.w, c - 1]) {
+        if (seen.has(q)) continue;
+        if (m.rubble[q]) {
+          seen.add(q);
+          if (seen.size > 64) return true;
+          st.push(q);
+        } else if (!m.solid[q]) {
+          const r = this.eco.regionOf(q);
+          if (r < 0) continue;
+          if (reg < 0) reg = r;
+          else if (r !== reg) return true;
+        }
+      }
     }
     return false;
   }
