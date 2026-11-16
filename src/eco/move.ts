@@ -502,6 +502,8 @@ export function keepOpenTiles(this: Ecology): Set<number> {
   }
   for (const cp of this.camps) around(this.tileOf(cp.x, cp.y), 6);
   for (const co of this.colonies) around(this.tileOf(co.x, co.y), 4);
+  // アリの巣とネズミの巣穴が掘り進めている通路の先（だれも通らないまま少しずつ伸びる。先を残せば、奥から崩れる通路は丸ごと残る）
+  for (const o of [...this.colonies, ...this.burrows]) if (o.hk !== undefined && o.hk >= 0) s.add(o.hk);
   const h = this.hold;
   if (h) {
     around(h.hk, 6);

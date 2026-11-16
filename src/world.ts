@@ -513,12 +513,25 @@ export class World {
   }
 
   /** 掘った所の瓦礫が固まって岩に戻る（掘られる前と同じ、ただの岩になる） */
-  private applyCompact(k: number): void {
+  private applyCompact(k: number, replay = false): void {
     const m = this.map;
     if (!m.rubble[k]) return;
     m.rubble[k] = 0;
     m.dug[k] = 0;
+    // ロード時の再生では、押し出した土とマナはすでにセーブされた隣の床にある
+    if (!replay) this.pushSoil(k, [k - m.w, k + 1, k + m.w, k - 1].find((q) => !m.solid[q]) ?? -1);
     this.digs.push(k * 8 + 5);
+  }
+
+  /** 岩になるマスの土と苔とキノコとマナを、隣の床 to へ押し出す（岩の中に閉じこめると、生き物が使えないまま残る） */
+  private pushSoil(k: number, to: number): void {
+    if (to < 0) return;
+    this.nutr[to] += this.nutr[k] + this.moss[k] + this.fungus[k];
+    this.mana[to] += this.mana[k];
+    this.nutr[k] = 0;
+    this.moss[k] = 0;
+    this.fungus[k] = 0;
+    this.mana[k] = 0;
   }
 
   /** はじめからの床に積まれた瓦礫が土に返る：通れる床になり、養分が少し生まれる */
@@ -566,7 +579,7 @@ export class World {
     else if (t === 2) this.applyRubble(k, true);
     else if (t === 3) this.applyWeather(k, true);
     else if (t === 4) this.applyPave(k);
-    else this.applyCompact(k);
+    else this.applyCompact(k, true);
   }
 
   /**
@@ -689,8 +702,9 @@ export class World {
     const occupied = this.eco.occupiedTiles();
     const x0 = near % m.w;
     const y0 = (near / m.w) | 0;
-    // 先に、掘った所の窪みを埋め戻す（固まって岩に戻る）。なければ、はじめからの床の窪みに積む（やがて崩れて土に返る）
-    for (const dugOnly of [true, false]) this.dumpSpoilRing(x0, y0, dugOnly, occupied);
+    // 先に、だれも通らなくなった古い掘り跡の窪みを埋め戻す（固まって岩に戻る）。なければ、はじめからの床の窪みに積む（やがて崩れて土に返る）
+    this.dumpSpoilRing(x0, y0, true, this.eco.keepOpenTiles());
+    this.dumpSpoilRing(x0, y0, false, occupied);
   }
 
   private dumpSpoilRing(x0: number, y0: number, dugOnly: boolean, occupied: Set<number>): void {
@@ -703,7 +717,7 @@ export class World {
           const y = y0 + dy;
           if (x < 3 || y < 4 || x >= m.w - 3 || y >= m.h - 3) continue;
           const k = y * m.w + x;
-          if (dugOnly && !m.dug[k]) continue;
+          if (dugOnly && (!m.dug[k] || this.trod[k])) continue;
           if (m.solid[k] || m.lava[k] || this.water[k] > 20 || m.paved[k] || occupied.has(k)) continue;
           // コボルトの住処の横穴（入口から奥まで）は行き止まりでも埋めない（掘り出した土で自分たちの住処の奥を埋めてしまう）
           if (this.eco.inWarrenTunnel(k)) continue;
@@ -768,15 +782,7 @@ export class World {
     let n = 0;
     while (n < CLOSE_RUN && cur >= 0 && ok(cur)) {
       const next = [cur - m.w, cur + 1, cur + m.w, cur - 1].find((q) => !m.solid[q]) ?? -1;
-      // 埋まるマスの土と苔とキノコとマナは、隣の床へ押し出す（岩の中に閉じこめない）
-      if (next >= 0) {
-        this.nutr[next] += this.nutr[cur] + this.moss[cur] + this.fungus[cur];
-        this.mana[next] += this.mana[cur];
-        this.nutr[cur] = 0;
-        this.moss[cur] = 0;
-        this.fungus[cur] = 0;
-        this.mana[cur] = 0;
-      }
+      this.pushSoil(cur, next);
       this.applyRubble(cur, true);
       n++;
       cur = next;
