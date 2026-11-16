@@ -36,6 +36,7 @@ class PassTest {
   private day = 0;
   private fly = false;
   private stat = false;
+  private statue: Uint8Array = NO8;
   private rat = false;
   /** 自分のいるマス（-2 はまだ求めていない） */
   private here = -2;
@@ -54,6 +55,7 @@ class PassTest {
     this.troll = c.k === Kind.Troll && this.day > 0.05;
     this.fly = flies(c);
     this.stat = eco.statueAt.size > 0;
+    this.statue = eco.statueMask;
     this.rat = c.k === Kind.Rat;
     this.here = -2;
     this.dry = 0;
@@ -67,7 +69,7 @@ class PassTest {
     if (this.fly) return true;
     if (this.lava[k]) return false;
     // 石像のあるマスは通れない（自分が石像のマスに立っているときは、そのマスから出られるように通れる）
-    if (this.stat && (this.eco as Ecology).statueAt.has(k)) {
+    if (this.stat && this.statue[k]) {
       if (this.here === -2) this.here = (this.eco as Ecology).tileOf((this.c as Cr).x, (this.c as Cr).y);
       if (this.here !== k) return false;
     }
@@ -83,6 +85,7 @@ class PassTest {
     this.c = null;
     this.solid = NO8;
     this.lava = NO8;
+    this.statue = NO8;
     this.light = NO16;
     this.water = NO32;
   }
@@ -159,15 +162,19 @@ export function nearPath(this: Ecology, c: Cr, from: number, to: number): number
   this.bprev[from] = -1;
   const limit = this.searchLimit(c);
   const pass = bfsPass.begin(this, c);
+  const W = m.w;
+  const H = m.h;
+  const mark = this.bmark;
+  const prev = this.bprev;
   while (qh < qt && qh < limit) {
     const cur = q[qh++];
-    const x = cur % m.w;
-    const y = (cur / m.w) | 0;
+    const x = cur % W;
+    const y = (cur / W) | 0;
     for (let d = 0; d < 4; d++) {
-      const n = d === 0 ? (x + 1 < m.w ? cur + 1 : -1) : d === 1 ? (x > 0 ? cur - 1 : -1) : d === 2 ? (y + 1 < m.h ? cur + m.w : -1) : y > 0 ? cur - m.w : -1;
-      if (n < 0 || this.bmark[n] === g || !pass.ok(n)) continue;
-      this.bmark[n] = g;
-      this.bprev[n] = cur;
+      const n = d === 0 ? (x + 1 < W ? cur + 1 : -1) : d === 1 ? (x > 0 ? cur - 1 : -1) : d === 2 ? (y + 1 < H ? cur + W : -1) : y > 0 ? cur - W : -1;
+      if (n < 0 || mark[n] === g || !pass.ok(n)) continue;
+      mark[n] = g;
+      prev[n] = cur;
       q[qt++] = n;
     }
   }
@@ -218,16 +225,20 @@ export function findPathAvoid(this: Ecology, c: Cr, from: number, to: number, av
   this.bprev[from] = -1;
   const limit = this.searchLimit(c);
   const pass = bfsPass.begin(this, c);
+  const W = m.w;
+  const H = m.h;
+  const mark = this.bmark;
+  const prev = this.bprev;
   while (qh < qt && qh < limit) {
     const cur = q[qh++];
     if (cur === to) break;
-    const x = cur % m.w;
-    const y = (cur / m.w) | 0;
+    const x = cur % W;
+    const y = (cur / W) | 0;
     for (let d = 0; d < 4; d++) {
-      const n = d === 0 ? (x + 1 < m.w ? cur + 1 : -1) : d === 1 ? (x > 0 ? cur - 1 : -1) : d === 2 ? (y + 1 < m.h ? cur + m.w : -1) : y > 0 ? cur - m.w : -1;
-      if (n < 0 || this.bmark[n] === g || !pass.ok(n) || avoid?.(n)) continue;
-      this.bmark[n] = g;
-      this.bprev[n] = cur;
+      const n = d === 0 ? (x + 1 < W ? cur + 1 : -1) : d === 1 ? (x > 0 ? cur - 1 : -1) : d === 2 ? (y + 1 < H ? cur + W : -1) : y > 0 ? cur - W : -1;
+      if (n < 0 || mark[n] === g || !pass.ok(n) || avoid?.(n)) continue;
+      mark[n] = g;
+      prev[n] = cur;
       q[qt++] = n;
     }
   }

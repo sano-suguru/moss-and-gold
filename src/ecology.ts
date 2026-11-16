@@ -775,6 +775,8 @@ export class Ecology {
   trails = new Map<number, number[]>();
   statues: Statue[] = [];
   statueAt = new Map<number, number>();
+  /** statueAt と同じマスに 1 を立てた配列（道探しがマスごとに Map を引かないように。statueAt と一緒に変える。セーブしない） */
+  statueMask = new Uint8Array(0);
   camps: Camp[] = [];
   /** 物資の置き場（深部の探索の一行が残す） */
   caches: SupplyCache[] = [];

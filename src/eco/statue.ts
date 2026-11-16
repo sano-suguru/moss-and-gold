@@ -32,7 +32,7 @@ export function petrify(this: Ecology, c: Cr, by = -1): void {
   // 石像のマスは、覚えておく位置（丸めた座標）で決める（ロードし直したときと同じマスになるように）
   const sk = this.tileOf(st.x, st.y);
   st.blocks = sk >= 0 && this.blocksAt(sk) ? 1 : 0;
-  if (st.blocks) this.statueAt.set(sk, st.id);
+  if (st.blocks) this.setStatueAt(sk, st.id);
   c.body = 0;
   c.food = 0;
   c.units = 0;
@@ -41,12 +41,24 @@ export function petrify(this: Ecology, c: Cr, by = -1): void {
 }
 
 export function rebuildStatueIndex(this: Ecology): void {
+  for (const k of this.statueAt.keys()) this.statueMask[k] = 0;
   this.statueAt.clear();
   for (const st of this.statues) {
     const k = this.tileOf(st.x, st.y);
     if (st.blocks === undefined) st.blocks = k >= 0 && this.blocksAt(k) ? 1 : 0;
-    if (k >= 0 && st.blocks) this.statueAt.set(k, st.id);
+    if (k >= 0 && st.blocks) this.setStatueAt(k, st.id);
   }
+}
+
+/** マス k を石像 id がふさぐ（statueAt と statueMask を一緒に変える） */
+export function setStatueAt(this: Ecology, k: number, id: number): void {
+  const N = this.w.map.w * this.w.map.h;
+  if (this.statueMask.length !== N) {
+    this.statueMask = new Uint8Array(N);
+    for (const q of this.statueAt.keys()) this.statueMask[q] = 1;
+  }
+  this.statueAt.set(k, id);
+  this.statueMask[k] = 1;
 }
 
 /** 石像が通り道をふさぐのは開けた場所だけ（細い通路では脇をすり抜けられる） */
@@ -115,6 +127,7 @@ declare module '../ecology' {
   interface Ecology {
     petrify: typeof petrify;
     rebuildStatueIndex: typeof rebuildStatueIndex;
+    setStatueAt: typeof setStatueAt;
     blocksAt: typeof blocksAt;
     updateStatues: typeof updateStatues;
     pickDark: typeof pickDark;
@@ -122,4 +135,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { petrify, rebuildStatueIndex, blocksAt, updateStatues, pickDark, sunlit });
+Object.assign(Ecology.prototype, { petrify, rebuildStatueIndex, setStatueAt, blocksAt, updateStatues, pickDark, sunlit });
