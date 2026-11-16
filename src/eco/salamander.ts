@@ -1,5 +1,5 @@
 /** Ecology のメソッド：サラマンダー（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { type Burrow, MOSS_R, type Cr, DAY_TICKS_ECO, DIR16, Ecology, Kind, MAX_WISPS, SPEC, ih, sq } from '../ecology';
+import { type Burrow, MOSS_R, type Cr, DAY_TICKS_ECO, DIR16, Ecology, Kind, MAX_WISPS, SPEC, WISP_MOSS_OPEN, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 import { isJobItem } from './armor';
 import { SPAWN_DEFS } from './spawndef';
@@ -229,10 +229,20 @@ export function seed(this: Ecology): void {
   this.seedSwarm();
 }
 
-/** 苔からウィスプが生まれる（苔の更新から呼ばれる） */
+/** 閉じた空洞の、苔が200以上のマスから、苔の更新1回にウィスプが生まれる割合は MOSS_R / (45 × WISP_SEALED_RARE) */
+const WISP_SEALED_RARE = 4;
+/** 開いた床の、苔の豊かなマスから、苔の更新1回にウィスプが生まれる割合は MOSS_R / WISP_OPEN_ODDS */
+const WISP_OPEN_ODDS = 450;
+/**
+ * 苔からウィスプが生まれる（苔の更新から呼ばれる）。
+ * 開いた床では、苔が WISP_MOSS_OPEN 以上の所から生まれる。閉じた空洞では、苔が200以上の所から、割合を抑えて生まれる
+ * （閉じた空洞の苔は食べられずに茂り、生まれたウィスプは壁に囲まれて出られない。割合を抑えないと、ウィスプの8〜10割が閉じた空洞の中にいて、
+ * 開いた洞窟にほとんど出てこず、マナの減った大物が吸いに行けない）
+ */
 export function maybeSpawnWisp(this: Ecology, k: number, step: number): void {
   if (this.counts[Kind.Wisp] >= MAX_WISPS) return;
-  if (this.w.moss[k] < 200 || ih(k, step, 99) % 45 >= MOSS_R || this.w.mana[k] < 2) return;
+  const sealed = this.w.map.sealed[k];
+  if (this.w.moss[k] < (sealed ? 200 : WISP_MOSS_OPEN) || ih(k, step, 99) % (sealed ? 45 * WISP_SEALED_RARE : WISP_OPEN_ODDS) >= MOSS_R || this.w.mana[k] < 2) return;
   this.w.moss[k] -= 4;
   this.counts[Kind.Wisp]++;
   const m = this.w.map;
