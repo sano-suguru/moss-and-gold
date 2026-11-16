@@ -7,17 +7,24 @@
  *
  * チェックの中身は tools/analysis/checks.ts。目安に届かないものがあれば終了コードを 1 にする。
  *
+ * CI では実行を複数の runner に分ける（.github/workflows/deploy.yml）。分けても判定は最後に一か所でまとめて行うので、出力は分けないときと同じ。
+ *   --shard 2/4 --list <file>   実行を、シードごとに4つに分けたうちの2つめだけ行い、判定はしない。作った実行のフォルダを
+ *                               runs/.cache からの相対パスで <file> に書く（CI はそれを固めて最後のジョブへ渡す）
+ *   --cached-only               実行がすべてキャッシュにそろっていなければ、シミュレーションせずに落ちる（渡し損ねを、黙って1台で全部実行し直さないため）
+ * 分け方は CHECKS の（シード、開始日、終了日）だけで決める。どの runner も同じ分け方を計算するので、キャッシュの有無や CPU の数で変わってはいけない。
+ * 一つのシードの実行（ベースの0日目からの実行と、そこから分かれる実行）は同じフォルダやロックを共有するので、シードの途中では分けない。
+ *
  * 地形の作り方（src/mapgen.ts と、それが使う src/rng.ts）がベースと作業ツリーで違うときは、ベースのスナップショットを使わず、
  * 作業ツリーで0日目から実行する。地形はセーブせずシードから作り直すので、ベースのスナップショットを新しい地形に載せると、
  * 生き物が岩の中に置かれるなど、ありえない状態から始まってしまうため（迷路をなくした変更で、埋まった生き物を床へ出すチェックが落ちた）。
  */
 import { cpus } from 'node:os';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { parseArgs } from './common';
 import { CHECKS, type Recs } from './checks';
-import { dayName, defaultAdv, ensureRun, getBin, pool } from './lib/runs';
+import { CACHE, dayName, defaultAdv, ensureRun, getBin, pool, readMeta, runDir } from './lib/runs';
 import { DAY_TICKS } from './lib/engine';
 import { readState } from './lib/state';
 
@@ -47,10 +54,35 @@ async function main() {
   const windows = (c: (typeof checks)[number]) => [{ seeds: c.seeds, from: c.from, to: c.to }, ...(c.more ?? [])];
   for (const c of checks) for (const wd of windows(c)) for (const s of wd.seeds) jobsMap.set(`${s}|${wd.from}|${wd.to}`, { seed: s, from: wd.from, to: wd.to });
   console.log(`チェック ${checks.length} 件、実行するもの ${jobsMap.size}（ベース ${a.base || 'HEAD'}：${base.simHash}、作業ツリー：${ver.simHash}）`);
+  // ベースのスナップショットから分かれず、作業ツリーで0日目から実行するか（ensureRun と同じ条件）
+  const pure = !sameMap || base.simHash === ver.simHash;
+  let todo = [...jobsMap];
+  if (a.shard) {
+    const [i, n] = a.shard.split('/').map(Number);
+    if (!(n >= 1 && i >= 1 && i <= n)) throw new Error(`--shard は 1/4 のように書く：${a.shard}`);
+    const mine = new Set(shardSeeds([...jobsMap.values()], n, pure)[i - 1]);
+    todo = todo.filter(([, j]) => mine.has(j.seed));
+    console.log(`分担 ${i}/${n}：シード ${[...mine].join('、') || 'なし'}（実行するもの ${todo.length}）`);
+  }
+  if (a['cached-only']) {
+    const missing = todo.filter(([, j]) => {
+      const dir = runDir(ver.binHash, adv, j.seed, pure ? '0' : `f${j.from}-${base.simHash}`);
+      return (readMeta(dir)?.tick ?? -1) < j.to * DAY_TICKS;
+    });
+    if (missing.length) {
+      console.error(`キャッシュにそろっていない実行がある（--cached-only なので実行しない）：${missing.map(([k]) => k).join('、')}`);
+      process.exit(1);
+    }
+  }
   const dirs = new Map<string, string>();
-  await pool([...jobsMap].map(([k, j]) => ({ w: j.to - j.from, f: async () => {
+  await pool(todo.map(([k, j]) => ({ w: j.to - j.from, f: async () => {
     dirs.set(k, await ensureRun({ seed: j.seed, days: j.to, adv, ver, fork: sameMap ? { day: j.from, base } : undefined }, (s) => console.log(s)));
   } })), jobs);
+  if (a.shard) {
+    if (a.list) writeFileSync(a.list, [...new Set(dirs.values())].map((d) => `${relative(CACHE, d)}\n`).sort().join(''));
+    console.log(`\n（${((Date.now() - t0) / 1000).toFixed(0)}秒。判定は全部の分担がそろってから行う）`);
+    return;
+  }
   let bad = 0;
   console.log('');
   for (const c of checks) {
@@ -71,6 +103,26 @@ async function main() {
   console.log(`\n（${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
   process.exit(bad ? 1 : 0);
 }
+/**
+ * シードを n 組に分ける。シードの重さは、実行する日数の見積もり（分かれる実行の日数の合計と、その元になるベースの0日目からの日数。
+ * 0日目から実行するときは最後の日まで）。重いシードから、いちばん軽い組に入れていく。
+ */
+function shardSeeds(jobs: { seed: string; from: number; to: number }[], n: number, pure: boolean): string[][] {
+  const w = new Map<string, number>();
+  for (const s of new Set(jobs.map((j) => j.seed))) {
+    const js = jobs.filter((j) => j.seed === s);
+    const last = Math.max(...js.map((j) => j.to));
+    w.set(s, pure ? last : Math.max(...js.map((j) => j.from)) + js.reduce((x, j) => x + j.to - j.from, 0));
+  }
+  const groups = Array.from({ length: n }, () => ({ w: 0, seeds: [] as string[] }));
+  for (const s of [...w.keys()].sort((x, y) => w.get(y)! - w.get(x)! || (x < y ? -1 : 1))) {
+    const g = groups.reduce((m, g) => (g.w < m.w ? g : m));
+    g.seeds.push(s);
+    g.w += w.get(s)!;
+  }
+  return groups.map((g) => g.seeds);
+}
+
 main().catch((e) => {
   console.error(e);
   process.exit(1);
