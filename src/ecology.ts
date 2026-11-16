@@ -45,6 +45,15 @@ export const enum Kind {
   Thrall = 30,
 }
 
+/** 種ごとの体の大きさ（間合いの目安。px。0 は押し合わない種）。Ecology.bodySize が引く表 */
+export const BODY_SIZE: Uint8Array = Uint8Array.from({ length: Kind.Thrall + 1 }, (_, k) => {
+  if (k === Kind.Dragon || k === Kind.Worm) return 40;
+  if (k === Kind.Golem || k === Kind.Troll || k === Kind.Minotaur || k === Kind.Wyvern) return 18;
+  if (k === Kind.Orc || k === Kind.Lizardman || k === Kind.Adventurer || k === Kind.Dwarf || k === Kind.Vampire || k === Kind.Skeleton || k === Kind.Lich || k === Kind.Armor || k === Kind.Basilisk || k === Kind.Lizard || k === Kind.Zombie) return 11;
+  if (k === Kind.Rat || k === Kind.Ant || k === Kind.Bat || k === Kind.Kobold || k === Kind.Goblin || k === Kind.Spider || k === Kind.Myconid || k === Kind.Slime) return 8;
+  return 0;
+});
+
 /** ドワーフの住みか */
 export interface Hold {
   /** 0 住む場所へ向かう、1 広間を掘る、2 坑道を掘る、3 宝を運ぶ、4 次の宝を探す */
@@ -771,6 +780,8 @@ export class Ecology {
   trails = new Map<number, number[]>();
   statues: Statue[] = [];
   statueAt = new Map<number, number>();
+  /** statueAt と同じマスに 1 を立てた配列（道探しがマスごとに Map を引かないように。statueAt と一緒に変える。セーブしない） */
+  statueMask = new Uint8Array(0);
   camps: Camp[] = [];
   /** 物資の置き場（深部の探索の一行が残す） */
   caches: SupplyCache[] = [];
@@ -928,11 +939,7 @@ export class Ecology {
 
   /** 体の大きさ（間合いの目安。px） */
   static bodySize(k: number): number {
-    if (k === Kind.Dragon || k === Kind.Worm) return 40;
-    if (k === Kind.Golem || k === Kind.Troll || k === Kind.Minotaur || k === Kind.Wyvern) return 18;
-    if (k === Kind.Orc || k === Kind.Lizardman || k === Kind.Adventurer || k === Kind.Dwarf || k === Kind.Vampire || k === Kind.Skeleton || k === Kind.Lich || k === Kind.Armor || k === Kind.Basilisk || k === Kind.Lizard || k === Kind.Zombie) return 11;
-    if (k === Kind.Rat || k === Kind.Ant || k === Kind.Bat || k === Kind.Kobold || k === Kind.Goblin || k === Kind.Spider || k === Kind.Myconid || k === Kind.Slime) return 8;
-    return 0;
+    return BODY_SIZE[k] ?? 0;
   }
 
   /**
@@ -1090,6 +1097,8 @@ export class Ecology {
   /** マス k からの歩いた道のり（溶岩、閉じた空洞、岩は通らない。max マスまで。届かなければ -1） */
   /** 歩いた道のりを測る探索（walkDist）の待ち行列（毎回確保せずに使い回す） */
   wdQ = new Int32Array(0);
+  /** 直前の walkDist が調べたマスの数（wdQ の初めの wdN 個が、届いたマスを近い順に並べたもの。すぐ使うだけでセーブしない） */
+  wdN = 0;
 
   /**
    * 住処の候補のまわりの食べ物：8マス以内の食べられる苔とキノコ（20以上の群落の、根元12を除いた分）と、10マス以内のネズミ1匹あたり100。

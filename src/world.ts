@@ -1001,17 +1001,30 @@ export class World {
 
   /**
    * 見通しのキャッシュ（マスごとに、まわり7×7への見通し。0 未計算 / 1 見える / 2 見えない）。
-   * 見通しは岩だけで決まるので、地形変更ログの長さ（digs.length）が増えたときだけ捨てる
+   * 見通しは岩だけで決まるので、地形変更ログの長さ（digs.length）が増えたときだけ捨てる。
+   * 二つのマスの見通しは、二つを囲む長方形の中の岩だけで決まるので、捨てるのは、増えたログのマスから縦横3マス以内を起点にした分だけ
    */
   private losMemo = new Uint8Array(0);
   private losDigs = -1;
   private losNear(k: number, dx: number, dy: number, cx: number, cy: number, nx: number, ny: number): boolean {
-    const N = this.map.w * this.map.h;
-    if (this.losMemo.length !== N * 49) {
-      this.losMemo = new Uint8Array(N * 49);
+    const W = this.map.w;
+    const H = this.map.h;
+    if (this.losMemo.length !== W * H * 49) {
+      this.losMemo = new Uint8Array(W * H * 49);
       this.losDigs = this.digs.length;
     } else if (this.losDigs !== this.digs.length) {
-      this.losMemo.fill(0);
+      if (this.digs.length < this.losDigs || this.digs.length - this.losDigs > 256) this.losMemo.fill(0);
+      else
+        for (let i = this.losDigs; i < this.digs.length; i++) {
+          const t = Math.floor(this.digs[i] / 8);
+          const tx = t % W;
+          const ty = Math.floor(t / W);
+          for (let y = Math.max(0, ty - 3); y <= Math.min(H - 1, ty + 3); y++) {
+            const a = (y * W + Math.max(0, tx - 3)) * 49;
+            const b = (y * W + Math.min(W - 1, tx + 3) + 1) * 49;
+            this.losMemo.fill(0, a, b);
+          }
+        }
       this.losDigs = this.digs.length;
     }
     const q = k * 49 + (dy + 3) * 7 + (dx + 3);

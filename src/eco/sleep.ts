@@ -1,5 +1,5 @@
-/** Ecology のメソッド：眠り（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { type Cr, DAY_TICKS_ECO, Ecology, Job, Kind, SPEC, ih, sq } from '../ecology';
+/** Ecology のメソッド：眠り（Ecology のクラスに prototype で足す） */
+import { BODY_SIZE, type Cr, DAY_TICKS_ECO, Ecology, Job, Kind, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
 /** 見張り：群れが休む間、一匹は起きている。ゲーム内の2時間ごとに交代する（群れの中で順番に） */
@@ -128,52 +128,80 @@ export function slotOf(this: Ecology, c: Cr, g: { hx: number; hy: number; member
  * 群れで寄り添う種（大ネズミ、アリ、コウモリ）は間合いが小さい。ドラゴンは押されても動かず（相手だけがどく）、飛んでいる間は押し合わない
  */
 export function personalSpace(this: Ecology): void {
+  // 近くの者は nearby と同じ格子を同じ順（行ごと、マスごと）にたどる。者ごとに関数を作って呼ぶと、この処理だけで生き物の更新の5％ほどかかるので、ここでは格子を直接見る
+  const m = this.w.map;
+  const W = m.w;
+  const BW = (W + 7) >> 3;
+  const head = this.head;
+  const next = this.next;
+  const blk = this.blk;
+  const items = this.items;
   for (const c of this.list) {
     if (c.dead || c.away) continue;
-    const sa = Ecology.bodySize(c.k);
+    const sa = BODY_SIZE[c.k];
     if (!sa) continue;
     if (c.k === Kind.Bat && c.st !== 0) continue;
     // 飛んでいるドラゴンは宙にいるので、地上の者と押し合わない
     if (c.k === Kind.Dragon && c.st === 2) continue;
     const stillA = c.act === 0 || c.sleep > 0;
-    this.nearby(c.x, c.y, 2, (o) => {
-      if (o === c || o.dead || o.away || o.id < c.id) return;
-      const sb = Ecology.bodySize(o.k);
-      if (!sb || (o.k === Kind.Bat && o.st !== 0) || (o.k === Kind.Dragon && o.st === 2)) return;
-      const huddle = (c.k === o.k && (c.k === Kind.Rat || c.k === Kind.Ant || c.k === Kind.Bat)) ? 0.65 : 1;
-      const r = ((sa + sb) / 2) * huddle;
-      const dx = o.x - c.x;
-      const dy = (o.y - c.y) * 1.3;
-      const d2 = dx * dx + dy * dy;
-      if (d2 >= r * r) return;
-      const stillB = o.act === 0 || o.sleep > 0;
-      const k = stillA && stillB ? 0.25 : stillA || stillB ? 0.08 : 0.03;
-      let d = Math.sqrt(d2);
-      let ux = dx;
-      let uy = dy;
-      if (d < 0.01) {
-        const a = ((c.id * 7919 + o.id * 104729) % 628) / 100;
-        ux = Math.cos(a);
-        uy = Math.sin(a);
-        d = 1;
+    const tx = Math.floor(c.x / TILE);
+    const ty = Math.floor(c.y / TILE);
+    const y1 = Math.min(m.h - 1, ty + 2);
+    const x0 = Math.max(0, tx - 2);
+    const x1 = Math.min(W - 1, tx + 2);
+    for (let yy = Math.max(0, ty - 2); yy <= y1; yy++) {
+      const row = yy * W;
+      const brow = yy * BW;
+      for (let xx = x0; xx <= x1; xx++) {
+        if (blk[brow + (xx >> 3)] === 0) {
+          xx |= 7;
+          continue;
+        }
+        for (let i = head[row + xx]; i >= 0; i = next[i]) {
+          const o = items[i];
+          if (o === c || o.dead || o.away || o.id < c.id) continue;
+          const sb = BODY_SIZE[o.k];
+          if (!sb || (o.k === Kind.Bat && o.st !== 0) || (o.k === Kind.Dragon && o.st === 2)) continue;
+          const huddle = c.k === o.k && (c.k === Kind.Rat || c.k === Kind.Ant || c.k === Kind.Bat) ? 0.65 : 1;
+          const r = ((sa + sb) / 2) * huddle;
+          const dx = o.x - c.x;
+          const dy = (o.y - c.y) * 1.3;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < r * r) pushApart(this, c, o, sa, sb, r, dx, dy, d2, stillA);
+        }
       }
-      const push = Math.min(1.2, (r - d) * k);
-      const px = (ux / d) * push;
-      const py = (uy / d) * push * 0.77;
-      // 大きいほうは動きにくい。ドラゴンは小さな者に押されても動かず、相手だけがどく
-      const dA = c.k === Kind.Dragon && o.k !== Kind.Dragon;
-      const dB = o.k === Kind.Dragon && c.k !== Kind.Dragon;
-      const wa = dA ? 0 : dB ? 1 : sb / (sa + sb);
-      const wb = dB ? 0 : dA ? 1 : sa / (sa + sb);
-      if (this.stepOk(c, c.x, c.y, c.x - px * wa, c.y - py * wa)) {
-        c.x -= px * wa;
-        c.y -= py * wa;
-      }
-      if (this.stepOk(o, o.x, o.y, o.x + px * wb, o.y + py * wb)) {
-        o.x += px * wb;
-        o.y += py * wb;
-      }
-    });
+    }
+  }
+}
+
+/** 重なった二者（c と o。dx・dy・d2 は c から o への、縦を1.3倍した差とその二乗）を押し離す（personalSpace） */
+function pushApart(eco: Ecology, c: Cr, o: Cr, sa: number, sb: number, r: number, dx: number, dy: number, d2: number, stillA: boolean): void {
+  const stillB = o.act === 0 || o.sleep > 0;
+  const k = stillA && stillB ? 0.25 : stillA || stillB ? 0.08 : 0.03;
+  let d = Math.sqrt(d2);
+  let ux = dx;
+  let uy = dy;
+  if (d < 0.01) {
+    const a = ((c.id * 7919 + o.id * 104729) % 628) / 100;
+    ux = Math.cos(a);
+    uy = Math.sin(a);
+    d = 1;
+  }
+  const push = Math.min(1.2, (r - d) * k);
+  const px = (ux / d) * push;
+  const py = (uy / d) * push * 0.77;
+  // 大きいほうは動きにくい。ドラゴンは小さな者に押されても動かず、相手だけがどく
+  const dA = c.k === Kind.Dragon && o.k !== Kind.Dragon;
+  const dB = o.k === Kind.Dragon && c.k !== Kind.Dragon;
+  const wa = dA ? 0 : dB ? 1 : sb / (sa + sb);
+  const wb = dB ? 0 : dA ? 1 : sa / (sa + sb);
+  if (eco.stepOk(c, c.x, c.y, c.x - px * wa, c.y - py * wa)) {
+    c.x -= px * wa;
+    c.y -= py * wa;
+  }
+  if (eco.stepOk(o, o.x, o.y, o.x + px * wb, o.y + py * wb)) {
+    o.x += px * wb;
+    o.y += py * wb;
   }
 }
 

@@ -1,4 +1,4 @@
-/** Ecology のメソッド：ゴブリン（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+/** Ecology のメソッド：ゴブリン（Ecology のクラスに prototype で足す） */
 import { type Camp, type Cr, DAY_TICKS_ECO, DIR16, Ecology, HUNT0, Kind, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
@@ -103,6 +103,8 @@ export function routeDist(this: Ecology, max: number): Int32Array {
   const dist = new Int32Array(N).fill(-1);
   if (this.wdQ.length !== N) this.wdQ = new Int32Array(N);
   const q = this.wdQ;
+  // 待ち行列を walkDist と共有するので、walkDist の届いたマスの数（wdN）は無効にする
+  this.wdN = 0;
   let h = 0;
   let t = 0;
   for (let k = 0; k < N; k++) {

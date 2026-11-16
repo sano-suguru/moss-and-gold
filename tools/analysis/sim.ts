@@ -170,24 +170,51 @@ const HITCH_N = 4;
 const HITCH_D2 = 8 * 8;
 type HitchRec = { xs: number[]; ys: number[]; ok: boolean[]; ep: null | { t0: number; x: number; y: number; st: number; near: number; wall: number; last: number; miss: number; n: number; nopath: number; walked: number; px: number; py: number } };
 const hitchMap = new Map<number, HitchRec>();
-/** 直近の 10 tick の間に、生き物の更新ごとに見て歩く姿だった回数と、見た回数（watchHitch が読んで空にする） */
-const hitchWalk = new Map<number, [number, number]>();
+/**
+ * 直近の 10 tick の間に、生き物の更新ごとに見て歩く姿だった回数（walkN）と、見た回数（seenN）。生き物の番号で引く。
+ * walkGen が今の hitchGen と違う番号は、この 10 tick の間にまだ見ていない（watchHitch が hitchGen を進めて空にする）。
+ * 生き物ごとに Map を引くと、この監視だけでシミュレーションの数％かかるので、配列で持つ
+ */
+let walkN = new Int32Array(1024);
+let seenN = new Int32Array(1024);
+let walkGen = new Int32Array(1024);
+/** watchHitch で見た回の番号（生き物の番号で引く。今の hitchGen なら、この回に見た） */
+let hitchSeen = new Int32Array(1024);
+let hitchGen = 1;
+function growById(id: number): void {
+  if (id < walkN.length) return;
+  let n = walkN.length;
+  while (n <= id) n *= 2;
+  const grow = (a: Int32Array) => {
+    const b = new Int32Array(n);
+    b.set(a);
+    return b;
+  };
+  walkN = grow(walkN);
+  seenN = grow(seenN);
+  walkGen = grow(walkGen);
+  hitchSeen = grow(hitchSeen);
+}
 function watchWalk(): void {
   for (const c of w.eco.list) {
     if (c.dead || c.away) continue;
-    let a = hitchWalk.get(c.id);
-    if (!a) hitchWalk.set(c.id, (a = [0, 0]));
+    const id = c.id;
+    growById(id);
+    if (walkGen[id] !== hitchGen) {
+      walkGen[id] = hitchGen;
+      walkN[id] = 0;
+      seenN[id] = 0;
+    }
     // 歩き方の止まる番でその場から動いていない者は、描画で立ち姿になるので歩いていないとみなす（src/creatureView.ts）
     // （古いバージョンのソースとも組み合わせて使うので、どのバージョンにもある gaitOf で見る。gaitPaused と同じ）
-    if (c.act === 1 && !(c.x === c.px && c.y === c.py && w.eco.gaitOf(c).every((v: number) => v === 0))) a[0]++;
-    a[1]++;
+    if (c.act === 1 && !(c.x === c.px && c.y === c.py && w.eco.gaitOf(c).every((v: number) => v === 0))) walkN[id]++;
+    seenN[id]++;
   }
 }
 function watchHitch(): unknown[] {
   const e = w.eco;
   const m = w.map;
   const rows: unknown[] = [];
-  const seen = new Set<number>();
   const close = (c: { k: number; id: number }, r: HitchRec) => {
     const p = r.ep!;
     rows.push({ t: w.tick, t0: p.t0, k: c.k, id: c.id, st: p.st, x: Math.round(p.x), y: Math.round(p.y), dur: p.last - p.t0, walked: Math.round(p.walked), nopath: +(p.nopath / p.n).toFixed(2), near: p.near, wall: p.wall });
@@ -195,15 +222,16 @@ function watchHitch(): unknown[] {
   };
   for (const c of e.list) {
     if (c.dead || c.away) continue;
-    seen.add(c.id);
+    growById(c.id);
+    hitchSeen[c.id] = hitchGen;
     let r = hitchMap.get(c.id);
     if (!r) hitchMap.set(c.id, (r = { xs: [], ys: [], ok: [], ep: null }));
     r.xs.push(c.x);
     r.ys.push(c.y);
     // 姿は、10 tick の間の生き物の更新ごと（2 tick ごと）に見て、8割以上が歩く姿なら歩いていたとみなす
     // （10 tick ごとの瞬間だけを見ると、大ネズミの「止まっては走る」の止まる番のように、画面ではほとんど立ち止まっている者を拾ってしまう）
-    const wa = hitchWalk.get(c.id);
-    r.ok.push(!!wa && wa[0] >= wa[1] * 0.8 && !c.caught && !(c.sleep > 0));
+    const walked = walkGen[c.id] === hitchGen && walkN[c.id] >= seenN[c.id] * 0.8;
+    r.ok.push(walked && !c.caught && !(c.sleep > 0));
     if (r.xs.length > HITCH_N) {
       r.xs.shift();
       r.ys.shift();
@@ -251,9 +279,8 @@ function watchHitch(): unknown[] {
       p.py = c.y;
     }
   }
-  hitchWalk.clear();
   for (const [id, r] of hitchMap) {
-    if (seen.has(id)) continue;
+    if (id < hitchSeen.length && hitchSeen[id] === hitchGen) continue;
     // 死んだ・外へ出た：続いていた区間はそこで閉じる
     if (r.ep) {
       const c = e.list.find((o) => o.id === id);
@@ -261,6 +288,7 @@ function watchHitch(): unknown[] {
     }
     hitchMap.delete(id);
   }
+  hitchGen++;
   return rows;
 }
 

@@ -1,4 +1,4 @@
-/** Ecology のメソッド：コボルト（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+/** Ecology のメソッド：コボルト（Ecology のクラスに prototype で足す） */
 import { type Cr, DAY_TICKS_ECO, DIR16, Ecology, Kind, SPEC, type Warren, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
@@ -72,6 +72,7 @@ export function walkDist(this: Ecology, k: number, max: number, par?: Int32Array
   const m = this.w.map;
   const N = m.w * m.h;
   const dist = new Int32Array(N).fill(-1);
+  this.wdN = 0;
   if (k < 0) return dist;
   if (par) par[k] = -1;
   if (this.wdQ.length !== N) this.wdQ = new Int32Array(N);
@@ -92,6 +93,7 @@ export function walkDist(this: Ecology, k: number, max: number, par?: Int32Array
       q[t++] = n;
     }
   }
+  this.wdN = t;
   return dist;
 }
 
