@@ -1,4 +1,4 @@
-/** Ecology のメソッド：石像（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+/** Ecology のメソッド：石像（Ecology のクラスに prototype で足す） */
 import { type Cr, Ecology, Kind, STR, type Statue, ih } from '../ecology';
 import { TILE } from '../mapgen';
 

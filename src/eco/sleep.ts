@@ -1,4 +1,4 @@
-/** Ecology のメソッド：眠り（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+/** Ecology のメソッド：眠り（Ecology のクラスに prototype で足す） */
 import { BODY_SIZE, type Cr, DAY_TICKS_ECO, Ecology, Job, Kind, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 

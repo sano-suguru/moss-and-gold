@@ -1,4 +1,4 @@
-/** Ecology のメソッド：コボルト（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+/** Ecology のメソッド：コボルト（Ecology のクラスに prototype で足す） */
 import { type Cr, DAY_TICKS_ECO, DIR16, Ecology, Kind, SPEC, type Warren, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 

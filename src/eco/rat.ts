@@ -1,4 +1,4 @@
-/** Ecology のメソッド：大ネズミ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+/** Ecology のメソッド：大ネズミ（Ecology のクラスに prototype で足す） */
 import { type Burrow, type Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
 
@@ -369,12 +369,15 @@ export function nearestEdibleD(this: Ecology, c: Cr, max: number): [number, numb
   // （そのマスだけだと、ゴーストの居座る群落で、隣のマスを目当てにしてはおびえるのを繰り返して飢える）
   const ax = c.gait > 0 ? (c.gait - 1) % W : -9;
   const ay = c.gait > 0 ? Math.floor((c.gait - 1) / W) : -9;
-  // 届いたマス（wdQ）だけを見る。いちばん近いマスが複数あれば、マスの番号の小さいほう
+  // 届いたマス（wdQ。近い順に並ぶ）だけを見る。いちばん近いマスが複数あれば、マスの番号の小さいほう。
+  // いちばん近いマスより遠いマスに来たら、それより先に選ばれるマスはない。
+  // 調べる間に walkDist を呼ぶ処理を挟まない（wdQ と wdN が書き換わる）
   const reached = this.wdQ;
   const n = this.wdN;
   let best = -1;
   for (let i = 0; i < n; i++) {
     const q = reached[i];
+    if (best >= 0 && d[q] > d[best]) break;
     if (Math.max(this.w.moss[q], this.w.fungus[q]) < 20) continue;
     if (Math.abs((q % W) - ax) <= 1 && Math.abs(Math.floor(q / W) - ay) <= 1) continue;
     // 立てないマス（大ネズミにとっての深い水）の苔は選ばない

@@ -1,4 +1,4 @@
-/** Ecology のメソッド：ユーティリティ、生き物の空間グリッド（近くの相手を探す）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+/** Ecology のメソッド：ユーティリティ、生き物の空間グリッド（近くの相手を探す）（Ecology のクラスに prototype で足す） */
 import { type Cr, DIR16, Ecology, Kind, SPEC, TIER, ih, sq, STONE_FULL, STONE_SLOW } from '../ecology';
 import { TILE } from '../mapgen';
 import { VAMP_SCATTER } from './vampire';
