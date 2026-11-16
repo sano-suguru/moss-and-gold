@@ -125,6 +125,9 @@ export interface Party {
   initial: number;
   /** 見たもの：1 金貨、2 アンデッド、4 大物、8 竜 */
   saw: number;
+  /** 拾いに向かっている金貨の山と、向かいはじめた生き物の更新の番号（src/eco/adventurer.ts の金貨を拾う処理） */
+  pile?: number;
+  pileAt?: number;
   targetAt: number;
   /** 先頭が仲間を待っている長さ（生き物の更新の回数） */
   waitT: number;
@@ -599,6 +602,8 @@ export interface Cr {
   thirst: number;
   /** 水場で、自分より強い種が去るのを待った回数（src/eco/water.ts。飲みはじめるか、あきらめたら0に戻す） */
   waitW: number;
+  /** 一行や一団から離れない種（冒険者・ドワーフ）が、水場へ向かっている途中なら 1（src/eco/water.ts。向かいはじめたら、遠ざかってもしばらくは向かい続ける） */
+  wtrip: number;
   /** 群れの識別のキャッシュ（セーブしない）：gkAt が今の生き物の更新の番号のとき、その更新の初めに求めた群れの識別が gk（src/eco/groups.ts の buildGroups） */
   gk: string | null;
   gkAt: number;
