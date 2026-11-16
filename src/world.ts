@@ -1,4 +1,4 @@
-import { CR_EVERY, Ecology, MOSS_R } from './eco/index';
+import { CR_EVERY, Ecology, MOSS_R, WISP_MOSS_OPEN } from './eco/index';
 import { type MapData, TILE, generate, lineOfSight } from './mapgen';
 
 export const TICKS_PER_SEC = 10;
@@ -1480,7 +1480,7 @@ export class World {
       const k = fl[i];
       tm += mo[k];
       tf += this.fungus[k];
-      if (mo[k] >= 200) this.eco.maybeSpawnWisp(k, step);
+      if (mo[k] >= WISP_MOSS_OPEN) this.eco.maybeSpawnWisp(k, step);
     }
     this.totalMoss = tm;
     this.totalFungus = tf;
