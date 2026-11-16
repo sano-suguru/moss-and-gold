@@ -1,7 +1,12 @@
 # 確かめて、Cloudflare Workers（静的アセット）へ公開する。
 #
 # - PR（作ったとき・push したとき）：
-#     check   … npm ci → typecheck → lint → npm test → npm run check（失敗すれば PR のチェックが赤）
+#     check   … npm run check を待ち時間を縮めるために分けて実行し、最後にまとめて判定する（失敗すれば PR のチェックが赤。必須のチェックはこの名前）
+#               static     … typecheck → lint → npm test
+#               check-sim  … check の実行をシードごとに4台に分けて行い（--shard）、実行のフォルダを固めて artifact に上げる
+#               check      … static と check-sim がすべて通ったことを確かめ、artifact を runs/.cache に展開して、
+#                            npm run check を --cached-only で実行する（判定と出力は1台で実行したときと同じ）。
+#                            static か check-sim が落ちたら check も落とす（必須のチェックが「スキップ」で通らないように）
 #     preview … npm run build → wrangler versions upload（本番には出さないバージョン）→ プレビューの URL を PR にコメント
 #               （同じ PR では一つのコメントを書き換える。URL はバージョンごとのものと、PR ごとに変わらない pr-<番号> のエイリアス。
 #                書き換える直前に、そのコミットが今も PR の先頭かを確かめ、先頭でなければ書き換えない）
@@ -30,10 +35,30 @@ permissions:
 
 jobs:
   # ── PR：確かめ ──
-  check:
+  static:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  check-sim:
+    if: github.event_name == 'pull_request'
+    name: check-sim (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [1, 2, 3, 4] # 数を変えるときは、下の --shard の分母もそろえる
     steps:
       - uses: actions/checkout@v7
         with:
@@ -43,17 +68,55 @@ jobs:
           node-version-file: .node-version
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm test
-      - name: main のシミュレーションのキャッシュを取得する（あれば。無ければ check が0日目から実行する）
+      - name: main のシミュレーションのキャッシュを取得する（あれば。無ければ0日目から実行する）
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: node tools/analysis/simcache.mjs fetch --ref "$BASE" || true
-      - name: npm run check（ベース＝PR の行き先の10日目のスナップショットから、PR のコードで）
+      - name: npm run check の実行のうち、この分担のシードの分だけ
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
-        run: npm run check -- --base "$BASE"
+        run: |
+          npm run check -- --base "$BASE" --shard "${{ matrix.shard }}/4" --list "$RUNNER_TEMP/runs.txt"
+          tar -czf "$RUNNER_TEMP/check-sim.tar.gz" -C runs/.cache -T "$RUNNER_TEMP/runs.txt"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: check-sim-${{ matrix.shard }}
+          path: ${{ runner.temp }}/check-sim.tar.gz
+          compression-level: 0 # もう gzip で固めてある
+          retention-days: 1
+
+  check:
+    needs: [static, check-sim]
+    # static か check-sim が落ちても実行して、落ちたことを結果にする（needs だけだとスキップになり、必須のチェックを通ってしまう）
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: static と check-sim がすべて通ったか
+        if: needs.static.result != 'success' || needs.check-sim.result != 'success'
+        run: |
+          echo "::error::static：${{ needs.static.result }}、check-sim：${{ needs.check-sim.result }}"
+          exit 1
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: check-sim-*
+          path: ${{ runner.temp }}/check-sim
+      - name: 分担した実行を runs/.cache に展開する
+        run: |
+          mkdir -p runs/.cache
+          for f in "$RUNNER_TEMP"/check-sim/*/check-sim.tar.gz; do tar -xzf "$f" -C runs/.cache; done
+      - name: npm run check（ベース＝PR の行き先の10日目のスナップショットから、PR のコードで。実行はそろっているので判定だけ）
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: npm run check -- --base "$BASE" --cached-only
 
   # ── PR：プレビュー ──
   preview:
