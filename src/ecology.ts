@@ -45,6 +45,15 @@ export const enum Kind {
   Thrall = 30,
 }
 
+/** 種ごとの体の大きさ（間合いの目安。px。0 は押し合わない種）。Ecology.bodySize が引く表 */
+export const BODY_SIZE: Uint8Array = Uint8Array.from({ length: Kind.Thrall + 1 }, (_, k) => {
+  if (k === Kind.Dragon || k === Kind.Worm) return 40;
+  if (k === Kind.Golem || k === Kind.Troll || k === Kind.Minotaur || k === Kind.Wyvern) return 18;
+  if (k === Kind.Orc || k === Kind.Lizardman || k === Kind.Adventurer || k === Kind.Dwarf || k === Kind.Vampire || k === Kind.Skeleton || k === Kind.Lich || k === Kind.Armor || k === Kind.Basilisk || k === Kind.Lizard || k === Kind.Zombie) return 11;
+  if (k === Kind.Rat || k === Kind.Ant || k === Kind.Bat || k === Kind.Kobold || k === Kind.Goblin || k === Kind.Spider || k === Kind.Myconid || k === Kind.Slime) return 8;
+  return 0;
+});
+
 /** ドワーフの住みか */
 export interface Hold {
   /** 0 住む場所へ向かう、1 広間を掘る、2 坑道を掘る、3 宝を運ぶ、4 次の宝を探す */
@@ -923,11 +932,7 @@ export class Ecology {
 
   /** 体の大きさ（間合いの目安。px） */
   static bodySize(k: number): number {
-    if (k === Kind.Dragon || k === Kind.Worm) return 40;
-    if (k === Kind.Golem || k === Kind.Troll || k === Kind.Minotaur || k === Kind.Wyvern) return 18;
-    if (k === Kind.Orc || k === Kind.Lizardman || k === Kind.Adventurer || k === Kind.Dwarf || k === Kind.Vampire || k === Kind.Skeleton || k === Kind.Lich || k === Kind.Armor || k === Kind.Basilisk || k === Kind.Lizard || k === Kind.Zombie) return 11;
-    if (k === Kind.Rat || k === Kind.Ant || k === Kind.Bat || k === Kind.Kobold || k === Kind.Goblin || k === Kind.Spider || k === Kind.Myconid || k === Kind.Slime) return 8;
-    return 0;
+    return BODY_SIZE[k] ?? 0;
   }
 
   /**
