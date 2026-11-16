@@ -1,4 +1,3 @@
-// 一時的な行：CI の check の待ち時間を測るため、シミュレーションのハッシュだけを変える（マージ前に消す）
 /** ゲーム内の1日の tick 数（world.ts の DAY_TICKS と同じ） */
 export const DAY_TICKS_ECO = 14400;
 import type { World } from './world';
