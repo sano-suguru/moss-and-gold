@@ -168,7 +168,7 @@ function partSave() {
 {
   const a = new World('かしたれ');
   for (let i = 0; i < DAY_TICKS * 6.0; i++) a.step();
-  const b = new World('かしたれ', { tick: a.tick, seen: Uint8Array.from(a.seen), water: Int32Array.from(a.water), nutr: Int32Array.from(a.nutr), moss: Uint8Array.from(a.moss), fungus: Uint8Array.from(a.fungus), burn: Uint8Array.from(a.burn), ash: Uint8Array.from(a.ash), mat: Uint8Array.from(a.mat), born: a.born, washed: a.washed, mana: Int32Array.from(a.mana), manaBorn: a.manaBorn, manaLeaked: a.manaLeaked, manaFaded: a.manaFaded, digs: a.digs.slice(), eco: JSON.parse(JSON.stringify(a.eco.serialize())) });
+  const b = new World('かしたれ', { tick: a.tick, seen: Uint8Array.from(a.seen), water: Int32Array.from(a.water), nutr: Int32Array.from(a.nutr), moss: Uint8Array.from(a.moss), fungus: Uint8Array.from(a.fungus), burn: Uint8Array.from(a.burn), ash: Uint8Array.from(a.ash), mat: Uint8Array.from(a.mat), trod: Uint8Array.from(a.trod), born: a.born, washed: a.washed, mana: Int32Array.from(a.mana), manaBorn: a.manaBorn, manaLeaked: a.manaLeaked, manaFaded: a.manaFaded, digs: a.digs.slice(), eco: JSON.parse(JSON.stringify(a.eco.serialize())) });
   const digs0 = a.digs.length;
   for (let i = 0; i < DAY_TICKS * 0.8; i++) { a.step(); b.step(); }
   check(JSON.stringify(a.eco.serialize()) === JSON.stringify(b.eco.serialize()) && fnv(a.moss) === fnv(b.moss) && fnv(a.fungus) === fnv(b.fungus) && a.digs.join() === b.digs.join() && fnv(a.ash) === fnv(b.ash), `保存から読み込み直しても続きの展開が一致（掘られた岩 ${digs0}→${a.digs.length} マス、キノコ ${a.totalFungus}）`);

@@ -33,7 +33,7 @@ const stuck = existsSync(join(run, 'stuck.jsonl')) ? rd('stuck.jsonl').filter(co
 const meta = JSON.parse(readFileSync(join(run, 'meta.json'), 'utf8'));
 const cp = JSON.parse(readFileSync(join(run, 'checkpoint.json'), 'utf8'));
 const unb64 = (s: string) => new Uint8Array(Buffer.from(s, 'base64'));
-const w = new World(cp.seed, { tick: cp.tick, seen: new Uint8Array(cp.n), water: new Int32Array(unb64(cp.water).buffer), nutr: new Int32Array(unb64(cp.nutr).buffer), moss: unb64(cp.moss), fungus: unb64(cp.fungus), burn: unb64(cp.burn), ash: unb64(cp.ash), mat: unb64(cp.mat), born: cp.born, washed: cp.washed, mana: cp.mana ? new Int32Array(unb64(cp.mana).buffer) : undefined, manaBorn: cp.manaBorn, manaLeaked: cp.manaLeaked, manaFaded: cp.manaFaded, digs: cp.digs, eco: cp.eco });
+const w = new World(cp.seed, { tick: cp.tick, seen: new Uint8Array(cp.n), water: new Int32Array(unb64(cp.water).buffer), nutr: new Int32Array(unb64(cp.nutr).buffer), moss: unb64(cp.moss), fungus: unb64(cp.fungus), burn: unb64(cp.burn), ash: unb64(cp.ash), mat: unb64(cp.mat), trod: cp.trod ? unb64(cp.trod) : undefined, born: cp.born, washed: cp.washed, mana: cp.mana ? new Int32Array(unb64(cp.mana).buffer) : undefined, manaBorn: cp.manaBorn, manaLeaked: cp.manaLeaked, manaFaded: cp.manaFaded, digs: cp.digs, eco: cp.eco });
 const m = w.map;
 const name = (k: number) => (k >= 0 ? KIND_NAMES[k] ?? `種${k}` : '—');
 const days = samples.length ? samples[samples.length - 1].day : 0;

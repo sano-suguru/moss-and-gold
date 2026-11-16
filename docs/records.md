@@ -26,6 +26,7 @@ stuck と hitch の記録はセーブしないので、再開した直後は数�
 - abandon：捨てた。reason は food 食べ物が尽きた / raids 襲われすぎた / alone 1匹になった / dragon 竜が近くに来た。to は leave 外へ / move 中で移った
 - empty：誰もいなくなった
 - joined：切り離されていた住みかが、入口側の洞窟とつながった。how は 1 住処のコボルトが内側から掘った / 0 それ以外
+- tunnelClose：長い間だれも通らない掘り跡が、奥から崩れて塞がった（World.closeOldTunnels）。k・id は -1、n は埋まったマスの数
 - cacheGo（k 12）：蓄えの乏しい集落から、冒険者の物資の置き場へ食料を取りに出た。n は出た数、to は置き場、how は歩いてのマス数
 - cacheLoot（k 12）：置き場の木箱をあさって袋に詰めた。n は詰めた量、how は置き場に残った量
 

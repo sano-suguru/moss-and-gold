@@ -30,6 +30,11 @@ const DRIP_WET = 150;
 const FUNGUS_CAP = 90000;
 /** はじめに水を流しておく回数 */
 const WARMUP_WATER_STEPS = 900;
+/** 通った跡の濃さの上限。200 tick ごとに1ずつ薄れるので、だれも通らなくなってからおよそ3.5日で消える */
+const TROD_MAX = 255;
+/** 古い坑道の崩れを試す間隔（200 tick ごとの、この回数に1回）と、一度に埋まるマスの数 */
+const CLOSE_EVERY = 3;
+const CLOSE_RUN = 6;
 
 export type LightKind = 'shaft' | 'bounce' | 'entrance' | 'torch';
 export interface Light {
@@ -116,6 +121,8 @@ export interface WorldState {
   manaBorn?: number;
   manaLeaked?: number;
   manaFaded?: number;
+  /** 生き物の通った跡 */
+  trod?: Uint8Array;
 }
 
 export class World {
@@ -189,6 +196,8 @@ export class World {
     this.burn = state?.burn && state.burn.length === N ? state.burn : new Uint8Array(N);
     this.ash = state?.ash && state.ash.length === N ? state.ash : new Uint8Array(N);
     this.mat = state?.mat && state.mat.length === N ? state.mat : new Uint8Array(N);
+    // 通った跡の無いセーブデータは、どこも通ったばかりとして始める（0 だと、掘られた所が一斉に崩れはじめる）
+    this.trod = state?.trod && state.trod.length === N ? state.trod : new Uint8Array(N).fill(TROD_MAX);
     this.mana = state?.mana && state.mana.length === N ? state.mana : new Int32Array(N);
     this.manaBorn = state?.manaBorn ?? 0;
     this.manaLeaked = state?.manaLeaked ?? 0;
@@ -388,6 +397,8 @@ export class World {
 
   /** 微生物の膜（溶岩や熱い所のそばに育つ。0〜220） */
   mat: Uint8Array;
+  /** 生き物の通った跡（0..TROD_MAX）。歩く生き物のいるマスで満ち、200 tick ごとに薄れる。0 の掘り跡は崩れうる（closeOldTunnels） */
+  trod: Uint8Array;
   /** 生まれた養分（光合成、化学合成、岩の風化、湧き水）と、吸い込み穴から流れ出た養分 */
   born = 0;
   washed = 0;
@@ -458,10 +469,12 @@ export class World {
         this.born++;
       }
     }
-    // 瓦礫は長い時間をかけて崩れ、土に返る（地上でおよそ6日）
+    // 瓦礫は長い時間（およそ6日）をかけて、もとの姿に戻る。はじめからの床に積まれた瓦礫は崩れて土に返り、
+    // 掘った所に積まれた瓦礫は固まって岩に戻る（掘った所まで床に返すと、掘るたびに開いた場所だけが増え続ける）
     for (let k = 0; k < m.rubble.length; k++) {
       if (!m.rubble[k] || ih(k * 13 + 306, step) % 864 !== 0) continue;
-      this.applyWeather(k);
+      if (m.dug[k]) this.applyCompact(k);
+      else this.applyWeather(k);
       terrain = true;
     }
     // 湧き水が溶けた養分を運び込む
@@ -499,13 +512,21 @@ export class World {
     this.digs.push(k * 8 + 4);
   }
 
-  /** 瓦礫が土に返る：通れる床になり、養分が少し生まれる */
+  /** 掘った所の瓦礫が固まって岩に戻る（掘られる前と同じ、ただの岩になる） */
+  private applyCompact(k: number): void {
+    const m = this.map;
+    if (!m.rubble[k]) return;
+    m.rubble[k] = 0;
+    m.dug[k] = 0;
+    this.digs.push(k * 8 + 5);
+  }
+
+  /** はじめからの床に積まれた瓦礫が土に返る：通れる床になり、養分が少し生まれる */
   private applyWeather(k: number, replay = false): void {
     const m = this.map;
     if (!m.rubble[k]) return;
     m.rubble[k] = 0;
     m.solid[k] = 0;
-    m.dug[k] = 1;
     this.weathered++;
     this.settleSealed(k);
     // ロード時の再生では、養分はすでにセーブされた土の中にある
@@ -540,11 +561,12 @@ export class World {
   private replayOp(op: number): void {
     const k = op >> 3;
     const t = op & 7;
-    if (t === 0) this.applyDig(k);
+    if (t === 0) this.applyDig(k, true);
     else if (t === 1) this.applyRubble(k, false);
     else if (t === 2) this.applyRubble(k, true);
     else if (t === 3) this.applyWeather(k, true);
-    else this.applyPave(k);
+    else if (t === 4) this.applyPave(k);
+    else this.applyCompact(k);
   }
 
   /**
@@ -667,7 +689,13 @@ export class World {
     const occupied = this.eco.occupiedTiles();
     const x0 = near % m.w;
     const y0 = (near / m.w) | 0;
-    for (let r = 2; r <= 4 && this.rockStock > 0; r++)
+    // 先に、掘った所の窪みを埋め戻す（固まって岩に戻る）。なければ、はじめからの床の窪みに積む（やがて崩れて土に返る）
+    for (const dugOnly of [true, false]) this.dumpSpoilRing(x0, y0, dugOnly, occupied);
+  }
+
+  private dumpSpoilRing(x0: number, y0: number, dugOnly: boolean, occupied: Set<number>): void {
+    const m = this.map;
+    for (let r = 2; r <= (dugOnly ? 6 : 4) && this.rockStock > 0; r++)
       for (let dy = -r; dy <= r && this.rockStock > 0; dy++)
         for (let dx = -r; dx <= r && this.rockStock > 0; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
@@ -675,28 +703,92 @@ export class World {
           const y = y0 + dy;
           if (x < 3 || y < 4 || x >= m.w - 3 || y >= m.h - 3) continue;
           const k = y * m.w + x;
+          if (dugOnly && !m.dug[k]) continue;
           if (m.solid[k] || m.lava[k] || this.water[k] > 20 || m.paved[k] || occupied.has(k)) continue;
           // コボルトの住処の横穴（入口から奥まで）は行き止まりでも埋めない（掘り出した土で自分たちの住処の奥を埋めてしまう）
           if (this.eco.inWarrenTunnel(k)) continue;
-          const o = [k - m.w, k + 1, k + m.w, k - 1].map((q) => !m.solid[q]);
-          const n4 = o.filter(Boolean).length;
-          let ok = n4 <= 1;
-          // 角の窪み：開いた二辺が直角で、その間の斜めも開いていれば、ふさいでも道は切れない
-          if (n4 === 2) {
-            for (let i = 0; i < 4; i++) {
-              const a = i;
-              const b = (i + 1) % 4;
-              if (!o[a] || !o[b]) continue;
-              const dxs = [0, 1, 0, -1];
-              const dys = [-1, 0, 1, 0];
-              const dg = k + (dys[a] + dys[b]) * m.w + dxs[a] + dxs[b];
-              if (!m.solid[dg]) ok = true;
-            }
-          }
-          if (n4 === 0) ok = false;
-          if (!ok) continue;
+          if (!this.fillKeepsPath(k)) continue;
           this.applyRubble(k, false);
         }
+  }
+
+  /**
+   * 床のマス k をふさいでも、まわりの床どうしの道が切れないか：行き止まり（開いた辺が一つ）か、
+   * 角の窪み（開いた二辺が直角で、その間の斜めも開いている）なら true。どこにもつながらない床は false
+   */
+  private fillKeepsPath(k: number): boolean {
+    const m = this.map;
+    const o = [k - m.w, k + 1, k + m.w, k - 1].map((q) => !m.solid[q]);
+    const n4 = o.filter(Boolean).length;
+    if (n4 === 1) return true;
+    if (n4 !== 2) return false;
+    const dxs = [0, 1, 0, -1];
+    const dys = [-1, 0, 1, 0];
+    for (let a = 0; a < 4; a++) {
+      const b = (a + 1) % 4;
+      if (o[a] && o[b] && !m.solid[k + (dys[a] + dys[b]) * m.w + dxs[a] + dxs[b]]) return true;
+    }
+    return false;
+  }
+
+  /** 古い坑道が崩れた（eco が記録に残し、土ぼこりを立てる）。k は崩れた奥のマス、n は埋まったマスの数 */
+  readonly closeQueue: { k: number; n: number }[] = [];
+
+  /**
+   * 長い間だれも通らない掘り跡は、奥から崩れて瓦礫で埋まる（瓦礫はやがて固まって岩に戻る）。200 tick ごと。
+   * 崩れるのは生き物が掘ったマスだけで、はじめからの床（部屋・通路・水場）は崩れない。
+   * 住みか・巣・宝・道具などのあるマス（Ecology.keepOpenTiles）は崩さない。道を切らないマス（fillKeepsPath）だけを埋めるので、
+   * 崩さないマスへ続く道も残る。一度の崩れでは、行き止まりから CLOSE_RUN マスまでを続けて埋める
+   */
+  private closeOldTunnels(): void {
+    const m = this.map;
+    const N = m.w * m.h;
+    for (let k = 0; k < N; k++) if (this.trod[k]) this.trod[k]--;
+    const step = (this.tick / 200) | 0;
+    if (ih(step, 0x7c1) % CLOSE_EVERY !== 0) return;
+    let keep: Set<number> | null = null;
+    const ok = (k: number) => {
+      if (!m.dug[k] || m.solid[k] || this.trod[k] || m.lava[k] || m.paved[k] || m.vault[k] || this.water[k] > 20 || !this.fillKeepsPath(k)) return false;
+      keep ??= this.eco.keepOpenTiles();
+      return !keep.has(k);
+    };
+    let tip = -1;
+    let best = 0x7fffffff;
+    for (let k = m.w * 2; k < N - m.w * 2; k++) {
+      if (!m.dug[k] || m.solid[k] || this.trod[k]) continue;
+      // 奥から崩れる：開いた辺が一つの行き止まりだけを起点にする
+      if ([k - m.w, k + 1, k + m.w, k - 1].filter((q) => !m.solid[q]).length !== 1) continue;
+      const h = ih(k * 13 + 0x7c2, step);
+      if (h >= best || !ok(k)) continue;
+      best = h;
+      tip = k;
+    }
+    if (tip < 0) return;
+    let cur = tip;
+    let n = 0;
+    while (n < CLOSE_RUN && cur >= 0 && ok(cur)) {
+      const next = [cur - m.w, cur + 1, cur + m.w, cur - 1].find((q) => !m.solid[q]) ?? -1;
+      // 埋まるマスの土と苔とキノコとマナは、隣の床へ押し出す（岩の中に閉じこめない）
+      if (next >= 0) {
+        this.nutr[next] += this.nutr[cur] + this.moss[cur] + this.fungus[cur];
+        this.mana[next] += this.mana[cur];
+        this.nutr[cur] = 0;
+        this.moss[cur] = 0;
+        this.fungus[cur] = 0;
+        this.mana[cur] = 0;
+      }
+      this.applyRubble(cur, true);
+      n++;
+      cur = next;
+    }
+    if (!n) return;
+    this.closeQueue.push({ k: tip, n });
+    this.buildFloors();
+    this.computeHeat();
+    this.computeLightBase();
+    this.terrainDirty = true;
+    this.fieldsDirty = true;
+    this.glowDirty = true;
   }
 
   /** 支えのない広すぎる、掘って広げた空間は崩れる（半径2の範囲がすべて開いていたら） */
@@ -741,11 +833,14 @@ export class World {
     }
   }
 
-  private applyDig(k: number): void {
+  private applyDig(k: number, replay = false): void {
     const m = this.map;
     if (!m.solid[k]) return;
+    // はじめからの床に積まれた瓦礫を掘り出したら、そのマスははじめからの床に戻る（掘った所として崩れる側に入れない）
+    if (!(m.rubble[k] && !m.dug[k])) m.dug[k] = 1;
     m.solid[k] = 0;
-    m.dug[k] = 1;
+    // 掘ったばかりの所は、通ったばかりとして扱う（まだ誰も歩いていない新しい横穴が、すぐに崩れないように）
+    if (!replay) this.trod[k] = TROD_MAX;
     m.paved[k] = 0;
     // 掘り出した岩（または瓦礫）は土になる
     m.rubble[k] = 0;
@@ -1050,6 +1145,15 @@ export class World {
 
   // ---------- tick の処理 ----------
 
+  /** 生き物の通った跡：歩く生き物のいるマスを、通ったばかり（TROD_MAX）にする。壁を抜ける者と飛ぶ者は数えない */
+  private markTrod(): void {
+    for (const c of this.eco.list) {
+      if (c.dead || c.away || this.eco.wallWalker(c)) continue;
+      const k = this.eco.tileOf(c.x, c.y);
+      if (k >= 0) this.trod[k] = TROD_MAX;
+    }
+  }
+
   /** 光る苔とキノコの光が計算し直された回数（描画側が送り直す合図） */
   glowVersion = 0;
 
@@ -1057,6 +1161,7 @@ export class World {
     this.tick++;
     this.stepInner();
     if (this.tick % 200 === 100) this.checkCollapse();
+    if (this.tick % 200 === 150) this.closeOldTunnels();
     if (this.tick % 100 === 50) this.nutrientStep();
     if (this.tick % 50 === 25) this.manaStep();
     // 光る苔とキノコの光は、決まった tick ごとに計算し直す（速度や画面の更新に左右されないように）
@@ -1072,6 +1177,7 @@ export class World {
     if (this.tick % CR_EVERY === 0) {
       const phase = (this.tick % DAY_TICKS) / DAY_TICKS;
       this.eco.update(this.tick, dayIntensity(this.tick), phase);
+      this.markTrod();
       this.eco.onDayEvents(this.prevPhase, phase);
       this.prevPhase = phase;
       if (this.eco.mossTouched) {

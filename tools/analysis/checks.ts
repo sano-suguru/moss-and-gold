@@ -1004,4 +1004,31 @@ export const CHECKS: Check[] = [
       return { ok: sum(n) <= 10, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
     },
   },
+  {
+    // 地形の釣り合い（World.closeOldTunnels と、掘った所の瓦礫が岩に戻ること）：掘り跡が開き続けず、開く分と閉じる分が釣り合う。
+    // 開いた床の増減は、地形変更ログ（digs）の from〜to 日目に増えた分から数える（掘る・風化で +1、瓦礫・崩落で −1、固まるは 0）
+    name: '開いた床の広さが釣り合う（15シードの10〜18日目で、増減の合計が床の1%以内）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const OPEN = [1, -1, -1, 1, 0, 0, 0, 0];
+      const d = rs.map((r) => {
+        const a = (r.state(r.from)?.digs ?? []) as number[];
+        const b = (r.state(r.to)?.digs ?? []) as number[];
+        let n = 0;
+        for (let i = a.length; i < b.length; i++) n += OPEN[b[i] & 7];
+        return n;
+      });
+      // 開いた床はシードごとにおよそ1万2千マス
+      return { ok: Math.abs(sum(d)) <= rs.length * 120, value: `合計 ${sum(d)}（${rs.map((r, i) => `${r.seed} ${d[i]}`).join('、')}）` };
+    },
+  },
+  {
+    // 古い坑道が崩れて塞がる場面（World.closeOldTunnels）：見せたい場面が起きているか
+    name: '古い坑道が崩れて塞がる（15シードの10〜18日目で、合計15回以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.ev === 'tunnelClose').length);
+      return { ok: sum(n) >= 15, value: `合計 ${sum(n)}（${rs.map((r, i) => `${r.seed} ${n[i]}`).join('、')}）` };
+    },
+  },
 ];

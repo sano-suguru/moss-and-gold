@@ -30,7 +30,7 @@ export function encodeState(w: World): Saved {
   return {
     v: 5, n: w.map.w * w.map.h, seed: w.map.seed, tick: w.tick, cam: { x: w.map.entrance.x * 16, y: 200, zoom: 2 }, speed: 1,
     seen: bits(w.seen), water: b64(new Uint8Array(w.water.buffer)), nutr: b64(new Uint8Array(w.nutr.buffer)), moss: b64(w.moss), fungus: b64(w.fungus),
-    burn: b64(w.burn), ash: b64(w.ash), mat: b64(w.mat), born: w.born, washed: w.washed, mana: b64(new Uint8Array(w.mana.buffer)), manaBorn: w.manaBorn, manaLeaked: w.manaLeaked, manaFaded: w.manaFaded, digs: w.digs.slice(), eco: w.eco.serialize(),
+    burn: b64(w.burn), ash: b64(w.ash), mat: b64(w.mat), trod: w.trod ? b64(w.trod) : undefined, born: w.born, washed: w.washed, mana: b64(new Uint8Array(w.mana.buffer)), manaBorn: w.manaBorn, manaLeaked: w.manaLeaked, manaFaded: w.manaFaded, digs: w.digs.slice(), eco: w.eco.serialize(),
   };
 }
 
@@ -38,7 +38,7 @@ export function decodeState(s: Saved): World {
   const N = s.n;
   return new World(s.seed, {
     tick: s.tick, seen: unbits(s.seen, N), water: i32(s.water), nutr: i32(s.nutr),
-    moss: unb64(s.moss), fungus: unb64(s.fungus), burn: unb64(s.burn), ash: unb64(s.ash), mat: unb64(s.mat), born: s.born, washed: s.washed, mana: s.mana ? i32(s.mana) : undefined, manaBorn: s.manaBorn, manaLeaked: s.manaLeaked, manaFaded: s.manaFaded, digs: s.digs, eco: s.eco,
+    moss: unb64(s.moss), fungus: unb64(s.fungus), burn: unb64(s.burn), ash: unb64(s.ash), mat: unb64(s.mat), trod: s.trod ? unb64(s.trod) : undefined, born: s.born, washed: s.washed, mana: s.mana ? i32(s.mana) : undefined, manaBorn: s.manaBorn, manaLeaked: s.manaLeaked, manaFaded: s.manaFaded, digs: s.digs, eco: s.eco,
   });
 }
 

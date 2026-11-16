@@ -474,6 +474,44 @@ export function occupiedTiles(this: Ecology): Set<number> {
 }
 
 /**
+ * 古い坑道が崩れても埋めないマスの集合（World.closeOldTunnels）。瓦礫を置いてはいけないマス（occupiedTiles）に加えて、
+ * 物のあるマス（宝の山、落ちた道具、死骸、卵、クモの巣、罠、石像、墓、ランプ、物資の置き場）と、
+ * 住みかのまわり（コボルトの住処と横穴、ゴブリンやオークの集落、アリの巣、ドワーフの坑道、竜の巣）。
+ * 住みかの者は出入りで通った跡を残すので、ふだんはこの集合がなくても崩れないが、出払っている間に埋まらないようにする
+ */
+export function keepOpenTiles(this: Ecology): Set<number> {
+  const m = this.w.map;
+  const s = this.occupiedTiles();
+  const at = (x: number, y: number) => {
+    const k = this.tileOf(x, y);
+    if (k >= 0) s.add(k);
+  };
+  const around = (k: number, r: number) => {
+    if (k < 0) return;
+    const x0 = k % m.w;
+    const y0 = (k / m.w) | 0;
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) s.add((y0 + dy) * m.w + x0 + dx);
+  };
+  for (const c of this.list) if (c.dead) at(c.x, c.y);
+  for (const o of [...this.piles, ...this.gear, ...this.eggs, ...this.webs, ...this.statues, ...this.graves, ...this.caches]) at(o.x, o.y);
+  for (const t of this.traps) s.add(t.k);
+  for (const k of this.lamps) s.add(k);
+  for (const wr of this.warrens) {
+    around(this.tileOf(wr.x, wr.y), 3);
+    if (wr.door !== undefined) around(wr.door, 1);
+  }
+  for (const cp of this.camps) around(this.tileOf(cp.x, cp.y), 6);
+  for (const co of this.colonies) around(this.tileOf(co.x, co.y), 4);
+  const h = this.hold;
+  if (h) {
+    around(h.hk, 6);
+    for (const k of [h.head, h.forge, ...h.todo, ...h.farm, ...(h.plan ?? []), ...(h.drift ?? [])]) if (k >= 0) s.add(k);
+  }
+  around(m.lair.y * m.w + m.lair.x, 6);
+  return s;
+}
+
+/**
  * 安全策：壁や瓦礫のマスの中にいる生き物（壁の中にいても構わない種を除く）を、いちばん近い立てる床へ移す。
  * 埋まった生き物は、どちらへ動こうとしても行き先が壁の中なので、歩く姿のまま身動きできなくなる。移したら true
  */
@@ -1065,6 +1103,7 @@ declare module '../ecology' {
     searchLimit: typeof searchLimit;
     wallWalker: typeof wallWalker;
     occupiedTiles: typeof occupiedTiles;
+    keepOpenTiles: typeof keepOpenTiles;
     unbury: typeof unbury;
     nearPath: typeof nearPath;
     pathToNearest: typeof pathToNearest;
@@ -1098,4 +1137,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, unbury, searchLimit, nearPath, pathToNearest, unreachable, findPathAvoid, goTo, straightOk, tileOf, ratOnDry, passable, stepOk, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, gaitPaused, tryMove, stroll, findMoss, updateForage, nearestForage, trimChews, eatMoss, eat, die, rebuildGrid, nearby });
+Object.assign(Ecology.prototype, { record, tilePassable, findPath, wallWalker, occupiedTiles, keepOpenTiles, unbury, searchLimit, nearPath, pathToNearest, unreachable, findPathAvoid, goTo, straightOk, tileOf, ratOnDry, passable, stepOk, litW, lit, spawn, deposit, nearestFloor, setDir, moveToward, gaitOf, gaitPaused, tryMove, stroll, findMoss, updateForage, nearestForage, trimChews, eatMoss, eat, die, rebuildGrid, nearby });

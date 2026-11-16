@@ -16,6 +16,8 @@ export interface SaveData {
   burn?: string;
   ash?: string;
   mat?: string;
+  /** 生き物の通った跡 */
+  trod?: string;
   mana?: string;
   manaBorn?: number;
   manaLeaked?: number;
