@@ -146,9 +146,15 @@ export function dragToLair(this: Ecology, c: Cr, d: Cr): boolean {
 
 /** ウィスプのマナを感じ取れる距離（マス）。見る・嗅ぐの気づき方ではなく、マナの気配で気づく */
 export const SIP_R = 8;
+/**
+ * マナが尽きかけた（MANA_LOW 未満の）大物が、ウィスプを探しに出かける距離（マス）。大物の住みかとウィスプの漂う所は離れていて、
+ * いちばん近いウィスプまでたいてい40〜130マスある（seed40・seed41・abc・seed5 の8〜20日目）。SIP_R だけだと、マナが尽きかけても吸いに行けるのは25日に十数回だった
+ */
+export const SIP_FAR = 40;
 
 /**
  * マナで命をつなぐ大物（Ecology.MANA_FED）が、体のマナが減ったとき（MANA_LOW 未満）か、飢えが半ばを過ぎたとき、近くのウィスプへ寄って吸う。
+ * マナが減ったときは、SIP_FAR マスまでのウィスプの気配に気づき、住みかを離れて吸いに出かける（壁の向こうでも、歩いて行ける同じ洞窟の領域なら道筋をたどる）。
  * 吸うとウィスプのマナが体に移り（manaMax まで）、ウィスプは消える（死因 sipped。残りのマナと体は、その場の土へ戻る）。
  * 胃には入れない（胃に入れると飢えが振り出しに戻り、マナで命をつなぐ意味がなくなる）。true なら今はこれをしている。
  * 狙うのは、マナを持ち、見通しが通り（壁の向こうのウィスプに張り付かない）、溶岩や深い水の上にいないウィスプだけ。ok を渡すと、さらに絞る（ヴァンパイアが明るい所を避けるなど）。
@@ -160,13 +166,16 @@ export function sipWisp(this: Ecology, c: Cr, ok?: (o: Cr) => boolean): boolean 
   if (!Ecology.MANA_FED.has(c.k) || c.mana >= max) return false;
   if (c.mana >= Ecology.MANA_LOW && c.hungry <= s.starve * 0.5) return false;
   const m = this.w.map;
+  const R = c.mana < Ecology.MANA_LOW ? SIP_FAR : SIP_R;
+  const reg = R > SIP_R ? this.regionOf(this.tileOf(c.x, c.y)) : -1;
   let best: Cr | null = null;
-  let bd = SIP_R * TILE * SIP_R * TILE;
-  this.nearby(c.x, c.y, SIP_R, (o) => {
+  let bd = R * TILE * R * TILE;
+  this.nearby(c.x, c.y, R, (o) => {
     if (o.k !== Kind.Wisp || o.dead || o.away || o.caught || o.elite === 7 || o.mana <= 0) return;
     const q = this.tileOf(o.x, o.y);
     if (q < 0 || m.lava[q] || this.w.water[q] > 40) return;
-    if (!lineOfSight(m, c.x, c.y, o.x, o.y)) return;
+    // SIP_R の内は見通しが通るものだけ（壁の向こうのウィスプに張り付かない）。その外は、歩いて行ける同じ領域のものだけ
+    if (sq(o.x - c.x) + sq(o.y - c.y) <= sq(SIP_R * TILE) ? !lineOfSight(m, c.x, c.y, o.x, o.y) : reg < 0 || this.regionOf(q) !== reg) return;
     if (ok && !ok(o)) return;
     const d = sq(o.x - c.x) + sq(o.y - c.y);
     if (d < bd) {
