@@ -187,6 +187,7 @@ export const MOMENTS: Moment[] = [
   { key: 'waterCrowd', label: '水場：3種以上が同時にいた（水場ごとに、生き物の更新300回に1回まで数える）' },
   { key: 'joined', label: '住処の洞窟が入口側とつながる' },
   { key: 'joinedDig', label: '住処の洞窟が入口側とつながる：住処のコボルトが掘ってつないだ' },
+  { key: 'tunnelClose', label: '地形：長い間だれも通らない古い坑道が、奥から崩れて塞がった' },
 ];
 
 const DAY = 14400;
@@ -474,6 +475,7 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     // 入口側と切り離されていた住みか（コボルトの住処、ゴブリン・リザードマンの集落、アリの巣）が、入口側の洞窟とつながった（markJoined）
     joined: s.filter((x) => x.ev === 'joined').length,
     joinedDig: s.filter((x) => x.ev === 'joined' && x.how === 1).length,
+    tunnelClose: s.filter((x) => x.ev === 'tunnelClose').length,
   };
 }
 

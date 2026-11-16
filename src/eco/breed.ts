@@ -142,6 +142,20 @@ export function updateDigging(this: Ecology): void {
       if (k >= 0 && m.solid[k]) this.die(c, 'crushed');
     });
   }
+  // 古い坑道が崩れて塞がる：土ぼこりが立ち、近くの生き物は驚く（下にいた者はいない。World.closeOldTunnels は生き物のいるマスを埋めない）
+  while (this.w.closeQueue.length) {
+    const o = this.w.closeQueue.shift() as { k: number; n: number };
+    const x = (o.k % m.w) * TILE + 8;
+    const y = Math.floor(o.k / m.w) * TILE + 8;
+    this.log(x, y, `古い坑道が崩れて塞がった`);
+    this.record('settle', { t: this.w.tick, k: -1, id: -1, ev: 'tunnelClose', n: o.n, x, y } as never);
+    this.noise(x, y, 10);
+    this.effects.push({ x, y, t: this.w.tick });
+    this.nearby(x, y, 5, (c) => {
+      if (c.dead || c.away || c.sleep > 0 || this.wallWalker(c)) return;
+      this.fxMarks.push({ t: this.w.tick, id: c.id, m: '!' });
+    });
+  }
   if (this.effects.length && this.w.tick - this.effects[0].t > 200) this.effects.shift();
   while (this.blood.length && this.w.tick - this.blood[0].t > DAY_TICKS_ECO / 2) this.blood.shift();
 }

@@ -6,7 +6,7 @@
  *   npm run shot -- --seed abc --find kind:24 --day 6 --zoom 3 --lit
  *   npm run shot -- --seed abc --find xy:120,40 --day 10
  *
- * --find：warren（横穴を掘り終え罠が2つ以上の住処）、advcorpse（白骨になる前の冒険者の亡骸）、thralladv（ヴァンパイアの眷属になった冒険者）、advsleep（焚き火のそばで眠る冒険者）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、haul（キノコの束を背負って住処へ運ぶコボルト）、gobhaul（腹を満たし、ネズミを担いで集落へ帰るゴブリン）、bless（冒険者の亡骸の前で祈る一行）、slimefeast（一つの死骸を2匹以上のスライムが食べている所）、kind:番号（その種の生き物）、xy:マスx,マスy
+ * --find：warren（横穴を掘り終え罠が2つ以上の住処）、advcorpse（白骨になる前の冒険者の亡骸）、thralladv（ヴァンパイアの眷属になった冒険者）、advsleep（焚き火のそばで眠る冒険者）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、haul（キノコの束を背負って住処へ運ぶコボルト）、gobhaul（腹を満たし、ネズミを担いで集落へ帰るゴブリン）、bless（冒険者の亡骸の前で祈る一行）、slimefeast（一つの死骸を2匹以上のスライムが食べている所）、tunnelclose（古い坑道が崩れて塞がった直後）、kind:番号（その種の生き物）、xy:マスx,マスy
  * --day 探し始める日（既定 0）、--until 探すのをやめる日（既定 25）、--every 探す間隔（tick、既定 200）、--zoom 拡大率（既定 4）、--lit 確認用の明かり（#lit）、
  * --fog 霧をそのまま（既定は地図全体を見えたマスにする）、--name 出力の名前（既定は find から）、--out 出力先（既定 build/shots）
  *
@@ -31,7 +31,7 @@ mkdirSync(out, { recursive: true });
 const b64 = (u: Uint8Array) => Buffer.from(u.buffer, u.byteOffset, u.byteLength).toString('base64');
 const bits = (a: Uint8Array) => { const b = new Uint8Array(Math.ceil(a.length / 8)); for (let i = 0; i < a.length; i++) if (a[i]) b[i >> 3] |= 1 << (i & 7); return b64(b); };
 const fog = argv.includes('--fog');
-const save = (w: World, cam: { x: number; y: number; zoom: number }) => ({ v: 5, seed: w.map.seed, tick: w.tick, cam, speed: 0, seen: bits(fog ? w.seen : new Uint8Array(w.seen.length).fill(1)), water: b64(new Uint8Array(w.water.buffer)), nutr: b64(new Uint8Array(w.nutr.buffer)), moss: b64(w.moss), fungus: b64(w.fungus), burn: b64(w.burn), ash: b64(w.ash), mat: b64(w.mat), mana: b64(new Uint8Array(w.mana.buffer)), manaBorn: w.manaBorn, manaLeaked: w.manaLeaked, manaFaded: w.manaFaded, born: w.born, washed: w.washed, digs: w.digs.slice(), eco: w.eco.serialize() });
+const save = (w: World, cam: { x: number; y: number; zoom: number }) => ({ v: 5, seed: w.map.seed, tick: w.tick, cam, speed: 0, seen: bits(fog ? w.seen : new Uint8Array(w.seen.length).fill(1)), water: b64(new Uint8Array(w.water.buffer)), nutr: b64(new Uint8Array(w.nutr.buffer)), moss: b64(w.moss), fungus: b64(w.fungus), burn: b64(w.burn), ash: b64(w.ash), mat: b64(w.mat), trod: b64(w.trod), mana: b64(new Uint8Array(w.mana.buffer)), manaBorn: w.manaBorn, manaLeaked: w.manaLeaked, manaFaded: w.manaFaded, born: w.born, washed: w.washed, digs: w.digs.slice(), eco: w.eco.serialize() });
 
 type Mark = { x: number; y: number; label: string; color: string; size?: number };
 const w = new World(seed);
@@ -94,6 +94,11 @@ function look(): Hit | null {
     // 冒険者の亡骸の前で祈っている一行（僧侶が清める。blessBrace）
     const p = e.parties.find((q: any) => q.braceK === 5 && (q.braceT ?? 0) > e.step);
     if (p) return { cam: { x: p.braceX, y: p.braceY, zoom }, marks: [], title: '亡骸の前で祈る一行' };
+  }
+  if (find === 'tunnelclose') {
+    // 古い坑道が崩れて塞がった直後（土ぼこりが立っている間）
+    const ev = e.events.findLast((x: any) => x.m.includes('古い坑道が崩れて') && w.tick - x.t < 100);
+    return ev ? { cam: { x: ev.x, y: ev.y, zoom }, marks: [{ x: ev.x, y: ev.y, label: '崩れて塞がった坑道', color: '#ffd24a', size: 2 }], title: `古い坑道の崩れ（tick ${ev.t}、px ${ev.x},${ev.y}）` } : null;
   }
   if (find === 'slimefeast') {
     // 一つの死骸を2匹以上のスライムが包み込んで食べている所（死骸を目当てにして、その上にいる）

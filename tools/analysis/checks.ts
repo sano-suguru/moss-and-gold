@@ -33,6 +33,8 @@ export interface Check {
   seeds: string[];
   from: number;
   to: number;
+  /** seeds の from〜to 日目に加えて見る組（test に渡すログは、seeds の組のあとに、この組のぶんが続く） */
+  more?: { seeds: string[]; from: number; to: number }[];
   /** シードごとのログを受け取り、目安に届いたかどうかと、表に出す値を返す */
   test: (r: Recs[]) => { ok: boolean; value: string };
 }
@@ -138,12 +140,15 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // コボルトとゴブリンの戦（planWars）：蓄えの乏しい大きな群れが隣の住みかへ攻めに出る。縄張りの近いシードでしか起きないので、広いシードの組の合計で見る
-    name: 'コボルトかゴブリンの群れが相手の住みかへ攻めに出る（15シードで3回以上・2シード以上）',
+    // コボルトとゴブリンの戦（planWars）：蓄えの乏しい大きな群れが隣の住みかへ攻めに出る。隣り合う住処と集落のあるシードでしか起きず、
+    // その組み合わせはベースのスナップショットから数日で入れ替わるので、一つの窓では起きないことがある（main の10〜18日目で15シード合計5回）。
+    // RUN_WIDE と RUN_ARMOR の二つの窓の合計で見る（どちらもほかのチェックが実行するので、実行は増えない）
+    name: 'コボルトかゴブリンの群れが相手の住みかへ攻めに出る（10〜18日目の15シードと15〜23日目の16シードの合計で3回以上・2シード以上）',
     ...RUN_WIDE,
+    more: [RUN_ARMOR],
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.ev === 'warGo').length);
-      return { ok: sum(n) >= 3 && n.filter((v) => v > 0).length >= 2, value: rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、') || 'なし' };
+      return { ok: sum(n) >= 3 && new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size >= 2, value: rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed}（${r.from}〜${r.to}日） ${n[rs.indexOf(r)]}`).join('、') || 'なし' };
     },
   },
   {
@@ -1002,6 +1007,33 @@ export const CHECKS: Check[] = [
     test: (rs) => {
       const n = rs.map((r) => r.deaths.filter((x) => x.k === 10 && x.cause === 'starve').length);
       return { ok: sum(n) <= 10, value: rs.map((r, i) => `${r.seed} ${n[i]}`).join('、') };
+    },
+  },
+  {
+    // 地形の釣り合い（World.closeOldTunnels と、掘った所の瓦礫が岩に戻ること）：掘り跡が開き続けない。
+    // 開いた床の増減は、地形変更ログ（digs）の from〜to 日目に増えた分から数える（掘る・風化で +1、瓦礫・崩落で −1、固まるは 0）
+    name: '開いた床が増え続けない（15シードの10〜18日目で、増えた床の合計が床の1%以内。main は 2619）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const OPEN = [1, -1, -1, 1, 0, 0, 0, 0];
+      const d = rs.map((r) => {
+        const a = (r.state(r.from)?.digs ?? []) as number[];
+        const b = (r.state(r.to)?.digs ?? []) as number[];
+        let n = 0;
+        for (let i = a.length; i < b.length; i++) n += OPEN[b[i] & 7];
+        return n;
+      });
+      // 開いた床はシードごとにおよそ1万2千マス
+      return { ok: Math.abs(sum(d)) <= rs.length * 120, value: `合計 ${sum(d)}（${rs.map((r, i) => `${r.seed} ${d[i]}`).join('、')}）` };
+    },
+  },
+  {
+    // 古い坑道が崩れて塞がる場面（World.closeOldTunnels）：見せたい場面が起きているか
+    name: '古い坑道が崩れて塞がる（15シードの10〜18日目で、合計15回以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.ev === 'tunnelClose').length);
+      return { ok: sum(n) >= 15, value: `合計 ${sum(n)}（${rs.map((r, i) => `${r.seed} ${n[i]}`).join('、')}）` };
     },
   },
 ];

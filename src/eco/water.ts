@@ -26,6 +26,7 @@ const HOMEBODIES = new Set<Kind>([Kind.Kobold, Kind.Goblin, Kind.Rat]);
 const HOME_R = 30;
 /** 一行や一団から離れないよう、通り道のそばの水場にだけ立ち寄る種 */
 const PASSERS = new Set<Kind>([Kind.Adventurer, Kind.Dwarf]);
+const PASS_KEEP = 14;
 /** 水を飲みに行く時刻（一日のうちの割合。0 が真夜中）：0 夜明けと夕暮れ、1 夜、2 昼 */
 const WINDOW: Partial<Record<Kind, 0 | 1 | 2>> = {
   [Kind.Rat]: 0, [Kind.Lizard]: 0, [Kind.Lizardman]: 0, [Kind.Troll]: 0, [Kind.Basilisk]: 0,
@@ -190,8 +191,17 @@ export function thirstTick(this: Ecology, c: Cr): void {
   if (c.thirst >= 0 && c.thirst < THIRST_MAX && DRINKERS.has(c.k) && !c.away && !c.elite) c.thirst++;
 }
 
-/** 渇いていれば水場へ行って飲む。この回の行動をこれで済ませたら true */
+/**
+ * 渇いていれば水場へ行って飲む。この回の行動をこれで済ませたら true。
+ * 水場へ向かっている途中かを覚えておき（wtrip）、一行から離れない種が水場を探す距離を、向かいはじめたら広げる
+ */
 export function thirstStep(this: Ecology, c: Cr): boolean {
+  const r = thirstInner.call(this, c);
+  c.wtrip = r && c.thirst >= 0 ? 1 : 0;
+  return r;
+}
+
+function thirstInner(this: Ecology, c: Cr): boolean {
   if (!DRINKERS.has(c.k) || c.away || c.elite) return false;
   // 飲んでいる最中（thirst が負）：水際でかがんだまま、残りの回数を数える
   if (c.thirst < 0) {
@@ -213,7 +223,9 @@ export function thirstStep(this: Ecology, c: Cr): boolean {
   const weak = STR[c.k] <= WEAK_STR;
   if (c.flee > 0 || c.feed || c.run !== 0 || c.caught || this.retreats.has(c.id) || this.w.tick - c.hitAt < 120 || c.food < SPEC[c.k].cap * (weak ? 0.4 : 0.15)) return false;
   if (c.thirst < THIRST_MAX && !inWindow(c.k, this.phaseNow)) return false;
-  const h = nearestHole(this, c, PASSERS.has(c.k) ? 8 : HOMEBODIES.has(c.k) ? HOME_R : WATER_R);
+  // 一行から離れない種は、通り道のそば（8マス）の水場にだけ向かい、向かっている途中は PASS_KEEP マスまで向かい続ける
+  // （水場が壁の向こうにあって道が回り込むと、歩き出したとたんに8マスを超えてあきらめ、一行の方へ戻るとまた向かうのを、毎回くり返していた）
+  const h = nearestHole(this, c, PASSERS.has(c.k) ? (c.wtrip ? PASS_KEEP : 8) : HOMEBODIES.has(c.k) ? HOME_R : WATER_R);
   if (!h) return false;
   const d2 = sq(h.x - c.x) + sq(h.y - c.y);
   // 水場のまわり（3マスの内）に、自分より強い、同じ群れでない者がいれば、5マスの所で待つ

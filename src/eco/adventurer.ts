@@ -12,6 +12,8 @@ import { QUEST_LEAD, beastSeenKind } from './quest';
 
 /** 一行の撤退で下がる生き物の更新の回数（およそ12秒） */
 const RETREAT_N = 60;
+/** 見えなくなった金貨の山へ向かい続ける上限（生き物の更新の回数） */
+const PILE_GIVEUP = 600;
 
 /** 職業ごとの技（src/eco/skill.ts）。吟遊詩人は戦わない */
 const JOB_SKILL: (Skill | undefined)[] = [SKILL_WARRIOR_SLASH, SKILL_WIZARD_MISSILE, SKILL_THIEF_THROW, SKILL_PRIEST_HAMMER, undefined, SKILL_HUNTER_RAIN, SKILL_SLAYER_CLEAVE];
@@ -333,6 +335,12 @@ export function pickTarget(this: Ecology, p: Party, from: Cr): void {
     if (deep && p.aim !== 1) gd = -1;
     for (const g of p.goldCells ?? []) {
       if ((p.goneGold ?? []).includes(g) || risky(g)) continue;
+      // 行き先に着いた区画の宝：拾えるなら、行き先を選ぶより先に拾っている（金貨を拾う処理）。拾えずにいるなら、見えない所か、
+      // 壁の向こうにあって届かないので、もう無いものとして覚える（その区画の中心を行き先に選び直して、そこで立ち続けていた）
+      if (g === here && sq(p.tx - from.x) + sq(p.ty - from.y) < 20 * 20) {
+        (p.goneGold ??= []).push(g);
+        continue;
+      }
       const d = Math.abs((g % cw) - hx) + Math.abs(Math.floor(g / cw) - hy);
       if (d < gd) {
         gd = d;
@@ -708,6 +716,18 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       if (!vis && !(k >= 0 && this.lit(k, day) > 0.35)) continue;
       pd = d;
       pile = o;
+    }
+    // 一行が拾いに向かっている山は、見えなくなっても14マスの内なら向かい続ける（生き物の更新 PILE_GIVEUP 回まで）。
+    // 山へ行く道が回り込むと、歩き出したとたんに見えなくなって一行の行き先へ戻り、また見えて向かうのを、毎回くり返していた
+    if (pile) {
+      if (p.pile !== (pile as Pile).id) {
+        p.pile = (pile as Pile).id;
+        p.pileAt = this.step;
+      }
+    } else if (p.pile !== undefined) {
+      const kept = this.piles.find((o) => o.id === p.pile && o.gold > 0);
+      if (kept && this.step - (p.pileAt ?? 0) < PILE_GIVEUP && sq(kept.x - c.x) + sq(kept.y - c.y) < sq(14 * TILE) && this.regionOf(this.tileOf(kept.x, kept.y)) === this.regionOf(this.tileOf(c.x, c.y))) pile = kept;
+      else p.pile = undefined;
     }
     if (pile) {
       const pl = pile as Pile;
