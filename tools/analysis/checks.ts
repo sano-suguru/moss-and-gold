@@ -33,6 +33,8 @@ export interface Check {
   seeds: string[];
   from: number;
   to: number;
+  /** seeds の from〜to 日目に加えて見る組（test に渡すログは、seeds の組のあとに、この組のぶんが続く） */
+  more?: { seeds: string[]; from: number; to: number }[];
   /** シードごとのログを受け取り、目安に届いたかどうかと、表に出す値を返す */
   test: (r: Recs[]) => { ok: boolean; value: string };
 }
@@ -138,12 +140,15 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // コボルトとゴブリンの戦（planWars）：蓄えの乏しい大きな群れが隣の住みかへ攻めに出る。縄張りの近いシードでしか起きないので、広いシードの組の合計で見る
-    name: 'コボルトかゴブリンの群れが相手の住みかへ攻めに出る（15シードで3回以上・2シード以上）',
+    // コボルトとゴブリンの戦（planWars）：蓄えの乏しい大きな群れが隣の住みかへ攻めに出る。隣り合う住処と集落のあるシードでしか起きず、
+    // その組み合わせはベースのスナップショットから数日で入れ替わるので、一つの窓では起きないことがある（main の10〜18日目で15シード合計5回）。
+    // RUN_WIDE と RUN_ARMOR の二つの窓の合計で見る（どちらもほかのチェックが実行するので、実行は増えない）
+    name: 'コボルトかゴブリンの群れが相手の住みかへ攻めに出る（10〜18日目の15シードと15〜23日目の16シードの合計で3回以上・2シード以上）',
     ...RUN_WIDE,
+    more: [RUN_ARMOR],
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.ev === 'warGo').length);
-      return { ok: sum(n) >= 3 && n.filter((v) => v > 0).length >= 2, value: rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、') || 'なし' };
+      return { ok: sum(n) >= 3 && new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size >= 2, value: rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed}（${r.from}〜${r.to}日） ${n[rs.indexOf(r)]}`).join('、') || 'なし' };
     },
   },
   {

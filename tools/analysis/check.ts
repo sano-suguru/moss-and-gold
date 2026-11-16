@@ -43,7 +43,9 @@ async function main() {
   }
   if (!sameMap) console.log('地形の作り方（src/mapgen.ts・src/rng.ts）がベースと違うので、ベースのスナップショットを使わず、作業ツリーで0日目から実行する');
   const jobsMap = new Map<string, { seed: string; from: number; to: number }>();
-  for (const c of checks) for (const s of c.seeds) jobsMap.set(`${s}|${c.from}|${c.to}`, { seed: s, from: c.from, to: c.to });
+  // 一つのチェックが見る実行：seeds の from〜to 日目と、more の組（ほかのチェックと同じ組なら実行を共有する）
+  const windows = (c: (typeof checks)[number]) => [{ seeds: c.seeds, from: c.from, to: c.to }, ...(c.more ?? [])];
+  for (const c of checks) for (const wd of windows(c)) for (const s of wd.seeds) jobsMap.set(`${s}|${wd.from}|${wd.to}`, { seed: s, from: wd.from, to: wd.to });
   console.log(`チェック ${checks.length} 件、実行するもの ${jobsMap.size}（ベース ${a.base || 'HEAD'}：${base.simHash}、作業ツリー：${ver.simHash}）`);
   const dirs = new Map<string, string>();
   await pool([...jobsMap].map(([k, j]) => ({ w: j.to - j.from, f: async () => {
@@ -52,16 +54,16 @@ async function main() {
   let bad = 0;
   console.log('');
   for (const c of checks) {
-    const rs: Recs[] = c.seeds.map((s) => {
-      const dir = dirs.get(`${s}|${c.from}|${c.to}`)!;
-      const lo = c.from * DAY_TICKS;
-      const hi = c.to * DAY_TICKS;
+    const rs: Recs[] = windows(c).flatMap((wd) => wd.seeds.map((s) => {
+      const dir = dirs.get(`${s}|${wd.from}|${wd.to}`)!;
+      const lo = wd.from * DAY_TICKS;
+      const hi = wd.to * DAY_TICKS;
       return {
-        seed: s, from: c.from, to: c.to,
+        seed: s, from: wd.from, to: wd.to,
         samples: rd(dir, 'samples', lo - 1, hi), deaths: rd(dir, 'deaths', lo, hi), births: rd(dir, 'births', lo, hi), exits: rd(dir, 'exits', lo, hi), settle: rd(dir, 'settle', lo, hi), events: rd(dir, 'events', lo, hi), stuck: rd(dir, 'stuck', lo, hi), hitch: rd(dir, 'hitch', lo, hi),
         state: (d: number) => readState(join(dir, 'snap', dayName(d))),
       };
-    });
+    }));
     const r = c.test(rs);
     if (!r.ok) bad++;
     console.log(`${r.ok ? '✅' : '❌'} ${c.name}：${r.value}`);
