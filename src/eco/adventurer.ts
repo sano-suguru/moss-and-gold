@@ -34,15 +34,6 @@ const NOTICE_DARK = 2 * TILE;
 function runsOff(o: Cr): boolean {
   return o.flee > 0 || (o.k === Kind.Kobold && o.run === -1);
 }
-/** (x, y) から向き (ux, uy) へ、壁に当たるまでに進める長さ（px。d まで）。僧侶の十字架を壁の向こうで爆ぜさせないため */
-function clearRun(e: Ecology, x: number, y: number, ux: number, uy: number, d: number): number {
-  const m = e.w.map;
-  for (let s = 4; s <= d; s += 4) {
-    const k = e.tileOf(x + ux * s, y + uy * s);
-    if (k < 0 || m.solid[k]) return Math.max(0, s - 8);
-  }
-  return d;
-}
 export function reputation(this: Ecology): number {
   const r = this.rumors;
   return r.light + r.gold * 2 + r.undead + this.beastTotal() + r.dragon * 2;
@@ -632,6 +623,16 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     const clear = lineOfSight(this.w.map, c.x, c.y, f.x, f.y);
     if (skill) {
       // 職業の技（src/eco/skill.ts）：届く距離に敵がいれば溜め、溜め終わった回に放つ。使ったあとの間は溜め直さない。
+      if (ready && !clear) {
+        // 溜め終わったときに相手が壁の陰へ入っていたら、放たずに構えを解き、見失って頭に「？」が出る（魔法使いの呪文は散って消える）。
+        // 使ったあとの間は、放ったときと同じく明けるまで待つ
+        c.act = 0;
+        c.actT = 0;
+        this.fxMarks.push({ t: this.w.tick, id: c.id, m: '?' });
+        if (c.sp === Job.Wizard) this.fxAttacks.push({ t: this.w.tick, style: 'puff', col: 2, size: 0, ax: c.x, ay: c.y, dx: c.x, dy: c.y - 14, did: -1, aid: c.id, big: false, kill: false });
+        this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: c.id, ev: 'skillLost', n: c.sp, x: Math.round(c.x), y: Math.round(c.y) } as never);
+        return;
+      }
       if (ready) {
         c.act = 2;
         c.actT = 0;
@@ -651,7 +652,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
         } else if (c.sp === Job.Priest) {
           // ハンマーを振り下ろし、打った所で光の十字架が爆ぜる（縦横に腕3マス）。打つのは敵の足もと（届く距離より遠ければ、届く距離の先）。
           // アンデッドと夜の眷属には倍効く
-          const hd = clearRun(this, c.x, c.y, ux, uy, Math.min(fl, reach));
+          const hd = Math.min(fl, reach);
           const hx = c.x + ux * hd;
           const hy = c.y + uy * hd;
           const holy = (o: Cr) => o.k === Kind.Zombie || o.k === Kind.Skeleton || o.k === Kind.Lich || o.k === Kind.Thrall || o.k === Kind.Vampire || o.k === Kind.Armor;
@@ -661,26 +662,24 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
           this.areaStrike(c, hx, hy, ux, uy, cross, 2.4, { style: '', col: 1 }, (o) => who(o) && holy(o));
         } else if (c.sp === Job.Wizard) {
           // マジックミサイル：紫の魔力の尾を引く誘導弾を4発。狙う敵と、そのほか近くの敵（最大2体）へ分かれて飛び、届いたときに必ず当たる（1発は軽い）
-          // 唱え終わったときに見えている敵がいなければ、呪文は散って消える
-          const tg: Cr[] = clear ? [f] : [];
+          const tg: Cr[] = [f];
           this.nearby(c.x, c.y, Math.ceil(JOB_REACH[c.sp]), (o) => {
             if (tg.length >= 3 || o === f || o.dead || o.away || !who(o) || sq(o.x - c.x) + sq(o.y - c.y) > reach * reach || !this.seenBy(c, lights, o) || !lineOfSight(this.w.map, c.x, c.y, o.x, o.y)) return;
             tg.push(o);
           });
-          if (!tg.length) this.fxAttacks.push({ t: this.w.tick, style: 'puff', col: 2, size: 0, ax: c.x, ay: c.y, dx: c.x, dy: c.y - 14, did: -1, aid: c.id, big: false, kill: false });
-          for (let i = 0; i < 4 && tg.length; i++) {
+          for (let i = 0; i < 4; i++) {
             const t = tg[i % tg.length];
             const fly = Math.round(6 + Math.sqrt(sq(t.x - c.x) + sq(t.y - c.y)) / 20);
             this.queueVolley(c, { d: t.id, x: 0, y: 0, r: 0, mul: 0.5, poison: 0 }, fly);
             this.fxAttacks.push({ t: this.w.tick, style: 'missile', col: 4, size: 1, ax: c.x, ay: c.y, dx: t.x, dy: t.y, did: t.id, aid: c.id, big: false, kill: false, n: i, fly });
           }
-        } else if (c.sp === Job.Hunter && clear) {
+        } else if (c.sp === Job.Hunter) {
           // 矢の雨：弧を描いて高く上がった矢が、狙った所のまわりに少しばらけて降る（1.3マス）。落ちたときにそこにいる者に当たり（動いていれば避けられる）、
           // 当たった所で毒の煙が爆ぜて毒にする
           const fly = 12;
           this.queueVolley(c, { d: -1, x: f.x, y: f.y, r: 1.3 * TILE, mul: 1.2, poison: 25, tgt: f.id }, fly);
           this.fxAttacks.push({ t: this.w.tick, style: 'rain', col: 3, size: 1, ax: c.x, ay: c.y, dx: f.x, dy: f.y, did: -1, aid: c.id, big: false, kill: false, rad: 1.3 * TILE, n: 6, fly });
-        } else if (c.sp === Job.Thief && clear && fd2 <= sq(reach * 1.2)) {
+        } else if (fd2 <= sq(reach * 1.2)) {
           // 盗賊の短剣投げ。構えているあいだに届く距離の外へ出られたら外れる
           if (this.strike(c, f, 1)) this.die(f, 'fight', c.k);
         }
