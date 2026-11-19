@@ -297,8 +297,8 @@ export function metabolism(this: Ecology, c: Cr): void {
   if (c.elite === 6 || c.elite === 7) return;
   if (c.k === Kind.Zombie || c.k === Kind.Ghost) return;
   const s = SPEC[c.k];
-  if (c.k === Kind.Slime && c.food === 0 && this.step % 80 === c.id % 80) {
-    // 食べるものがないスライムは少しずつ縮む
+  // 食べるものがないスライムは少しずつ縮む（その回の行動で倒れたスライムは縮まない。体が負になり、養分が1増える）
+  if (c.k === Kind.Slime && !c.dead && c.food === 0 && this.step % 80 === c.id % 80) {
     c.body--;
     this.deposit(c.x, c.y, 1);
     if (c.body < 4) this.die(c, 'starve');
