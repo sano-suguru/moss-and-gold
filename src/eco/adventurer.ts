@@ -1,5 +1,5 @@
 /** Ecology のメソッド：冒険者（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { CELL, type Cr, DAY_TICKS_ECO, Ecology, GOLD_CAP, ItemKind, Job, Kind, type Note, type Party, type Pile, SPEC, STR, TIER, TORCH_FUEL, ih, sq, STONE_FULL } from '../ecology';
+import { CELL, CR_EVERY, type Cr, DAY_TICKS_ECO, Ecology, GOLD_CAP, ItemKind, Job, Kind, type Note, type Party, type Pile, SPEC, STR, TIER, TORCH_FUEL, ih, sq, STONE_FULL } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
@@ -467,6 +467,9 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   }
   const ready = sk === 'ready';
   if (!ready && c.act === 2 && c.actT < 4) return;
+  // 技の相手を見失った者は、溜め終わりから生き物の更新4回のあいだ、その場で立ち止まる（技を放った者がその場に留まる長さと同じ）。
+  // すぐに角の向こうへ追うと、一行がゴブリンの集落へ踏み込む回数が増え、集落が長続きしなくなる。打たれたら立ち止まらない
+  if (skill && c.act === 0 && c.hitAt <= c.cast && this.w.tick - c.cast <= (skill.windup + 4) * CR_EVERY) return;
   const lights = this.partyLights(p);
   const leader = this.byId.get(p.members[0]);
   // 探した範囲と、見かけた宝と、地表への別の横穴を覚える
@@ -625,7 +628,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       // 職業の技（src/eco/skill.ts）：届く距離に敵がいれば溜め、溜め終わった回に放つ。使ったあとの間は溜め直さない。
       if (ready && !clear) {
         // 溜め終わったときに相手が壁の陰へ入っていたら、放たずに構えを解き、見失って頭に「？」が出る（魔法使いの呪文は散って消える）。
-        // 使ったあとの間は、放ったときと同じく明けるまで待つ
+        // 使ったあとの間は、放ったときと同じく明けるまで待つ。少しの間その場で立ち止まる（上の「見失った者は」）
         c.act = 0;
         c.actT = 0;
         this.fxMarks.push({ t: this.w.tick, id: c.id, m: '?' });
