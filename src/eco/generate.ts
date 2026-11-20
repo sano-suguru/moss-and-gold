@@ -4,9 +4,14 @@
  * 体と胃の養分はすべて場所のまわりの土から取る（takeNutrients。全部取れなければ湧かない）ので、養分の保存則は自動で守られる。
  * 体のマナも場所のまわりの土から移す（takeMana）。表の行に manaAll があれば、マナも全部集められるときだけ湧く（いまはバジリスク）。
  */
-import { type Cr, DAY_TICKS_ECO, Ecology } from '../ecology';
+import { type Cr, DAY_TICKS_ECO, Ecology, Kind } from '../ecology';
 import { TILE } from '../mapgen';
 import { SPAWN_DEFS, type SpawnDef } from './spawndef';
+
+/** 魔物が湧く床の、つながった洞窟のマスの数の下限（3×3） */
+const SPAWN_MIN_REGION = 9;
+/** 壁を通り抜けるか飛び越える種（湧く場所の洞窟の広さを見ない。コウモリは岩の縦穴から湧く） */
+const THROUGH_WALLS = new Set<number>([Kind.Bat, Kind.Worm, Kind.Wisp, Kind.Ghost, Kind.Wyvern]);
 
 /** 生き物の更新ごとに呼ぶ。表の各行を、その行の判定の回（step % every === phase）にだけ見る */
 export function generate(this: Ecology): void {
@@ -22,6 +27,9 @@ export function generateOne(this: Ecology, d: SpawnDef, at = -1): boolean {
   if (d.chance && !d.chance(this)) return false;
   const site = at >= 0 ? at : d.site(this);
   if (site < 0) return false;
+  // 歩く者が湧く床は、つながった洞窟が SPAWN_MIN_REGION マス以上ある所だけ。瓦礫が崩れて土に返ったり、積んだ瓦礫で小部屋が切り離されたりして
+  // できた小さな穴に湧くと、出られずにその場でじっとしたまま飢える（main の8シード×10〜18日目で6回）。壁を通り抜けたり飛び越えたりする種は見ない
+  if (!THROUGH_WALLS.has(d.k) && this.regionSize(site) < SPAWN_MIN_REGION) return false;
   const n = d.band(this, site);
   // 体のマナを全部か無しかで払う種（manaAll）は、土から集めきれなければ湧かない（湧くたびにその場のマナが減り、続けては湧きにくくなる）
   if (d.manaAll && d.mana && !this.manaObtainable(site, n * d.mana, d.manaR ?? 3)) {

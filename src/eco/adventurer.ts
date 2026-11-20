@@ -1,5 +1,5 @@
 /** Ecology のメソッド：冒険者（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { CELL, type Cr, DAY_TICKS_ECO, Ecology, GOLD_CAP, ItemKind, Job, Kind, type Note, type Party, type Pile, SPEC, STR, TIER, TORCH_FUEL, ih, sq, STONE_FULL } from '../ecology';
+import { CELL, CR_EVERY, type Cr, DAY_TICKS_ECO, Ecology, GOLD_CAP, ItemKind, Job, Kind, type Note, type Party, type Pile, SPEC, STR, TIER, TORCH_FUEL, ih, sq, STONE_FULL } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
 import { JOB_NAMES } from '../names';
 import { RANK_NAMES, heroTitle } from './roster';
@@ -467,6 +467,9 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   }
   const ready = sk === 'ready';
   if (!ready && c.act === 2 && c.actT < 4) return;
+  // 技の相手を見失った者は、溜め終わりから生き物の更新4回のあいだ、その場で立ち止まる（技を放った者がその場に留まる長さと同じ）。
+  // すぐに角の向こうへ追うと、一行がゴブリンの集落へ踏み込む回数が増え、集落が長続きしなくなる。打たれたら立ち止まらない
+  if (skill && c.act === 0 && c.hitAt <= c.cast && this.w.tick - c.cast <= (skill.windup + 4) * CR_EVERY) return;
   const lights = this.partyLights(p);
   const leader = this.byId.get(p.members[0]);
   // 探した範囲と、見かけた宝と、地表への別の横穴を覚える
@@ -561,12 +564,16 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   if (c.sp === Job.Slayer) ENEMY.push(Kind.Dragon, Kind.Wyvern, Kind.Worm);
   let foe: Cr | null = null;
   let bd = 1e18;
+  // 見通しが利かず、歩いても行けない（別のつながった洞窟にいる）相手は、敵として追わない
+  // （小さな穴に閉じこめられたトロールに気づいた一行が、たどり着けないまま壁ぎわで歩き続けていた）
+  const myReg = this.regionOf(this.tileOf(c.x, c.y));
+  const reachable = (o: Cr) => this.regionOf(this.tileOf(o.x, o.y)) === myReg || lineOfSight(this.w.map, c.x, c.y, o.x, o.y);
   // 一行で向かっている手強い敵がいれば、まずそれ
   if (p.engage) {
     const e = this.byId.get(p.engage);
     const runner = e && ((runsOff(e) && STR[e.k] <= 3) || this.orcYields(p, e)) && !(e.id === c.foe && this.w.tick - c.hitAt < 150);
-    if (e && !e.dead && !e.away && !runner && sq(e.x - c.x) + sq(e.y - c.y) < 10 * TILE * 10 * TILE && c.sp !== Job.Bard && c.sp !== Job.Thief) foe = e;
-    else if (!e || e.dead || e.away || runner) p.engage = 0;
+    if (e && !e.dead && !e.away && !runner && sq(e.x - c.x) + sq(e.y - c.y) < 10 * TILE * 10 * TILE && c.sp !== Job.Bard && c.sp !== Job.Thief && reachable(e)) foe = e;
+    else if (!e || e.dead || e.away || runner || !reachable(e)) p.engage = 0;
   }
   // 気づける遠さ（見通しが利くことが条件）：
   //   打ってきた相手は、暗がりでも NOTICE_HIT まで（打たれたら気づく。オークの投げ斧のように、灯りの外から打つ敵がいるので）。
@@ -588,7 +595,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       // （盗みに忍び寄るゴブリンも、暗がりの気配では気づかれない。見張りが気配で盗人に気づくと、夜の盗みがはっきり減った）
       const sneaking = o.k === Kind.Goblin && o.st >= 15 && o.st <= 18;
       const reach = attacked ? NOTICE_HIT : this.seenBy(c, lights, o) ? NOTICE_LIT : enemy && !sneaking && d < near * near && !this.isHidden(o) ? near : 0;
-      if (d >= reach * reach || (d > 2 * TILE * 2 * TILE && !lineOfSight(this.w.map, c.x, c.y, o.x, o.y))) return;
+      if (d >= reach * reach || (d > 2 * TILE * 2 * TILE && !lineOfSight(this.w.map, c.x, c.y, o.x, o.y)) || !reachable(o)) return;
       // 雑魚は、近く（2マス）に来たときか、自分に害をなしたときだけ払う
       if (minor && !enemy && !attacked && o.foe !== c.id && d > 2 * TILE * 2 * TILE) return;
       // 逃げていく弱い者（コボルトなど）は、追いかけて倒しには行かない
@@ -619,8 +626,20 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
     c.dir = Math.abs(f.x - c.x) > Math.abs(f.y - c.y) ? (f.x > c.x ? 2 : 3) : f.y > c.y ? 0 : 1;
     const fd2 = sq(f.x - c.x) + sq(f.y - c.y);
     const reach = JOB_REACH[c.sp] * TILE;
+    // 技は見通しの利く相手にだけ使う（一行で向かっている敵や、すぐそばの気配の敵は、壁の向こうにいることがある）
+    const clear = lineOfSight(this.w.map, c.x, c.y, f.x, f.y);
     if (skill) {
       // 職業の技（src/eco/skill.ts）：届く距離に敵がいれば溜め、溜め終わった回に放つ。使ったあとの間は溜め直さない。
+      if (ready && !clear) {
+        // 溜め終わったときに相手が壁の陰へ入っていたら、放たずに構えを解き、見失って頭に「？」が出る（魔法使いの呪文は散って消える）。
+        // 使ったあとの間は、放ったときと同じく明けるまで待つ。少しの間その場で立ち止まる（上の「見失った者は」）
+        c.act = 0;
+        c.actT = 0;
+        this.fxMarks.push({ t: this.w.tick, id: c.id, m: '?' });
+        if (c.sp === Job.Wizard) this.fxAttacks.push({ t: this.w.tick, style: 'puff', col: 2, size: 0, ax: c.x, ay: c.y, dx: c.x, dy: c.y - 14, did: -1, aid: c.id, big: false, kill: false });
+        this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: c.id, ev: 'skillLost', n: c.sp, x: Math.round(c.x), y: Math.round(c.y) } as never);
+        return;
+      }
       if (ready) {
         c.act = 2;
         c.actT = 0;
@@ -652,7 +671,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
           // マジックミサイル：紫の魔力の尾を引く誘導弾を4発。狙う敵と、そのほか近くの敵（最大2体）へ分かれて飛び、届いたときに必ず当たる（1発は軽い）
           const tg: Cr[] = [f];
           this.nearby(c.x, c.y, Math.ceil(JOB_REACH[c.sp]), (o) => {
-            if (tg.length >= 3 || o === f || o.dead || o.away || !who(o) || sq(o.x - c.x) + sq(o.y - c.y) > reach * reach || !this.seenBy(c, lights, o)) return;
+            if (tg.length >= 3 || o === f || o.dead || o.away || !who(o) || sq(o.x - c.x) + sq(o.y - c.y) > reach * reach || !this.seenBy(c, lights, o) || !lineOfSight(this.w.map, c.x, c.y, o.x, o.y)) return;
             tg.push(o);
           });
           for (let i = 0; i < 4; i++) {
@@ -673,13 +692,13 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
         }
         return;
       }
-      if (fd2 <= reach * reach && this.skillCanStart(c, skill)) {
+      if (fd2 <= reach * reach && clear && this.skillCanStart(c, skill)) {
         this.skillStart(c, skill);
         return;
       }
     }
-    if (c.sp === Job.Wizard || c.sp === Job.Hunter) {
-      // 離れて撃つ者が、使ったあとの間を待つあいだ：敵が近ければ（2.5マス）離れ、遠ければその場で構える
+    if ((c.sp === Job.Wizard || c.sp === Job.Hunter) && clear) {
+      // 離れて撃つ者が、使ったあとの間を待つあいだ：敵が近ければ（2.5マス）離れ、遠ければその場で構える。見通しが利かなければ、見える所まで近づく
       if (fd2 < 2.5 * TILE * 2.5 * TILE) {
         c.act = 1;
         this.fleeFrom(c, f, s.speed);

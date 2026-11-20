@@ -15,6 +15,7 @@ export function regionOf(this: Ecology, k: number): number {
     if (this.regionMap.length !== N) this.regionMap = new Int32Array(N);
     this.regionMap.fill(-1);
     let id = 0;
+    this.regionSizes = [];
     const q = new Int32Array(N);
     for (let s0 = 0; s0 < N; s0++) {
       if (this.regionMap[s0] >= 0 || m.solid[s0] || m.sealed[s0] || m.lava[s0]) continue;
@@ -30,6 +31,7 @@ export function regionOf(this: Ecology, k: number): number {
           q[t++] = n;
         }
       }
+      this.regionSizes.push(t);
       id++;
     }
     this.mainRegion = this.regionMap[1 * m.w + m.entrance.x];
@@ -37,6 +39,12 @@ export function regionOf(this: Ecology, k: number): number {
     this.mainPointCache.clear();
   }
   return k >= 0 && k < this.regionMap.length ? this.regionMap[k] : -1;
+}
+
+/** マス k が属する領域のマスの数（岩・閉じた空洞・溶岩のマスは 0） */
+export function regionSize(this: Ecology, k: number): number {
+  const r = this.regionOf(k);
+  return r >= 0 ? this.regionSizes[r] : 0;
 }
 
 /** その場所が島（入口側の洞窟とつながっていない開いた洞窟）か */
@@ -182,6 +190,7 @@ export function markJoined(this: Ecology, id: number, x: number, y: number, k: n
 declare module '../ecology' {
   interface Ecology {
     regionOf: typeof regionOf;
+    regionSize: typeof regionSize;
     onIsland: typeof onIsland;
     nearestMain: typeof nearestMain;
     windTarget: typeof windTarget;
@@ -191,4 +200,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { regionOf, onIsland, nearestMain, windTarget, breakTopWall, checkJoined, markJoined });
+Object.assign(Ecology.prototype, { regionOf, regionSize, onIsland, nearestMain, windTarget, breakTopWall, checkJoined, markJoined });

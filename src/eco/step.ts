@@ -293,6 +293,8 @@ export function restSoak(this: Ecology, c: Cr): void {
 }
 
 export function metabolism(this: Ecology, c: Cr): void {
+  // その回の行動で倒れた者は、代謝しない（倒れた亡骸の体が負になったり、もう一度 die が呼ばれて死者が二重に記録されたりする）
+  if (c.dead) return;
   // 水の精と光の精は、マナで体を保つので腹が減らない（食べ物も体も減らない）
   if (c.elite === 6 || c.elite === 7) return;
   if (c.k === Kind.Zombie || c.k === Kind.Ghost) return;

@@ -166,9 +166,10 @@ export function minoTarget(this: Ecology, c: Cr, R: number): Cr | null {
 
 /**
  * 狩り（src/eco/combat.ts の hunt）で獲物 p に向かうミノタウロスが、技を使うか。使ったら（溜めはじめたら）true。
- * 4マスの内なら斧の薙ぎ払い、4〜8マスで見通しが利けば突進
+ * 見通しが利けば、4マスの内なら斧の薙ぎ払い、4〜8マスなら突進（匂いで壁の向こうの獲物に気づいても、壁に向かって振らない）
  */
 export function minoEngage(this: Ecology, c: Cr, p: Cr, d2: number): boolean {
+  if (!lineOfSight(this.w.map, c.x, c.y, p.x, p.y)) return false;
   if (d2 <= 4 * TILE * 4 * TILE) {
     if (!this.skillCanStart(c, SKILL_MINO_SWEEP)) return false;
     this.skillStart(c, SKILL_MINO_SWEEP);
@@ -176,7 +177,7 @@ export function minoEngage(this: Ecology, c: Cr, p: Cr, d2: number): boolean {
     this.setDir(c, p.x - c.x, p.y - c.y);
     return true;
   }
-  if (d2 <= RUN_LEN * RUN_LEN && this.skillCanStart(c, SKILL_MINO_CHARGE) && lineOfSight(this.w.map, c.x, c.y, p.x, p.y)) {
+  if (d2 <= RUN_LEN * RUN_LEN && this.skillCanStart(c, SKILL_MINO_CHARGE)) {
     this.skillStart(c, SKILL_MINO_CHARGE);
     c.run = -1;
     c.aim = p.id;
@@ -417,10 +418,10 @@ export function golemSkill(this: Ecology, c: Cr): boolean {
 
 /**
  * 持ち場のゴーレムが、技を使うか（溜めはじめたら true）。foe は入口を通ろうとする者か宝を抱えた者（src/eco/monsters.ts の golem）。
- * 3マスの内に相手がいれば振り下ろし。そうでなければ、入口から8マスの内で入口の方を向いて近づいてくる者か宝を抱えた者に、地割れ
+ * 3マスの内に見通しの利く相手がいれば振り下ろし。そうでなければ、入口から8マスの内で入口の方を向いて近づいてくる者か宝を抱えた者に、地割れ
  */
 export function golemEngage(this: Ecology, c: Cr, foe: Cr | null): boolean {
-  if (foe && sq(foe.x - c.x) + sq(foe.y - c.y) <= 3 * TILE * 3 * TILE && this.skillCanStart(c, SKILL_GOLEM_SLAM)) {
+  if (foe && sq(foe.x - c.x) + sq(foe.y - c.y) <= 3 * TILE * 3 * TILE && this.skillCanStart(c, SKILL_GOLEM_SLAM) && lineOfSight(this.w.map, c.x, c.y, foe.x, foe.y)) {
     this.skillStart(c, SKILL_GOLEM_SLAM);
     c.run = 0;
     c.aim = foe.id;
@@ -557,8 +558,9 @@ export function armorSkill(this: Ecology, c: Cr): boolean {
   return true;
 }
 
-/** 襲う相手 f（d2 は距離の二乗）に、リビングアーマーが技を使うか（溜めはじめたら true） */
+/** 襲う相手 f（d2 は距離の二乗）に、リビングアーマーが技を使うか（溜めはじめたら true）。見通しの利かない相手には使わない */
 export function armorEngage(this: Ecology, c: Cr, f: Cr, d2: number): boolean {
+  if (!lineOfSight(this.w.map, c.x, c.y, f.x, f.y)) return false;
   const { weapons, shield } = armorArms.call(this, c);
   const R = armorSweepR(weapons);
   if (d2 <= R * R * 0.8) {
@@ -569,7 +571,7 @@ export function armorEngage(this: Ecology, c: Cr, f: Cr, d2: number): boolean {
     this.setDir(c, f.x - c.x, f.y - c.y);
     return true;
   }
-  if (shield && d2 <= BASH_LEN * BASH_LEN && this.skillCanStart(c, SKILL_ARMOR_BASH) && lineOfSight(this.w.map, c.x, c.y, f.x, f.y)) {
+  if (shield && d2 <= BASH_LEN * BASH_LEN && this.skillCanStart(c, SKILL_ARMOR_BASH)) {
     this.skillStart(c, SKILL_ARMOR_BASH);
     c.run = -1;
     c.aim = f.id;
