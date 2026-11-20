@@ -1005,6 +1005,8 @@ export class Ecology {
 
   /** 歩いてつながる洞窟の領域（地形が変わるたび＝地形変更ログ digs が増えるたびに作り直す。セーブしなくても同じものが作り直せる） */
   regionMap = new Int32Array(0);
+  /** 領域ごとのマスの数（番号は regionMap の値。regionMap と一緒に作り直す） */
+  regionSizes: number[] = [];
   regionVer = -1;
   /** ミノタウロスの縄張りの床（寝床から縄張りの中を歩いて行ける床）。地形変更ログ digs が増えるたびに作り直す（セーブしない） */
   lairTilesCache: number[] = [];

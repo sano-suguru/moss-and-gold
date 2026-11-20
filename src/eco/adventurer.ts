@@ -564,12 +564,16 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   if (c.sp === Job.Slayer) ENEMY.push(Kind.Dragon, Kind.Wyvern, Kind.Worm);
   let foe: Cr | null = null;
   let bd = 1e18;
+  // 見通しが利かず、歩いても行けない（別のつながった洞窟にいる）相手は、敵として追わない
+  // （小さな穴に閉じこめられたトロールに気づいた一行が、たどり着けないまま壁ぎわで歩き続けていた）
+  const myReg = this.regionOf(this.tileOf(c.x, c.y));
+  const reachable = (o: Cr) => this.regionOf(this.tileOf(o.x, o.y)) === myReg || lineOfSight(this.w.map, c.x, c.y, o.x, o.y);
   // 一行で向かっている手強い敵がいれば、まずそれ
   if (p.engage) {
     const e = this.byId.get(p.engage);
     const runner = e && ((runsOff(e) && STR[e.k] <= 3) || this.orcYields(p, e)) && !(e.id === c.foe && this.w.tick - c.hitAt < 150);
-    if (e && !e.dead && !e.away && !runner && sq(e.x - c.x) + sq(e.y - c.y) < 10 * TILE * 10 * TILE && c.sp !== Job.Bard && c.sp !== Job.Thief) foe = e;
-    else if (!e || e.dead || e.away || runner) p.engage = 0;
+    if (e && !e.dead && !e.away && !runner && sq(e.x - c.x) + sq(e.y - c.y) < 10 * TILE * 10 * TILE && c.sp !== Job.Bard && c.sp !== Job.Thief && reachable(e)) foe = e;
+    else if (!e || e.dead || e.away || runner || !reachable(e)) p.engage = 0;
   }
   // 気づける遠さ（見通しが利くことが条件）：
   //   打ってきた相手は、暗がりでも NOTICE_HIT まで（打たれたら気づく。オークの投げ斧のように、灯りの外から打つ敵がいるので）。
@@ -591,7 +595,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
       // （盗みに忍び寄るゴブリンも、暗がりの気配では気づかれない。見張りが気配で盗人に気づくと、夜の盗みがはっきり減った）
       const sneaking = o.k === Kind.Goblin && o.st >= 15 && o.st <= 18;
       const reach = attacked ? NOTICE_HIT : this.seenBy(c, lights, o) ? NOTICE_LIT : enemy && !sneaking && d < near * near && !this.isHidden(o) ? near : 0;
-      if (d >= reach * reach || (d > 2 * TILE * 2 * TILE && !lineOfSight(this.w.map, c.x, c.y, o.x, o.y))) return;
+      if (d >= reach * reach || (d > 2 * TILE * 2 * TILE && !lineOfSight(this.w.map, c.x, c.y, o.x, o.y)) || !reachable(o)) return;
       // 雑魚は、近く（2マス）に来たときか、自分に害をなしたときだけ払う
       if (minor && !enemy && !attacked && o.foe !== c.id && d > 2 * TILE * 2 * TILE) return;
       // 逃げていく弱い者（コボルトなど）は、追いかけて倒しには行かない
