@@ -1,6 +1,7 @@
 /** Ecology のメソッド：ワイバーン、ドラゴン（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 import { type Cr, DAY_TICKS_ECO, Ecology, Job, Kind, type Pile, SPEC, STR, ih, sq } from '../ecology';
 import { lineOfSight, TILE } from '../mapgen';
+import { OLD_BONES } from './battle';
 
 export function wyvern(this: Ecology, c: Cr): void {
   const s = SPEC[Kind.Wyvern];
@@ -341,7 +342,7 @@ export function dragon(this: Ecology, c: Cr, _day: number): void {
     let bd = 8 * TILE * 8 * TILE;
     for (const o of this.corpses) {
       // 同じ更新の中で食べ尽くされた死骸と、ゾンビとして起き上がった者を除く（src/eco/monsters.ts の troll と同じ）
-      if (o.dead !== 1 || o.units <= 0) continue;
+      if (o.dead !== 1 || o.units <= 0 || o.st === OLD_BONES) continue;
       const d = sq(o.x - c.x) + sq(o.y - c.y);
       if (d < bd) {
         bd = d;

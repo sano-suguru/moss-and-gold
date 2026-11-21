@@ -151,6 +151,8 @@ function causeLine(e: Ecology, n: Note): string {
       return '干からびた';
     case 'petrified':
       return '石になりかけて、崩れ落ちた';
+    case 'old':
+      return '遠い昔の戦いで倒れた';
     case 'sipped':
       return by ? `${by}にマナを吸われた` : 'マナを吸われた';
     default:
@@ -175,7 +177,7 @@ export function describeThing(this: Ecology, s: Thing): { title: string; lines: 
   switch (s.t) {
     case 'corpse': {
       const c = this.byId.get(s.id)!;
-      if (n) lines.push(`${causeLine(this, n)}（${ago(this, n.t)}）`);
+      if (n) lines.push(n.cause === 'old' ? causeLine(this, n) : `${causeLine(this, n)}（${ago(this, n.t)}）`);
       else lines.push('いきさつはわからない');
       const r = c.init > 0 ? c.units / c.init : 0;
       lines.push(c.units <= 0 ? '骨だけが残っている' : r > 0.66 ? 'まだ新しい' : r > 0.33 ? '腐りはじめている' : 'ほとんど骨になっている');
@@ -189,10 +191,11 @@ export function describeThing(this: Ecology, s: Thing): { title: string; lines: 
       if (o.kind === ItemKind.Torch) lines.push('床に落ちたまま燃えている');
       else if (o.kind === ItemKind.Stub) lines.push('燃え尽きた松明');
       const who = n ? whoName(this, n) : '';
-      const when = n ? `（${ago(this, n.t)}）` : '';
+      const when = n && n.cause !== 'old' ? `（${ago(this, n.t)}）` : '';
       if (o.kind === ItemKind.Trophy) lines.push(`${n?.name ? `${n.name}の一行` : 'ある一行'}が持ち帰れなかった戦利品${when}`);
       else if (who && n?.cause === 'spent') lines.push(`${who}が捨てていった${when}`);
       else if (who && n?.cause === 'shed') lines.push(`${who}が打たれて落とした${when}`);
+      else if (who && n?.cause === 'old') lines.push(`遠い昔の戦いで倒れた${who}が残していった。錆びついている`);
       else if (who) lines.push(`倒れた${who}が残していった${when}`);
       else lines.push('いきさつはわからない');
       // 持ち主の未練や、土から吸ったマナが宿っている（src/eco/armor.ts）
@@ -203,6 +206,7 @@ export function describeThing(this: Ecology, s: Thing): { title: string; lines: 
       const o = this.piles.find((q) => q.id === s.id)!;
       const who = n ? whoName(this, n) : '';
       if (!n) lines.push('昔からここに積まれている');
+      else if (n.cause === 'old') lines.push('遠い昔の戦いで倒れた者たちが落としていった');
       else if (n.cause === 'stash') lines.push(`${who || '何者か'}が運び込んだ（${ago(this, n.t)}）`);
       else lines.push(`倒れた${who || '何者か'}が落としていった（${ago(this, n.t)}）`);
       return { title: `金貨${o.gold}枚`, lines };

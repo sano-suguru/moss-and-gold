@@ -1,4 +1,5 @@
 /** Ecology のメソッド：生き物の更新1回（step。src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
+import { BATTLE_BONE_SLOW } from './battle';
 import { BONE_CAP, BONE_KINDS, KIN_RISE_MANA, KIN_ZOMBIE_CAP, KIN_ZOMBIES, ZOMBIE_KINDS } from './undead';
 import { type Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, STR, ih, STONE_DECAY_EVERY } from '../ecology';
 import { TILE } from '../mapgen';
@@ -388,9 +389,9 @@ export function decay(this: Ecology, c: Cr): void {
   if (this.raiseThrall(c)) return;
   // 僧侶に清められた骨は、祈りの終わりに金の光の粒になって崩れる（blessCrumble）
   if (this.blessCrumble(c)) return;
-  // 何もされなければ、死骸はとてもゆっくり朽ちて土に返る。骨はさらに長く残る（ミノタウロスの縄張りの骨は、その4倍。寝床に骨が積もる）
+  // 何もされなければ、死骸はとてもゆっくり朽ちて土に返る。骨はさらに長く残る（ミノタウロスの縄張りと古戦場の骨は、その4倍。寝床に骨が積もり、古戦場の骨は起き上がるまで残る）
   const stage = this.corpseStage(c);
-  const every = stage === 2 ? (this.inLair(c.x, c.y) ? 1600 : 400) : 60;
+  const every = stage === 2 ? (this.inLair(c.x, c.y) || this.inBattle(c.x, c.y) ? 400 * BATTLE_BONE_SLOW : 400) : 60;
   if (c.units > 0 && this.step % every === c.id % every) {
     c.units--;
     this.rotInto(c);

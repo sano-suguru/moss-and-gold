@@ -1,6 +1,7 @@
 /** Ecology のメソッド：スライム（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 import { type Cr, DIR16, Ecology, Kind, SPEC, STR, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
+import { OLD_BONES } from './battle';
 
 /** 一つの死骸に群がって食べられるスライムの数 */
 const SLIME_SHARE = 3;
@@ -58,7 +59,7 @@ export function slime(this: Ecology, c: Cr): void {
     let bd = 160 * 160;
     for (const o of this.corpses) {
       // 同じ更新の中で食べ尽くされた死骸と、ゾンビとして起き上がった者を除く（src/eco/monsters.ts の troll と同じ）
-      if (o.dead !== 1 || o.units <= 0) continue;
+      if (o.dead !== 1 || o.units <= 0 || o.st === OLD_BONES) continue;
       const ok = this.tileOf(o.x, o.y);
       if (ok < 0 || this.w.moist[ok] < 60) continue;
       const d = sq(o.x - c.x) + sq(o.y - c.y);
@@ -162,6 +163,7 @@ export function spawnSlimes(this: Ecology): void {
   // 腐ったもの（死骸）の近く（6マス以内）の、湿って養分の溜まった開いた床だけで生まれる。
   const near = new Uint8Array(m.w * m.h);
   for (const d of this.corpses) {
+    if (d.st === OLD_BONES) continue;
     const cx = Math.floor(d.x / TILE);
     const cy = Math.floor(d.y / TILE);
     for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) { const x = cx + dx; const y = cy + dy; if (x >= 0 && y >= 0 && x < m.w && y < m.h) near[y * m.w + x] = 1; }

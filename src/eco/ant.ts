@@ -1,6 +1,7 @@
 /** Ecology のメソッド：ジャイアントアント（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 import { type Colony, type Cr, DIR16, Ecology, Kind, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
+import { OLD_BONES } from './battle';
 
 export function pickNest(this: Ecology): number {
   const m = this.w.map;
@@ -107,7 +108,7 @@ export function ant(this: Ecology, c: Cr): void {
     let bd = 14 * TILE * 14 * TILE;
     for (const o of this.corpses) {
       // 同じ更新の中で食べ尽くされた死骸と、ゾンビとして起き上がった者を除く（src/eco/monsters.ts の troll と同じ）
-      if (o.dead !== 1 || o.units <= 0) continue;
+      if (o.dead !== 1 || o.units <= 0 || o.st === OLD_BONES) continue;
       const d = sq(o.x - col.x) + sq(o.y - col.y);
       if (d < bd && reach(o.x, o.y)) {
         bd = d;

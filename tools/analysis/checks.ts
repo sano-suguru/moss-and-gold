@@ -11,6 +11,7 @@ import { countsAsStuck } from './common';
 import { World, DAY_TICKS } from '../../src/world';
 import { CR_EVERY, Kind } from '../../src/ecology';
 import { SPAWN_DEFS } from '../../src/eco/spawndef';
+import { generate } from '../../src/mapgen';
 export interface Recs {
   seed: string;
   from: number;
@@ -48,6 +49,8 @@ const RUN_ARMOR = { seeds: ['abc', 'かしたれ', 'はじまりの洞窟', 'see
 // まれな出来事（僧侶が亡骸の前で祈る）を見る組。数シードを選ぶと、ほかの変更で展開が分かれるたびに落ちるので、15シードの合計で見る
 const RUN_WIDE = { seeds: ['abc', 'かしたれ', 'はじまりの洞窟', 'seed4', 'seed5', 'seed6', 'seed7', 'seed8', 'seed40', 'seed41', 'seed18', 'seed27', 'seed35', 'seed30', 'seed17'], from: 10, to: 18 };
 const RUN_BLESS = RUN_WIDE;
+// 古戦場（src/eco/battle.ts）は新しいダンジョンを作ったときにだけ置かれるので、0日目から見る。骨は1日目ごろ、甲冑は2〜4日目に起き上がる
+const RUN_BATTLE = { seeds: ['abc', 'かしたれ', 'seed4', 'seed7', 'seed18', 'seed27', 'seed35', 'seed41'], from: 0, to: 5 };
 // check の項目にしないもの：オークの貢ぎ物の取り立て（collectTribute）と、倒れた冒険者がヴァンパイアの眷属として起き上がる場面（vampRaiseFallen）。
 // どちらも16シード×25日でも数回〜十数回で、どのシードを選んでも短い実行では確かめられない。ab の「見せたい場面」の表（lib/moments.ts）で起きたシードの数を追う。
 // ヴァンパイアが倒した者を眷属にする仕組みそのものは、RUN_A の項目（旋回と眷属）で確かめる
@@ -525,6 +528,23 @@ export const CHECKS: Check[] = [
       const bone = rs.map((r) => r.births.filter((x) => x.k === 26 && x.origin === 'raised' && [12, 10, 13, 28, 14].includes(x.from)).length);
       const zom = rs.map((r) => r.births.filter((x) => x.k === 6 && x.origin === 'raised' && [12, 10, 13, 14].includes(x.from)).length);
       return { ok: sum(bone) >= 10 && sum(zom) >= 3, value: `骨 ${sum(bone)}（${bone.filter((n) => n > 0).length}シード）、ゾンビ ${sum(zom)}（${zom.filter((n) => n > 0).length}シード）` };
+    },
+  },
+  {
+    // 古戦場（src/eco/battle.ts）：始めから散らばっている骨がスケルトンとして起き上がり、錆びた武具がマナを吸ってリビングアーマーとして立ち上がる
+    name: '古戦場の骨がスケルトンとして起き上がり、錆びた武具から甲冑が立ち上がる（8シードの0〜5日目で、それぞれ6シード以上）',
+    ...RUN_BATTLE,
+    test: (rs) => {
+      // 真ん中から10マスの内（古戦場の位置は、シードから地形を作り直して求める）
+      const near = (r: Recs) => {
+        const B = generate(r.seed).battle;
+        return (x: { x: number; y: number }) => B.x >= 0 && (x.x - B.x * 16 - 8) ** 2 + (x.y - B.y * 16 - 8) ** 2 <= (10 * 16) ** 2;
+      };
+      const bone = rs.map((r) => r.births.filter((x) => x.origin === 'raised').filter(near(r)).length);
+      const armor = rs.map((r) => r.births.filter((x) => x.k === 29 && x.origin === 'gear').filter(near(r)).length);
+      const nb = bone.filter((n) => n > 0).length;
+      const na = armor.filter((n) => n > 0).length;
+      return { ok: nb >= 6 && na >= 6, value: `骨の起き上がり ${sum(bone)}（${nb}シード）、甲冑 ${sum(armor)}（${na}シード）` };
     },
   },
   {

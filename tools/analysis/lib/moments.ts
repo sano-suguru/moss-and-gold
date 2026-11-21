@@ -6,6 +6,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { generate } from '../../../src/mapgen';
 
 const K = { Myconid: 8, Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5, Ghost: 7, Basilisk: 17 };
 
@@ -169,6 +170,9 @@ export const MOMENTS: Moment[] = [
   { key: 'mycSporeAdv', label: 'マイコニド：眠りの胞子で冒険者をうたた寝させた' },
   { key: 'mycBurst', label: 'マイコニド：倒れて弾けた胞子で、すぐそばの人がうたた寝した' },
   { key: 'armorRise', label: 'リビングアーマー：武具が寄り集まって立ち上がった' },
+  // 古戦場（src/eco/battle.ts）：始めから骨と錆びた武具が散らばる所。真ん中から10マスの内で数える
+  { key: 'battleRise', label: '古戦場：骨がスケルトンとして起き上がった（リッチ・ゾンビを含む）' },
+  { key: 'battleArmor', label: '古戦場：錆びた武具が寄り集まって、リビングアーマーとして立ち上がった' },
   { key: 'armorAbsorb', label: 'リビングアーマー：武具を取り込んだ（床の物と奪った物）' },
   { key: 'armorRob', label: 'リビングアーマー：倒した相手の武具を奪って取り込んだ' },
   { key: 'armorShed', label: 'リビングアーマー：打たれて手の武器を落とした' },
@@ -272,12 +276,28 @@ function koboGobOutsideWar(pre: Rec[], s: Rec[], d: Rec[]): number {
   return d.filter((y) => ((y.k === K.Kobold && y.by === K.Goblin) || (y.k === K.Goblin && y.by === K.Kobold)) && !spans.some(([a, b]) => y.t >= a && y.t <= b)).length;
 }
 
+/** 実行のシードの古戦場の真ん中（px。無ければ null）。meta.json のシードから地形を作り直して求める */
+const battleCache = new Map<string, { x: number; y: number } | null>();
+export function battleAt(dir: string): { x: number; y: number } | null {
+  const metaP = join(dir, 'meta.json');
+  if (!existsSync(metaP)) return null;
+  const seed = JSON.parse(readFileSync(metaP, 'utf8')).seed as string;
+  if (!battleCache.has(seed)) {
+    const B = generate(seed).battle;
+    battleCache.set(seed, B.x < 0 ? null : { x: B.x * 16 + 8, y: B.y * 16 + 8 });
+  }
+  return battleCache.get(seed) ?? null;
+}
+/** (x, y)（px）が古戦場の真ん中から10マスの内か */
+const nearBattle = (B: { x: number; y: number } | null, x: number, y: number) => !!B && (x - B.x) ** 2 + (y - B.y) ** 2 <= (10 * 16) ** 2;
+
 /** 1回の実行（1シード）のログから、場面ごとの発生回数を数える。since（tick）より後のログだけ */
 export function countMoments(dir: string, since = -1): Record<string, number> {
   const s = read(dir, 'settle.jsonl', since);
   const b = read(dir, 'births.jsonl', since);
   const d = read(dir, 'deaths.jsonl', since);
   const x = read(dir, 'exits.jsonl', since);
+  const B = battleAt(dir);
   const pre = since >= 0 ? readAll(dir, 'settle.jsonl').filter((r) => typeof r.t === 'number' && r.t <= since) : [];
   const gobAb = (r: string) => s.filter((y) => y.k === K.Goblin && y.ev === 'abandon' && y.reason === r).length;
   const ev = (k: number, e: string) => s.filter((x) => x.k === k && x.ev === e);
@@ -458,6 +478,8 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     scar: ev(K.Adventurer, 'scar').length,
     orcBluff: ev(K.Orc, 'bluff').length,
     armorRise: b.filter((x) => x.k === K.Armor && x.origin === 'gear').length,
+    battleRise: b.filter((x) => x.origin === 'raised' && nearBattle(B, x.x, x.y)).length,
+    battleArmor: b.filter((x) => x.k === K.Armor && x.origin === 'gear' && nearBattle(B, x.x, x.y)).length,
     armorAbsorb: ev(K.Armor, 'absorb').length,
     armorRob: ev(K.Armor, 'absorb').filter((x) => x.how === 'rob').length,
     armorShed: ev(K.Armor, 'shed').length,

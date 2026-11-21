@@ -217,6 +217,8 @@ export function seed(this: Ecology): void {
     }
     this.trails.set(wm.id, tr);
   }
+  // 古戦場の骨と錆びた武具（src/eco/battle.ts）
+  this.seedBattle();
   let n = 0;
   for (let k = 0; k < m.w * m.h && n < 40; k += 7) {
     if (this.w.moss[k] >= 200 && ih(k, 7) % 3 === 0) {

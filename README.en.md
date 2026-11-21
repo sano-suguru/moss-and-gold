@@ -29,6 +29,7 @@ Each creature follows simple rules, but together they do things I didn't expect.
 - Adventurers and dwarves from outside. Adventurers travel back and forth to town, so the same ones come back again and again.
 - Further down there are bigger monsters, such as golems and dragons.
 - Where the gear of fallen adventurers piles up, an empty suit of armor may rise on its own and wander off collecting weapons.
+- Somewhere in the dark lies an old battlefield; its scattered bones and rusted weapons rise again before long.
 
 The settlers take a while to show up, so it helps to fast-forward.
 
