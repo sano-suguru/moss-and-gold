@@ -1,7 +1,6 @@
 /** Ecology のメソッド：ジャイアントアント（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 import { type Colony, type Cr, DIR16, Ecology, Kind, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
-import { OLD_BONES } from './battle';
 
 export function pickNest(this: Ecology): number {
   const m = this.w.map;
@@ -95,7 +94,7 @@ export function ant(this: Ecology, c: Cr): void {
   }
   // 運ぶ物を探す：巣に近い死骸、なければキノコや苔
   let target = this.byId.get(c.ref2) ?? null;
-  if (target && (target.dead !== 1 || target.units <= 0)) target = null;
+  if (target && this.flesh(target) <= 0) target = null;
   // 目当ての死骸が無くなっていたら（ほかの者に食べられた、朽ちた）、覚えた番号を消して探し直す
   if (!target && c.ref2 > 0) c.ref2 = 0;
   if (!target && c.ref2 === 0) {
@@ -106,9 +105,9 @@ export function ant(this: Ecology, c: Cr): void {
     const farm = (x: number, y: number) => this.warrens.some((o) => o.id >= 0 && sq(o.x - x) + sq(o.y - y) < 5 * TILE * 5 * TILE);
     const reach = (x: number, y: number) => (home < 0 || this.regionOf(this.tileOf(x, y)) === home) && !farm(x, y);
     let bd = 14 * TILE * 14 * TILE;
-    for (const o of this.corpses) {
-      // 同じ更新の中で食べ尽くされた死骸と、ゾンビとして起き上がった者を除く（src/eco/monsters.ts の troll と同じ）
-      if (o.dead !== 1 || o.units <= 0 || o.st === OLD_BONES) continue;
+    for (const o of this.carrion) {
+      // 同じ更新の中で肉を食べ尽くされた死骸と、ゾンビとして起き上がった者を除く（src/eco/monsters.ts の troll と同じ）
+      if (this.flesh(o) <= 0) continue;
       const d = sq(o.x - col.x) + sq(o.y - col.y);
       if (d < bd && reach(o.x, o.y)) {
         bd = d;
@@ -137,11 +136,11 @@ export function ant(this: Ecology, c: Cr): void {
   c.act = 1;
   if (target) {
     if (sq(target.x - c.x) + sq(target.y - c.y) < 8 * 8) {
-      const t = Math.min(2, target.units, 4 - c.units);
+      const t = Math.min(2, this.flesh(target), 4 - c.units);
       target.units -= t;
       c.units += t;
-      if (target.units <= 0) target.dead = 2;
-      if (c.units >= 4 || target.dead === 2) c.st = 1;
+      // 運べるだけ持つか、肉を取り尽くしたら（骨は残す）巣へ帰る
+      if (c.units >= 4 || this.flesh(target) <= 0) c.st = 1;
     } else this.goTo(c, target.x, target.y, s.speed);
     return;
   }

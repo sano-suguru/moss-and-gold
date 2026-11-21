@@ -1,7 +1,6 @@
 /** Ecology のメソッド：スライム（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 import { type Cr, DIR16, Ecology, Kind, SPEC, STR, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
-import { OLD_BONES } from './battle';
 
 /** 一つの死骸に群がって食べられるスライムの数 */
 const SLIME_SHARE = 3;
@@ -54,12 +53,12 @@ export function slime(this: Ecology, c: Cr): void {
   }
   // 死骸の匂いをたどる
   let target: Cr | null = this.byId.get(c.ref) ?? null;
-  if (target?.dead !== 1 || target.units <= 0) {
+  if (!target || this.flesh(target) <= 0) {
     target = null;
     let bd = 160 * 160;
-    for (const o of this.corpses) {
-      // 同じ更新の中で食べ尽くされた死骸と、ゾンビとして起き上がった者を除く（src/eco/monsters.ts の troll と同じ）
-      if (o.dead !== 1 || o.units <= 0 || o.st === OLD_BONES) continue;
+    for (const o of this.carrion) {
+      // 同じ更新の中で肉を食べ尽くされた死骸と、ゾンビとして起き上がった者を除く（src/eco/monsters.ts の troll と同じ）
+      if (this.flesh(o) <= 0) continue;
       const ok = this.tileOf(o.x, o.y);
       if (ok < 0 || this.w.moist[ok] < 60) continue;
       const d = sq(o.x - c.x) + sq(o.y - c.y);
@@ -88,17 +87,15 @@ export function slime(this: Ecology, c: Cr): void {
     }
     if (sq(target.x - c.x) + sq(target.y - c.y) < 7 * 7 && sq(ax - c.x) + sq(ay - c.y) < 3 * 3) {
       // 包み込んで溶かす
-      const t = Math.min(2, target.units, s.cap - c.food);
+      const t = Math.min(2, this.flesh(target), s.cap - c.food);
       if (t > 0) {
         target.units -= t;
         c.food += t;
         c.sinceMeal = 0;
         c.act = 2;
         if (c.actT > 4) c.actT = 0;
-        if (target.units <= 0) {
-          target.dead = 2;
-          c.ref = 0;
-        }
+        // 肉を溶かし尽くしたら、骨を残して離れる
+        if (this.flesh(target) <= 0) c.ref = 0;
       } else c.act = 0;
     } else {
       c.act = 1;
@@ -157,13 +154,12 @@ export function slimeSize(this: Ecology, c: Cr): number {
 /** 水と養分の溜まった所からスライムが生まれる（死骸が多いほど生まれやすい）。水たまりか、とても湿った床（SLIME_DAMP 以上）で生まれる */
 export function spawnSlimes(this: Ecology): void {
   const n = this.counts[Kind.Slime];
-  if (n >= 40 || n > 3 + this.corpses.length) return;
+  if (n >= 40 || n > 3 + this.carrion.length) return;
   if (ih(this.step, 1, 53) % 3 !== 0) return;
   const m = this.w.map;
-  // 腐ったもの（死骸）の近く（6マス以内）の、湿って養分の溜まった開いた床だけで生まれる。
+  // 腐ったもの（肉の残る死骸）の近く（6マス以内）の、湿って養分の溜まった開いた床だけで生まれる。
   const near = new Uint8Array(m.w * m.h);
-  for (const d of this.corpses) {
-    if (d.st === OLD_BONES) continue;
+  for (const d of this.carrion) {
     const cx = Math.floor(d.x / TILE);
     const cy = Math.floor(d.y / TILE);
     for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) { const x = cx + dx; const y = cy + dy; if (x >= 0 && y >= 0 && x < m.w && y < m.h) near[y * m.w + x] = 1; }

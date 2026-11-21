@@ -1,7 +1,6 @@
 /** Ecology のメソッド：ゴブリン（Ecology のクラスに prototype で足す） */
 import { type Camp, type Cr, DAY_TICKS_ECO, DIR16, Ecology, HUNT0, Kind, SPEC, ih, sq } from '../ecology';
 import { TILE } from '../mapgen';
-import { OLD_BONES } from './battle';
 
 /**
  * 集落の候補のまわりの食べ物。ゴブリンは狩りと死骸あさりで広く動くので、コボルト（8マス）より広く数える：
@@ -354,8 +353,8 @@ export function inKoboldLand(this: Ecology, x: number, y: number): boolean {
 export function goblinCarrion(this: Ecology, c: Cr, R: number): boolean {
   let best: Cr | null = null;
   let bd = R * TILE * R * TILE;
-  for (const o of this.corpses) {
-    if (o.dead !== 1 || o.units <= 0 || o.k === Kind.Goblin || o.st === OLD_BONES) continue;
+  for (const o of this.carrion) {
+    if (this.flesh(o) <= 0 || o.k === Kind.Goblin) continue;
     const d = sq(o.x - c.x) + sq(o.y - c.y);
     if (d >= bd || this.inKoboldLand(o.x, o.y) || this.fireNear(o.x, o.y)) continue;
     bd = d;

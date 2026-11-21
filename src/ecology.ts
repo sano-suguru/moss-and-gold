@@ -857,7 +857,10 @@ export class Ecology {
   usedTiles: number[] = [];
 
   day = 0;
+  /** 死骸（骨だけのものも含む）。生き物の更新ごとに作り直す（セーブしない） */
   corpses: Cr[] = [];
+  /** 死骸のうち、まだ肉の残っているもの（食べる者が探す。骨だけのものは食べられない）。corpses と同じく作り直す */
+  carrion: Cr[] = [];
 
   dayNow = 0;
   lastLogged: number[] = [];

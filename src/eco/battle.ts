@@ -11,27 +11,14 @@
  * 骨や金貨の量は、土の養分と同じく、はじめの総量に入る（保存則の初期値は seed のあとで測る）。
  * 骨の体は古戦場のまわりの土の養分から取る。武具の未練は薄れきっている（fuel 0）ので、土のマナが濃くなるまでは立ち上がらない。
  */
-import { type Cr, Ecology, ItemKind, Kind, SPEC, ih, sq } from '../ecology';
+import { type Cr, Ecology, ItemKind, Kind, SPEC, ih } from '../ecology';
 import { BATTLE_R, TILE } from '../mapgen';
+import { boneUnits } from './step';
 
-/** 古戦場の骨が朽ちる遅さ（ふつうの骨の何倍か。ミノタウロスの縄張りの骨と同じ）。ふつうの速さでは、冒険者の骨でも2日ほどで土に返り、起き上がらずに消えるものが多い */
-export const BATTLE_BONE_SLOW = 4;
-/**
- * 古戦場の骨の印（st）：遠い昔の骨は乾ききっていて、食べる所が残っていない（スライム・アリ・ゴブリン・トロール・ドラゴンは食べない）。
- * 起き上がるか、僧侶に清められると印は消える。食べられないので、起き上がるまで古戦場に残る
- */
-export const OLD_BONES = 97;
 /** 古戦場に散らばる金貨 */
 const BATTLE_GOLD = 40;
 /** 古戦場の死者の多さ（死者1人あたり100。300 以上で骨が起き上がれる。600 以上になるとゴーストが生まれるので、それより少なくする） */
 const BATTLE_GRAVE = 500;
-
-/** (x, y) が古戦場（真ん中から BATTLE_R + 2 マスの内）か。x, y はピクセル */
-export function inBattle(this: Ecology, x: number, y: number): boolean {
-  const B = this.w.map.battle;
-  const r = BATTLE_R + 2;
-  return B.x >= 0 && sq(x / TILE - (B.x + 0.5)) + sq(y / TILE - (B.y + 0.5)) <= r * r;
-}
 
 /** 古戦場を置く（新しいダンジョンを作ったときに一度だけ。seed から） */
 export function seedBattle(this: Ecology): void {
@@ -55,9 +42,9 @@ export function seedBattle(this: Ecology): void {
   const center = B.y * m.w + B.x;
   fallen.forEach((f, i) => {
     const k = spots[i % spots.length];
-    // 骨だけになった亡骸：生きていたときの大きさ（init）の3割を残す（corpseStage の骨の段階）
+    // 肉は朽ちきって、骨だけが残っている。骨の養分は古戦場のまわりの土から取る
     const init = SPEC[f.k].body + (SPEC[f.k].cap >> 1);
-    const units = this.takeNutrients(center, Math.floor(init * 0.3), BATTLE_R + 2);
+    const units = this.takeNutrients(center, boneUnits(init), BATTLE_R + 2);
     if (!units) return;
     const x = (k % m.w) * TILE + 4 + (ih(k, i, 3) % 9);
     const y = Math.floor(k / m.w) * TILE + 4 + (ih(k, i, 4) % 9);
@@ -70,7 +57,6 @@ export function seedBattle(this: Ecology): void {
     c.init = init;
     c.dead = 1;
     c.act = 3;
-    c.st = OLD_BONES;
     // 倒れてから長くたっている（骨が起き上がる条件の一つ。decay）
     c.actT = 3000;
     this.note(c.id, { t: 0, cause: 'old', who: f.k, ...(f.k === Kind.Adventurer ? { job: f.sp } : {}) });
@@ -97,8 +83,7 @@ export function seedBattle(this: Ecology): void {
 
 declare module '../ecology' {
   interface Ecology {
-    inBattle: typeof inBattle;
     seedBattle: typeof seedBattle;
   }
 }
-Object.assign(Ecology.prototype, { inBattle, seedBattle });
+Object.assign(Ecology.prototype, { seedBattle });

@@ -898,6 +898,19 @@ export function eatMoss(this: Ecology, c: Cr, n: number): boolean {
  */
 export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
   const s = SPEC[pred.k];
+  if (prey.dead === 1) {
+    // すでに死骸のもの（ゴブリンの死骸あさり）：肉をその場で食べ、骨は残す。ゴブリンは食べきれない肉を少し持ち帰る（畑の肥やし）
+    const fl = this.flesh(prey);
+    const take = Math.min(fl, s.cap - pred.food);
+    const keep = pred.k === Kind.Goblin ? Math.max(0, Math.min(fl - take, 12 - pred.units)) : 0;
+    prey.units -= take + keep;
+    pred.food += take;
+    pred.units += keep;
+    pred.sinceMeal = 0;
+    pred.act = 2;
+    pred.actT = 0;
+    return;
+  }
   const total = prey.body + prey.food + prey.units;
   // 倒した獲物は、まず死骸になり、捕食者がその上で数秒かけて食べる（食べ残しは死骸として残る）。
   // はかない種（ウィスプ、スライム、ゴースト、マイコニド）と、丸のみにするワームとミミック、すでに死骸のものは、その場で食べる

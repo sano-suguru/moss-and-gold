@@ -1,5 +1,4 @@
 /** Ecology のメソッド：生き物の更新1回（step。src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { BATTLE_BONE_SLOW } from './battle';
 import { BONE_CAP, BONE_KINDS, KIN_RISE_MANA, KIN_ZOMBIE_CAP, KIN_ZOMBIES, ZOMBIE_KINDS } from './undead';
 import { type Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, STR, ih, STONE_DECAY_EVERY } from '../ecology';
 import { TILE } from '../mapgen';
@@ -17,6 +16,7 @@ export function update(this: Ecology, _tick: number, day: number, phase: number)
   this.buildLitMap();
   this.updateWaterholes();
   this.corpses = this.list.filter((c) => c.dead === 1 && c.units > 0 && c.k !== Kind.Wisp && c.k !== Kind.Slime && c.k !== Kind.Myconid);
+  this.carrion = this.corpses.filter((c) => this.flesh(c) > 0);
   this.counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (const c of this.list) if (!c.dead) this.counts[c.k]++;
   // 飛んでいた魔法の矢と、降ってきた矢の雨を当てる（src/eco/attack.ts）
@@ -373,9 +373,26 @@ export function rotInto(this: Ecology, c: Cr): void {
 /** まわり8マスの向き */
 const RING8: [number, number][] = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
 
-/** 死骸の段階：0 新しい、1 腐りかけ、2 骨 */
+/**
+ * 死骸の骨の分（養分の単位）：倒れたときの大きさ（init）の3割（少なくとも2）。死骸の養分（units）のうち、これを超える分が肉。
+ * 食べる者は肉だけを食べ（flesh）、骨は食べない。骨は雨風でゆっくり土に返り（decay）、起き上がったり、僧侶に清められたりする
+ */
+export function boneOf(this: Ecology, c: Cr): number {
+  return boneUnits(c.init);
+}
+/** 倒れたときの大きさが init の死骸の、骨の分（boneOf） */
+export function boneUnits(init: number): number {
+  return Math.max(2, Math.floor(init * 0.3));
+}
+
+/** 死骸に残っている肉（食べられる分）。骨だけになった死骸と、死骸でない者は0 */
+export function flesh(this: Ecology, c: Cr): number {
+  return c.dead === 1 ? Math.max(0, c.units - this.boneOf(c)) : 0;
+}
+
+/** 死骸の段階：0 新しい、1 腐りかけ、2 骨（肉が残っていない） */
 export function corpseStage(this: Ecology, c: Cr): number {
-  if (c.units <= Math.max(2, Math.floor(c.init * 0.3))) return 2;
+  if (this.flesh(c) <= 0) return 2;
   if (c.actT > 900 || c.units < c.init * 0.75) return 1;
   return 0;
 }
@@ -389,9 +406,9 @@ export function decay(this: Ecology, c: Cr): void {
   if (this.raiseThrall(c)) return;
   // 僧侶に清められた骨は、祈りの終わりに金の光の粒になって崩れる（blessCrumble）
   if (this.blessCrumble(c)) return;
-  // 何もされなければ、死骸はとてもゆっくり朽ちて土に返る。骨はさらに長く残る（ミノタウロスの縄張りと古戦場の骨は、その4倍。寝床に骨が積もり、古戦場の骨は起き上がるまで残る）
+  // 何もされなければ、死骸はとてもゆっくり朽ちて土に返る。骨はさらに長く残る（ミノタウロスの縄張りの骨は、その4倍。寝床に骨が積もる）
   const stage = this.corpseStage(c);
-  const every = stage === 2 ? (this.inLair(c.x, c.y) || this.inBattle(c.x, c.y) ? 400 * BATTLE_BONE_SLOW : 400) : 60;
+  const every = stage === 2 ? (this.inLair(c.x, c.y) ? 1600 : 400) : 60;
   if (c.units > 0 && this.step % every === c.id % every) {
     c.units--;
     this.rotInto(c);
@@ -472,9 +489,11 @@ declare module '../ecology' {
     update: typeof update;
     metabolism: typeof metabolism;
     corpseStage: typeof corpseStage;
+    boneOf: typeof boneOf;
+    flesh: typeof flesh;
     rotInto: typeof rotInto;
     decay: typeof decay;
   }
 }
 
-Object.assign(Ecology.prototype, { update, restSoak, metabolism, corpseStage, rotInto, decay });
+Object.assign(Ecology.prototype, { update, restSoak, metabolism, corpseStage, boneOf, flesh, rotInto, decay });
