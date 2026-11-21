@@ -390,6 +390,12 @@ export function flesh(this: Ecology, c: Cr): number {
   return c.dead === 1 ? Math.max(0, c.units - this.boneOf(c)) : 0;
 }
 
+/**
+ * 骨が雨風で1単位土に返るまでの、生き物の更新の回数。ゴブリンの骨は2日ほど、冒険者の骨は9日ほど残り、死者の多い所に骨が積もる
+ * （骨が3体以上積もった暗がりから、骨が起き上がる。src/eco/undead.ts の riseSpot）
+ */
+export const BONE_WEATHER = 1200;
+
 /** 死骸の段階：0 新しい、1 腐りかけ、2 骨（肉が残っていない） */
 export function corpseStage(this: Ecology, c: Cr): number {
   if (this.flesh(c) <= 0) return 2;
@@ -406,9 +412,9 @@ export function decay(this: Ecology, c: Cr): void {
   if (this.raiseThrall(c)) return;
   // 僧侶に清められた骨は、祈りの終わりに金の光の粒になって崩れる（blessCrumble）
   if (this.blessCrumble(c)) return;
-  // 何もされなければ、死骸はとてもゆっくり朽ちて土に返る。骨はさらに長く残る（ミノタウロスの縄張りの骨は、その4倍。寝床に骨が積もる）
+  // 何もされなければ、肉は生き物の更新60回に1ずつ朽ちて土に返る。骨は BONE_WEATHER 回に1ずつ（ミノタウロスの縄張りの骨は、その4倍。寝床に骨が積もる）
   const stage = this.corpseStage(c);
-  const every = stage === 2 ? (this.inLair(c.x, c.y) ? 1600 : 400) : 60;
+  const every = stage === 2 ? (this.inLair(c.x, c.y) ? BONE_WEATHER * 4 : BONE_WEATHER) : 60;
   if (c.units > 0 && this.step % every === c.id % every) {
     c.units--;
     this.rotInto(c);
