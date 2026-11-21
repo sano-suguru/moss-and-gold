@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { generate } from '../../../src/mapgen';
 
-const K = { Myconid: 8, Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5, Ghost: 7, Basilisk: 17 };
+const K = { Myconid: 8, Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5, Ghost: 7, Basilisk: 17, Ghoul: 31 };
 
 export interface Moment {
   key: string;
@@ -173,6 +173,10 @@ export const MOMENTS: Moment[] = [
   // 古戦場（src/eco/battle.ts）：始めから骨と錆びた武具が散らばる所。真ん中から10マスの内で数える
   { key: 'battleRise', label: '古戦場：骨がスケルトンとして起き上がった（リッチ・ゾンビを含む）' },
   { key: 'battleArmor', label: '古戦場：錆びた武具が寄り集まって、リビングアーマーとして立ち上がった' },
+  // グール（src/eco/ghoul.ts）
+  { key: 'ghoulDrag', label: 'グール：死骸を巣へ引きずってきた' },
+  { key: 'ghoulDenRise', label: 'グール：巣（群れの湧いた所から6マスの内）の骨が起き上がった' },
+  { key: 'ghoulSkel', label: 'グール：スケルトンとグールが倒し合った' },
   { key: 'armorAbsorb', label: 'リビングアーマー：武具を取り込んだ（床の物と奪った物）' },
   { key: 'armorRob', label: 'リビングアーマー：倒した相手の武具を奪って取り込んだ' },
   { key: 'armorShed', label: 'リビングアーマー：打たれて手の武器を落とした' },
@@ -480,6 +484,9 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     armorRise: b.filter((x) => x.k === K.Armor && x.origin === 'gear').length,
     battleRise: b.filter((x) => x.origin === 'raised' && nearBattle(B, x.x, x.y)).length,
     battleArmor: b.filter((x) => x.k === K.Armor && x.origin === 'gear' && nearBattle(B, x.x, x.y)).length,
+    ghoulDrag: s.filter((x) => x.k === K.Ghoul && x.ev === 'drag').length,
+    ghoulDenRise: b.filter((x) => x.origin === 'raised' && b.some((g) => g.k === K.Ghoul && g.t <= x.t && (g.x - x.x) ** 2 + (g.y - x.y) ** 2 <= (6 * 16) ** 2)).length,
+    ghoulSkel: d.filter((x) => (x.k === K.Ghoul && x.by === 26) || (x.k === 26 && x.by === K.Ghoul)).length,
     armorAbsorb: ev(K.Armor, 'absorb').length,
     armorRob: ev(K.Armor, 'absorb').filter((x) => x.how === 'rob').length,
     armorShed: ev(K.Armor, 'shed').length,

@@ -376,7 +376,7 @@ export function skeleton(this: Ecology, c: Cr, _day: number): void {
     }
   }
   // 食べずに、生きているものを襲う
-  const foeKinds = [Kind.Rat, Kind.Goblin, Kind.Kobold, Kind.Adventurer, Kind.Lizardman, Kind.Orc, Kind.Lizard, Kind.Ant];
+  const foeKinds = [Kind.Rat, Kind.Goblin, Kind.Kobold, Kind.Adventurer, Kind.Lizardman, Kind.Orc, Kind.Lizard, Kind.Ant, Kind.Ghoul];
   let foe: Cr | null = null;
   let bd = 6 * TILE * 6 * TILE;
   this.nearby(c.x, c.y, 6, (o) => {

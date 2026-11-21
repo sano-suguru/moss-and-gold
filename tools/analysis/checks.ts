@@ -548,6 +548,16 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // グール（src/eco/ghoul.ts）：肉の残る死骸を巣へ引きずって食べる。どのシードに群れが来るかは展開で変わるので、15シードの合計で見る
+    name: 'グールが死骸を巣へ引きずってくる（15シードの10〜18日目の合計で20回以上・6シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === Kind.Ghoul && x.ev === 'drag').length);
+      const seeds = n.filter((v) => v > 0).length;
+      return { ok: sum(n) >= 20 && seeds >= 6, value: `${sum(n)}（${seeds}シード）` };
+    },
+  },
+  {
     name: 'ゴブリンの集落の蓄えが0でない時がある（集落のあったサンプルの1割以上）',
     ...RUN_A,
     test: (rs) => {

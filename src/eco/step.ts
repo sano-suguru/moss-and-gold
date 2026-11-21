@@ -17,7 +17,7 @@ export function update(this: Ecology, _tick: number, day: number, phase: number)
   this.updateWaterholes();
   this.corpses = this.list.filter((c) => c.dead === 1 && c.units > 0 && c.k !== Kind.Wisp && c.k !== Kind.Slime && c.k !== Kind.Myconid);
   this.carrion = this.corpses.filter((c) => this.flesh(c) > 0);
-  this.counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  this.counts = new Array<number>(Kind.Ghoul + 1).fill(0);
   for (const c of this.list) if (!c.dead) this.counts[c.k]++;
   // 飛んでいた魔法の矢と、降ってきた矢の雨を当てる（src/eco/attack.ts）
   this.resolveVolleys();
@@ -211,6 +211,7 @@ export function update(this: Ecology, _tick: number, day: number, phase: number)
       case Kind.Dwarf: this.dwarf(c); break;
       case Kind.Armor: this.armor(c); break;
       case Kind.Thrall: this.thrall(c); break;
+      case Kind.Ghoul: this.ghoul(c); break;
     }
     if (!c.dead) this.metabolism(c);
   }
@@ -374,10 +375,12 @@ export function rotInto(this: Ecology, c: Cr): void {
 const RING8: [number, number][] = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
 
 /**
- * 死骸の骨の分（養分の単位）：倒れたときの大きさ（init）の3割（少なくとも2）。死骸の養分（units）のうち、これを超える分が肉。
+ * 死骸の骨の分（養分の単位）：倒れたときの大きさ（init）の3割（少なくとも2。スケルトンとリッチの残骸はすべて骨）。死骸の養分（units）のうち、これを超える分が肉。
  * 食べる者は肉だけを食べ（flesh）、骨は食べない。骨は雨風でゆっくり土に返り（decay）、起き上がったり、僧侶に清められたりする
  */
 export function boneOf(this: Ecology, c: Cr): number {
+  // スケルトンとリッチの残骸は、はじめから骨だけ（肉が無い）
+  if (c.k === Kind.Skeleton || c.k === Kind.Lich) return Math.max(c.init, boneUnits(c.init));
   return boneUnits(c.init);
 }
 /** 倒れたときの大きさが init の死骸の、骨の分（boneOf） */

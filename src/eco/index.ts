@@ -53,6 +53,7 @@ import './kobold';
 import './salamander';
 import './armor';
 import './battle';
+import './ghoul';
 import './skill';
 import './attack';
 import './charge';

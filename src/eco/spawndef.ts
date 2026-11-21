@@ -242,6 +242,21 @@ export const SPAWN_DEFS: SpawnDef[] = [
     band: () => 1,
     body: 30, food: 20, mana: 0,
   },
+  // グール：肉の残る死骸か骨が4つ以上あれば、その近くの暗い行き止まりに巣を構えて、2〜3匹の群れで湧く（src/eco/ghoul.ts）。
+  // 群れは一度に一つまで（巣は群れの皆で同じ）。いなくなってから1日はあける
+  {
+    k: Kind.Ghoul, side: 'nutr', every: 50, phase: 31, cool: DAY_TICKS_ECO / 2, minDay: 2,
+    ok: (e) => e.counts[Kind.Ghoul] === 0 && e.corpses.length >= 4,
+    chance: (e) => ih(e.step, 31, 71) % 20 === 0,
+    site: (e) => e.ghoulDen(),
+    band: (e, site) => 2 + (ih(site, e.step, 72) % 2),
+    body: 40, food: 40, mana: 0,
+    setup: (e, c, site) => {
+      c.hx = tileX(e, site);
+      c.hy = tileY(e, site);
+    },
+    log: `死骸の匂いの溜まる暗がりに、{k:${Kind.Ghoul}}の群れが巣を構えた`,
+  },
   // ジャイアントアント：キノコが増えたら、キノコの多い壁ぎわに、巣と女王と働きアリ5匹が湧く（巣の蓄え16と女王の30も土の養分から）
   {
     k: Kind.Ant, side: 'nutr', every: 50, phase: 0, cool: 0, minDay: 5,

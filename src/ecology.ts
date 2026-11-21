@@ -43,13 +43,15 @@ export const enum Kind {
   Armor = 29,
   /** ヴァンパイアの眷属：ヴァンパイアに倒された者の亡骸が起き上がったもの（src/eco/thrall.ts） */
   Thrall = 30,
+  /** グール：肉の残る死骸を巣へ引きずって食べる屍喰い。巣に骨塚ができる（src/eco/ghoul.ts） */
+  Ghoul = 31,
 }
 
 /** 種ごとの体の大きさ（間合いの目安。px。0 は押し合わない種）。Ecology.bodySize が引く表 */
-export const BODY_SIZE: Uint8Array = Uint8Array.from({ length: Kind.Thrall + 1 }, (_, k) => {
+export const BODY_SIZE: Uint8Array = Uint8Array.from({ length: Kind.Ghoul + 1 }, (_, k) => {
   if (k === Kind.Dragon || k === Kind.Worm) return 40;
   if (k === Kind.Golem || k === Kind.Troll || k === Kind.Minotaur || k === Kind.Wyvern) return 18;
-  if (k === Kind.Orc || k === Kind.Lizardman || k === Kind.Adventurer || k === Kind.Dwarf || k === Kind.Vampire || k === Kind.Skeleton || k === Kind.Lich || k === Kind.Armor || k === Kind.Basilisk || k === Kind.Lizard || k === Kind.Zombie) return 11;
+  if (k === Kind.Orc || k === Kind.Lizardman || k === Kind.Adventurer || k === Kind.Dwarf || k === Kind.Vampire || k === Kind.Skeleton || k === Kind.Lich || k === Kind.Armor || k === Kind.Basilisk || k === Kind.Lizard || k === Kind.Zombie || k === Kind.Ghoul) return 11;
   if (k === Kind.Rat || k === Kind.Ant || k === Kind.Bat || k === Kind.Kobold || k === Kind.Goblin || k === Kind.Spider || k === Kind.Myconid || k === Kind.Slime) return 8;
   return 0;
 });
@@ -392,17 +394,17 @@ export interface Camp {
 }
 
 /** 種ごとの強さ（戦いの勝ち負けの確率に使う） */
-export const STR = [0, 1, 1, 5, 3, 2, 3, 2, 2, 1, 3, 4, 3, 10, 6, 20, 15, 8, 4, 12, 8, 30, 40, 25, 60, 5, 3, 18, 6, 6, 3];
+export const STR = [0, 1, 1, 5, 3, 2, 3, 2, 2, 1, 3, 4, 3, 10, 6, 20, 15, 8, 4, 12, 8, 30, 40, 25, 60, 5, 3, 18, 6, 6, 3, 5];
 /** ドワーフの強さ（坑夫、鍛冶屋、戦士） */
 export const DWARF_STR = [5, 6, 10];
 /**
  * 賢さの段階：0 本能だけ（傷ついても逃げない）、1 動物（体力が半分を切ると逃げる）、
  * 2 狡猾（不利なら退く。強い相手には仲間がいなければ挑まない）、3 知性（戦う前に見積もり、勝てない相手は避ける）
  */
-export const TIER = [1, 1, 1, 1, 1, 0, 0, 0, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 0, 3, 0, 0, 0, 1, 3, 3, 0, 3, 3, 0, 2];
+export const TIER = [1, 1, 1, 1, 1, 0, 0, 0, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 0, 3, 0, 0, 0, 1, 3, 3, 0, 3, 3, 0, 2, 2];
 export const FLEE_AT = [0, 0.5, 0.35, 0.4];
 /** 血の色：0 赤、1 暗い赤（爬虫類・竜）、2 緑（虫）、3 石のかけら、-1 なし */
-export const BLOOD = [-1, 0, 0, 1, 2, -1, -1, -1, -1, 2, 0, 1, 0, 0, 1, 0, 0, 1, 3, 0, -1, 3, 0, 1, 1, 0, -1, -1, 0, -1, -1];
+export const BLOOD = [-1, 0, 0, 1, 2, -1, -1, -1, -1, 2, 0, 1, 0, 0, 1, 0, 0, 1, 3, 0, -1, 3, 0, 1, 1, 0, -1, -1, 0, -1, -1, 1];
 /** 冒険者の強さ（職業）と、一行の格（駆け出し・手練れ・精鋭） */
 export const JOB_STR = [8, 5, 4, 5, 3, 6, 20];
 export const TIER_MUL = [0.7, 1.1, 1.6];
@@ -514,6 +516,8 @@ export const SPEC: Spec[] = [
   { body: 0, cap: 0, meta: 1e9, starve: 1e9, speed: 0.55, glowDecay: 1 },
   // 眷属：ものを食べず、飢えない（体は起き上がった亡骸の残りの分）
   { body: 0, cap: 0, meta: 1e9, starve: 1e9, speed: 0.85, glowDecay: 1 },
+  // グール：死骸の肉を食べる。一度にたくさん食べ、長く食べずにいられる（死骸はいつもあるとは限らない）
+  { body: 40, cap: 90, meta: 40, starve: 6000, speed: 0.9, glowDecay: 1 },
 ];
 
 export interface Cr {
@@ -667,8 +671,8 @@ export const HUNT_ORC: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Kobold, Kind.Ant, K
 export const HUNT2: Kind[] = [Kind.Rat, Kind.Ant, Kind.Kobold];
 // ミノタウロスの獲物。スライムは狙わない（小さすぎる。突進と斧の薙ぎ払いを持たせてから、縄張りのスライムがまとめて倒され、
 // 8シードの10〜18日目でミノタウロスに倒されるスライムが main の14匹から38匹に増え、スライムが0匹の日が増えていた。ほかの獲物を狙った攻撃の巻き込みには当たる）
-export const HUNT3: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Orc, Kind.Lizardman, Kind.Spider, Kind.Zombie, Kind.Adventurer];
-export const HUNT4: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Lizardman, Kind.Orc, Kind.Slime, Kind.Zombie, Kind.Myconid, Kind.Adventurer];
+export const HUNT3: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Orc, Kind.Lizardman, Kind.Spider, Kind.Zombie, Kind.Ghoul, Kind.Adventurer];
+export const HUNT4: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Lizardman, Kind.Orc, Kind.Slime, Kind.Zombie, Kind.Myconid, Kind.Ghoul, Kind.Adventurer];
 export const HUNT5: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Ant, Kind.Kobold, Kind.Goblin];
 export const HUNT6: Kind[] = [Kind.Rat];
 /** 石化の進み（Cr.stone）がこれに達すると石像になる */
@@ -708,7 +712,7 @@ export const MAX_WISPS = 1400;
 export const WISP_MOSS_OPEN = 120;
 /** 群れを作りうる種（groupKeyRaw が null 以外を返しうる種） */
 export const GROUPED: boolean[] = [];
-for (const k of [Kind.Rat, Kind.Bat, Kind.Vampire, Kind.Orc, Kind.Ant, Kind.Kobold, Kind.Goblin, Kind.Lizardman, Kind.Adventurer, Kind.Dwarf]) GROUPED[k] = true;
+for (const k of [Kind.Rat, Kind.Bat, Kind.Vampire, Kind.Orc, Kind.Ant, Kind.Kobold, Kind.Goblin, Kind.Lizardman, Kind.Adventurer, Kind.Dwarf, Kind.Ghoul]) GROUPED[k] = true;
 
 export class Ecology {
   list: Cr[] = [];
@@ -721,7 +725,8 @@ export class Ecology {
   exported = 0;
   /** 生き物の更新の通し番号（step 番号。CR_EVERY tick ごとに1増える。セーブに入れる） */
   step = 0;
-  counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  /** 種ごとのいまの数（生き物の更新ごとに数え直す） */
+  counts: number[] = new Array<number>(Kind.Ghoul + 1).fill(0);
   /** ドワーフの住みか（一つまで）、坑道のランプ、外に伝わった話（1 = ゴーレムの宝物庫は危ない） */
   hold: Hold | null = null;
   lamps: number[] = [];
@@ -938,6 +943,7 @@ export class Ecology {
     [Kind.Minotaur]: { kind: 'irreg', when: 'any', th: 2600, out: 2.5 },
     [Kind.Basilisk]: { kind: 'irreg', when: 'any', th: 2600, out: 2.5 },
     [Kind.Vampire]: { kind: 'mono', when: 'day', th: 1500, out: 2 },
+    [Kind.Ghoul]: { kind: 'mono', when: 'day', th: 1500, out: 2 },
   };
 
   /** 体の大きさ（間合いの目安。px） */
@@ -962,7 +968,7 @@ export class Ecology {
     // バジリスクは、濃いマナの暗がりに住むので夜目
     [Kind.Basilisk]: 'night',
     [Kind.Goblin]: 'night', [Kind.Kobold]: 'night', [Kind.Orc]: 'night', [Kind.Dwarf]: 'night', [Kind.Vampire]: 'night', [Kind.Dragon]: 'night',
-    [Kind.Rat]: 'smell', [Kind.Ant]: 'smell', [Kind.Troll]: 'smell', [Kind.Zombie]: 'smell', [Kind.Minotaur]: 'smell', [Kind.Slime]: 'smell',
+    [Kind.Rat]: 'smell', [Kind.Ant]: 'smell', [Kind.Ghoul]: 'smell', [Kind.Troll]: 'smell', [Kind.Zombie]: 'smell', [Kind.Minotaur]: 'smell', [Kind.Slime]: 'smell',
     [Kind.Spider]: 'vib', [Kind.Worm]: 'vib', [Kind.Mimic]: 'vib',
     [Kind.Bat]: 'echo',
     [Kind.Ghost]: 'magic', [Kind.Lich]: 'magic', [Kind.Wisp]: 'magic', [Kind.Gargoyle]: 'magic', [Kind.Golem]: 'magic', [Kind.Skeleton]: 'magic', [Kind.Salamander]: 'magic', [Kind.Armor]: 'magic',
@@ -980,7 +986,7 @@ export class Ecology {
   /** 火を怖がる野の獣 */
   /** クモの巣の大きさ（半径 px。2×2マスほど。通路をまたいでふさぐ） */
   static WEB_R = 32;
-  static FEARS_FIRE = new Set<number>([Kind.Rat, Kind.Lizard, Kind.Spider, Kind.Bat, Kind.Ant, Kind.Troll, Kind.Basilisk, Kind.Minotaur]);
+  static FEARS_FIRE = new Set<number>([Kind.Rat, Kind.Lizard, Kind.Spider, Kind.Bat, Kind.Ant, Kind.Troll, Kind.Basilisk, Kind.Minotaur, Kind.Ghoul]);
   /**
    * マナで命をつなぐ大物（マナから湧く種）。体は養分の側の獲物を食べて保つが、胃が空のまま飢えの猶予（SPEC.starve）を過ぎても、
    * 体のマナを燃やして生き延びる（MANA_BURN_EVERY 回ごとに1。metabolism）。マナは、休んでいる間に足もとの土から吸い（MANA_REST_EVERY 回ごとに1）、
