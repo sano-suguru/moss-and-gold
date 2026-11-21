@@ -1,5 +1,5 @@
 /** Ecology のメソッド：生き物の更新1回（step。src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { BONE_CAP, BONE_KINDS, KIN_RISE_MANA, KIN_ZOMBIE_CAP, KIN_ZOMBIES, ZOMBIE_KINDS } from './undead';
+import { BONE_CAP, BONE_KINDS, BONE_PILE, KIN_RISE_MANA, KIN_ZOMBIE_CAP, KIN_ZOMBIES, ZOMBIE_KINDS } from './undead';
 import { type Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, STR, ih, STONE_DECAY_EVERY } from '../ecology';
 import { TILE } from '../mapgen';
 import { VAMP_SCATTER } from './vampire';
@@ -417,23 +417,21 @@ export function decay(this: Ecology, c: Cr): void {
     c.dead = 2;
     return;
   }
-  // 清められていない冒険者の亡骸は、骨になったあと、多くが死んだ暗い所で起き上がる
-  if (c.k === Kind.Adventurer && c.st !== BLESSED && c.actT > 1500 && this.step % 50 === c.id % 50) {
-    const k = this.tileOf(c.x, c.y);
-    const deaths = this.deathsAt(c.x, c.y);
+  // 清められていない冒険者の亡骸は、骨の積もった暗い所で起き上がる（riseSpot。冒険者は足もとのマナが6以上要る）。
+  // 骨がとても多く（BONE_PILE の2倍）、マナが濃い所では、魔法使いはリッチになる
+  if (c.k === Kind.Adventurer && c.st !== BLESSED && c.actT > 1500 && this.step % 50 === c.id % 50 && this.riseSpot(c.x, c.y, 6)) {
     const lichNear = this.lichNear(c.x, c.y);
-    if (k >= 0 && this.lit(k, this.day) < 0.15 && this.manaAround(k) >= 6 && (deaths >= 300 || lichNear) && ih(c.id, this.step, 140) % (lichNear ? 6 : 30) === 0) {
-      this.raiseUndead(c, deaths >= 600 && this.manaAround(k) >= 10);
+    if (ih(c.id, this.step, 140) % (lichNear ? 6 : 30) === 0) {
+      const k = this.tileOf(c.x, c.y);
+      this.raiseUndead(c, this.bonesNear(c.x, c.y) >= BONE_PILE * 2 && this.manaAround(k) >= 10);
       return;
     }
   }
-  // 冒険者のほかの人型（ゴブリン・コボルト・オーク・ドワーフ・リザードマン）の亡骸も、骨になったあと、死者の多い暗い所で起き上がる（raiseBones）。
+  // 冒険者のほかの人型（ゴブリン・コボルト・オーク・ドワーフ・リザードマン）の亡骸も、骨になったあと、骨の積もった暗い所で起き上がる（raiseBones）。
   // 僧侶に清められた亡骸（blessBrace）は起き上がらない
   const blessed = c.st === BLESSED || c.st === CRUMBLING;
-  if (BONE_KINDS.includes(c.k) && !blessed && stage === 2 && c.actT > 1500 && this.step % 50 === c.id % 50 && this.counts[Kind.Skeleton] < BONE_CAP) {
-    const k = this.tileOf(c.x, c.y);
-    const lichNear = this.lichNear(c.x, c.y);
-    if (k >= 0 && this.lit(k, this.day) < 0.15 && this.manaAround(k) >= KIN_RISE_MANA && (this.deathsAt(c.x, c.y) >= 300 || lichNear) && ih(c.id, this.step, 141) % (lichNear ? 6 : 30) === 0) {
+  if (BONE_KINDS.includes(c.k) && !blessed && stage === 2 && c.actT > 1500 && this.step % 50 === c.id % 50 && this.counts[Kind.Skeleton] < BONE_CAP && this.riseSpot(c.x, c.y)) {
+    if (ih(c.id, this.step, 141) % (this.lichNear(c.x, c.y) ? 6 : 30) === 0) {
       this.raiseBones(c);
       return;
     }

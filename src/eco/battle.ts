@@ -8,17 +8,19 @@
  *     どちらも今ある仕組み（骨の起き上がり、武具の未練）がそのまま拾う。
  *  3. 散らばった金貨と骨は、ゴブリンや冒険者を呼び寄せ、起き上がった骨や甲冑とぶつかる。
  *
+ * 古戦場は「骨が積もった暗がり」なので、骨が起き上がる条件（riseSpot）のうち、骨の数はもう満たしている。足りないのはマナだけで、
+ * 真ん中の湧き口からマナが溜まると起き上がりはじめる。
  * 骨や金貨の量は、土の養分と同じく、はじめの総量に入る（保存則の初期値は seed のあとで測る）。
  * 骨の体は古戦場のまわりの土の養分から取る。武具の未練は薄れきっている（fuel 0）ので、土のマナが濃くなるまでは立ち上がらない。
  */
-import { type Cr, Ecology, ItemKind, Kind, SPEC, ih } from '../ecology';
+import { CR_EVERY, type Cr, DAY_TICKS_ECO, Ecology, ItemKind, Kind, SPEC, ih } from '../ecology';
 import { BATTLE_R, TILE } from '../mapgen';
 import { boneUnits } from './step';
 
 /** 古戦場に散らばる金貨 */
 const BATTLE_GOLD = 40;
-/** 古戦場の死者の多さ（死者1人あたり100。300 以上で骨が起き上がれる。600 以上になるとゴーストが生まれるので、それより少なくする） */
-const BATTLE_GRAVE = 500;
+/** 古戦場で倒れたのがどのくらい前か（生き物の更新の回数。ゲーム内の10日） */
+const BATTLE_AGE = Math.round((10 * DAY_TICKS_ECO) / CR_EVERY);
 
 /** 古戦場を置く（新しいダンジョンを作ったときに一度だけ。seed から） */
 export function seedBattle(this: Ecology): void {
@@ -48,17 +50,16 @@ export function seedBattle(this: Ecology): void {
     if (!units) return;
     const x = (k % m.w) * TILE + 4 + (ih(k, i, 3) % 9);
     const y = Math.floor(k / m.w) * TILE + 4 + (ih(k, i, 4) % 9);
-    const c: Cr = this.spawn(f.k, x, y, 0, 0);
     // 始めから骨なので、生まれた記録には残さない（はじめの宝の山と同じく、ダンジョンのはじめの姿の一部）
-    this.stats.births.pop();
+    const c: Cr = this.spawn(f.k, x, y, 0, 0, false);
     c.sp = f.sp;
     c.dir = ih(k, i, 5) % 4;
     c.units = units;
     c.init = init;
     c.dead = 1;
     c.act = 3;
-    // 倒れてから長くたっている（骨が起き上がる条件の一つ。decay）
-    c.actT = 3000;
+    // 死骸の actT は、倒れてからの生き物の更新の回数
+    c.actT = BATTLE_AGE;
     this.note(c.id, { t: 0, cause: 'old', who: f.k, ...(f.k === Kind.Adventurer ? { job: f.sp } : {}) });
     // 冒険者の職業の道具は、未練の薄れきった錆びた武具として、亡骸のそばに残る
     if (f.k === Kind.Adventurer)
@@ -74,10 +75,6 @@ export function seedBattle(this: Ecology): void {
   const gk = spots[(fallen.length + 2) % spots.length];
   this.note(this.nextId, { t: 0, cause: 'old' });
   this.piles.push({ id: this.nextId++, x: (gk % m.w) * TILE + 8, y: Math.floor(gk / m.w) * TILE + 8, gold: BATTLE_GOLD, age: 0 });
-  // 死者の多い所として覚えられている（骨が起き上がる条件。冒険者の分は亡霊の騎士の条件にも数える）
-  const cell = Math.min(17, Math.floor(B.y / 8)) * 24 + Math.min(23, Math.floor(B.x / 8));
-  this.graveMap[cell] += BATTLE_GRAVE;
-  this.advGrave[cell] += 100 * fallen.filter((f) => f.k === Kind.Adventurer).length;
   this.log(B.x * TILE + 8, B.y * TILE + 8, '暗がりに、遠い昔の戦いの跡が残っている');
 }
 
