@@ -295,6 +295,26 @@ export function followOwner(this: Ecology, c: Cr): boolean {
   return true;
 }
 
+/** 骨が積もった所：まわり BONE_PILE_R マスの内に、骨（肉の残っていない死骸）が BONE_PILE 体以上ある */
+export const BONE_PILE = 3;
+export const BONE_PILE_R = 5;
+/** (x, y)（ピクセル）のまわり BONE_PILE_R マスの内の骨の数 */
+export function bonesNear(this: Ecology, x: number, y: number): number {
+  const R2 = sq(BONE_PILE_R * TILE);
+  let n = 0;
+  for (const o of this.corpses) if (o.dead === 1 && o.units > 0 && this.flesh(o) <= 0 && sq(o.x - x) + sq(o.y - y) <= R2) n++;
+  return n;
+}
+
+/**
+ * 亡骸や骨が起き上がりうる所か：暗く、足もとの土のマナ（まわり9マスの平均）が mana 以上で、骨が積もっているか、リッチが近い。
+ * 骨とゾンビの起き上がり（decay）と、僧侶が清める骨を選ぶ判断（blessBrace）に共通の条件
+ */
+export function riseSpot(this: Ecology, x: number, y: number, mana = KIN_RISE_MANA): boolean {
+  const k = this.tileOf(x, y);
+  return k >= 0 && this.lit(k, this.day) < 0.15 && this.manaAround(k) >= mana && (this.bonesNear(x, y) >= BONE_PILE || this.lichNear(x, y));
+}
+
 export function deathsAt(this: Ecology, x: number, y: number): number {
   const cx = Math.min(23, Math.max(0, Math.floor(x / (TILE * 8))));
   const cy = Math.min(17, Math.max(0, Math.floor(y / (TILE * 8))));
@@ -356,7 +376,7 @@ export function skeleton(this: Ecology, c: Cr, _day: number): void {
     }
   }
   // 食べずに、生きているものを襲う
-  const foeKinds = [Kind.Rat, Kind.Goblin, Kind.Kobold, Kind.Adventurer, Kind.Lizardman, Kind.Orc, Kind.Lizard, Kind.Ant];
+  const foeKinds = [Kind.Rat, Kind.Goblin, Kind.Kobold, Kind.Adventurer, Kind.Lizardman, Kind.Orc, Kind.Lizard, Kind.Ant, Kind.Ghoul];
   let foe: Cr | null = null;
   let bd = 6 * TILE * 6 * TILE;
   this.nearby(c.x, c.y, 6, (o) => {
@@ -512,6 +532,8 @@ declare module '../ecology' {
     ghost: typeof ghost;
     followOwner: typeof followOwner;
     deathsAt: typeof deathsAt;
+    bonesNear: typeof bonesNear;
+    riseSpot: typeof riseSpot;
     lichNear: typeof lichNear;
     raiseUndead: typeof raiseUndead;
     skeleton: typeof skeleton;
@@ -520,4 +542,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { kinZombies, startRise, raiseBones, undeadRise, addDeath, zombie, spawnGhosts, ghost, followOwner, deathsAt, lichNear, raiseUndead, skeleton, lich, scavenge });
+Object.assign(Ecology.prototype, { kinZombies, startRise, raiseBones, undeadRise, addDeath, zombie, spawnGhosts, ghost, followOwner, deathsAt, bonesNear, riseSpot, lichNear, raiseUndead, skeleton, lich, scavenge });

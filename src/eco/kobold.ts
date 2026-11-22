@@ -97,6 +97,42 @@ export function walkDist(this: Ecology, k: number, max: number, par?: Int32Array
   return dist;
 }
 
+/**
+ * walkDist と同じ、マス k から max 歩までの歩いての道のり（届かないマスは -1）を、使い回す配列に入れて返す。
+ * 次に walkNear を呼ぶまでの間だけ有効（前に印を付けたマスだけを消すので、毎回の更新で呼んでも軽い）
+ */
+export function walkNear(this: Ecology, k: number, max: number): Int32Array {
+  const m = this.w.map;
+  const N = m.w * m.h;
+  if (this.wnD.length !== N) {
+    this.wnD = new Int32Array(N).fill(-1);
+    this.wnQ = new Int32Array(N);
+    this.wnT = 0;
+  }
+  const dist = this.wnD;
+  const q = this.wnQ;
+  for (let i = 0; i < this.wnT; i++) dist[q[i]] = -1;
+  this.wnT = 0;
+  if (k < 0) return dist;
+  let h = 0;
+  let t = 0;
+  dist[k] = 0;
+  q[t++] = k;
+  const W = m.w;
+  while (h < t) {
+    const c = q[h++];
+    if (dist[c] >= max) continue;
+    for (let d = 0; d < 4; d++) {
+      const n = d === 0 ? c + 1 : d === 1 ? c - 1 : d === 2 ? c + W : c - W;
+      if (n < 0 || n >= N || dist[n] >= 0 || m.solid[n] || m.lava[n] || m.sealed[n]) continue;
+      dist[n] = dist[c] + 1;
+      q[t++] = n;
+    }
+  }
+  this.wnT = t;
+  return dist;
+}
+
 export function warrenFood(this: Ecology, k: number): number {
   const m = this.w.map;
   const x0 = k % m.w;
@@ -237,9 +273,17 @@ export function kobold(this: Ecology, c: Cr): void {
   if (c.st === 7) c.st = 0;
   if (wr && this.defend(c, wr.x, wr.y, [Kind.Goblin])) return;
   const home = wr ? sq(wr.x - c.x) + sq(wr.y - c.y) : 1e18;
+  // 住処に着いた：奥（住処の中心）から2マスの内か、入口のマスから2マスの内で、入口より奥に近い所（細い横穴に仲間が詰まって奥まで行けなくても、
+  // 入口から内側は住処。入口の外側は住処に入らない）
+  let inside = home < 2 * TILE * 2 * TILE;
+  if (!inside && wr && wr.door !== undefined && wr.door >= 0) {
+    const dx = (wr.door % this.w.map.w) * TILE + 8;
+    const dy = Math.floor(wr.door / this.w.map.w) * TILE + 8;
+    inside = sq(dx - c.x) + sq(dy - c.y) < 2 * TILE * 2 * TILE && home <= sq(dx - wr.x) + sq(dy - wr.y);
+  }
   // 腹を空かせた者は、住処の蓄えから食べる
   if (wr && (wr.store ?? 0) > 0 && (c.hungry || c.food < s.cap * 0.15)) {
-    if (home < 2 * TILE * 2 * TILE) {
+    if (inside) {
       const t = Math.min(wr.store ?? 0, Math.floor(s.cap * 0.7) - c.food);
       if (t > 0) {
         wr.store = (wr.store ?? 0) - t;
@@ -258,7 +302,7 @@ export function kobold(this: Ecology, c: Cr): void {
     }
   }
   // 蓄えを運び込む：腹が満ちた者は、余りを住処に置く
-  if (wr && c.food > s.cap * (c.st === 13 ? 0.55 : 0.75) && home < 2 * TILE * 2 * TILE && (wr.store ?? 0) < this.storeGoal(wr)) {
+  if (wr && c.food > s.cap * (c.st === 13 ? 0.55 : 0.75) && inside && (wr.store ?? 0) < this.storeGoal(wr)) {
     const t = c.food - Math.floor(s.cap * 0.5);
     c.food -= t;
     wr.store = (wr.store ?? 0) + t;
@@ -893,6 +937,7 @@ declare module '../ecology' {
   interface Ecology {
     pickWarren: typeof pickWarren;
     walkDist: typeof walkDist;
+    walkNear: typeof walkNear;
     warrenFood: typeof warrenFood;
     tunnelDir: typeof tunnelDir;
     newWarren: typeof newWarren;
@@ -919,4 +964,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { pickWarren, walkDist, warrenFood, tunnelDir, newWarren, warrenMembers, isHidden, atDoorOf, warrenOf, kobold, floorNear, tunnelNext, storeGoal, inWarrenTunnel, leaveWithGroup, exitCreature, abandonWarren, updateWarrens, farmTiles, farmFungus, koboldTransit, underground, placeTrap, checkTraps, watchWarrens });
+Object.assign(Ecology.prototype, { pickWarren, walkDist, walkNear, warrenFood, tunnelDir, newWarren, warrenMembers, isHidden, atDoorOf, warrenOf, kobold, floorNear, tunnelNext, storeGoal, inWarrenTunnel, leaveWithGroup, exitCreature, abandonWarren, updateWarrens, farmTiles, farmFungus, koboldTransit, underground, placeTrap, checkTraps, watchWarrens });

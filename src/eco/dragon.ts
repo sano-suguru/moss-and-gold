@@ -339,9 +339,9 @@ export function dragon(this: Ecology, c: Cr, _day: number): void {
   if (c.food < s.cap * 0.9) {
     let best: Cr | null = null;
     let bd = 8 * TILE * 8 * TILE;
-    for (const o of this.corpses) {
-      // 同じ更新の中で食べ尽くされた死骸と、ゾンビとして起き上がった者を除く（src/eco/monsters.ts の troll と同じ）
-      if (o.dead !== 1 || o.units <= 0) continue;
+    for (const o of this.carrion) {
+      // 同じ更新の中で肉を食べ尽くされた死骸と、ゾンビとして起き上がった者を除く（src/eco/monsters.ts の troll と同じ）
+      if (this.flesh(o) <= 0) continue;
       const d = sq(o.x - c.x) + sq(o.y - c.y);
       if (d < bd) {
         bd = d;
@@ -352,11 +352,10 @@ export function dragon(this: Ecology, c: Cr, _day: number): void {
       const b = best as Cr;
       c.act = 1;
       if (sq(b.x - c.x) + sq(b.y - c.y) < 16 * 16) {
-        const t = Math.min(b.units, 40, s.cap - c.food);
+        const t = Math.min(this.flesh(b), 40, s.cap - c.food);
         b.units -= t;
         c.food += t;
         c.sinceMeal = 0;
-        if (b.units <= 0) b.dead = 2;
       } else this.goTo(c, b.x, b.y, s.speed);
       return;
     }

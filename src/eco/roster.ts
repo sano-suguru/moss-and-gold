@@ -15,7 +15,7 @@ import { type Cr, Ecology, Job, Kind, type Party, STR, ih, sq } from '../ecology
 import { lineOfSight, TILE } from '../mapgen';
 import { ADV_NAMES, JOB_NAMES } from '../names';
 import { isJobItem } from './armor';
-import { BONE_KINDS, KIN_RISE_MANA } from './undead';
+import { BONE_KINDS } from './undead';
 
 /** 名簿の一人 */
 export interface Hero {
@@ -358,8 +358,8 @@ export function graveBrace(this: Ecology, p: Party, lead: Cr): void {
  *
  * 祈る相手は、見える所にあるうちの先に、冒険者の亡骸。清められた冒険者の亡骸は、スケルトンやリッチとして起き上がらず、
  * ヴァンパイアの眷属にもならない（src/eco/step.ts、src/eco/vampire.ts）。亡骸は骨になっても残り、聖印の光が立ちのぼる。
- * 冒険者の亡骸が見えなければ、冒険者でない亡骸にも祈る（以前は冒険者の亡骸だけが相手で、冒険者が倒れにくくなると、祈りの場面がまとめて減った）：
- *  - 人型（ゴブリン・コボルト・オーク・ドワーフ・リザードマン）の亡骸のうち、起き上がりうる所（暗く、足もとにマナがあり、死者が多いかリッチが近い。
+ * 冒険者の亡骸が見えなければ、冒険者でない亡骸にも祈る：
+ *  - 人型（ゴブリン・コボルト・オーク・ドワーフ・リザードマン）の亡骸のうち、起き上がりうる所（暗く、足もとにマナがあり、骨が積もっているかリッチが近い。
  *    decay と同じ条件）にあるもの（riseSpot）。肉の残る亡骸は、清められると残ったまま起き上がらなくなる（聖印の光が立ちのぼる）。
  *  - 倒されたスケルトン・ゾンビ・リッチの残骸（場所を問わない）。
  *  骨（人型の骨と、アンデッドの残骸）は、祈る間に金色に光り、祈りの終わりに金の光の粒になって立ちのぼって消える（blessCrumble）。
@@ -420,11 +420,6 @@ export function blessBrace(this: Ecology, p: Party, lead: Cr): void {
   }
 }
 
-/** 人型の亡骸が起き上がりうる所か（暗く、足もとにマナがあり、死者が多いかリッチが近い。src/eco/step.ts の decay の、骨とゾンビの起き上がりに共通の条件） */
-export function riseSpot(this: Ecology, x: number, y: number): boolean {
-  const k = this.tileOf(x, y);
-  return k >= 0 && this.lit(k, this.day) < 0.15 && this.manaAround(k) >= KIN_RISE_MANA && (this.deathsAt(x, y) >= 300 || this.lichNear(x, y));
-}
 
 /**
  * 清められた骨が崩れる（step.ts の decay から。祈り始めてから生き物の更新 KIN_STOP 回たったら）：金の光の粒になって立ちのぼり、消える。
@@ -488,7 +483,6 @@ declare module '../ecology' {
     raiseGrave: typeof raiseGrave;
     graveBrace: typeof graveBrace;
     blessBrace: typeof blessBrace;
-    riseSpot: typeof riseSpot;
     blessCrumble: typeof blessCrumble;
     pickGrave: typeof pickGrave;
     blessGearNear: typeof blessGearNear;
@@ -497,4 +491,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { recruit, fillRoster, heroOf, rankMul, pickHeroes, canLead, heroEnter, heroHome, rosterStep, raiseGrave, graveBrace, blessBrace, riseSpot, blessCrumble, pickGrave, blessGearNear, ensureCrests, heroHurt });
+Object.assign(Ecology.prototype, { recruit, fillRoster, heroOf, rankMul, pickHeroes, canLead, heroEnter, heroHome, rosterStep, raiseGrave, graveBrace, blessBrace, blessCrumble, pickGrave, blessGearNear, ensureCrests, heroHurt });

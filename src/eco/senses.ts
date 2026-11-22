@@ -526,7 +526,7 @@ export function feeding(this: Ecology, c: Cr): boolean {
   // 6マスの内まで歩み寄ってから寝床へ引きずる。
   // 死骸は倒れてから生き物の更新900回で腐りかけになる（corpseStage）ので、行き着けなくても歩き続けはしない
   const walkTo = !!d && d.dead === 1 && d2 > 18 * 18 && c.k === Kind.Minotaur && this.corpseStage(d) === 0 && d2 < 6 * TILE * 6 * TILE;
-  if (d?.dead !== 1 || d.units <= 0 || c.food >= s.cap || (this.w.tick - c.hitAt < 30 && c.foe !== d.id) || (d2 > 18 * 18 && !walkTo)) {
+  if (!d || this.flesh(d) <= 0 || c.food >= s.cap || (this.w.tick - c.hitAt < 30 && c.foe !== d.id) || (d2 > 18 * 18 && !walkTo)) {
     c.feed = 0;
     return false;
   }
@@ -537,16 +537,17 @@ export function feeding(this: Ecology, c: Cr): boolean {
     this.goTo(c, d.x, d.y, s.speed);
     return true;
   }
-  // ミノタウロスは、まず寝床まで引きずっていく。食べるのは骨になるところまでで、骨は寝床に残す（src/eco/monsters.ts）
+  // ミノタウロスは、まず寝床まで引きずっていく。骨は寝床に残る（src/eco/monsters.ts）
   if (this.dragToLair(c, d)) return true;
-  // ミノタウロスは骨になったら食べるのをやめる。ヴァンパイアは、眷属として起き上がらせる亡骸からは、血を短く吸うだけで離れる（src/eco/thrall.ts）
-  if ((c.k === Kind.Minotaur && this.corpseStage(d) === 2) || (c.k === Kind.Vampire && d.lure === c.id && this.step - d.lureAt > 15)) {
+  // ヴァンパイアは、眷属として起き上がらせる亡骸からは、血を短く吸うだけで離れる（src/eco/thrall.ts）
+  if (c.k === Kind.Vampire && d.lure === c.id && this.step - d.lureAt > 15) {
     c.feed = 0;
     return false;
   }
   c.dir = Math.abs(d.x - c.x) > Math.abs(d.y - c.y) ? (d.x > c.x ? 2 : 3) : d.y > c.y ? 0 : 1;
   if (this.step % 4 === c.id % 4) {
-    const t = Math.min(5, d.units, s.cap - c.food);
+    // 食べるのは肉だけ。骨は残る
+    const t = Math.min(5, this.flesh(d), s.cap - c.food);
     d.units -= t;
     c.food += t;
     c.glow = Math.max(c.glow, d.glow);
@@ -554,10 +555,7 @@ export function feeding(this: Ecology, c: Cr): boolean {
     if (c.hp > 0) c.hp = Math.min(this.maxHp(c), c.hp + this.maxHp(c) / 30);
     c.act = 2;
     c.actT = 0;
-    if (d.units <= 0) {
-      d.dead = 2;
-      c.feed = 0;
-    }
+    if (this.flesh(d) <= 0) c.feed = 0;
   }
   return true;
 }

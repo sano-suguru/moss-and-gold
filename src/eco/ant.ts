@@ -94,7 +94,7 @@ export function ant(this: Ecology, c: Cr): void {
   }
   // 運ぶ物を探す：巣に近い死骸、なければキノコや苔
   let target = this.byId.get(c.ref2) ?? null;
-  if (target && (target.dead !== 1 || target.units <= 0)) target = null;
+  if (target && this.flesh(target) <= 0) target = null;
   // 目当ての死骸が無くなっていたら（ほかの者に食べられた、朽ちた）、覚えた番号を消して探し直す
   if (!target && c.ref2 > 0) c.ref2 = 0;
   if (!target && c.ref2 === 0) {
@@ -105,9 +105,9 @@ export function ant(this: Ecology, c: Cr): void {
     const farm = (x: number, y: number) => this.warrens.some((o) => o.id >= 0 && sq(o.x - x) + sq(o.y - y) < 5 * TILE * 5 * TILE);
     const reach = (x: number, y: number) => (home < 0 || this.regionOf(this.tileOf(x, y)) === home) && !farm(x, y);
     let bd = 14 * TILE * 14 * TILE;
-    for (const o of this.corpses) {
-      // 同じ更新の中で食べ尽くされた死骸と、ゾンビとして起き上がった者を除く（src/eco/monsters.ts の troll と同じ）
-      if (o.dead !== 1 || o.units <= 0) continue;
+    for (const o of this.carrion) {
+      // 同じ更新の中で肉を食べ尽くされた死骸と、ゾンビとして起き上がった者を除く（src/eco/monsters.ts の troll と同じ）
+      if (this.flesh(o) <= 0) continue;
       const d = sq(o.x - col.x) + sq(o.y - col.y);
       if (d < bd && reach(o.x, o.y)) {
         bd = d;
@@ -136,11 +136,11 @@ export function ant(this: Ecology, c: Cr): void {
   c.act = 1;
   if (target) {
     if (sq(target.x - c.x) + sq(target.y - c.y) < 8 * 8) {
-      const t = Math.min(2, target.units, 4 - c.units);
+      const t = Math.min(2, this.flesh(target), 4 - c.units);
       target.units -= t;
       c.units += t;
-      if (target.units <= 0) target.dead = 2;
-      if (c.units >= 4 || target.dead === 2) c.st = 1;
+      // 運べるだけ持つか、肉を取り尽くしたら（骨は残す）巣へ帰る
+      if (c.units >= 4 || this.flesh(target) <= 0) c.st = 1;
     } else this.goTo(c, target.x, target.y, s.speed);
     return;
   }
@@ -187,11 +187,19 @@ export function findFungus(this: Ecology, cx: number, cy: number, R: number, sal
   return best;
 }
 
+/** 飢えかけた働きアリとみなす空腹の度合い（胃が空になってからの生き物の更新の回数が、飢え死にまでの猶予のこの割合を超えた） */
+const ANT_HUNGRY = 0.25;
 /** 巣：蓄えでキノコ畑を育て、女王が働きアリを産む。食べ物が尽きると衰えて消える */
 export function updateColonies(this: Ecology): void {
   const m = this.w.map;
   for (const col of this.colonies) {
-    const workers = this.list.filter((c) => c.k === Kind.Ant && !c.dead && c.ref === col.id).length;
+    let workers = 0;
+    let hungry = 0;
+    for (const c of this.list) {
+      if (c.k !== Kind.Ant || c.dead || c.ref !== col.id) continue;
+      workers++;
+      if (c.hungry > SPEC[Kind.Ant].starve * ANT_HUNGRY) hungry++;
+    }
     // 女王の暮らし
     if (this.step % 200 === 5) {
       if (col.store > 0) {
@@ -214,8 +222,8 @@ export function updateColonies(this: Ecology): void {
         }
       }
     }
-    // 産卵
-    if (this.step % 100 === 5 && col.store >= 10 && workers < Math.min(40, 6 + Math.floor(col.store / 3))) {
+    // 産卵：飢えかけた働きアリ（ANT_HUNGRY）がいる間は産まず、蓄えを食べさせる（産むと蓄えが尽き、産まれたアリも飢えかけたアリも飢え死にしつづける）
+    if (this.step % 100 === 5 && col.store >= 10 && hungry === 0 && workers < Math.min(40, 6 + Math.floor(col.store / 3))) {
       col.store -= 4;
       const a = this.spawn(Kind.Ant, col.x, col.y, 4, 0);
       a.ref = col.id;

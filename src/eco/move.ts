@@ -709,6 +709,15 @@ export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
         if (o.act === 1 && o.sleep <= 0 && along > 0.5) slow = ahead < gap * 0.5 ? 0.15 : 0.5;
         else sidestep = cross > 0 ? -1 : cross < 0 ? 1 : c.id % 2 ? 1 : -1;
       });
+      // よける側が岩なら反対の側へ。どちらも岩（幅1マスの通路）なら、よけずにそのまま進んで仲間と重なって通り抜ける
+      // （よけられないまま横へ押しつけ続けると、眠り込んだ仲間の後ろで群れが詰まり、足踏みし続ける）
+      if (sidestep) {
+        const open = (s: number) => {
+          const k = this.tileOf(c.x + hy * s * TILE * 0.75, c.y - hx * s * TILE * 0.75);
+          return k >= 0 && this.tilePassable(c, k);
+        };
+        if (!open(sidestep)) sidestep = open(-sidestep) ? -sidestep : 0;
+      }
       if (sidestep) {
         // 進む向きに対して横（仲間のいない側）へ半分、前へ半分
         const px = hy * sidestep;
@@ -898,6 +907,19 @@ export function eatMoss(this: Ecology, c: Cr, n: number): boolean {
  */
 export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
   const s = SPEC[pred.k];
+  if (prey.dead === 1) {
+    // すでに死骸のもの（ゴブリンの死骸あさり）：肉をその場で食べ、骨は残す。ゴブリンは食べきれない肉を少し持ち帰る（畑の肥やし）
+    const fl = this.flesh(prey);
+    const take = Math.min(fl, s.cap - pred.food);
+    const keep = pred.k === Kind.Goblin ? Math.max(0, Math.min(fl - take, 12 - pred.units)) : 0;
+    prey.units -= take + keep;
+    pred.food += take;
+    pred.units += keep;
+    pred.sinceMeal = 0;
+    pred.act = 2;
+    pred.actT = 0;
+    return;
+  }
   const total = prey.body + prey.food + prey.units;
   // 倒した獲物は、まず死骸になり、捕食者がその上で数秒かけて食べる（食べ残しは死骸として残る）。
   // はかない種（ウィスプ、スライム、ゴースト、マイコニド）と、丸のみにするワームとミミック、すでに死骸のものは、その場で食べる
@@ -931,6 +953,8 @@ export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
     prey.caught = false;
     this.addDeath(prey.x, prey.y, prey.k);
     pred.feed = prey.id;
+    // グールは、仕留めた獲物を巣へ引きずる。引きずりはじめた回を覚える（GHOUL_DRAG 回で打ち切る。src/eco/ghoul.ts）
+    if (pred.k === Kind.Ghoul) pred.lureAt = this.step;
     pred.sinceMeal = 0;
     pred.act = 2;
     pred.actT = 0;

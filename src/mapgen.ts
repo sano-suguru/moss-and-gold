@@ -55,6 +55,8 @@ export interface MapData {
   deep: { x: number; y: number };
   /** ミノタウロスの寝床：深部の暗い行き止まりの奥（なければ -1）。そのまわり LAIR_R マスが縄張り */
   lair: { x: number; y: number };
+  /** 古戦場の真ん中（なければ -1）。遠い昔に倒れた者たちの骨と武具が散らばり、怨念がマナとしてにじみ出る（findBattle） */
+  battle: { x: number; y: number };
   /** 生成時の古い宝の山（タイル座標と金貨の量） */
   hoards: { x: number; y: number; gold: number }[];
   /** 1 = 岩の中に閉じた空洞の床（まだ掘り当てられていない） */
@@ -502,11 +504,12 @@ export function generate(seed: string): MapData {
   const sealed = sealPockets(seed, W, H, solid, lava, vault, ex, shafts, springs, height, humidity);
   const mouths = placeMouths(seed, W, H, solid, sealed, lava, vault, deep, springs);
   const lair = findLair(W, H, solid, lava, paved, vault, ex, shafts, springs, deep, vaultCenter);
+  const battle = findBattle(seed, W, H, solid, lava, sealed, moss, vault, ex, shafts, springs, sinks, [deep, vaultCenter, lair]);
   const hard = rockHardness(seed, W, H);
 
   return {
     seed, w: W, h: H, solid, moss, paved, shafts, patches, rooms, entrance: { x: ex, y: 0 },
-    height, humidity, lava, springs, sinks, nutrients, dug: new Uint8Array(W * H), vault, vaultCenter, deep, lair, hoards,
+    height, humidity, lava, springs, sinks, nutrients, dug: new Uint8Array(W * H), vault, vaultCenter, deep, lair, battle, hoards,
     sealed, rubble: new Uint8Array(W * H), mouths, hard,
   };
 }
@@ -1011,6 +1014,62 @@ function findLair(W: number, H: number, solid: Uint8Array, lava: Uint8Array, pav
     if (best >= 0) return { x: best % W, y: (best / W) | 0 };
   }
   return { x: -1, y: -1 };
+}
+
+/** 古戦場の骨と武具を散らす半径（マス） */
+export const BATTLE_R = 4;
+
+/**
+ * 古戦場の場所：入口から歩いてほどほどの所（BATTLE_NEAR〜BATTLE_FAR 歩）にある、開けた暗がりの床。
+ * 骨が起き上がるには暗さが要る（日の光も光る苔も無い）ので、光の筋と苔から離し、溶岩と水場からも離す。
+ * 宝物庫・深部・ミノタウロスの寝床の近くは、ほかの場面と重ならないよう避ける。
+ * 条件を満たすマスの中から、シードごとの別の乱数で選ぶ（ほかの地形は変えない）
+ */
+const BATTLE_NEAR = 45;
+const BATTLE_FAR = 140;
+function findBattle(seed: string, W: number, H: number, solid: Uint8Array, lava: Uint8Array, sealed: Uint8Array, moss: Uint8Array, vault: Uint8Array, ex: number, shafts: Shaft[], springs: { x: number; y: number }[], sinks: { x: number; y: number }[], avoid: { x: number; y: number }[]): { x: number; y: number } {
+  const N = W * H;
+  const dist = new Int32Array(N).fill(-1);
+  const q = new Int32Array(N);
+  let qh = 0;
+  let qt = 0;
+  dist[W + ex] = 0;
+  q[qt++] = W + ex;
+  while (qh < qt) {
+    const c = q[qh++];
+    const x = c % W;
+    for (const n of [x + 1 < W ? c + 1 : -1, x > 0 ? c - 1 : -1, c + W < N ? c + W : -1, c - W]) {
+      if (n < 0 || dist[n] >= 0 || solid[n] || lava[n] || sealed[n]) continue;
+      dist[n] = dist[c] + 1;
+      q[qt++] = n;
+    }
+  }
+  const far = (x: number, y: number, ps: { x: number; y: number }[], r: number) => ps.every((p) => p.x < 0 || Math.abs(p.x - x) + Math.abs(p.y - y) >= r);
+  const cands: number[] = [];
+  const R = BATTLE_R;
+  for (let k = 0; k < N; k++) {
+    if (dist[k] < BATTLE_NEAR || dist[k] > BATTLE_FAR || vault[k]) continue;
+    const x = k % W;
+    const y = (k / W) | 0;
+    if (y < 20 || x < R + 2 || x >= W - R - 2 || y >= H - R - 2) continue;
+    if (!far(x, y, shafts, 16) || !far(x, y, springs, 10) || !far(x, y, sinks, 8) || !far(x, y, avoid, 24)) continue;
+    // 開けていて（まわりの床が7割以上）、苔も溶岩も無い
+    let open = 0;
+    let bad = false;
+    for (let dy = -R - 2; dy <= R + 2 && !bad; dy++)
+      for (let dx = -R - 2; dx <= R + 2; dx++) {
+        const n = k + dy * W + dx;
+        if (lava[n] || moss[n]) {
+          bad = true;
+          break;
+        }
+        if (Math.abs(dx) <= R && Math.abs(dy) <= R && !solid[n] && !sealed[n]) open++;
+      }
+    if (!bad && open >= (2 * R + 1) * (2 * R + 1) * 0.7) cands.push(k);
+  }
+  if (!cands.length) return { x: -1, y: -1 };
+  const k = cands[new Rng(hashSeed(`${seed}:battle`)).int(cands.length)];
+  return { x: k % W, y: (k / W) | 0 };
 }
 
 export function lineOfSight(m: MapData, ax: number, ay: number, bx: number, by: number): boolean {

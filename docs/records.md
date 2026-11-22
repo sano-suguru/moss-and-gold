@@ -7,7 +7,7 @@
 | settle.jsonl | `{t, k, id, ev, how, reason, to, n, x, y}`。群れや個体の出来事。ev ごとの意味は下の一覧 |
 | samples.jsonl | ゲーム内の1/4日ごとのサンプル。シードの豊かさ（rich：開いた地表の横穴から歩いて100タイル以内の床1タイルあたりの、食べられる苔とキノコの量）、種ごとの数（`counts`、キーは種の番号）、死骸、開いた床、瓦礫、使える養分とその総量、保存則のずれ（nutrientDrift / goldDrift / rockDrift）、噂、冒険者パーティの数、外の世界の地図の区画数、ドワーフの拠点の発展段階。tick が `DAY_TICKS/4` の倍数のときに書く（中断・再開しても同じ tick で書かれる） |
 | deaths.jsonl | `{t, id, k, cause, by, x, y, slain?, near?, camp?}`。cause は死因：eaten 食べられた / fight 戦って倒れた / starve 飢え / burned 焼死 / crushed 崩落 / petrified 石化（by はバジリスクの睨みなら 17、トロールが光の筋を浴びたなら −1）/ killed 襲われた（ゾンビなど）/ dried 干からびた（スライム）/ faded ゴーストが消えた・リビングアーマーのマナが尽きた / planted マイコニドがキノコになった / crumbled スケルトンが崩れた / crumble 眷属が崩れた / sipped ウィスプが大物に吸われた / other。by は手を下した種（なければ −1）。slain は eaten のとき、打ち合いで仕留めてから食べた（1。無ければ一口で食べた）。near は飢え死にした大ネズミだけ、食べられる苔・キノコまでの歩いての距離（60タイルまで、なければ −1）。camp は焚き火で休む一行の冒険者だった（1） |
-| births.jsonl | `{t, k, origin, x, y, from?}`。origin は出現の経路：entrance 正面の入口 / mouth 地表の横穴 / fissure 地底の裂け目 / river 川の出口 / shaft 天井の裂け目 / soil 土の養分から / mana マナから / gear 床の武具から（リビングアーマー）/ raised 亡骸が起き上がった（from は亡骸の種）/ born ダンジョンの中で生まれた（親から、卵から） |
+| births.jsonl | `{t, k, origin, x, y, from?}`。origin は出現の経路：entrance 正面の入口 / mouth 地表の横穴 / fissure 地底の裂け目 / river 川の出口 / shaft 天井の裂け目 / soil 土の養分から / mana マナから / gear 床の武具から（リビングアーマー）/ raised 亡骸が起き上がった（from は亡骸の種）/ battle 新しいダンジョンの古戦場に、はじめから骨として置かれた / born ダンジョンの中で生まれた（親から、卵から） |
 | moves.jsonl | `{t, k, n, x, y, tx, ty}`。大ネズミの巣穴の引っ越し：n 匹が (x, y) から (tx, ty) へ |
 | exits.jsonl | `{t, k, reason}`。外へ出ていった理由：starving 飢えて去った / returned 冒険者の生還 / home 満腹になって巣へ帰った（ワイバーン）/ abandoned 住処を捨てて群れで去った（コボルト）/ dispersed 空腹で群れごと出ていった（大ネズミ） |
 | events.jsonl | ゲーム内ログに表示される出来事（`{k:番号}` の所に種の名前が入る） |
@@ -55,7 +55,7 @@ stuck と hitch の記録はセーブしないので、再開した直後は数�
 - burn：炎に焼かれた。k は火をつけた種（いまはドラゴンだけ）、id は焼かれた個体、n はその種。前に傷を受けてから生き物の更新100回より後の、最初の一回だけ
 - web（k 4。id は巣）：クモの巣の出来事。how は catch 捕まった / tear 大きな者が引き裂いた / cut 冒険者が切り払った。by はその者の種
 - split（k 5）：スライムが二つに分かれた（n は生まれた個体）
-- drag（k 15）：ミノタウロスが獲物の死骸を寝床まで引きずり終えた（n は獲物の種）
+- drag（k 15 ミノタウロス、31 グール）：死骸を寝床（グールは巣）まで引きずり終えた（n は死骸の種）
 - absorb（k 29）：リビングアーマーが武具を取り込んだ。how は floor 床の物 / rob 倒した相手の落とし物、n は武具の種類（ItemKind）
 - fall（k 29）：崩れて武具が床に散らばった（n は数）
 - gaze（k 17）：バジリスクの睨み。n は相手の種、how は 0 相手が目を背けた / 1 最初に目が合った（ここから石化が進む）/ 2 石像になった。x, y は相手の位置

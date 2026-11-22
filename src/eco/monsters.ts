@@ -1,6 +1,7 @@
 /** Ecology のメソッド：ミノタウロス、トロール、ガーゴイル、ミミック、ゴーレム、ワーム（バジリスクは src/eco/basilisk.ts）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 import { type Cr, DIR16, Ecology, HUNT3, HUNT4, Kind, NB4, SPEC, STR, ih, sq } from '../ecology';
 import { LAIR_R, lineOfSight, TILE } from '../mapgen';
+import { GHOUL_BED, GHOUL_DRAG, GHOUL_TAIL } from './ghoul';
 
 /** (x, y) がミノタウロスの縄張り（寝床から LAIR_R マスの内）か。x, y はピクセル */
 export function inLair(this: Ecology, x: number, y: number): boolean {
@@ -101,18 +102,33 @@ export function minotaur(this: Ecology, c: Cr): void {
 }
 
 /**
- * ミノタウロスが、仕留めた獲物の死骸 d を寝床まで引きずる（生き物の更新ごと、ふだんの6割の速さで）。
- * 死骸は、ミノタウロスの体の MINO_TAIL px うしろ（手前へ歩くときは体の横）を付いてくる（そこが岩なら、ミノタウロスが動く前にいた所＝必ず歩ける床へ）。寝床に着いたか、
- * 倒れてから生き物の更新 MINO_DRAG 回たっても着かなければ（道がふさがっているなど）、引きずるのをやめてその場で食べる。true なら今は引きずっている
+ * 食べる死骸 d を住みかまで引きずる（生き物の更新ごと、ふだんの6割の速さで）。true なら今は引きずっている。
+ *  - ミノタウロス：仕留めた獲物を寝床へ。倒れてから生き物の更新 MINO_DRAG 回たっても着かなければ（道がふさがっているなど）、引きずるのをやめてその場で食べる
+ *  - グール：見つけた死骸を巣（hx, hy）へ（src/eco/ghoul.ts）。つかんでから生き物の更新 GHOUL_DRAG 回たっても着かなければ、その場で食べる
+ * 死骸は、引きずる者の体のうしろ（ミノタウロスは MINO_TAIL px、グールは GHOUL_TAIL px。手前へ歩くときは体の横）を付いてくる
+ * （そこが岩なら、引きずる者が動く前にいた所＝必ず歩ける床へ）
  */
 export function dragToLair(this: Ecology, c: Cr, d: Cr): boolean {
   const m = this.w.map;
-  if (c.k !== Kind.Minotaur || m.lair.x < 0) return false;
-  const bx = m.lair.x * TILE + 8;
-  const by = m.lair.y * TILE + 8;
-  if (sq(d.x - bx) + sq(d.y - by) < LAIR_BED * LAIR_BED) return false;
-  // 死骸の actT は倒れてからの生き物の更新の回数（引きずるのは仕留めた直後からなので、引きずった回数とほぼ同じ）
-  if (d.actT > MINO_DRAG) return false;
+  let bx: number;
+  let by: number;
+  let bed: number;
+  if (c.k === Kind.Minotaur) {
+    if (m.lair.x < 0) return false;
+    bx = m.lair.x * TILE + 8;
+    by = m.lair.y * TILE + 8;
+    bed = LAIR_BED;
+    if (sq(d.x - bx) + sq(d.y - by) < bed * bed) return false;
+    // 死骸の actT は倒れてからの生き物の更新の回数（引きずるのは仕留めた直後からなので、引きずった回数とほぼ同じ）
+    if (d.actT > MINO_DRAG) return false;
+  } else if (c.k === Kind.Ghoul) {
+    bx = c.hx;
+    by = c.hy;
+    bed = GHOUL_BED;
+    if (sq(d.x - bx) + sq(d.y - by) < bed * bed) return false;
+    if (this.step - c.lureAt > GHOUL_DRAG) return false;
+  } else return false;
+  const mino = c.k === Kind.Minotaur;
   const x0 = c.x;
   const y0 = c.y;
   c.act = 1;
@@ -124,8 +140,9 @@ export function dragToLair(this: Ecology, c: Cr, d: Cr): boolean {
     // 進む向きの MINO_TAIL px うしろ。手前（下）へ歩くときは、うしろ（上）だと背の高い体に隠れるので、体の横（右）へずらす
     // 向きが変わっても跳ばないよう、死骸が1回に動くのは 2.5px まで（ミノタウロスの引きずる速さより少し速い）
     const down = my > Math.abs(mx);
-    const gx = c.x - (mx / ml) * (down ? 4 : MINO_TAIL) + (down ? 10 : 0);
-    const gy = c.y - (my / ml) * (down ? 4 : MINO_TAIL);
+    const tail = mino ? MINO_TAIL : GHOUL_TAIL;
+    const gx = c.x - (mx / ml) * (down ? 4 : tail) + (down ? (mino ? 10 : 6) : 0);
+    const gy = c.y - (my / ml) * (down ? 4 : tail);
     const gl = Math.sqrt(sq(gx - d.x) + sq(gy - d.y));
     const f = gl > 2.5 ? 2.5 / gl : 1;
     const nx = d.x + (gx - d.x) * f;
@@ -138,8 +155,8 @@ export function dragToLair(this: Ecology, c: Cr, d: Cr): boolean {
       d.x = x0;
       d.y = y0;
     }
-    // 寝床に着いた（分析用に記録する。n は獲物の種）
-    if (sq(d.x - bx) + sq(d.y - by) < LAIR_BED * LAIR_BED) this.record('settle', { t: this.w.tick, k: Kind.Minotaur, id: c.id, ev: 'drag', n: d.k, x: Math.round(d.x), y: Math.round(d.y) } as never);
+    // 住みかに着いた（分析用に記録する。n は死骸の種）
+    if (sq(d.x - bx) + sq(d.y - by) < bed * bed) this.record('settle', { t: this.w.tick, k: c.k, id: c.id, ev: 'drag', n: d.k, x: Math.round(d.x), y: Math.round(d.y) } as never);
   }
   return true;
 }
@@ -226,10 +243,9 @@ export function troll(this: Ecology, c: Cr, day: number): void {
     if (this.hunt(c, 10, HUNT4, s.speed * 1.15)) return;
     let best: Cr | null = null;
     let bd = 10 * TILE * 10 * TILE;
-    for (const o of this.corpses) {
-      // この更新の頭で作った死骸の一覧なので、同じ更新の中で食べ尽くされた死骸と、ゾンビとして起き上がった者を除く
-      // （起き上がった者の units は0なので、食べる量0で dead = 2 にして、体の養分ごと消していた）
-      if (o.dead !== 1 || o.units <= 0) continue;
+    for (const o of this.carrion) {
+      // この更新の頭で作った死骸の一覧なので、同じ更新の中で肉を食べ尽くされた死骸と、ゾンビとして起き上がった者を除く
+      if (this.flesh(o) <= 0) continue;
       const d = sq(o.x - c.x) + sq(o.y - c.y);
       if (d < bd) {
         bd = d;
@@ -240,13 +256,12 @@ export function troll(this: Ecology, c: Cr, day: number): void {
       const b = best as Cr;
       c.act = 1;
       if (sq(b.x - c.x) + sq(b.y - c.y) < 10 * 10) {
-        const t = Math.min(b.units, 20, s.cap - c.food);
+        const t = Math.min(this.flesh(b), 20, s.cap - c.food);
         b.units -= t;
         c.food += t;
         c.sinceMeal = 0;
         c.act = 2;
         c.actT = 0;
-        if (b.units <= 0) b.dead = 2;
       } else this.goTo(c, b.x, b.y, s.speed);
       return;
     }

@@ -280,6 +280,8 @@ export class World {
     // ミノタウロスの寝床（古い呪いの場所）：寝床のまわり3×3マスに、わずかずつ湧く。縄張りは深部の行き止まりにあり、マナが薄いことが多いので、
     // 主が眠っている間に吸えるように（マナで命をつなぐ大物。src/eco/step.ts）
     if (m.lair.x >= 0) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) out.push([(m.lair.y + dy) * m.w + m.lair.x + dx, 1]);
+    // 古戦場（遠い昔に倒れた者たちの怨念）：真ん中の1マスに。暗がりの骨が起き上がり、錆びた武具がマナを吸って甲冑が立ち上がる（Ecology.seedBattle）
+    if (m.battle.x >= 0) out.push([m.battle.y * m.w + m.battle.x, 2]);
     // 宝物庫（古い魔法）
     let vk = -1;
     for (let k = 0; k < m.vault.length; k++) if (m.vault[k] && !m.solid[k]) { vk = k; break; }

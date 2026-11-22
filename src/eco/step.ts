@@ -1,5 +1,5 @@
 /** Ecology のメソッド：生き物の更新1回（step。src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
-import { BONE_CAP, BONE_KINDS, KIN_RISE_MANA, KIN_ZOMBIE_CAP, KIN_ZOMBIES, ZOMBIE_KINDS } from './undead';
+import { BONE_CAP, BONE_KINDS, BONE_PILE, KIN_RISE_MANA, KIN_ZOMBIE_CAP, KIN_ZOMBIES, ZOMBIE_KINDS } from './undead';
 import { type Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, STR, ih, STONE_DECAY_EVERY } from '../ecology';
 import { TILE } from '../mapgen';
 import { VAMP_SCATTER } from './vampire';
@@ -16,7 +16,8 @@ export function update(this: Ecology, _tick: number, day: number, phase: number)
   this.buildLitMap();
   this.updateWaterholes();
   this.corpses = this.list.filter((c) => c.dead === 1 && c.units > 0 && c.k !== Kind.Wisp && c.k !== Kind.Slime && c.k !== Kind.Myconid);
-  this.counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  this.carrion = this.corpses.filter((c) => this.flesh(c) > 0);
+  this.counts = new Array<number>(Kind.Ghoul + 1).fill(0);
   for (const c of this.list) if (!c.dead) this.counts[c.k]++;
   // 飛んでいた魔法の矢と、降ってきた矢の雨を当てる（src/eco/attack.ts）
   this.resolveVolleys();
@@ -210,6 +211,7 @@ export function update(this: Ecology, _tick: number, day: number, phase: number)
       case Kind.Dwarf: this.dwarf(c); break;
       case Kind.Armor: this.armor(c); break;
       case Kind.Thrall: this.thrall(c); break;
+      case Kind.Ghoul: this.ghoul(c); break;
     }
     if (!c.dead) this.metabolism(c);
   }
@@ -372,9 +374,34 @@ export function rotInto(this: Ecology, c: Cr): void {
 /** まわり8マスの向き */
 const RING8: [number, number][] = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
 
-/** 死骸の段階：0 新しい、1 腐りかけ、2 骨 */
+/**
+ * 死骸の骨の分（養分の単位）：倒れたときの大きさ（init）の3割（少なくとも2。スケルトンとリッチの残骸はすべて骨）。死骸の養分（units）のうち、これを超える分が肉。
+ * 食べる者は肉だけを食べ（flesh）、骨は食べない。骨は雨風でゆっくり土に返り（decay）、起き上がったり、僧侶に清められたりする
+ */
+export function boneOf(this: Ecology, c: Cr): number {
+  // スケルトンとリッチの残骸は、はじめから骨だけ（肉が無い）
+  if (c.k === Kind.Skeleton || c.k === Kind.Lich) return Math.max(c.init, boneUnits(c.init));
+  return boneUnits(c.init);
+}
+/** 倒れたときの大きさが init の死骸の、骨の分（boneOf） */
+export function boneUnits(init: number): number {
+  return Math.max(2, Math.floor(init * 0.3));
+}
+
+/** 死骸に残っている肉（食べられる分）。骨だけになった死骸と、死骸でない者は0 */
+export function flesh(this: Ecology, c: Cr): number {
+  return c.dead === 1 ? Math.max(0, c.units - this.boneOf(c)) : 0;
+}
+
+/**
+ * 骨が雨風で1単位土に返るまでの、生き物の更新の回数。ゴブリンの骨は2日ほど、冒険者の骨は9日ほど残り、死者の多い所に骨が積もる
+ * （骨が3体以上積もった暗がりから、骨が起き上がる。src/eco/undead.ts の riseSpot）
+ */
+export const BONE_WEATHER = 1200;
+
+/** 死骸の段階：0 新しい、1 腐りかけ、2 骨（肉が残っていない） */
 export function corpseStage(this: Ecology, c: Cr): number {
-  if (c.units <= Math.max(2, Math.floor(c.init * 0.3))) return 2;
+  if (this.flesh(c) <= 0) return 2;
   if (c.actT > 900 || c.units < c.init * 0.75) return 1;
   return 0;
 }
@@ -388,9 +415,9 @@ export function decay(this: Ecology, c: Cr): void {
   if (this.raiseThrall(c)) return;
   // 僧侶に清められた骨は、祈りの終わりに金の光の粒になって崩れる（blessCrumble）
   if (this.blessCrumble(c)) return;
-  // 何もされなければ、死骸はとてもゆっくり朽ちて土に返る。骨はさらに長く残る（ミノタウロスの縄張りの骨は、その4倍。寝床に骨が積もる）
+  // 何もされなければ、肉は生き物の更新60回に1ずつ朽ちて土に返る。骨は BONE_WEATHER 回に1ずつ（ミノタウロスの縄張りの骨は、その4倍。寝床に骨が積もる）
   const stage = this.corpseStage(c);
-  const every = stage === 2 ? (this.inLair(c.x, c.y) ? 1600 : 400) : 60;
+  const every = stage === 2 ? (this.inLair(c.x, c.y) ? BONE_WEATHER * 4 : BONE_WEATHER) : 60;
   if (c.units > 0 && this.step % every === c.id % every) {
     c.units--;
     this.rotInto(c);
@@ -399,23 +426,21 @@ export function decay(this: Ecology, c: Cr): void {
     c.dead = 2;
     return;
   }
-  // 清められていない冒険者の亡骸は、骨になったあと、多くが死んだ暗い所で起き上がる
-  if (c.k === Kind.Adventurer && c.st !== BLESSED && c.actT > 1500 && this.step % 50 === c.id % 50) {
-    const k = this.tileOf(c.x, c.y);
-    const deaths = this.deathsAt(c.x, c.y);
+  // 清められていない冒険者の亡骸は、骨の積もった暗い所で起き上がる（riseSpot。冒険者は足もとのマナが6以上要る）。
+  // 骨がとても多く（BONE_PILE の2倍）、マナが濃い所では、魔法使いはリッチになる
+  if (c.k === Kind.Adventurer && c.st !== BLESSED && c.actT > 1500 && this.step % 50 === c.id % 50 && this.riseSpot(c.x, c.y, 6)) {
     const lichNear = this.lichNear(c.x, c.y);
-    if (k >= 0 && this.lit(k, this.day) < 0.15 && this.manaAround(k) >= 6 && (deaths >= 300 || lichNear) && ih(c.id, this.step, 140) % (lichNear ? 6 : 30) === 0) {
-      this.raiseUndead(c, deaths >= 600 && this.manaAround(k) >= 10);
+    if (ih(c.id, this.step, 140) % (lichNear ? 6 : 30) === 0) {
+      const k = this.tileOf(c.x, c.y);
+      this.raiseUndead(c, this.bonesNear(c.x, c.y) >= BONE_PILE * 2 && this.manaAround(k) >= 10);
       return;
     }
   }
-  // 冒険者のほかの人型（ゴブリン・コボルト・オーク・ドワーフ・リザードマン）の亡骸も、骨になったあと、死者の多い暗い所で起き上がる（raiseBones）。
+  // 冒険者のほかの人型（ゴブリン・コボルト・オーク・ドワーフ・リザードマン）の亡骸も、骨になったあと、骨の積もった暗い所で起き上がる（raiseBones）。
   // 僧侶に清められた亡骸（blessBrace）は起き上がらない
   const blessed = c.st === BLESSED || c.st === CRUMBLING;
-  if (BONE_KINDS.includes(c.k) && !blessed && stage === 2 && c.actT > 1500 && this.step % 50 === c.id % 50 && this.counts[Kind.Skeleton] < BONE_CAP) {
-    const k = this.tileOf(c.x, c.y);
-    const lichNear = this.lichNear(c.x, c.y);
-    if (k >= 0 && this.lit(k, this.day) < 0.15 && this.manaAround(k) >= KIN_RISE_MANA && (this.deathsAt(c.x, c.y) >= 300 || lichNear) && ih(c.id, this.step, 141) % (lichNear ? 6 : 30) === 0) {
+  if (BONE_KINDS.includes(c.k) && !blessed && stage === 2 && c.actT > 1500 && this.step % 50 === c.id % 50 && this.counts[Kind.Skeleton] < BONE_CAP && this.riseSpot(c.x, c.y)) {
+    if (ih(c.id, this.step, 141) % (this.lichNear(c.x, c.y) ? 6 : 30) === 0) {
       this.raiseBones(c);
       return;
     }
@@ -471,9 +496,11 @@ declare module '../ecology' {
     update: typeof update;
     metabolism: typeof metabolism;
     corpseStage: typeof corpseStage;
+    boneOf: typeof boneOf;
+    flesh: typeof flesh;
     rotInto: typeof rotInto;
     decay: typeof decay;
   }
 }
 
-Object.assign(Ecology.prototype, { update, restSoak, metabolism, corpseStage, rotInto, decay });
+Object.assign(Ecology.prototype, { update, restSoak, metabolism, corpseStage, boneOf, flesh, rotInto, decay });

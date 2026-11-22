@@ -27,6 +27,8 @@ export function groupKeyRaw(this: Ecology, c: Cr): string | null {
       return c.ref2 ? `v${c.ref2}` : null;
     case Kind.Orc:
       return c.hx || c.hy ? this.memoKey(c, 'o', c.hx, c.hy) : null;
+    case Kind.Ghoul:
+      return c.hx || c.hy ? this.memoKey(c, 'g', c.hx, c.hy) : null;
     case Kind.Ant:
     case Kind.Kobold:
     case Kind.Goblin:

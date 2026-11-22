@@ -1327,6 +1327,7 @@ export class CreatureView {
       case Kind.Goblin: return A.named('goblin', dir, act, f, v);
       case Kind.Orc: return A.named('orc', dir, act, f, v);
       case Kind.Lizardman: return A.named('lizardman', dir, act, f);
+      case Kind.Ghoul: return A.named('ghoul', dir, act, f);
       case Kind.Minotaur: return A.named('minotaur', dir, act, f);
       case Kind.Troll: return A.named('troll', dir, act, f);
       case Kind.Basilisk: return A.named('basilisk', dir, act, f);
