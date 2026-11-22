@@ -187,6 +187,8 @@ export function findFungus(this: Ecology, cx: number, cy: number, R: number, sal
   return best;
 }
 
+/** 飢えかけた働きアリとみなす空腹の度合い（胃が空になってからの生き物の更新の回数が、飢え死にまでの猶予のこの割合を超えた） */
+const ANT_HUNGRY = 0.25;
 /** 巣：蓄えでキノコ畑を育て、女王が働きアリを産む。食べ物が尽きると衰えて消える */
 export function updateColonies(this: Ecology): void {
   const m = this.w.map;
@@ -196,7 +198,7 @@ export function updateColonies(this: Ecology): void {
     for (const c of this.list) {
       if (c.k !== Kind.Ant || c.dead || c.ref !== col.id) continue;
       workers++;
-      if (c.hungry) hungry++;
+      if (c.hungry > SPEC[Kind.Ant].starve * ANT_HUNGRY) hungry++;
     }
     // 女王の暮らし
     if (this.step % 200 === 5) {
@@ -220,7 +222,7 @@ export function updateColonies(this: Ecology): void {
         }
       }
     }
-    // 産卵：腹を空かせた働きアリがいる間は産まず、蓄えを食べさせる（産むと蓄えが尽き、産まれたアリも腹を空かせたアリも飢え死にしつづける）
+    // 産卵：飢えかけた働きアリ（ANT_HUNGRY）がいる間は産まず、蓄えを食べさせる（産むと蓄えが尽き、産まれたアリも飢えかけたアリも飢え死にしつづける）
     if (this.step % 100 === 5 && col.store >= 10 && hungry === 0 && workers < Math.min(40, 6 + Math.floor(col.store / 3))) {
       col.store -= 4;
       const a = this.spawn(Kind.Ant, col.x, col.y, 4, 0);

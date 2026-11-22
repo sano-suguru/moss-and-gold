@@ -953,6 +953,8 @@ export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
     prey.caught = false;
     this.addDeath(prey.x, prey.y, prey.k);
     pred.feed = prey.id;
+    // グールは、仕留めた獲物を巣へ引きずる。引きずりはじめた回を覚える（GHOUL_DRAG 回で打ち切る。src/eco/ghoul.ts）
+    if (pred.k === Kind.Ghoul) pred.lureAt = this.step;
     pred.sinceMeal = 0;
     pred.act = 2;
     pred.actT = 0;

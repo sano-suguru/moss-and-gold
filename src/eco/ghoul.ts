@@ -57,10 +57,9 @@ export function ghoul(this: Ecology, c: Cr): void {
       });
       if (prey) {
         const p = prey as Cr;
-        if (bd < 14 * 14) {
-          // 仕留めたら、その死骸を巣へ引きずる（eat が feed を付ける）
-          if (this.fight(c, p) && c.feed) c.lureAt = this.step;
-        } else {
+        // 仕留めたら、その死骸を巣へ引きずる（eat が feed と lureAt を付ける）
+        if (bd < 14 * 14) this.fight(c, p);
+        else {
           c.act = 1;
           this.goTo(c, p.x, p.y, s.speed * 1.2);
         }
