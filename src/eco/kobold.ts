@@ -97,6 +97,42 @@ export function walkDist(this: Ecology, k: number, max: number, par?: Int32Array
   return dist;
 }
 
+/**
+ * walkDist と同じ、マス k から max 歩までの歩いての道のり（届かないマスは -1）を、使い回す配列に入れて返す。
+ * 次に walkNear を呼ぶまでの間だけ有効（前に印を付けたマスだけを消すので、毎回の更新で呼んでも軽い）
+ */
+export function walkNear(this: Ecology, k: number, max: number): Int32Array {
+  const m = this.w.map;
+  const N = m.w * m.h;
+  if (this.wnD.length !== N) {
+    this.wnD = new Int32Array(N).fill(-1);
+    this.wnQ = new Int32Array(N);
+    this.wnT = 0;
+  }
+  const dist = this.wnD;
+  const q = this.wnQ;
+  for (let i = 0; i < this.wnT; i++) dist[q[i]] = -1;
+  this.wnT = 0;
+  if (k < 0) return dist;
+  let h = 0;
+  let t = 0;
+  dist[k] = 0;
+  q[t++] = k;
+  const W = m.w;
+  while (h < t) {
+    const c = q[h++];
+    if (dist[c] >= max) continue;
+    for (let d = 0; d < 4; d++) {
+      const n = d === 0 ? c + 1 : d === 1 ? c - 1 : d === 2 ? c + W : c - W;
+      if (n < 0 || n >= N || dist[n] >= 0 || m.solid[n] || m.lava[n] || m.sealed[n]) continue;
+      dist[n] = dist[c] + 1;
+      q[t++] = n;
+    }
+  }
+  this.wnT = t;
+  return dist;
+}
+
 export function warrenFood(this: Ecology, k: number): number {
   const m = this.w.map;
   const x0 = k % m.w;
@@ -901,6 +937,7 @@ declare module '../ecology' {
   interface Ecology {
     pickWarren: typeof pickWarren;
     walkDist: typeof walkDist;
+    walkNear: typeof walkNear;
     warrenFood: typeof warrenFood;
     tunnelDir: typeof tunnelDir;
     newWarren: typeof newWarren;
@@ -927,4 +964,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { pickWarren, walkDist, warrenFood, tunnelDir, newWarren, warrenMembers, isHidden, atDoorOf, warrenOf, kobold, floorNear, tunnelNext, storeGoal, inWarrenTunnel, leaveWithGroup, exitCreature, abandonWarren, updateWarrens, farmTiles, farmFungus, koboldTransit, underground, placeTrap, checkTraps, watchWarrens });
+Object.assign(Ecology.prototype, { pickWarren, walkDist, walkNear, warrenFood, tunnelDir, newWarren, warrenMembers, isHidden, atDoorOf, warrenOf, kobold, floorNear, tunnelNext, storeGoal, inWarrenTunnel, leaveWithGroup, exitCreature, abandonWarren, updateWarrens, farmTiles, farmFungus, koboldTransit, underground, placeTrap, checkTraps, watchWarrens });

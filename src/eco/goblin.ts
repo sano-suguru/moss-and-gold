@@ -376,22 +376,19 @@ export function goblinForage(this: Ecology, c: Cr, cx: number, cy: number, R: nu
   const m = this.w.map;
   const x0 = Math.floor(cx / TILE);
   const y0 = Math.floor(cy / TILE);
-  const gx = c.x / TILE;
-  const gy = c.y / TILE;
   let best = -1;
   let bv = -1e9;
-  // いまいる所と歩いてつながるマスだけを選ぶ（上下左右が壁で斜めにしかつながらない窪みや、壁の向こうのマスを選ぶと、
-  // そこへまっすぐ向かって壁の角に押しつけ続けた。seed41 の集落のそばで、2分以上の足踏みが25日で100回ほど）
-  const here = this.tileOf(c.x, c.y);
-  const reg = here >= 0 ? this.regionOf(here) : -1;
+  // 近さは歩いての道のりで測る（いまいる所から R の3倍の歩数まで。それより遠いマスと、歩いて行けないマスは選ばない）。
+  // まっすぐの近さで選ぶと、薄い壁の向こうの、歩けば遠回りになるマスを選び、道が見つかる回と見つからない回を行き来して足踏みし続ける
+  const walk = this.walkNear(this.tileOf(c.x, c.y), R * 3);
   for (let y = Math.max(1, y0 - R); y <= Math.min(m.h - 2, y0 + R); y++)
     for (let x = Math.max(1, x0 - R); x <= Math.min(m.w - 2, x0 + R); x++) {
       const k = y * m.w + x;
-      if (m.solid[k] || m.lava[k] || m.sealed[k]) continue;
-      if (reg >= 0 && this.regionOf(k) !== reg) continue;
+      const wd = walk[k];
+      if (wd < 0) continue;
       const f = Math.max(this.w.moss[k], this.w.fungus[k]);
       if (f < 20 || this.inKoboldLand(x * TILE + 8, y * TILE + 8)) continue;
-      const v = Math.min(30, f - 12) - (Math.abs(x - gx) + Math.abs(y - gy)) * 4;
+      const v = Math.min(30, f - 12) - wd * 4;
       if (v > bv) {
         bv = v;
         best = k;
