@@ -237,9 +237,12 @@ export function kobold(this: Ecology, c: Cr): void {
   if (c.st === 7) c.st = 0;
   if (wr && this.defend(c, wr.x, wr.y, [Kind.Goblin])) return;
   const home = wr ? sq(wr.x - c.x) + sq(wr.y - c.y) : 1e18;
+  // 住処に着いた：奥（住処の中心）か入口のマスから2マスの内（細い横穴に仲間が詰まって奥まで行けなくても、入口から内側は住処）
+  const doorK = wr && wr.door !== undefined && wr.door >= 0 ? wr.door : -1;
+  const inside = home < 2 * TILE * 2 * TILE || (doorK >= 0 && sq((doorK % this.w.map.w) * TILE + 8 - c.x) + sq(Math.floor(doorK / this.w.map.w) * TILE + 8 - c.y) < 2 * TILE * 2 * TILE);
   // 腹を空かせた者は、住処の蓄えから食べる
   if (wr && (wr.store ?? 0) > 0 && (c.hungry || c.food < s.cap * 0.15)) {
-    if (home < 2 * TILE * 2 * TILE) {
+    if (inside) {
       const t = Math.min(wr.store ?? 0, Math.floor(s.cap * 0.7) - c.food);
       if (t > 0) {
         wr.store = (wr.store ?? 0) - t;
@@ -258,7 +261,7 @@ export function kobold(this: Ecology, c: Cr): void {
     }
   }
   // 蓄えを運び込む：腹が満ちた者は、余りを住処に置く
-  if (wr && c.food > s.cap * (c.st === 13 ? 0.55 : 0.75) && home < 2 * TILE * 2 * TILE && (wr.store ?? 0) < this.storeGoal(wr)) {
+  if (wr && c.food > s.cap * (c.st === 13 ? 0.55 : 0.75) && inside && (wr.store ?? 0) < this.storeGoal(wr)) {
     const t = c.food - Math.floor(s.cap * 0.5);
     c.food -= t;
     wr.store = (wr.store ?? 0) + t;
