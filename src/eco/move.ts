@@ -709,6 +709,15 @@ export function tryMove(this: Ecology, c: Cr, mx: number, my: number): void {
         if (o.act === 1 && o.sleep <= 0 && along > 0.5) slow = ahead < gap * 0.5 ? 0.15 : 0.5;
         else sidestep = cross > 0 ? -1 : cross < 0 ? 1 : c.id % 2 ? 1 : -1;
       });
+      // よける側が岩なら反対の側へ。どちらも岩（幅1マスの通路）なら、よけずにそのまま進んで仲間と重なって通り抜ける
+      // （よけられないまま横へ押しつけ続けると、眠り込んだ仲間の後ろで群れが詰まり、足踏みし続ける）
+      if (sidestep) {
+        const open = (s: number) => {
+          const k = this.tileOf(c.x + hy * s * TILE * 0.75, c.y - hx * s * TILE * 0.75);
+          return k >= 0 && this.tilePassable(c, k);
+        };
+        if (!open(sidestep)) sidestep = open(-sidestep) ? -sidestep : 0;
+      }
       if (sidestep) {
         // 進む向きに対して横（仲間のいない側）へ半分、前へ半分
         const px = hy * sidestep;
