@@ -191,7 +191,13 @@ export function findFungus(this: Ecology, cx: number, cy: number, R: number, sal
 export function updateColonies(this: Ecology): void {
   const m = this.w.map;
   for (const col of this.colonies) {
-    const workers = this.list.filter((c) => c.k === Kind.Ant && !c.dead && c.ref === col.id).length;
+    let workers = 0;
+    let hungry = 0;
+    for (const c of this.list) {
+      if (c.k !== Kind.Ant || c.dead || c.ref !== col.id) continue;
+      workers++;
+      if (c.hungry) hungry++;
+    }
     // 女王の暮らし
     if (this.step % 200 === 5) {
       if (col.store > 0) {
@@ -214,8 +220,8 @@ export function updateColonies(this: Ecology): void {
         }
       }
     }
-    // 産卵
-    if (this.step % 100 === 5 && col.store >= 10 && workers < Math.min(40, 6 + Math.floor(col.store / 3))) {
+    // 産卵：腹を空かせた働きアリがいる間は産まず、蓄えを食べさせる（産むと蓄えが尽き、産まれたアリも腹を空かせたアリも飢え死にしつづける）
+    if (this.step % 100 === 5 && col.store >= 10 && hungry === 0 && workers < Math.min(40, 6 + Math.floor(col.store / 3))) {
       col.store -= 4;
       const a = this.spawn(Kind.Ant, col.x, col.y, 4, 0);
       a.ref = col.id;
