@@ -238,8 +238,10 @@ export const CHECKS: Check[] = [
   },
   {
     // バジリスクに仲間を石にされた一行が帰ると、バジリスクの噂が強まり、狩りの依頼が出る（どの種も同じ決まり。src/eco/quest.ts）
-    name: 'バジリスク狩りの依頼が出る（15シードの合計で1回以上）',
+    // 16シード×25日でも数回〜十数回で、どの窓に入るかは展開で変わる。RUN_WIDE と RUN_ARMOR の二つの窓の合計で見る（どちらもほかのチェックが実行するので、実行は増えない）
+    name: 'バジリスク狩りの依頼が出る（10〜18日目の15シードと15〜23日目の16シードの合計で1回以上）',
     ...RUN_WIDE,
+    more: [RUN_ARMOR],
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'quest' && x.how === 3 && x.to === 17).length);
       return { ok: sum(n) >= 1, value: rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、') || 'なし' };
