@@ -243,7 +243,7 @@ export const SPAWN_DEFS: SpawnDef[] = [
     body: 30, food: 20, mana: 0,
   },
   // グール：肉の残る死骸か骨が4つ以上あれば、その近くの暗い行き止まりに巣を構えて、2〜3匹の群れで湧く（src/eco/ghoul.ts）。
-  // 群れは一度に一つまで（巣は群れの皆で同じ）。いなくなってから1日はあける
+  // 群れは一度に一つまで（巣は群れの皆で同じ）。前の群れが湧いてから1日はあける
   {
     k: Kind.Ghoul, side: 'nutr', every: 50, phase: 31, cool: DAY_TICKS_ECO / 2, minDay: 2,
     ok: (e) => e.counts[Kind.Ghoul] === 0 && e.corpses.length >= 4,

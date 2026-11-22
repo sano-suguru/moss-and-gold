@@ -7,6 +7,7 @@
  *  3. 食べ終わった骨は巣に残り、骨塚になる。骨が積もった暗がりなので、マナが溜まると骨がスケルトンとして起き上がり（riseSpot）、
  *     起き上がった骨はグールに打ちかかる（スケルトンの襲う相手にグールが入っている）。
  *  4. 死骸が見つからないまま腹が減りきると、近くの大ネズミを襲う。仕留めた獲物も巣へ運ぶ。
+ * 死骸をつかんだ回は lureAt に持つ（GHOUL_DRAG 回たっても巣に着かなければ、その場で食べる。dragToLair）。
  * 昼は巣で眠る（Ecology.SLEEP）。群れは巣ごとに一つ（群れの識別は巣の位置）で、眠る場所も巣のまわり。火を怖がる（Ecology.FEARS_FIRE）。
  */
 import { type Cr, Ecology, Kind, SPEC, ih, sq } from '../ecology';
@@ -18,6 +19,8 @@ export const GHOUL_SMELL = 16;
 export const GHOUL_BED = 2 * TILE;
 /** 引きずる死骸が、グールの体のどれだけうしろを付いてくるか（px） */
 export const GHOUL_TAIL = 8;
+/** 死骸をつかんでから（lureAt）生き物の更新この回数たっても巣に着かなければ（道がふさがったなど）、引きずるのをやめてその場で食べる */
+export const GHOUL_DRAG = 1800;
 /** 死骸を探しに出る腹の減り具合（食べた物が胃の大きさのこの割合を切ったら） */
 const GHOUL_HUNGRY = 0.6;
 /** 大ネズミを襲う腹の減り具合（死骸が見つからず、食べた物がこの割合を切ったら） */
@@ -30,8 +33,9 @@ export function ghoul(this: Ecology, c: Cr): void {
     const d = this.ghoulCarrion(c);
     if (d) {
       if (sq(d.x - c.x) + sq(d.y - c.y) < 14 * 14) {
-        // 死骸をつかむ。次の回から feeding が巣へ引きずり、巣で食べる
+        // 死骸をつかむ。次の回から feeding が巣へ引きずり、巣で食べる（つかんだ回を lureAt に覚える）
         c.feed = d.id;
+        c.lureAt = this.step;
         c.act = 2;
         c.actT = 0;
       } else {
@@ -53,8 +57,10 @@ export function ghoul(this: Ecology, c: Cr): void {
       });
       if (prey) {
         const p = prey as Cr;
-        if (bd < 14 * 14) this.fight(c, p);
-        else {
+        if (bd < 14 * 14) {
+          // 仕留めたら、その死骸を巣へ引きずる（eat が feed を付ける）
+          if (this.fight(c, p) && c.feed) c.lureAt = this.step;
+        } else {
           c.act = 1;
           this.goTo(c, p.x, p.y, s.speed * 1.2);
         }

@@ -1,7 +1,7 @@
 /** Ecology のメソッド：ミノタウロス、トロール、ガーゴイル、ミミック、ゴーレム、ワーム（バジリスクは src/eco/basilisk.ts）（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 import { type Cr, DIR16, Ecology, HUNT3, HUNT4, Kind, NB4, SPEC, STR, ih, sq } from '../ecology';
 import { LAIR_R, lineOfSight, TILE } from '../mapgen';
-import { GHOUL_BED, GHOUL_TAIL } from './ghoul';
+import { GHOUL_BED, GHOUL_DRAG, GHOUL_TAIL } from './ghoul';
 
 /** (x, y) がミノタウロスの縄張り（寝床から LAIR_R マスの内）か。x, y はピクセル */
 export function inLair(this: Ecology, x: number, y: number): boolean {
@@ -104,7 +104,7 @@ export function minotaur(this: Ecology, c: Cr): void {
 /**
  * 食べる死骸 d を住みかまで引きずる（生き物の更新ごと、ふだんの6割の速さで）。true なら今は引きずっている。
  *  - ミノタウロス：仕留めた獲物を寝床へ。倒れてから生き物の更新 MINO_DRAG 回たっても着かなければ（道がふさがっているなど）、引きずるのをやめてその場で食べる
- *  - グール：見つけた死骸を巣（hx, hy）へ（src/eco/ghoul.ts）。着くまで引きずる
+ *  - グール：見つけた死骸を巣（hx, hy）へ（src/eco/ghoul.ts）。つかんでから生き物の更新 GHOUL_DRAG 回たっても着かなければ、その場で食べる
  * 死骸は、引きずる者の体のうしろ（ミノタウロスは MINO_TAIL px、グールは GHOUL_TAIL px。手前へ歩くときは体の横）を付いてくる
  * （そこが岩なら、引きずる者が動く前にいた所＝必ず歩ける床へ）
  */
@@ -126,6 +126,7 @@ export function dragToLair(this: Ecology, c: Cr, d: Cr): boolean {
     by = c.hy;
     bed = GHOUL_BED;
     if (sq(d.x - bx) + sq(d.y - by) < bed * bed) return false;
+    if (this.step - c.lureAt > GHOUL_DRAG) return false;
   } else return false;
   const mino = c.k === Kind.Minotaur;
   const x0 = c.x;

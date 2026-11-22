@@ -237,9 +237,14 @@ export function kobold(this: Ecology, c: Cr): void {
   if (c.st === 7) c.st = 0;
   if (wr && this.defend(c, wr.x, wr.y, [Kind.Goblin])) return;
   const home = wr ? sq(wr.x - c.x) + sq(wr.y - c.y) : 1e18;
-  // 住処に着いた：奥（住処の中心）か入口のマスから2マスの内（細い横穴に仲間が詰まって奥まで行けなくても、入口から内側は住処）
-  const doorK = wr && wr.door !== undefined && wr.door >= 0 ? wr.door : -1;
-  const inside = home < 2 * TILE * 2 * TILE || (doorK >= 0 && sq((doorK % this.w.map.w) * TILE + 8 - c.x) + sq(Math.floor(doorK / this.w.map.w) * TILE + 8 - c.y) < 2 * TILE * 2 * TILE);
+  // 住処に着いた：奥（住処の中心）から2マスの内か、入口のマスから2マスの内で、入口より奥に近い所（細い横穴に仲間が詰まって奥まで行けなくても、
+  // 入口から内側は住処。入口の外側は住処に入らない）
+  let inside = home < 2 * TILE * 2 * TILE;
+  if (!inside && wr && wr.door !== undefined && wr.door >= 0) {
+    const dx = (wr.door % this.w.map.w) * TILE + 8;
+    const dy = Math.floor(wr.door / this.w.map.w) * TILE + 8;
+    inside = sq(dx - c.x) + sq(dy - c.y) < 2 * TILE * 2 * TILE && home <= sq(dx - wr.x) + sq(dy - wr.y);
+  }
   // 腹を空かせた者は、住処の蓄えから食べる
   if (wr && (wr.store ?? 0) > 0 && (c.hungry || c.food < s.cap * 0.15)) {
     if (inside) {

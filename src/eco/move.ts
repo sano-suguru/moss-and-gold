@@ -409,9 +409,8 @@ export function lit(this: Ecology, k: number, day: number): number {
   return (this.w.lightBase[k] * day) / 1000 + this.w.moss[k] / 510 + (this.w.map.lava[k] ? 0.8 : 0);
 }
 
-/** 生き物を作る。rec が false なら生まれた記録（births）に残さない（古戦場の骨のように、ダンジョンのはじめの姿として置く者） */
-export function spawn(this: Ecology, k: Kind, x: number, y: number, body: number, food: number, rec = true): Cr {
-  if (rec) this.record('births', { t: this.w ? this.w.tick : 0, k, origin: this.originNext || 'born', x: Math.round(x), y: Math.round(y) } as never);
+export function spawn(this: Ecology, k: Kind, x: number, y: number, body: number, food: number): Cr {
+  this.record('births', { t: this.w ? this.w.tick : 0, k, origin: this.originNext || 'born', x: Math.round(x), y: Math.round(y) } as never);
   // マナから生まれた者は、描画で出現の演出をする（描画専用の印）。
   // ミミックは除く（宝箱のふりをして待つ種なので、現れる瞬間を光の柱で目立たせると、宝箱でないことが一目でわかってしまう）
   const fromMana = this.originNext === 'mana' && k !== Kind.Mimic;

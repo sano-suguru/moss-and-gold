@@ -50,8 +50,9 @@ export function seedBattle(this: Ecology): void {
     if (!units) return;
     const x = (k % m.w) * TILE + 4 + (ih(k, i, 3) % 9);
     const y = Math.floor(k / m.w) * TILE + 4 + (ih(k, i, 4) % 9);
-    // 始めから骨なので、生まれた記録には残さない（はじめの宝の山と同じく、ダンジョンのはじめの姿の一部）
-    const c: Cr = this.spawn(f.k, x, y, 0, 0, false);
+    // 始めから骨として置く。生まれた記録には、出現の経路 battle（古戦場の骨）として残す
+    this.originNext = 'battle';
+    const c: Cr = this.spawn(f.k, x, y, 0, 0);
     c.sp = f.sp;
     c.dir = ih(k, i, 5) % 4;
     c.units = units;

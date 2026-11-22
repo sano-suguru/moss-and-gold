@@ -175,7 +175,7 @@ export const MOMENTS: Moment[] = [
   { key: 'battleArmor', label: '古戦場：錆びた武具が寄り集まって、リビングアーマーとして立ち上がった' },
   // グール（src/eco/ghoul.ts）
   { key: 'ghoulDrag', label: 'グール：死骸を巣へ引きずってきた' },
-  { key: 'ghoulDenRise', label: 'グール：巣（群れの湧いた所から6マスの内）の骨が起き上がった' },
+  { key: 'ghoulDenRise', label: 'グール：死骸を引きずってきた所（巣）から4マスの内の骨が起き上がった（引きずってきた後）' },
   { key: 'ghoulSkel', label: 'グール：スケルトンとグールが倒し合った' },
   { key: 'armorAbsorb', label: 'リビングアーマー：武具を取り込んだ（床の物と奪った物）' },
   { key: 'armorRob', label: 'リビングアーマー：倒した相手の武具を奪って取り込んだ' },
@@ -485,7 +485,7 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     battleRise: b.filter((x) => x.origin === 'raised' && nearBattle(B, x.x, x.y)).length,
     battleArmor: b.filter((x) => x.k === K.Armor && x.origin === 'gear' && nearBattle(B, x.x, x.y)).length,
     ghoulDrag: s.filter((x) => x.k === K.Ghoul && x.ev === 'drag').length,
-    ghoulDenRise: b.filter((x) => x.origin === 'raised' && b.some((g) => g.k === K.Ghoul && g.t <= x.t && (g.x - x.x) ** 2 + (g.y - x.y) ** 2 <= (6 * 16) ** 2)).length,
+    ghoulDenRise: b.filter((x) => x.origin === 'raised' && s.some((g) => g.k === K.Ghoul && g.ev === 'drag' && g.t <= x.t && (g.x - x.x) ** 2 + (g.y - x.y) ** 2 <= (4 * 16) ** 2)).length,
     ghoulSkel: d.filter((x) => (x.k === K.Ghoul && x.by === 26) || (x.k === 26 && x.by === K.Ghoul)).length,
     armorAbsorb: ev(K.Armor, 'absorb').length,
     armorRob: ev(K.Armor, 'absorb').filter((x) => x.how === 'rob').length,
