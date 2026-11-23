@@ -405,7 +405,14 @@ if (args.paired && all.length >= 2) {
   }
   L.push(`## A/B 比較（同じシード同士）：${names[0]} → ${names[names.length - 1]}（${sd.length} シード${args.since ? `、${args.since}日目より後` : ''}）`, '', PAIRED_NOTE, '');
   if (nulls.length)
-    L.push(PAIRED_NOTE_NULL, '', `**無害な変更でも「はっきり」になった行：${nullClear.join('、')}（全 ${nRows} 行）。この比較で「はっきり」の条件がそろった ${nClear} 行のうち、無害な変更の幅を超えたのは ${nKept} 行**`, '', ...PAIRED_HEAD_NULL);
+    L.push(
+      PAIRED_NOTE_NULL,
+      '',
+      `**無害な変更でも「はっきり」になった行：${nullClear.join('、')}（全 ${nRows} 行）。この比較で「はっきり」の条件がそろった ${nClear} 行のうち、無害な変更の幅を超えたのは ${nKept} 行**`,
+      ...(nClear <= Math.max(...nullClear) ? ['', `（「はっきり」の行の数が、無害な変更の多いほうの回（${Math.max(...nullClear)} 行）以下なので、表全体としては、無害な変更と見分けがつかない。効果とみなすのは、見せたい場面のように変更が直接ねらった行と、無害な変更の差をはっきり超えた行だけにする）`] : []),
+      '',
+      ...PAIRED_HEAD_NULL,
+    );
   else L.push(...PAIRED_HEAD);
   L.push(...rows);
   // 内訳の印（seedShift）が付いた種と関わりを、ここにもまとめて出す（表の後ろのほうまで読まなくても気づけるように）
