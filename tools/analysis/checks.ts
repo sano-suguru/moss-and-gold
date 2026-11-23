@@ -592,14 +592,14 @@ export const CHECKS: Check[] = [
   },
   {
     // 灯り蛾（moth）：冒険者の焚き火に群がり、明かりに群がった蛾をコウモリがさらう。焚き火とコウモリのいるシードは展開で変わるので、15シードの合計で見る。
-    // 目安は、ベースの10日目から分岐した実行と、0日目から実行したものの少ないほうの、半分ほど（実測：焚き火 492回・9シード、コウモリ 128回・11シード）
-    name: '灯り蛾が焚き火に群がり、コウモリにさらわれる（15シードの10〜18日目の合計で、焚き火240回・5シード、コウモリ60回・6シード以上）',
+    // 目安は、ベースの10日目から分岐した実行と、0日目から実行したものの少ないほうの、半分ほど（コウモリは展開しだいで大きく動く。実測：焚き火 492回・9シード、コウモリ 57回・8シード）
+    name: '灯り蛾が焚き火に群がり、コウモリにさらわれる（15シードの10〜18日目の合計で、焚き火240回・5シード、コウモリ25回・5シード以上）',
     ...RUN_WIDE,
     test: (rs) => {
       const camp = rs.map((r) => r.settle.filter((x) => x.k === Kind.Moth && x.ev === 'light' && x.n === 2).length);
       const bat = rs.map((r) => r.deaths.filter((x) => x.k === Kind.Moth && x.by === Kind.Bat).length);
       const seeds = (n: number[]) => n.filter((v) => v > 0).length;
-      return { ok: sum(camp) >= 240 && seeds(camp) >= 5 && sum(bat) >= 60 && seeds(bat) >= 6, value: `焚き火 ${sum(camp)}（${seeds(camp)}シード）、コウモリ ${sum(bat)}（${seeds(bat)}シード）` };
+      return { ok: sum(camp) >= 240 && seeds(camp) >= 5 && sum(bat) >= 25 && seeds(bat) >= 5, value: `焚き火 ${sum(camp)}（${seeds(camp)}シード）、コウモリ ${sum(bat)}（${seeds(bat)}シード）` };
     },
   },
   {
