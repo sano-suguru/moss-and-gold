@@ -6,6 +6,10 @@
  *   - 増えたシードと減ったシードの数（符号検定の両側 p 値が 0.1 未満。たとえば 5対0、6対0、7対1 は届き、4対0、6対1 は届かない）
  *   - いちばん差の大きい1シードを除いても、差の合計の向きが変わらないか（1シードの出来事に引っ張られていないか）
  * を並べ、三つともそろったときだけ「はっきり」とする。どれかが欠けたら「ばらつきの内」。
+ *
+ * 表は300行あまりあり、一行ずつ判定するので、何も仕組みを変えなくても、そのうち4％ほど（10行あまり）は「はっきり」になる。
+ * そこで ab は、ベースのまま途中の状態だけを少し変えた「無害な変更」の実行（lib/nullrun.ts）も作り、その差を行ごとに並べる（pairedRowNull）。
+ * 差の平均の大きさが、無害な変更のどの回の差の平均よりも大きいときだけ「はっきり」のままにし、そうでなければ「無害な変更の幅の内」とする。
  */
 export interface Paired {
   n: number;
@@ -110,3 +114,21 @@ export function pairedRow(label: string, p: Paired): string {
   return `| ${label} | ${f(p.sumA)} | ${f(p.sumB)} | ${f(p.mean, 2)}（${f(p.lo, 2)}〜${f(p.hi, 2)}） | ${f(p.median)} | ${p.up} / ${p.down} | ${p.top ? `${Math.round(p.top * 100)}％ ${p.topSeed}${p.robust ? '' : '（除くと向きが変わる）'}` : '—'} | ${strip(p.diffs)} | ${p.verdict === 'はっきり増' ? '**↑ はっきり**' : p.verdict === 'はっきり減' ? '**↓ はっきり**' : p.verdict} |`;
 }
 export const PAIRED_NOTE = '「目安」：差の平均の90％区間（シードをリサンプリングするブートストラップ）が0をまたがず、増えたシードと減ったシードの数の偏り（符号検定の両側 p）が 0.1 未満で、いちばん差の大きい1シードを除いても差の合計の向きが変わらないときだけ「はっきり」。どれかが欠けたら「ばらつきの内」（その差は、展開の分かれ方で説明できる大きさ）。';
+
+/** 無害な変更の行の判定：「はっきり」でも、差の平均の大きさが、無害な変更のどれかの差の平均の大きさ以下なら、無害な変更の幅の内 */
+export function withinNull(p: Paired, nulls: Paired[]): boolean {
+  return nulls.length > 0 && nulls.some((q) => Number.isFinite(q.mean) && Math.abs(p.mean) <= Math.abs(q.mean));
+}
+const isClear = (p: Paired) => p.verdict === 'はっきり増' || p.verdict === 'はっきり減';
+/** 無害な変更の差も並べた A/B 比較の表の見出しと1行 */
+export const PAIRED_HEAD_NULL = ['| 指標 | 前の合計 | 後の合計 | 差の平均（90％区間） | 差の中央値 | 増 / 減 | 1シードの寄与 | 差の分布（小さい順、\\| は0） | 無害な変更の差の平均 | 目安 |', '|---|---:|---:|---|---:|---:|---|---|---|---|'];
+export function pairedRowNull(label: string, p: Paired, nulls: Paired[]): string {
+  const nm = nulls.map((q) => `${f(q.mean, 2)}${isClear(q) ? '＊' : ''}`).join(' / ');
+  const v = isClear(p) && withinNull(p, nulls) ? `${p.verdict === 'はっきり増' ? '↑' : '↓'} 無害な変更の幅の内` : null;
+  const row = pairedRow(label, p);
+  const cut = row.lastIndexOf(' | ');
+  return v ? `${row.slice(0, cut)} | ${nm} | ${v} |` : `${row.slice(0, cut)} | ${nm} |${row.slice(cut + 2)}`;
+}
+export const PAIRED_NOTE_NULL =
+  '「無害な変更の差の平均」：ベースと同じシミュレーションのまま、途中の状態だけを少し変えて（次に生まれる生き物の番号を進めて）続けた実行と、ベースとの差の平均（回ごと。＊はその回でも「はっきり」だった行）。' +
+  '「はっきり」の三つの条件がそろっても、差の平均の大きさが無害な変更のどれかの回以下なら「無害な変更の幅の内」（展開の分かれ方で起きうる大きさ）とする。';

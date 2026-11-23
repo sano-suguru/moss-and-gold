@@ -14,6 +14,10 @@
  *   npm run ab -- --resume-check 7 --seeds かしたれ --days 10
  *       作業ツリーで、通しで実行したものと、7日目で止めて再開したものの、ログと状態が一致するかを確かめる（キャッシュは使わない）
  *
+ * preset を付けると、ベースのまま途中の状態だけを少し変えた「無害な変更」の実行を2回分作り（lib/nullrun.ts。quick は分岐する日から、final は1日目から）、
+ * compare.md の表に、その差（揺れの幅）を行ごとに並べる。無害な変更の実行はベースのバージョンごとにキャッシュするので、作るのはベースが変わったときだけ。
+ * --null 回数 で回数を変える（0 で作らない）。--null-ks 0 は、状態を変えずに続けた実行を作る（ベースと1バイトも違わないかの、しくみの確かめ）。
+ *
  * --base を省くと HEAD（コミット前の変更と比べる）。--seeds 8 / 16 は固定のシードの組。--jobs は並列に実行する数（既定は CPU の数）。
  * 比較は <out>/compare.md（シードごとの差と、その分布・ばらつきの目安。compare.ts の --paired）。
  */
@@ -22,7 +26,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { parseArgs } from './common';
-import { defaultAdv, getBin, pool } from './lib/runs';
+import { defaultAdv, getBin, materialize, pool, secPerDay } from './lib/runs';
+import { ensureNullRun } from './lib/nullrun';
 import { dirName, runSets } from './lib/batchrun';
 import { parseSeeds, PRESETS } from './lib/seeds';
 
@@ -86,7 +91,22 @@ async function main() {
     { seeds, days, adv, ver: base, out: join(out, 'base') },
     { seeds, days, adv, ver: cur, fork: fork ? { day: fork, base } : undefined, out: join(out, 'new') },
   ], jobs);
+  // 無害な変更の実行（ベースのまま、from 日目の状態だけを少し変えて続けたもの）
+  const ks = a['null-ks'] !== undefined ? String(a['null-ks']).split(',').map(Number) : Array.from({ length: a.null !== undefined ? +a.null : a.preset ? 2 : 0 }, (_, i) => i + 1);
+  const from = fork ?? 1;
+  await pool(ks.flatMap((k) => seeds.map((s, i) => ({
+    w: (days - from) * secPerDay(s),
+    f: async () => materialize(await ensureNullRun(s, days, adv, base, k, from, console.log), join(out, `null${k}`, dirName(seeds, i)), days),
+  }))), jobs);
   console.log(`実行終わり（${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
+  if (ks.length && a['null-ks'] !== undefined)
+    for (const k of ks)
+      for (let i = 0; i < seeds.length; i++) {
+        const d = (f: string) => [`${out}/base/${dirName(seeds, i)}/${f}`, `${out}/null${k}/${dirName(seeds, i)}/${f}`] as const;
+        const sOk = read(d('samples.jsonl')[0]).equals(read(d('samples.jsonl')[1]));
+        const cOk = read(d('checkpoint.json')[0]).equals(read(d('checkpoint.json')[1]));
+        console.log(`無害な変更 k${k}・${seeds[i]}：ベースと${sOk && cOk ? '同じ' : `違う（${sOk ? 'samples は同じ' : firstDiff(...d('samples.jsonl'))}、checkpoint ${cOk ? '同じ' : '違う'}）`}`);
+      }
   let same = true;
   if (!fork) {
     for (let i = 0; i < seeds.length; i++) {
@@ -99,7 +119,7 @@ async function main() {
   }
   if (!same || fork || a.preset || a.compare) {
     const cmp = await getBin('compare');
-    await run([cmp.path, '--runs', `${out}/base,${out}/new`, '--names', `ベース（${baseRef}）,作業ツリー`, '--out', `${out}/compare.md`, '--paired', ...(fork ? ['--since', String(fork)] : []), ...(a.goals ? ['--goals', a.goals] : [])]);
+    await run([cmp.path, '--runs', `${out}/base,${out}/new`, '--names', `ベース（${baseRef}）,作業ツリー`, '--out', `${out}/compare.md`, '--paired', ...(fork ? ['--since', String(fork)] : []), ...(ks.length ? ['--null', ks.map((k) => `${out}/null${k}`).join(',')] : []), ...(a.goals ? ['--goals', a.goals] : [])]);
     console.log(`比較：${out}/compare.md（${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
   }
   if (!fork && !a.preset) process.exit(same ? 0 : 1);
