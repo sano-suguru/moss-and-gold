@@ -60,8 +60,8 @@ const RAMP={
  // 段階5b-1
  gob:[[22,36,14],[48,78,30],[82,122,48],[122,160,70],[164,196,104]],
  // グール：血の気の無い、青みがかった灰色の肌
- ghl:[[26,28,34],[58,62,72],[96,100,110],[136,140,146],[178,180,180]],
- ghlD:[[18,20,26],[42,46,54],[70,74,84],[100,104,112],[132,134,138]],
+ ghl:[[24,30,22],[60,72,52],[100,116,84],[144,160,118],[190,202,158]],
+ ghlD:[[16,20,16],[42,50,38],[68,80,58],[98,112,82],[130,144,108]],
  gobD:[[16,26,10],[36,58,22],[60,90,36],[88,118,52],[118,146,76]],
  rag:[[34,26,18],[66,50,34],[98,76,50],[128,104,72],[156,132,96]],
  orc:[[24,30,24],[52,64,50],[84,98,74],[116,130,98],[148,160,124]],
@@ -981,12 +981,15 @@ function ghoulHead(dir,P,x,y,dead,open,_k){
   else P.push(LN(x-1.4,y+2.2,x+1.4,y+2.2,'ghlD',0,{no:1}),D(x-0.8,y+1.8,COL.white),D(x+0.8,y+1.8,COL.white));
  }
 }
-/** グールの鉤爪：手の先に伸びた3本の爪（振るときは前へ大きく） */
+/** グールの鉤爪：手の先に伸びた3本の爪（振るときは前へ大きく）。暗がりでも見えるよう、爪の先は白く光る骨の色 */
 function ghoulClaws(dir,P,hx,hy,sw,rest,k){
  if(dir==='up'&&rest)return;
  const fx=dir==='side'?1:0, fy=dir==='side'?0.4:1;
- const L=(rest?1.6:2.6+Math.abs(sw))*k;
- for(let i=-1;i<=1;i++)P.push(LN(hx,hy,hx+fx*L+(dir==='side'?0:i*0.9*k),hy+fy*L+(dir==='side'?i*0.9*k:0),'bone',2,{no:1}));
+ const L=(rest?2.2:3.2+Math.abs(sw))*k;
+ for(let i=-1;i<=1;i++){
+  const tx=hx+fx*L+(dir==='side'?0:i*1.1*k), ty=hy+fy*L+(dir==='side'?i*1.1*k:0);
+  P.push(LN(hx,hy,tx,ty,'bone',2,{no:1}),D(tx,ty,RAMP.bone[4]));
+ }
 }
 function ghoul(dir,act,f){return humanoid(dir,act,f,{s:1.05,skin:'ghl',skinD:'ghlD',cloth:'rag',head:ghoulHead,tool:ghoulClaws,leg:4.6,bw:2.6,bh:3,hh:7.6,limb:0.9,armL:2,hunch:1.8})}
 
