@@ -106,8 +106,8 @@ export function slay(this: Ecology, a: Cr, d: Cr, canEat = true): boolean {
   return ate;
 }
 
-/** 冒険者の技に巻き込まない小物（src/eco/adventurer.ts で雑魚として払う小物と、払わない大ガエル） */
-export const ADV_MINOR: number[] = [Kind.Rat, Kind.Bat, Kind.Ant, Kind.Myconid, Kind.Salamander, Kind.Lizard, Kind.Spider, Kind.Slime, Kind.RustBeetle, Kind.Frog];
+/** 冒険者の技に巻き込まない小物（src/eco/adventurer.ts で雑魚として払う小物と、払わない大ガエルと灯り蛾） */
+export const ADV_MINOR: number[] = [Kind.Rat, Kind.Bat, Kind.Ant, Kind.Myconid, Kind.Salamander, Kind.Lizard, Kind.Spider, Kind.Slime, Kind.RustBeetle, Kind.Frog, Kind.Moth];
 
 /**
  * 冒険者の技が当たってよい小物か：技で狙った相手（tgt）か、その冒険者を襲ってきた相手だけ。

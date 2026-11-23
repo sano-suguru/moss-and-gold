@@ -61,6 +61,8 @@ export function bat(this: Ecology, c: Cr, day: number, phase: number): void {
     }
     return;
   }
+  // 夜に飛ぶコウモリは、明かりに群がる灯り蛾をさらう（batHuntMoth）
+  if (this.counts[Kind.Moth] > 0 && !c.away && this.batHuntMoth(c)) return;
   // ヴァンパイアに従うコウモリは外へ出ず、その周りに群れる
   const lord = c.ref2 ? this.byId.get(c.ref2) : undefined;
   if (lord && !lord.dead && lord.k === Kind.Vampire && !c.away) {

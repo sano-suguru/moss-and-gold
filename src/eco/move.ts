@@ -12,7 +12,7 @@ export function record(this: Ecology, kind: 'deaths' | 'births' | 'exits' | 'mov
 
 /** 飛ぶ（または漂う）者：溶岩や水の上も越え、岩の角を斜めにかすめて進める */
 function flies(c: Cr): boolean {
-  return c.k === Kind.Wisp || c.k === Kind.Bat || c.k === Kind.Ghost || c.k === Kind.Wyvern || (c.k === Kind.Gargoyle && c.act !== 0) || (c.k === Kind.Dragon && c.st === 2) || (c.k === Kind.Vampire && c.st === VAMP_SCATTER);
+  return c.k === Kind.Wisp || c.k === Kind.Bat || c.k === Kind.Moth || c.k === Kind.Ghost || c.k === Kind.Wyvern || (c.k === Kind.Gargoyle && c.act !== 0) || (c.k === Kind.Dragon && c.st === 2) || (c.k === Kind.Vampire && c.st === VAMP_SCATTER);
 }
 
 /**
@@ -364,7 +364,7 @@ export function passable(this: Ecology, c: Cr, x: number, y: number): boolean {
   if (k < 0) return false;
   const m = this.w.map;
   if (m.solid[k]) return false;
-  if (c.k === Kind.Wisp || c.k === Kind.Bat || (c.k === Kind.Vampire && c.st === VAMP_SCATTER)) return true;
+  if (c.k === Kind.Wisp || c.k === Kind.Bat || c.k === Kind.Moth || (c.k === Kind.Vampire && c.st === VAMP_SCATTER)) return true;
   if (m.lava[k]) return false;
   // 大ネズミは深い水に入らない。ただし、水かさが増して深い水に取り残されたら、泳いで抜け出せる
   if (c.k === Kind.Rat && this.w.water[k] > 40 && this.ratOnDry(c)) return false;
@@ -922,7 +922,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
   }
   const total = prey.body + prey.food + prey.units;
   // 倒した獲物は、まず死骸になり、捕食者がその上で数秒かけて食べる（肉を食べ、骨と食べ残しは死骸として残る。丸のみにする種が小さな獲物を食べるときは骨ごと。feeding）。
-  // はかない種（ウィスプ、スライム、ゴースト、マイコニド）と、丸のみにするワームとミミック、すでに死骸のものは、その場で食べる
+  // はかない種（ウィスプ、スライム、ゴースト、マイコニド）と小さな灯り蛾（死骸を残さない）、丸のみにするワームとミミック、すでに死骸のものは、その場で食べる
   // 獲物の体のマナは、食べた者へ受け渡される（食物連鎖で濃くなる）
   pred.mana += prey.mana;
   prey.mana = 0;
@@ -930,7 +930,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
     this.fxEats.push({ t: this.w.tick, id: prey.id, k: prey.k, sp: prey.sp, by: pred.id, bk: pred.k, x: prey.x, y: prey.y, slain });
     if (this.fxEats.length > 80) this.fxEats.splice(0, 20);
   }
-  const quick = prey.dead !== 0 || [Kind.Wisp, Kind.Slime, Kind.Ghost, Kind.Myconid].includes(prey.k) || pred.k === Kind.Worm || pred.k === Kind.Mimic || total <= 4;
+  const quick = prey.dead !== 0 || [Kind.Wisp, Kind.Slime, Kind.Ghost, Kind.Myconid, Kind.Moth].includes(prey.k) || pred.k === Kind.Worm || pred.k === Kind.Mimic || total <= 4;
   if (!quick) {
     this.record('deaths', { t: this.w.tick, id: prey.id, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(slain ? { slain: 1 } : {}), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(this.inCamp(prey) ? { camp: 1 } : {}) } as never);
     this.noteDeath(prey, 'eaten', pred.k, pred);
@@ -1052,8 +1052,8 @@ export function die(this: Ecology, c: Cr, cause = '', by = -1): void {
   }
   // 倒されたマイコニドは、体が弾けて胞子が散る（すぐそばの人がうたた寝をする。src/eco/myconidskill.ts）
   if (c.k === Kind.Myconid && cause !== 'planted') this.sporeCloud(c, c.x, c.y, BURST_R, 1);
-  if (c.k === Kind.Wisp || c.k === Kind.Slime || c.k === Kind.Ghost || c.k === Kind.Myconid) {
-    // ウィスプは光の粒としてほどけ、スライムは乾いて崩れ、養分はその場の土へ
+  if (c.k === Kind.Wisp || c.k === Kind.Slime || c.k === Kind.Ghost || c.k === Kind.Myconid || c.k === Kind.Moth) {
+    // ウィスプは光の粒としてほどけ、スライムは乾いて崩れ、灯り蛾は小さくて死骸を残さず、養分はその場の土へ
     this.deposit(c.x, c.y, c.body + c.food + c.units);
     c.body = 0;
     c.food = 0;

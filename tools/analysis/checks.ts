@@ -7,7 +7,7 @@
  *
  * チェックを足すときは、起きることがわかっているシードと日を、前の batch の settle.jsonl などから選ぶ（例：かしたれは10日目ごろに貢ぎ物）。
  */
-import { countsAsStuck } from './common';
+import { countsAsStuck } from './lib/stuck';
 import { World, DAY_TICKS } from '../../src/world';
 import { CR_EVERY, Kind } from '../../src/ecology';
 import { SPAWN_DEFS } from '../../src/eco/spawndef';
@@ -49,6 +49,8 @@ const RUN_ARMOR = { seeds: ['abc', 'かしたれ', 'はじまりの洞窟', 'see
 // まれな出来事（僧侶が亡骸の前で祈る）を見る組。数シードを選ぶと、ほかの変更で展開が分かれるたびに落ちるので、15シードの合計で見る
 const RUN_WIDE = { seeds: ['abc', 'かしたれ', 'はじまりの洞窟', 'seed4', 'seed5', 'seed6', 'seed7', 'seed8', 'seed40', 'seed41', 'seed18', 'seed27', 'seed35', 'seed30', 'seed17'], from: 10, to: 18 };
 const RUN_BLESS = RUN_WIDE;
+// 序盤（ベースの1日目のスナップショットから）に起きやすい、まれな出来事を見る組（ゴブリンが貧しい場所に集落を作るのは、たいてい4〜9日目）
+const RUN_EARLY = { seeds: RUN_WIDE.seeds, from: 1, to: 10 };
 // 古戦場（seedBattle）：骨は1日目ごろ、甲冑は2〜4日目に起き上がる。ベースの日次スナップショットは1日目からしか無いので（0日目からは分かれられない）、1日目から見る
 const RUN_BATTLE = { seeds: ['abc', 'かしたれ', 'seed4', 'seed7', 'seed18', 'seed27', 'seed35', 'seed41'], from: 1, to: 6 };
 // check の項目にしないもの：オークの貢ぎ物の取り立て（collectTribute）と、倒れた冒険者がヴァンパイアの眷属として起き上がる場面（vampRaiseFallen）。
@@ -272,13 +274,14 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 食べ物の足りる場所がどの横穴の先にも無いマップでも、少ない群れが貧しい場所に集落を作る。起きるシードが展開で入れ替わるので、15シードの合計で見る
-    // （0日目からの16シード×25日では main で13回・10シードだが、ベースの10日目から8日だけの実行では1回のこともある）
-    name: 'ゴブリンの少ない群れが貧しい場所に集落を作る（15シードの合計で1回以上）',
-    ...RUN_WIDE,
+    // 食べ物の足りる場所がどの横穴の先にも無いマップでも、少ない群れが貧しい場所に集落を作る。起きるシードが展開で入れ替わり、たいてい4〜9日目に起きるので、
+    // 10日目からの窓だけでは0回のこともある（0日目から実行した16シード×25日で3回、どれも10日目より前）。序盤の窓を含む三つの窓の合計で見る
+    name: 'ゴブリンの少ない群れが貧しい場所に集落を作る（1〜10日目と10〜18日目の15シード、15〜23日目の16シードの合計で1回以上）',
+    ...RUN_EARLY,
+    more: [RUN_WIDE, RUN_ARMOR],
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 12 && x.ev === 'found' && x.poor === 1).length);
-      return { ok: sum(n) >= 1, value: `${sum(n)}回（${rs.filter((_, i) => n[i] > 0).map((r) => r.seed).join('、') || 'なし'}）` };
+      return { ok: sum(n) >= 1, value: `${sum(n)}回（${rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed}（${r.from}〜${r.to}日）`).join('、') || 'なし'}）` };
     },
   },
   {
@@ -585,6 +588,18 @@ export const CHECKS: Check[] = [
       const n = rs.map((r) => r.settle.filter((x) => x.k === Kind.Frog && x.ev === 'tongue').length);
       const seeds = n.filter((v) => v > 0).length;
       return { ok: sum(n) >= 220 && seeds >= 10, value: `${sum(n)}（${seeds}シード）` };
+    },
+  },
+  {
+    // 灯り蛾（moth）：冒険者の焚き火に群がり、明かりに群がった蛾をコウモリがさらう。焚き火とコウモリのいるシードは展開で変わるので、15シードの合計で見る。
+    // 目安は、ベースの10日目から分岐した実行と、0日目から実行したものの少ないほうの、半分ほど（実測：焚き火 492回・9シード、コウモリ 128回・11シード）
+    name: '灯り蛾が焚き火に群がり、コウモリにさらわれる（15シードの10〜18日目の合計で、焚き火240回・5シード、コウモリ60回・6シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const camp = rs.map((r) => r.settle.filter((x) => x.k === Kind.Moth && x.ev === 'light' && x.n === 2).length);
+      const bat = rs.map((r) => r.deaths.filter((x) => x.k === Kind.Moth && x.by === Kind.Bat).length);
+      const seeds = (n: number[]) => n.filter((v) => v > 0).length;
+      return { ok: sum(camp) >= 240 && seeds(camp) >= 5 && sum(bat) >= 60 && seeds(bat) >= 6, value: `焚き火 ${sum(camp)}（${seeds(camp)}シード）、コウモリ ${sum(bat)}（${seeds(bat)}シード）` };
     },
   },
   {

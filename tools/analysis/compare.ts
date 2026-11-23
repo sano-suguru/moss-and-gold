@@ -14,7 +14,8 @@
  */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseArgs, KIND_NAMES, countsAsStuck } from './common';
+import { parseArgs, KIND_NAMES } from './common';
+import { countsAsStuck } from './lib/stuck';
 import { DAY_TICKS } from '../../src/world';
 import { generate } from '../../src/mapgen';
 import { paired, pairedRow, pairedRowNull, PAIRED_HEAD, PAIRED_HEAD_NULL, PAIRED_NOTE, PAIRED_NOTE_NULL, withinNull } from './lib/stats';
@@ -245,7 +246,7 @@ function measure(dir: string): M {
         })(),
         // 短い引っかかり（sim.ts の hitch.jsonl）：歩く姿のまま3秒で正味半タイルも進まない状態が続いた区間。
         // 回数、合わせた秒数、5秒以上続いたもの、往復（区間の間に歩いた道のりが24px以上）、近くに他の生き物がいたもの、種ごとの回数。
-        // 漂う種は数えない（common.ts の countsAsStuck）。hitch.jsonl の無い古い実行結果では hitchKnown が false
+        // 漂う種は数えない（countsAsStuck）。hitch.jsonl の無い古い実行結果では hitchKnown が false
         ...(() => {
           const known = existsSync(join(dir, 'hitch.jsonl'));
           const H = known ? rd(dir, 'hitch.jsonl').filter(countsAsStuck) : [];

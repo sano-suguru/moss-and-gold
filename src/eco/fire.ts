@@ -204,9 +204,9 @@ export function breathe(this: Ecology, c: Cr, tx: number, _ty: number, t: number
   });
 }
 
-/** 宙にいて、床に燃え残った火では焼けない者（飛んでいるコウモリ、ワイバーン、ウィスプ） */
+/** 宙にいて、床に燃え残った火では焼けない者（飛んでいるコウモリ、ワイバーン、ウィスプ、苔を食べに降りていない灯り蛾） */
 export function airborne(this: Ecology, o: Cr): boolean {
-  return (o.k === Kind.Bat || o.k === Kind.Wyvern || o.k === Kind.Wisp) && o.st !== 0;
+  return ((o.k === Kind.Bat || o.k === Kind.Wyvern || o.k === Kind.Wisp) && o.st !== 0) || (o.k === Kind.Moth && o.act !== 2);
 }
 
 declare module '../ecology' {

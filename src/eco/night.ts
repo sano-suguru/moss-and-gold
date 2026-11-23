@@ -29,7 +29,7 @@ const WATCH_R = 5.5;
 const THIEF_R = 3;
 
 /** 小物（焚き火のそばに来ても、一行の皆は起きない） */
-const PETTY = new Set<number>([Kind.Rat, Kind.Bat, Kind.Ant, Kind.Spider, Kind.Lizard, Kind.Slime, Kind.Myconid, Kind.Salamander, Kind.Wisp]);
+const PETTY = new Set<number>([Kind.Rat, Kind.Bat, Kind.Ant, Kind.Spider, Kind.Lizard, Kind.Slime, Kind.Myconid, Kind.Salamander, Kind.Wisp, Kind.Moth]);
 
 /** 焚き火の眠りを破る手強い敵か（大ネズミやコウモリのような小物は除く。焚き火への盗み・通路の掠め取りのゴブリンと、威嚇して退くオークは別に扱う） */
 export function campFoe(this: Ecology, o: Cr): boolean {

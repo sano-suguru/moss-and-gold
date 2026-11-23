@@ -1345,6 +1345,7 @@ export class CreatureView {
       case Kind.Ghoul: return A.named('ghoul', dir, act, f);
       case Kind.RustBeetle: return A.named('rust', dir, act, f);
       case Kind.Frog: return A.named('frog', dir, act, f);
+      case Kind.Moth: return A.named('moth', dir, act, f);
       case Kind.Minotaur: return A.named('minotaur', dir, act, f);
       case Kind.Troll: return A.named('troll', dir, act, f);
       case Kind.Basilisk: return A.named('basilisk', dir, act, f);
@@ -2120,6 +2121,15 @@ export class CreatureView {
       if (sp === Kind.Wyvern && !c.dead) lift = 18 + (Math.floor(t * 2 + seed) & 1);
       if (sp === Kind.Dragon && c.st === 2 && !c.dead) lift = 20;
       if (sp === Kind.Dragon && c.away) continue;
+      if (sp === Kind.Moth && !c.dead && !c.caught) {
+        // 灯り蛾：苔を食べている間は床に降り、ほかは宙をひらひら上下しながら羽ばたく
+        if (act === 2) lift = 0;
+        else {
+          lift = 14 + Math.sin(t * 5 + seed * 7) * 3;
+          act = 1;
+          f = Math.floor(t * 14 + seed) & 3;
+        }
+      }
       if (sp === Kind.Wisp) {
         lift = c.dead ? 4 : 7 + (Math.floor(t * 2 + seed) & 1);
       } else if (sp === Kind.Bat) {

@@ -102,11 +102,11 @@ export function spider(this: Ecology, c: Cr, day: number): void {
 
 /**
  * 巣を通る者の扱い（体の大きさ＝強さで分ける。webEffect）：
- * 0 何も起きない（飛ばない種のうち、霊やゴーレムなど糸に絡まないもの、巣の主のクモ）、1 捕まる（ウィスプ、飛ぶコウモリ、大ネズミ、アリ）、
+ * 0 何も起きない（飛ばない種のうち、霊やゴーレムなど糸に絡まないもの、巣の主のクモ）、1 捕まる（ウィスプ、灯り蛾、飛ぶコウモリ、大ネズミ、アリ）、
  * 2 糸に足を取られて半分の速さになる（強さ2〜5の地面を行く者）、3 引き裂いて通る（強さ6以上）、4 刃物か松明で切り払って通る（冒険者）
  */
 export function webEffect(this: Ecology, o: Cr): number {
-  if (o.k === Kind.Wisp || o.k === Kind.Rat || o.k === Kind.Ant) return 1;
+  if (o.k === Kind.Wisp || o.k === Kind.Rat || o.k === Kind.Ant || o.k === Kind.Moth) return 1;
   if (o.k === Kind.Bat) return o.st !== 0 ? 1 : 0;
   if (o.k === Kind.Adventurer) return 4;
   if (o.k === Kind.Spider || o.k === Kind.Ghost || o.k === Kind.Gargoyle || o.k === Kind.Wyvern || o.k === Kind.Dragon || o.k === Kind.Mimic || o.k === Kind.Worm || o.k === Kind.Lich) return 0;
@@ -165,8 +165,8 @@ export function updateWebs(this: Ecology): void {
       if (sq(o.x - web.x) + sq(o.y - web.y) > web.r * web.r) return;
       const ef = this.webEffect(o);
       if (ef === 1) {
-        // 捕まる：ウィスプは8分の1、コウモリは25分の1、大ネズミとアリは30分の1（生き物の更新ごと、糸の中にいる間）
-        const chance = o.k === Kind.Wisp ? 8 : o.k === Kind.Bat ? 25 : 30;
+        // 捕まる：ウィスプと灯り蛾は8分の1、コウモリは25分の1、大ネズミとアリは30分の1（生き物の更新ごと、糸の中にいる間）
+        const chance = o.k === Kind.Wisp || o.k === Kind.Moth ? 8 : o.k === Kind.Bat ? 25 : 30;
         if (ih(o.id, this.step, 61) % chance === 0) {
           o.caught = true;
           o.ref = web.id;

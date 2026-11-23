@@ -6,7 +6,7 @@
  *   npm run shot -- --seed abc --find kind:24 --day 6 --zoom 3 --lit
  *   npm run shot -- --seed abc --find xy:120,40 --day 10
  *
- * --find：warren（横穴を掘り終え罠が2つ以上の住処）、advcorpse（白骨になる前の冒険者の亡骸）、thralladv（ヴァンパイアの眷属になった冒険者）、advsleep（焚き火のそばで眠る冒険者）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、haul（キノコの束を背負って住処へ運ぶコボルト）、gobhaul（腹を満たし、ネズミを担いで集落へ帰るゴブリン）、bless（冒険者の亡骸の前で祈る一行）、slimefeast（一つの死骸を2匹以上のスライムが食べている所）、tunnelclose（古い坑道が崩れて塞がった直後）、battle（古戦場の真ん中。--day の時点の様子）、ghouldrag（死骸を巣へ引きずっているグール）、rust（鉄の武具を齧っている錆喰い虫）、frog（舌を伸ばして獲物を捕まえた大ガエル。--every 1 で探す）、kind:番号（その種の生き物）、xy:マスx,マスy
+ * --find：warren（横穴を掘り終え罠が2つ以上の住処）、advcorpse（白骨になる前の冒険者の亡骸）、thralladv（ヴァンパイアの眷属になった冒険者）、advsleep（焚き火のそばで眠る冒険者）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、haul（キノコの束を背負って住処へ運ぶコボルト）、gobhaul（腹を満たし、ネズミを担いで集落へ帰るゴブリン）、bless（冒険者の亡骸の前で祈る一行）、slimefeast（一つの死骸を2匹以上のスライムが食べている所）、tunnelclose（古い坑道が崩れて塞がった直後）、battle（古戦場の真ん中。--day の時点の様子）、ghouldrag（死骸を巣へ引きずっているグール）、rust（鉄の武具を齧っている錆喰い虫）、frog（舌を伸ばして獲物を捕まえた大ガエル。--every 1 で探す）、moth（明かりのまわりを4匹以上で回る灯り蛾）、mothcamp（冒険者の焚き火のまわりを3匹以上で回る灯り蛾）、kind:番号（その種の生き物）、xy:マスx,マスy
  * --day 探し始める日（既定 0）、--until 探すのをやめる日（既定 25）、--every 探す間隔（tick、既定 200）、--zoom 拡大率（既定 4）、--lit 確認用の明かり（#lit）、
  * --fog 霧をそのまま（既定は地図全体を見えたマスにする）、--name 出力の名前（既定は find から）、--out 出力先（既定 build/shots）
  *
@@ -151,6 +151,17 @@ function look(): Hit | null {
     const c = e.byId.get(r.aid);
     const d = e.byId.get(r.did);
     return { cam: { x: Math.round(r.ax), y: Math.round(r.ay), zoom }, marks: [{ x: c.x, y: c.y, label: '大ガエル', color: '#ffd24a' }, ...(d ? [{ x: r.dx, y: r.dy, label: NAMES[d.k], color: '#ff5050' }] : []), { x: c.hx, y: c.hy, label: '住みか', color: '#7fd0ff', size: 2 }], title: '舌で獲物を捕まえる大ガエル' };
+  }
+  if (find === 'moth' || find === 'mothcamp') {
+    // 明かりのまわりを回る灯り蛾（src/eco/moth.ts）：同じ明かりを回る蛾が4匹以上（mothcamp は冒険者の焚き火を3匹以上。ref2 は明かりの種類×1e6＋マス）
+    const camp = find === 'mothcamp';
+    const by = new Map<number, any[]>();
+    for (const o of e.list) if (o.k === 34 && !o.dead && o.ref2 && (!camp || Math.floor(o.ref2 / 1e6) === 2)) by.set(o.ref2, [...(by.get(o.ref2) ?? []), o]);
+    const best = [...by.values()].sort((a, b) => b.length - a.length)[0];
+    if (!best || best.length < (camp ? 3 : 4)) return null;
+    const cx = best.reduce((s: number, o: any) => s + o.x, 0) / best.length;
+    const cy = best.reduce((s: number, o: any) => s + o.y, 0) / best.length;
+    return { cam: { x: Math.round(cx), y: Math.round(cy), zoom }, marks: best.map((o: any) => ({ x: o.x, y: o.y, label: '蛾', color: '#ffd24a' })), title: `明かりに群がる灯り蛾（${best.length}匹）` };
   }
   if (find === 'battle') {
     // 古戦場（src/eco/battle.ts）：骨と錆びた武具と、まわりの起き上がった者
