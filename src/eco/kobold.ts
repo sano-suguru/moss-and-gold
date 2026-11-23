@@ -1,6 +1,6 @@
 /** Ecology のメソッド：コボルト（Ecology のクラスに prototype で足す） */
 import { type Cr, DAY_TICKS_ECO, DIR16, Ecology, Kind, SPEC, type Warren, ih, sq } from '../ecology';
-import { TILE } from '../mapgen';
+import { lineOfSight, TILE } from '../mapgen';
 
 /**
  * 新しい住処の場所：人の気配が薄く（正面の入口や冒険者のよく通る道から離れ）、竜の寝床から30マス、
@@ -195,7 +195,30 @@ export function isHidden(this: Ecology, o: Cr): boolean {
   if (o.st === 12) return true;
   if (o.st !== 7) return false;
   const wr = this.warrenOf(o);
-  return !!wr && wr.hide === 1 && sq(o.x - wr.x) + sq(o.y - wr.y) < 1.5 * TILE * 1.5 * TILE;
+  if (wr?.hide !== 1) return false;
+  // 奥から1.5マスの内か、奥へ並ぶ仲間の列の後ろでしゃがんでいる者（warrenQueued で止まった者。奥から4マスの内）
+  const d2 = sq(o.x - wr.x) + sq(o.y - wr.y);
+  return d2 < 1.5 * TILE * 1.5 * TILE || (o.act === 0 && d2 < 4 * TILE * 4 * TILE);
+}
+
+/**
+ * 住処の奥へ並ぶ仲間の列の後ろについたか：奥から4マスの内で、すぐ前（奥の側の1マスの内で、あいだに岩のない所）に、
+ * 歩いていない同じ住処の仲間がいる。そうなったら、それ以上奥へは押さずにそこで止まる
+ * （全員が奥へ入ろうとすると、細い横穴で仲間に詰まり、歩く姿のまま押し合い続ける）
+ */
+export function warrenQueued(this: Ecology, c: Cr, wr: Warren): boolean {
+  const ux = wr.x - c.x;
+  const uy = wr.y - c.y;
+  const d2 = ux * ux + uy * uy;
+  if (d2 <= 0.6 * TILE * 0.6 * TILE || d2 >= 4 * TILE * 4 * TILE) return false;
+  let queued = false;
+  this.nearby(c.x, c.y, 1, (o) => {
+    if (queued || o === c || o.k !== Kind.Kobold || o.dead || o.act === 1 || o.ref !== c.ref) return;
+    const vx = o.x - c.x;
+    const vy = o.y - c.y;
+    if (vx * vx + vy * vy < TILE * TILE && vx * ux + vy * uy > 0 && sq(wr.x - o.x) + sq(wr.y - o.y) < d2 && lineOfSight(this.w.map, c.x, c.y, o.x, o.y)) queued = true;
+  });
+  return queued;
 }
 
 /** 見る者 c が、隠れている o の住処の入口に踏み込んでいるか（すぐそばまで来ているか） */
@@ -264,7 +287,9 @@ export function kobold(this: Ecology, c: Cr): void {
   }
   if (wr && wr.hide === 1 && !(c.hungry > 300 && (wr.store ?? 0) <= 0) && (c.st === 7 || sq(wr.x - c.x) + sq(wr.y - c.y) < 8 * TILE * 8 * TILE)) {
     c.st = 7;
-    if (sq(wr.x - c.x) + sq(wr.y - c.y) > 0.6 * TILE * 0.6 * TILE) {
+    const d2 = sq(wr.x - c.x) + sq(wr.y - c.y);
+    const queued = this.warrenQueued(c, wr);
+    if (d2 > 0.6 * TILE * 0.6 * TILE && !queued) {
       c.act = 1;
       this.goTo(c, wr.x, wr.y, s.speed * 1.2);
     } else c.act = 0;
@@ -274,8 +299,8 @@ export function kobold(this: Ecology, c: Cr): void {
   if (wr && this.defend(c, wr.x, wr.y, [Kind.Goblin])) return;
   const home = wr ? sq(wr.x - c.x) + sq(wr.y - c.y) : 1e18;
   // 住処に着いた：奥（住処の中心）から2マスの内か、入口のマスから2マスの内で、入口より奥に近い所（細い横穴に仲間が詰まって奥まで行けなくても、
-  // 入口から内側は住処。入口の外側は住処に入らない）
-  let inside = home < 2 * TILE * 2 * TILE;
+  // 入口から内側は住処。入口の外側は住処に入らない）。奥へ並ぶ仲間の列の後ろについた者も着いたとみなす（warrenQueued）
+  let inside = home < 2 * TILE * 2 * TILE || (!!wr && this.warrenQueued(c, wr));
   if (!inside && wr && wr.door !== undefined && wr.door >= 0) {
     const dx = (wr.door % this.w.map.w) * TILE + 8;
     const dy = Math.floor(wr.door / this.w.map.w) * TILE + 8;
@@ -943,6 +968,7 @@ declare module '../ecology' {
     newWarren: typeof newWarren;
     warrenMembers: typeof warrenMembers;
     isHidden: typeof isHidden;
+    warrenQueued: typeof warrenQueued;
     atDoorOf: typeof atDoorOf;
     warrenOf: typeof warrenOf;
     kobold: typeof kobold;
@@ -964,4 +990,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { pickWarren, walkDist, walkNear, warrenFood, tunnelDir, newWarren, warrenMembers, isHidden, atDoorOf, warrenOf, kobold, floorNear, tunnelNext, storeGoal, inWarrenTunnel, leaveWithGroup, exitCreature, abandonWarren, updateWarrens, farmTiles, farmFungus, koboldTransit, underground, placeTrap, checkTraps, watchWarrens });
+Object.assign(Ecology.prototype, { pickWarren, walkDist, walkNear, warrenFood, tunnelDir, newWarren, warrenMembers, isHidden, warrenQueued, atDoorOf, warrenOf, kobold, floorNear, tunnelNext, storeGoal, inWarrenTunnel, leaveWithGroup, exitCreature, abandonWarren, updateWarrens, farmTiles, farmFungus, koboldTransit, underground, placeTrap, checkTraps, watchWarrens });

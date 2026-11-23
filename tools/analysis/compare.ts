@@ -5,6 +5,8 @@
  *   npm run compare -- --runs ... --seeds "abc,かしたれ"     一部のシードだけ
  *   npm run compare -- --runs runs/ab-x/base,runs/ab-x/new --paired --since 10
  *       10日目より後のログだけで比べ、シードごとの差の分布と、差がばらつきに埋もれていないかの目安の表を先頭に付ける（ab が使う）
+ *   npm run compare -- --runs runs/ab-x/base,runs/ab-x/new --paired --null runs/ab-x/null1,runs/ab-x/null2
+ *       無害な変更の実行（ensureNullRun）とベースの差も行ごとに並べ、その幅の内の「はっきり」を「無害な変更の幅の内」にする（ab が使う）
  *
  * 各 batch のシードごとに：にぎわい（同時にいるモンスターの種の数とその内訳）、関わり（どの種がどの種に何をしたかの組み合わせの数とその内訳）、ゴブリンの集落（続いた日数、終わり方、冒険者・コボルトとの殺し合い）、コボルトの住処が続いた日数（中央値、ゲーム内の1/4日ごとのサンプルから）、冒険者に倒されたコボルト、
  * ドラゴンに焼かれたコボルト、コボルトの去り方（starving 一匹ずつ飢えて / abandoned 住処ごと）、大ネズミの飢え死に、
@@ -15,7 +17,7 @@ import { join } from 'node:path';
 import { parseArgs, KIND_NAMES, countsAsStuck } from './common';
 import { DAY_TICKS } from '../../src/world';
 import { generate } from '../../src/mapgen';
-import { paired, pairedRow, PAIRED_HEAD, PAIRED_NOTE } from './lib/stats';
+import { paired, pairedRow, pairedRowNull, PAIRED_HEAD, PAIRED_HEAD_NULL, PAIRED_NOTE, PAIRED_NOTE_NULL, withinNull } from './lib/stats';
 import { MOMENTS, countMoments, momentTable } from './lib/moments';
 
 const args = parseArgs(process.argv.slice(2));
@@ -264,7 +266,10 @@ function measure(dir: string): M {
 
 // --seeds "abc,seed4" で一部のシードだけを比べる（16シードのうち、前回までの8シードだけを見るときなど）
 const only = args.seeds ? new Set(args.seeds.split(',')) : null;
-const all = runs.map((r) => readdirSync(r).filter((d) => /^\d\d-/.test(d)).sort().map((d) => measure(join(r, d))).filter((m) => !only || only.has(m.seed)));
+const load = (r: string) => readdirSync(r).filter((d) => /^\d\d-/.test(d)).sort().map((d) => measure(join(r, d))).filter((m) => !only || only.has(m.seed));
+const all = runs.map(load);
+/** --null：無害な変更の実行（ベースとの差を、A/B 比較の表で揺れの幅として並べる） */
+const nulls = (args.null || '').split(',').filter(Boolean).map(load);
 const L: string[] = [];
 const seeds = all[0].map((m) => m.seed);
 const tbl = (title: string, f: (m: M) => string | number, total?: (ms: M[]) => string | number) => {
@@ -376,12 +381,40 @@ if (args.paired && all.length >= 2) {
   for (const mo of MOMENTS) P.push([`瞬間：${mo.label}`, (m) => m.mo[mo.key] ?? 0]);
   const sd = A.map((m) => m.seed);
   const Bs = sd.map((s) => Bm.find((m) => m.seed === s));
-  L.push(`## A/B 比較（同じシード同士）：${names[0]} → ${names[names.length - 1]}（${sd.length} シード${args.since ? `、${args.since}日目より後` : ''}）`, '', PAIRED_NOTE, '', ...PAIRED_HEAD);
+  const rows: string[] = [];
+  const clear = (q: { verdict: string }) => q.verdict === 'はっきり増' || q.verdict === 'はっきり減';
+  let nRows = 0;
+  let nClear = 0;
+  let nKept = 0;
+  const nullClear = nulls.map(() => 0);
   for (const [label, f] of P) {
     const pr = paired(A.map(f), Bs.map((m) => (m ? f(m) : NaN)), sd);
     if (pr.verdict === '差なし' && pr.sumA === 0) continue;
-    L.push(pairedRow(label, pr));
+    nRows++;
+    if (!nulls.length) {
+      rows.push(pairedRow(label, pr));
+      continue;
+    }
+    const nps = nulls.map((N) => paired(A.map(f), sd.map((s) => N.find((m) => m.seed === s)).map((m) => (m ? f(m) : NaN)), sd));
+    nps.forEach((q, i) => (nullClear[i] += clear(q) ? 1 : 0));
+    if (clear(pr)) {
+      nClear++;
+      if (!withinNull(pr, nps)) nKept++;
+    }
+    rows.push(pairedRowNull(label, pr, nps));
   }
+  L.push(`## A/B 比較（同じシード同士）：${names[0]} → ${names[names.length - 1]}（${sd.length} シード${args.since ? `、${args.since}日目より後` : ''}）`, '', PAIRED_NOTE, '');
+  if (nulls.length)
+    L.push(
+      PAIRED_NOTE_NULL,
+      '',
+      `**無害な変更でも「はっきり」になった行：${nullClear.join('、')}（全 ${nRows} 行）。この比較で「はっきり」の条件がそろった ${nClear} 行のうち、無害な変更の幅を超えたのは ${nKept} 行**`,
+      ...(nClear <= Math.max(...nullClear) ? ['', `（「はっきり」の行の数が、無害な変更の多いほうの回（${Math.max(...nullClear)} 行）以下なので、表全体としては、無害な変更と見分けがつかない。効果とみなすのは、見せたい場面のように変更が直接ねらった行と、無害な変更の差をはっきり超えた行だけにする）`] : []),
+      '',
+      ...PAIRED_HEAD_NULL,
+    );
+  else L.push(...PAIRED_HEAD);
+  L.push(...rows);
   // 内訳の印（seedShift）が付いた種と関わりを、ここにもまとめて出す（表の後ろのほうまで読まなくても気づけるように）
   const flagged: string[] = [];
   for (const k of MONSTER_KINDS) {
