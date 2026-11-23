@@ -106,7 +106,7 @@ export function slay(this: Ecology, a: Cr, d: Cr, canEat = true): boolean {
   return ate;
 }
 
-/** 冒険者が雑魚として扱う小物（src/eco/adventurer.ts） */
+/** 冒険者の技に巻き込まない小物（src/eco/adventurer.ts で雑魚として払う小物と、払わない大ガエル） */
 export const ADV_MINOR: number[] = [Kind.Rat, Kind.Bat, Kind.Ant, Kind.Myconid, Kind.Salamander, Kind.Lizard, Kind.Spider, Kind.Slime, Kind.RustBeetle, Kind.Frog];
 
 /**

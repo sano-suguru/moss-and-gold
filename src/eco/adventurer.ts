@@ -560,7 +560,8 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   }
   const ENEMY = [Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Lizardman, Kind.Minotaur, Kind.Troll, Kind.Vampire, Kind.Thrall, Kind.Zombie, Kind.Basilisk, Kind.Skeleton, Kind.Lich, Kind.Armor, Kind.Ghoul];
   // ウィスプは剣では払えない光なので、雑魚に含めない（誘われても追いかけて迷うだけ。魔法使いは瓶に捕まえる）
-  const MINOR = [Kind.Rat, Kind.Bat, Kind.Ant, Kind.Myconid, Kind.Salamander, Kind.Lizard, Kind.Spider, Kind.Slime, Kind.RustBeetle, Kind.Frog];
+  // 大ガエルも雑魚に含めない（水際にじっと座っているだけで、通りがかりの一行に払われると、水場ごとの待ち伏せの場面がほとんど見られなくなる）
+  const MINOR = [Kind.Rat, Kind.Bat, Kind.Ant, Kind.Myconid, Kind.Salamander, Kind.Lizard, Kind.Spider, Kind.Slime, Kind.RustBeetle];
   if (c.sp === Job.Slayer) ENEMY.push(Kind.Dragon, Kind.Wyvern, Kind.Worm);
   let foe: Cr | null = null;
   let bd = 1e18;
