@@ -152,10 +152,10 @@ export const CHECKS: Check[] = [
   {
     // コボルトとゴブリンの戦（planWars）：蓄えの乏しい大きな群れが隣の住みかへ攻めに出る。隣り合う住処と集落のあるシードでしか起きず、
     // その組み合わせはベースのスナップショットから数日で入れ替わるので、一つの窓では起きないことがある（main の10〜18日目で15シード合計5回）。
-    // RUN_WIDE と RUN_ARMOR の二つの窓の合計で見る（どちらもほかのチェックが実行するので、実行は増えない）
-    name: 'コボルトかゴブリンの群れが相手の住みかへ攻めに出る（10〜18日目の15シードと15〜23日目の16シードの合計で3回以上・2シード以上）',
-    ...RUN_WIDE,
-    more: [RUN_ARMOR],
+    // RUN_EARLY・RUN_WIDE・RUN_ARMOR の三つの窓の合計で見る（どれもほかのチェックが実行するので、実行は増えない。二つの窓では、ベースから分岐した展開しだいで1回のこともあった）
+    name: 'コボルトかゴブリンの群れが相手の住みかへ攻めに出る（1〜10日目と10〜18日目の15シード、15〜23日目の16シードの合計で3回以上・2シード以上）',
+    ...RUN_EARLY,
+    more: [RUN_WIDE, RUN_ARMOR],
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.ev === 'warGo').length);
       return { ok: sum(n) >= 3 && new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size >= 2, value: rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed}（${r.from}〜${r.to}日） ${n[rs.indexOf(r)]}`).join('、') || 'なし' };
