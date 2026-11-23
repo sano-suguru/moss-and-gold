@@ -1,6 +1,6 @@
 /** Ecology のメソッド：コボルト（Ecology のクラスに prototype で足す） */
 import { type Cr, DAY_TICKS_ECO, DIR16, Ecology, Kind, SPEC, type Warren, ih, sq } from '../ecology';
-import { TILE } from '../mapgen';
+import { lineOfSight, TILE } from '../mapgen';
 
 /**
  * 新しい住処の場所：人の気配が薄く（正面の入口や冒険者のよく通る道から離れ）、竜の寝床から30マス、
@@ -265,13 +265,13 @@ export function kobold(this: Ecology, c: Cr): void {
   if (wr && wr.hide === 1 && !(c.hungry > 300 && (wr.store ?? 0) <= 0) && (c.st === 7 || sq(wr.x - c.x) + sq(wr.y - c.y) < 8 * TILE * 8 * TILE)) {
     c.st = 7;
     const d2 = sq(wr.x - c.x) + sq(wr.y - c.y);
-    // 奥から4マスの内で、すぐ前（1マスの内）に、奥により近い所でひそんでいる仲間がいれば、その後ろで身をひそめる
-    // （全員が奥の0.6マスに入ろうとすると、細い横穴で仲間に詰まり、歩く姿のまま押し合い続ける）
+    // 奥から4マスの内で、すぐ前（1マスの内で、あいだに岩のない所）に、奥により近い所でひそんでいる仲間がいれば、その後ろで身をひそめる
+    // （全員が奥の0.6マスに入ろうとすると、細い横穴で仲間に詰まり、歩く姿のまま押し合い続ける。岩の向こうの仲間で止まると、通路に取り残される）
     let queued = false;
     if (d2 > 0.6 * TILE * 0.6 * TILE && d2 < 4 * TILE * 4 * TILE)
       this.nearby(c.x, c.y, 1, (o) => {
         if (queued || o === c || o.k !== Kind.Kobold || o.dead || o.st !== 7 || o.ref !== c.ref) return;
-        if (sq(o.x - c.x) + sq(o.y - c.y) < TILE * TILE && sq(wr.x - o.x) + sq(wr.y - o.y) < d2) queued = true;
+        if (sq(o.x - c.x) + sq(o.y - c.y) < TILE * TILE && sq(wr.x - o.x) + sq(wr.y - o.y) < d2 && lineOfSight(this.w.map, c.x, c.y, o.x, o.y)) queued = true;
       });
     if (d2 > 0.6 * TILE * 0.6 * TILE && !queued) {
       c.act = 1;

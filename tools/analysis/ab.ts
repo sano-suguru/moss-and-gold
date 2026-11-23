@@ -14,7 +14,7 @@
  *   npm run ab -- --resume-check 7 --seeds かしたれ --days 10
  *       作業ツリーで、通しで実行したものと、7日目で止めて再開したものの、ログと状態が一致するかを確かめる（キャッシュは使わない）
  *
- * preset を付けると、ベースのまま途中の状態だけを少し変えた「無害な変更」の実行を2回分作り（lib/nullrun.ts。quick は分岐する日から、final は1日目から）、
+ * preset を付けると、ベースのまま途中の状態だけを少し変えた「無害な変更」の実行を2回分作り（ensureNullRun。quick は分岐する日から、final は1日目から）、
  * compare.md の表に、その差（揺れの幅）を行ごとに並べる。無害な変更の実行はベースのバージョンごとにキャッシュするので、作るのはベースが変わったときだけ。
  * --null 回数 で回数を変える（0 で作らない）。--null-ks 0 は、状態を変えずに続けた実行を作る（ベースと1バイトも違わないかの、しくみの確かめ）。
  *
@@ -92,7 +92,9 @@ async function main() {
     { seeds, days, adv, ver: cur, fork: fork ? { day: fork, base } : undefined, out: join(out, 'new') },
   ], jobs);
   // 無害な変更の実行（ベースのまま、from 日目の状態だけを少し変えて続けたもの）
-  const ks = a['null-ks'] !== undefined ? String(a['null-ks']).split(',').map(Number) : Array.from({ length: a.null !== undefined ? +a.null : a.preset ? 2 : 0 }, (_, i) => i + 1);
+  const nNull = a.null !== undefined ? +a.null : a.preset ? 2 : 0;
+  const ks = a['null-ks'] !== undefined ? String(a['null-ks']).split(',').map(Number) : Array.from({ length: Number.isInteger(nNull) && nNull >= 0 ? nNull : 0 }, (_, i) => i + 1);
+  if (!(Number.isInteger(nNull) && nNull >= 0) || ks.some((k) => !Number.isInteger(k) || k < 0)) throw new Error(`--null は0以上の整数、--null-ks は0以上の整数をコンマで区切ったもの（--null ${a.null}、--null-ks ${a['null-ks']}）`);
   const from = fork ?? 1;
   await pool(ks.flatMap((k) => seeds.map((s, i) => ({
     w: (days - from) * secPerDay(s),
@@ -117,7 +119,7 @@ async function main() {
       console.log(`${seeds[i]}：${sOk && cOk ? '同じ（samples と checkpoint が1バイトも違わない）' : `違う（${sOk ? 'samples は同じ' : firstDiff(...d('samples.jsonl'))}、checkpoint ${cOk ? '同じ' : '違う'}）`}`);
     }
   }
-  if (!same || fork || a.preset || a.compare) {
+  if (!same || fork || a.preset || a.compare || (ks.length && a['null-ks'] === undefined)) {
     const cmp = await getBin('compare');
     await run([cmp.path, '--runs', `${out}/base,${out}/new`, '--names', `ベース（${baseRef}）,作業ツリー`, '--out', `${out}/compare.md`, '--paired', ...(fork ? ['--since', String(fork)] : []), ...(ks.length ? ['--null', ks.map((k) => `${out}/null${k}`).join(',')] : []), ...(a.goals ? ['--goals', a.goals] : [])]);
     console.log(`比較：${out}/compare.md（${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
