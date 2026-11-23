@@ -526,7 +526,10 @@ export function feeding(this: Ecology, c: Cr): boolean {
   // 6マスの内まで歩み寄ってから寝床へ引きずる。
   // 死骸は倒れてから生き物の更新900回で腐りかけになる（corpseStage）ので、行き着けなくても歩き続けはしない
   const walkTo = !!d && d.dead === 1 && d2 > 18 * 18 && c.k === Kind.Minotaur && this.corpseStage(d) === 0 && d2 < 6 * TILE * 6 * TILE;
-  if (!d || this.flesh(d) <= 0 || c.food >= s.cap || (this.w.tick - c.hitAt < 30 && c.foe !== d.id) || (d2 > 18 * 18 && !walkTo)) {
+  // 食べられる分：ふつうは肉だけ（骨は残る）。獲物を丸のみにする種（SWALLOWERS）は、小さな獲物（SWALLOW_PREY）なら骨ごと一口で食べる
+  const gulp = !!d && SWALLOWERS.has(c.k) && SWALLOW_PREY.has(d.k);
+  const edible = (o: Cr) => (gulp ? (o.dead === 1 ? o.units : 0) : this.flesh(o));
+  if (!d || edible(d) <= 0 || c.food >= s.cap || (this.w.tick - c.hitAt < 30 && c.foe !== d.id) || (d2 > 18 * 18 && !walkTo)) {
     c.feed = 0;
     return false;
   }
@@ -546,8 +549,7 @@ export function feeding(this: Ecology, c: Cr): boolean {
   }
   c.dir = Math.abs(d.x - c.x) > Math.abs(d.y - c.y) ? (d.x > c.x ? 2 : 3) : d.y > c.y ? 0 : 1;
   if (this.step % 4 === c.id % 4) {
-    // 食べるのは肉だけ。骨は残る
-    const t = Math.min(5, this.flesh(d), s.cap - c.food);
+    const t = Math.min(gulp ? edible(d) : 5, edible(d), s.cap - c.food);
     d.units -= t;
     c.food += t;
     c.glow = Math.max(c.glow, d.glow);
@@ -555,10 +557,19 @@ export function feeding(this: Ecology, c: Cr): boolean {
     if (c.hp > 0) c.hp = Math.min(this.maxHp(c), c.hp + this.maxHp(c) / 30);
     c.act = 2;
     c.actT = 0;
-    if (this.flesh(d) <= 0) c.feed = 0;
+    if (d.units <= 0) d.dead = 2;
+    if (edible(d) <= 0) c.feed = 0;
   }
   return true;
 }
+
+/**
+ * 獲物を丸のみにする種と、丸のみにできる小さな獲物：仕留めた獲物を骨ごと一口で食べ、骨を残さない（feeding）。
+ * 大トカゲとサラマンダーは、大ネズミやアリを丸のみにする（骨を残すと、一匹から得る食べ物が3割減り、子を産めるほど満ちなくなる）。
+ * 打ち返しで倒した人型などの大きな獲物は、ほかの捕食者と同じく肉だけを食べる
+ */
+const SWALLOWERS = new Set<number>([Kind.Lizard, Kind.Salamander]);
+const SWALLOW_PREY = new Set<number>([Kind.Rat, Kind.Ant]);
 
 /**
  * 物音を立てる。s は音の種類：0 大きな音（戦い、崩落、掘る音。獣を呼び、眠りを覚ます）、1 足音、2 うなり声。

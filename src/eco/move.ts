@@ -921,7 +921,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
     return;
   }
   const total = prey.body + prey.food + prey.units;
-  // 倒した獲物は、まず死骸になり、捕食者がその上で数秒かけて食べる（食べ残しは死骸として残る）。
+  // 倒した獲物は、まず死骸になり、捕食者がその上で数秒かけて食べる（肉を食べ、骨と食べ残しは死骸として残る。丸のみにする種が小さな獲物を食べるときは骨ごと。feeding）。
   // はかない種（ウィスプ、スライム、ゴースト、マイコニド）と、丸のみにするワームとミミック、すでに死骸のものは、その場で食べる
   // 獲物の体のマナは、食べた者へ受け渡される（食物連鎖で濃くなる）
   pred.mana += prey.mana;
