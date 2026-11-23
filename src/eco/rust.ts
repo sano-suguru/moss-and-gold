@@ -18,7 +18,7 @@ const RUST_SMELL = 24;
 /** 一つの武具を食べ尽くすまでの、生き物の更新の回数 */
 export const RUST_GNAW = 300;
 /** 最後に鉄を食べてから、これだけの生き物の更新の回数がたつと飢えて死ぬ（ゲーム内の2日） */
-const RUST_STARVE = Math.round((2 * DAY_TICKS_ECO) / CR_EVERY);
+export const RUST_STARVE = Math.round((2 * DAY_TICKS_ECO) / CR_EVERY);
 /** 武具へ向かう途中で目当てを選び直す間隔（生き物の更新の回数） */
 const RUST_RETARGET = 200;
 /** ダンジョン全体の数の上限（子を産むのはこれより少ないときだけ） */

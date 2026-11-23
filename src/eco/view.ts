@@ -4,6 +4,7 @@ import { TILE } from '../mapgen';
 import { heroTitle } from './roster';
 import { ARMOR_LOW } from './armor';
 import { ITEM_NAMES } from './inspect';
+import { RUST_STARVE } from './rust';
 
 /** 触れた場所のいちばん近い生き物（死骸は除く） */
 export function pick(this: Ecology, wx: number, wy: number): Cr | null {
@@ -60,6 +61,8 @@ export function describe(this: Ecology, c: Cr, names: string[], jobs: string[]):
   // 食べない種（腹に入る量が0：ゾンビ、ゴースト、マイコニド、ゴーレム、スケルトン、リッチ、リビングアーマー、眷属）は、
   // 代謝の処理で空腹のカウンタが増えても飢えないので、空腹の文を出さない。飢えが進んでいるときだけ出す
   else if (c.hungry > SPEC[c.k].starve * 0.3 && SPEC[c.k].cap > 0) state = '飢えている';
+  // 錆喰い虫は胃を持たず、最後に鉄を食べてからの長さで飢える（rustBeetle）
+  else if (c.k === Kind.RustBeetle && c.sinceMeal > RUST_STARVE * 0.5) state = '鉄を食べられず、飢えている';
   if (state) lines.push(state);
   if (c.hp > 0 && c.hp / this.maxHp(c) < 0.35) lines.push('深手を負っている');
   // バジリスクの睨みで石化しかけている（体の灰色がかりと、鈍った歩みで画面にも出る）
