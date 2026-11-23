@@ -24,8 +24,8 @@ const DRINKERS = new Set<Kind>([Kind.Rat, Kind.Lizard, Kind.Kobold, Kind.Goblin,
  *  コボルトの住処が続く日数が半分になった。大ネズミは食べ物から離れすぎて、飢え死にが3倍になった） */
 const HOMEBODIES = new Set<Kind>([Kind.Kobold, Kind.Goblin, Kind.Rat]);
 const HOME_R = 30;
-/** 住処から離れない種が、水場へ向かっている途中は、ここまで遠くなっても向かい続ける（マス。まっすぐの距離。水場が壁の向こうにあって道が回り込むと、
- *  歩き出して HOME_R を超えたとたんにあきらめ、住処の方へ戻るとまた向かうのを、毎回くり返していた） */
+/** 住処から離れない種が、水場へ向かっている途中は、ここまで遠くなっても向かい続ける（マス。まっすぐの距離。HOME_R で打ち切らない：
+ *  水場が壁の向こうにあって道が回り込むと、歩き出して HOME_R を超えたとたんにあきらめ、住処の方へ戻るとまた向かうのをくり返す） */
 const HOME_KEEP = 45;
 /** 一行や一団から離れないよう、通り道のそばの水場にだけ立ち寄る種 */
 const PASSERS = new Set<Kind>([Kind.Adventurer, Kind.Dwarf]);

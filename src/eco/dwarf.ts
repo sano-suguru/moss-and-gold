@@ -374,11 +374,22 @@ export function dwarf(this: Ecology, c: Cr): void {
   if (c.hungry) {
     if (this.hunt(c, 7, HUNT6, s.speed * 1.1)) return;
     // 同じつながった洞窟にあるキノコだけを目指す（瓦礫の向こうのキノコを目指すと、飢えたまま道が見つからずに足踏みし続ける）。
-    // 向かっているキノコがまだ残っていれば、目当てを替えない（キノコを探すくじは毎回違う所を選ぶので、目当てが入れ替わり続けてどちらへも進めない）
-    const reg = this.regionOf(this.tileOf(c.x, c.y));
-    const prev = this.paths.get(c.id)?.gk ?? -1;
-    const kf = prev >= 0 && this.w.fungus[prev] > 24 && this.regionOf(prev) === reg ? prev : this.findFungus(c.x, c.y, 10, c.id);
-    const k = kf >= 0 && this.regionOf(kf) === reg ? kf : -1;
+    // 足もとにキノコがあればそこで食べ、向かっているキノコ（道が見つかった、10マスの内の、近ごろ選んだ目当て）が残っていれば目当てを替えない
+    // （キノコを探すくじは回ごとに違う所を選ぶので、替えると目当てが入れ替わり続けてどちらへも進めない）。
+    // 立っているマスの洞窟の領域が分からない（閉じた空洞の上、崩れた直後）ときは、領域で選り分けない
+    const k0 = this.tileOf(c.x, c.y);
+    const reg = this.regionOf(k0);
+    const sameReg = (q: number) => reg < 0 || this.regionOf(q) === reg;
+    const p0 = this.paths.get(c.id);
+    const prev = p0 && p0.miss === 0 && this.step - p0.at < 200 ? p0.gk : -1;
+    const near = (q: number) => Math.abs((q % m.w) - Math.floor(c.x / TILE)) <= 10 && Math.abs(Math.floor(q / m.w) - Math.floor(c.y / TILE)) <= 10;
+    const kf =
+      k0 >= 0 && this.w.fungus[k0] > 24
+        ? k0
+        : prev >= 0 && !m.solid[prev] && this.w.fungus[prev] > 24 && near(prev) && sameReg(prev)
+          ? prev
+          : this.findFungus(c.x, c.y, 10, c.id);
+    const k = kf >= 0 && sameReg(kf) ? kf : -1;
     if (k >= 0) {
       c.act = 1;
       if (this.goTo(c, (k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8, s.speed) || this.tileOf(c.x, c.y) === k) {
