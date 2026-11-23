@@ -195,7 +195,7 @@ export function isHidden(this: Ecology, o: Cr): boolean {
   if (o.st === 12) return true;
   if (o.st !== 7) return false;
   const wr = this.warrenOf(o);
-  if (!wr || wr.hide !== 1) return false;
+  if (wr?.hide !== 1) return false;
   // 奥から1.5マスの内か、奥へ並ぶ仲間の列の後ろでしゃがんでいる者（warrenQueued で止まった者。奥から4マスの内）
   const d2 = sq(o.x - wr.x) + sq(o.y - wr.y);
   return d2 < 1.5 * TILE * 1.5 * TILE || (o.act === 0 && d2 < 4 * TILE * 4 * TILE);
