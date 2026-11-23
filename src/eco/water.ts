@@ -3,7 +3,7 @@
  *
  * - 水を飲む種（DRINKERS）は、生き物の更新ごとに渇き（Cr.thirst）が1ずつ増える（thirstTick。代謝と同じく毎回）。THIRSTY を超え、種ごとの水を飲みに行く時刻
  *   （WINDOW。夜明けと夕暮れ／夜／昼）に入ったら、WATER_R マスの内（まっすぐの距離で見て、同じ洞窟の領域）の、いちばん近い水場へ行く。
- *   コボルト・ゴブリン・大ネズミは、住処や集落や巣穴から遠く離れないよう、HOME_R マスの内の水場にだけ行く。
+ *   コボルト・ゴブリン・大ネズミは、住処や集落や巣穴から遠く離れないよう、HOME_R マスの内の水場にだけ行く（向かっている途中は HOME_KEEP マスまで向かい続ける）。
  *   渇きが THIRST_MAX を超えたら、時刻に関わらず行く。渇いて死ぬことはない（水場が遠い者は行かず、渇きは THIRST_MAX で止まる）。
  * - 冒険者とドワーフは、一行や一団から離れないよう、通り道から8マスの内に水場があるときだけ立ち寄る。
  * - 水場に着いたら、DRINK_TIME 回のあいだ水際でかがんで飲み（Cr.thirst を負の数にして、残りの回数を数える）、渇きが0に戻る。
@@ -24,6 +24,9 @@ const DRINKERS = new Set<Kind>([Kind.Rat, Kind.Lizard, Kind.Kobold, Kind.Goblin,
  *  コボルトの住処が続く日数が半分になった。大ネズミは食べ物から離れすぎて、飢え死にが3倍になった） */
 const HOMEBODIES = new Set<Kind>([Kind.Kobold, Kind.Goblin, Kind.Rat]);
 const HOME_R = 30;
+/** 住処から離れない種が、水場へ向かっている途中は、ここまで遠くなっても向かい続ける（マス。まっすぐの距離。水場が壁の向こうにあって道が回り込むと、
+ *  歩き出して HOME_R を超えたとたんにあきらめ、住処の方へ戻るとまた向かうのを、毎回くり返していた） */
+const HOME_KEEP = 45;
 /** 一行や一団から離れないよう、通り道のそばの水場にだけ立ち寄る種 */
 const PASSERS = new Set<Kind>([Kind.Adventurer, Kind.Dwarf]);
 const PASS_KEEP = 14;
@@ -193,7 +196,7 @@ export function thirstTick(this: Ecology, c: Cr): void {
 
 /**
  * 渇いていれば水場へ行って飲む。この回の行動をこれで済ませたら true。
- * 水場へ向かっている途中かを覚えておき（wtrip）、一行から離れない種が水場を探す距離を、向かいはじめたら広げる
+ * 水場へ向かっている途中かを覚えておき（wtrip）、一行から離れない種と住処から離れない種が水場を探す距離を、向かいはじめたら広げる
  */
 export function thirstStep(this: Ecology, c: Cr): boolean {
   const r = thirstInner.call(this, c);
@@ -225,7 +228,7 @@ function thirstInner(this: Ecology, c: Cr): boolean {
   if (c.thirst < THIRST_MAX && !inWindow(c.k, this.phaseNow)) return false;
   // 一行から離れない種は、通り道のそば（8マス）の水場にだけ向かい、向かっている途中は PASS_KEEP マスまで向かい続ける
   // （水場が壁の向こうにあって道が回り込むと、歩き出したとたんに8マスを超えてあきらめ、一行の方へ戻るとまた向かうのを、毎回くり返していた）
-  const h = nearestHole(this, c, PASSERS.has(c.k) ? (c.wtrip ? PASS_KEEP : 8) : HOMEBODIES.has(c.k) ? HOME_R : WATER_R);
+  const h = nearestHole(this, c, PASSERS.has(c.k) ? (c.wtrip ? PASS_KEEP : 8) : HOMEBODIES.has(c.k) ? (c.wtrip ? HOME_KEEP : HOME_R) : WATER_R);
   if (!h) return false;
   const d2 = sq(h.x - c.x) + sq(h.y - c.y);
   // 水場のまわり（3マスの内）に、自分より強い、同じ群れでない者がいれば、5マスの所で待つ
