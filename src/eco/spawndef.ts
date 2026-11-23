@@ -10,6 +10,7 @@ import { type Burrow, type Camp, type Colony, type Cr, DAY_TICKS_ECO, Ecology, K
 import { TILE } from '../mapgen';
 import { BASILISK_MANA } from './basilisk';
 import { FROG_CAP } from './frog';
+import { MOTH_CAP } from './moth';
 
 export interface SpawnDef {
   k: Kind;
@@ -286,6 +287,19 @@ export const SPAWN_DEFS: SpawnDef[] = [
       c.hy = tileY(e, site);
     },
     log: `水場の水際に、{k:${Kind.Frog}}が住みついた`,
+  },
+  // 灯り蛾：光る苔の濃い群落から、4匹ずつ湧く（src/eco/moth.ts）。数は湧く表の上限まで（子は産まない）
+  {
+    k: Kind.Moth, side: 'nutr', every: 50, phase: 34, cool: DAY_TICKS_ECO / 8, minDay: 1,
+    ok: (e) => e.counts[Kind.Moth] + 4 <= MOTH_CAP,
+    chance: (e) => ih(e.step, 34, 71) % 6 === 0,
+    site: (e) => e.mothSite(),
+    band: () => 4,
+    body: 2, food: 3, mana: 0,
+    setup: (e, c, site) => {
+      c.hx = tileX(e, site);
+      c.hy = tileY(e, site);
+    },
   },
   // ジャイアントアント：キノコが増えたら、キノコの多い壁ぎわに、巣と女王と働きアリ5匹が湧く（巣の蓄え16と女王の30も土の養分から）
   {

@@ -22,7 +22,7 @@ export interface Thing {
 export const ITEM_NAMES = ['松明', '燃えさし', '剣', '盾', '杖', '鎚矛', '短剣', '聖印', 'リュート', '弓', '大剣', '背負い袋と寝具', '戦利品'];
 const DWARF_JOBS = ['坑夫', '鍛冶屋', '戦士'];
 /** 死骸を残さない（ほどけて消える）種 */
-const FLEETING: Kind[] = [Kind.Wisp, Kind.Slime, Kind.Ghost, Kind.Myconid];
+const FLEETING: Kind[] = [Kind.Wisp, Kind.Slime, Kind.Ghost, Kind.Myconid, Kind.Moth];
 
 /** 触れた場所でいちばん優先する物（無ければ null） */
 export function pickThing(this: Ecology, wx: number, wy: number): Thing | null {

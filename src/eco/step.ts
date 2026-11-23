@@ -214,6 +214,7 @@ export function update(this: Ecology, _tick: number, day: number, phase: number)
       case Kind.Ghoul: this.ghoul(c); break;
       case Kind.RustBeetle: this.rustBeetle(c); break;
       case Kind.Frog: this.frog(c); break;
+      case Kind.Moth: this.moth(c); break;
     }
     if (!c.dead) this.metabolism(c);
   }

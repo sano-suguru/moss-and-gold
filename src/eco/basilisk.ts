@@ -27,7 +27,7 @@ const GAZE_LOOK_R = 8;
  * 睨まない種：同じバジリスク、体が石や土の者（ガーゴイル・ゴーレム・ワーム）、竜、体のない者（ウィスプ・ゴースト）、空を飛ぶ者（コウモリ・ワイバーン。
  * 床に降りないので、石像にすると宙に浮いた石像になってしまう）
  */
-const GAZE_IMMUNE = new Set<number>([Kind.Basilisk, Kind.Gargoyle, Kind.Golem, Kind.Worm, Kind.Dragon, Kind.Wisp, Kind.Ghost, Kind.Bat, Kind.Wyvern]);
+const GAZE_IMMUNE = new Set<number>([Kind.Basilisk, Kind.Gargoyle, Kind.Golem, Kind.Worm, Kind.Dragon, Kind.Wisp, Kind.Ghost, Kind.Bat, Kind.Wyvern, Kind.Moth]);
 /** 魔物が睨みの溜めに気づいて目を背ける割合（％。賢さの段階 TIER ごと：本能だけの者は背けない） */
 const AVERT_TIER = [0, 10, 25, 40];
 

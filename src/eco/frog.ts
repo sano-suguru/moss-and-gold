@@ -14,7 +14,7 @@ import { lineOfSight, TILE } from '../mapgen';
 /** 舌の届く距離（マス） */
 export const FROG_TONGUE = 4;
 /** 舌で捕まえる獲物 */
-const FROG_PREY = new Set<number>([Kind.Rat, Kind.Bat, Kind.Ant, Kind.RustBeetle]);
+const FROG_PREY = new Set<number>([Kind.Rat, Kind.Bat, Kind.Ant, Kind.RustBeetle, Kind.Moth]);
 /** ダンジョン全体の数の上限（子を産むのはこれより少ないときだけ） */
 export const FROG_CAP = 8;
 /** 舌を伸ばす腹の減り具合（食べた物が胃の大きさのこの割合を切ったら） */

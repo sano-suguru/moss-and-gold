@@ -41,6 +41,8 @@ const RAMP={
  // 錆喰い虫：橙の錆色の丸い甲羅と、淡い触角
  rst:[[60,18,4],[140,48,10],[206,84,20],[240,128,40],[255,184,96]],
  rstD:[[30,14,6],[70,34,12],[112,58,20],[150,84,34],[184,116,60]],
+ mth:[[70,62,48],[140,128,100],[196,184,150],[228,220,190],[250,246,226]],
+ mthD:[[30,24,18],[62,50,38],[96,80,60],[128,110,86],[160,142,116]],
  frg:[[14,30,12],[36,72,28],[64,116,44],[104,160,62],[164,206,104]],
  frgD:[[10,20,10],[24,46,20],[42,74,32],[66,104,44],[100,138,64]],
  frgB:[[60,58,30],[124,120,64],[176,170,98],[214,206,138],[240,234,184]],
@@ -451,7 +453,7 @@ function bones(sp){
  if(sp==='bat'){[[10,5,2,2],[10,5,4,7],[10,5,18,1],[10,5,17,6],[10,5,7,8]].forEach(([a,b,c,d])=>P.push(LN(a,b,c,d,'bone',2,{no:1})));P.push(E(12,4.5,1.7,1.4,'bone',{ol:1}),D(12,4,COL.K));return {...raster(20,9,P),ax:10,ay:7}}
  P.push(E(11,8,4.2,2.6,'zspi',{ol:1,flat:2}));[[8,8,5,4,7,2],[9.5,7,9,3,11,1.6],[12.5,7,13,3,11,1.6],[14,8,17,4,15,2],[7,9,3,9,4,6],[15,9,19,9,18,6]].forEach(([a,b,c,d,e,g])=>P.push(LN(a,b,c,d,'bone',1,{no:1}),LN(c,d,e,g,'bone',1,{no:1})));return {...raster(22,12,P),ax:11,ay:11};
 }
-const DEADF={rat:()=>ratDead(1),lizard:()=>lizDead(1),bat:()=>batDead(),spider:()=>spider('side','death',3),kobold:()=>kobold('side','death',3),ant:()=>ant('side','death',0),salamander:()=>salamander('side','death',3),goblin:()=>goblin('side','death',3),orc:()=>orc('side','death',3),lizardman:()=>lizardman('side','death',3),minotaur:()=>minotaur('side','death',3),troll:()=>troll('side','death',3),basilisk:()=>basilisk('side','death',3),gargoyle:()=>gargoyle('side','death',3),vampire:()=>vampire('side','death',3),mimic:()=>mimic('side','death',3),golem:()=>golem('side','death',3),wyvern:()=>wyvern('side','death',3),dragon:()=>dragon('side','death',3),adventurer:()=>heroSprite('warrior','down','death',3,false,0,1),skeleton:()=>skeleton('none','side','death',3),lich:()=>lich('side','death',3),dwarf:()=>dwarf('miner','side','death',3),ghoul:()=>ghoul('side','death',3),rust:()=>rustBeetle('side','death',3),frog:()=>frog('side','death',3)};
+const DEADF={rat:()=>ratDead(1),lizard:()=>lizDead(1),bat:()=>batDead(),spider:()=>spider('side','death',3),kobold:()=>kobold('side','death',3),ant:()=>ant('side','death',0),salamander:()=>salamander('side','death',3),goblin:()=>goblin('side','death',3),orc:()=>orc('side','death',3),lizardman:()=>lizardman('side','death',3),minotaur:()=>minotaur('side','death',3),troll:()=>troll('side','death',3),basilisk:()=>basilisk('side','death',3),gargoyle:()=>gargoyle('side','death',3),vampire:()=>vampire('side','death',3),mimic:()=>mimic('side','death',3),golem:()=>golem('side','death',3),wyvern:()=>wyvern('side','death',3),dragon:()=>dragon('side','death',3),adventurer:()=>heroSprite('warrior','down','death',3,false,0,1),skeleton:()=>skeleton('none','side','death',3),lich:()=>lich('side','death',3),dwarf:()=>dwarf('miner','side','death',3),ghoul:()=>ghoul('side','death',3),rust:()=>rustBeetle('side','death',3),frog:()=>frog('side','death',3),moth:()=>moth('side','death',3)};
 /** 死骸の段階：0 新しい、1 腐りかけ、2 骨 */
 function corpse(sp,stage){if(stage===2){if(sp==='ant')return rotFrame(ant('side','death',0),0.5,3,false);if(sp==='rust')return rotFrame(rustBeetle('side','death',0),0.5,3,false);if(sp==='frog')return bones('lizard');if(sp==='gargoyle')return gargoyle('side','death',3);if(sp==='wyvern'||sp==='dragon')return bones('lizard');if(sp==='adventurer'||sp==='skeleton'||sp==='lich'||sp==='dwarf')return bones('kobold');if(sp==='mimic')return mimic('side','death',3);if(sp==='golem')return golem('side','death',3);if(sp==='salamander'||sp==='lizardman'||sp==='basilisk')return bones('lizard');if(sp==='goblin'||sp==='orc'||sp==='minotaur'||sp==='troll'||sp==='vampire'||sp==='ghoul')return bones('kobold');return bones(sp)}const fr=DEADF[sp]();return stage===0?fr:rotFrame(fr,0.28,13,false)}
 // ===== スライム =====
@@ -668,6 +670,22 @@ function frog(dir,act,f){
   P.push(E(5.6,Y(3.6)+hop,1.5,1.3,'frg',{ol:1}),E(10.4,Y(3.6)+hop,1.5,1.3,'frg',{ol:1}));
  }
  return {...raster(16,14,P),ax:8,ay:flip?10:11};
+}
+// 灯り蛾：淡い色の三角の翅を二対、細い胴と短い触角。羽ばたき（f）で翅が開いたり閉じたりする。明かりのそばで翅が照らされて白く浮く。
+// 苔の上でも見分けられるよう、翅のふちは暗く縁取る
+function moth(dir,act,f){
+ const P=[],q=mod(f,4),cx=8;
+ if(act==='death'){
+  P.push(LN(5,5,11,5,'mthD',1,{no:1}),PL([[5,5],[1,2.6],[2.4,6.4]],'mth',2,{ol:1}),PL([[11,5],[15,2.6],[13.6,6.4]],'mth',2,{ol:1}));
+  return {...raster(17,9,P),ax:cx,ay:7};
+ }
+ const open=act==='attack'||(act==='idle'&&q%2)?1:[1,0.6,0.2,0.6][q];
+ const wy=4.4-open*3.4;
+ P.push(PL([[cx-0.4,4.6],[cx-6.6*open-0.8,wy],[cx-4.4*open-0.8,6.8]],'mth',2,{ol:1}),PL([[cx+0.4,4.6],[cx+6.6*open+0.8,wy],[cx+4.4*open+0.8,6.8]],'mth',2,{ol:1}));
+ P.push(PL([[cx-0.4,5.6],[cx-3.6*open-0.6,8.4],[cx-0.4,7.4]],'mthD',3,{ol:1}),PL([[cx+0.4,5.6],[cx+3.6*open+0.6,8.4],[cx+0.4,7.4]],'mthD',3,{ol:1}));
+ P.push(D(cx-3*open-0.6,4.6,RAMP.mth[4]),D(cx+3*open+0.6,4.6,RAMP.mth[4]));
+ P.push(LN(cx,3.2,cx,8.4,'mthD',1,{no:1}),LN(cx-0.4,3.2,cx-2,1,'mthD',1,{no:1}),LN(cx+0.4,3.2,cx+2,1,'mthD',1,{no:1}));
+ return {...raster(17,10,P),ax:cx,ay:9};
 }
 function anthill(){
  const P=[];
@@ -6229,4 +6247,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxTongue, fxSporeCloud, fxSporePuff, fxSporeMote, fxSlingWhirl, fxSlingStone, fxStoneHit, fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, HERO_JOBS, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, haulArt, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, ghoul, rustBeetle, frog, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxTongue, fxSporeCloud, fxSporePuff, fxSporeMote, fxSlingWhirl, fxSlingStone, fxStoneHit, fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, HERO_JOBS, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, haulArt, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, ghoul, rustBeetle, frog, moth, RAMP, COL, E, C, PL, LN, D, GD };
