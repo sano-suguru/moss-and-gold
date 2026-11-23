@@ -12,7 +12,8 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { World } from '../../src/world';
-import { CAUSE_NAMES, KIND_NAMES, countsAsStuck, encodePng, parseArgs } from './common';
+import { CAUSE_NAMES, KIND_NAMES, encodePng, parseArgs } from './common';
+import { countsAsStuck } from './lib/stuck';
 
 const args = parseArgs(process.argv.slice(2));
 const run = args.run;
