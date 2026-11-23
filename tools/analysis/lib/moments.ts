@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { generate } from '../../../src/mapgen';
 
-const K = { Myconid: 8, Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5, Ghost: 7, Basilisk: 17, Ghoul: 31, RustBeetle: 32 };
+const K = { Myconid: 8, Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5, Ghost: 7, Basilisk: 17, Ghoul: 31, RustBeetle: 32, Frog: 33 };
 
 export interface Moment {
   key: string;
@@ -179,6 +179,8 @@ export const MOMENTS: Moment[] = [
   { key: 'ghoulSkel', label: 'グール：スケルトンとグールが倒し合った' },
   // 錆喰い虫（src/eco/rust.ts）
   { key: 'rustEat', label: '錆喰い虫：未練の抜けた鉄の武具を食べ尽くした' },
+  // 大ガエル（src/eco/frog.ts）
+  { key: 'frogTongue', label: '大ガエル：水際で舌を伸ばして獲物を捕まえた' },
   { key: 'armorAbsorb', label: 'リビングアーマー：武具を取り込んだ（床の物と奪った物）' },
   { key: 'armorRob', label: 'リビングアーマー：倒した相手の武具を奪って取り込んだ' },
   { key: 'armorShed', label: 'リビングアーマー：打たれて手の武器を落とした' },
@@ -489,6 +491,7 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     ghoulDrag: s.filter((x) => x.k === K.Ghoul && x.ev === 'drag').length,
     ghoulDenRise: b.filter((x) => x.origin === 'raised' && s.some((g) => g.k === K.Ghoul && g.ev === 'drag' && g.t <= x.t && (g.x - x.x) ** 2 + (g.y - x.y) ** 2 <= (4 * 16) ** 2)).length,
     rustEat: s.filter((x) => x.k === K.RustBeetle && x.ev === 'rust').length,
+    frogTongue: s.filter((x) => x.k === K.Frog && x.ev === 'tongue').length,
     ghoulSkel: d.filter((x) => (x.k === K.Ghoul && x.by === 26) || (x.k === 26 && x.by === K.Ghoul)).length,
     armorAbsorb: ev(K.Armor, 'absorb').length,
     armorRob: ev(K.Armor, 'absorb').filter((x) => x.how === 'rob').length,

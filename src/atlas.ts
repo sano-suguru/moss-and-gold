@@ -1,4 +1,4 @@
-import { fxSporeCloud, fxSporePuff, fxSporeMote, fxSlingWhirl, fxSlingStone, fxStoneHit, fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, vampMist, livingArmor, heroSprite, heroBed, HERO_JOBS, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, haulArt, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, ghoul, rustBeetle, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
+import { fxTongue, fxSporeCloud, fxSporePuff, fxSporeMote, fxSlingWhirl, fxSlingStone, fxStoneHit, fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, vampMist, livingArmor, heroSprite, heroBed, HERO_JOBS, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, haulArt, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, ghoul, rustBeetle, frog, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -371,6 +371,7 @@ export function buildAtlas(): Atlas {
     ['lizardman', 1, (d, a, f) => lizardman(d, a, f) as RawFrame],
     ['ghoul', 1, (d, a, f) => ghoul(d, a, f) as RawFrame],
     ['rust', 1, (d, a, f) => rustBeetle(d, a, f) as RawFrame],
+    ['frog', 1, (d, a, f) => frog(d, a, f) as RawFrame],
     ['minotaur', 1, (d, a, f) => minotaur(d, a, f) as RawFrame],
     ['troll', 1, (d, a, f) => troll(d, a, f) as RawFrame],
     ['basilisk', 1, (d, a, f) => basilisk(d, a, f) as RawFrame],
@@ -634,6 +635,7 @@ export function buildAtlas(): Atlas {
   // 大グモの糸吐き：腹の先の糸の玉（4コマ）、帯の粒（3つの太さ）、帯の先（4コマ）、足もとに巻きつく糸（3つの大きさ×2コマ）、切れ端（6種）、貼りつく糸（4コマ）
   for (let f = 0; f < 4; f++) addFx(`sball:${f}`, fxSilkBall(f) as RawFrame);
   for (let k = 0; k < 3; k++) addFx(`sdot:${k}`, fxSilkDot(k) as RawFrame);
+  for (let k = 0; k < 2; k++) addFx(`tongue:${k}`, fxTongue(k) as RawFrame);
   for (let f = 0; f < 4; f++) addFx(`shead:${f}`, fxSilkHead(f) as RawFrame);
   for (let size = 0; size < 3; size++) for (let f = 0; f < 2; f++) addFx(`swrap:${size}:${f}`, fxSilkWrap(size, f) as RawFrame);
   for (let v = 0; v < 6; v++) addFx(`sbit:${v}`, fxSilkBit(v) as RawFrame);
@@ -726,7 +728,7 @@ export function buildAtlas(): Atlas {
     raws.push(vampMist(f) as RawFrame);
   }
   const corpses = new Map<string, number>();
-  const CSP: [number, string][] = [[1, 'bat'], [2, 'rat'], [3, 'lizard'], [4, 'spider'], [9, 'ant'], [10, 'kobold'], [11, 'salamander'], [12, 'goblin'], [13, 'orc'], [14, 'lizardman'], [15, 'minotaur'], [16, 'troll'], [17, 'basilisk'], [18, 'gargoyle'], [19, 'vampire'], [20, 'mimic'], [21, 'golem'], [23, 'wyvern'], [24, 'dragon'], [25, 'adventurer'], [26, 'skeleton'], [27, 'lich'], [28, 'dwarf'], [31, 'ghoul'], [32, 'rust']];
+  const CSP: [number, string][] = [[1, 'bat'], [2, 'rat'], [3, 'lizard'], [4, 'spider'], [9, 'ant'], [10, 'kobold'], [11, 'salamander'], [12, 'goblin'], [13, 'orc'], [14, 'lizardman'], [15, 'minotaur'], [16, 'troll'], [17, 'basilisk'], [18, 'gargoyle'], [19, 'vampire'], [20, 'mimic'], [21, 'golem'], [23, 'wyvern'], [24, 'dragon'], [25, 'adventurer'], [26, 'skeleton'], [27, 'lich'], [28, 'dwarf'], [31, 'ghoul'], [32, 'rust'], [33, 'frog']];
   for (const [si, name] of CSP)
     for (let st = 0; st < 3; st++) {
       corpses.set(`${si},${st}`, raws.length);

@@ -55,6 +55,7 @@ import './armor';
 import './battle';
 import './ghoul';
 import './rust';
+import './frog';
 import './skill';
 import './attack';
 import './charge';

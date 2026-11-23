@@ -565,11 +565,11 @@ export function feeding(this: Ecology, c: Cr): boolean {
 
 /**
  * 獲物を丸のみにする種と、丸のみにできる小さな獲物：仕留めた獲物を骨ごと一口で食べ、骨を残さない（feeding）。
- * 大トカゲとサラマンダーは、大ネズミやアリを丸のみにする（骨を残すと、一匹から得る食べ物が3割減り、子を産めるほど満ちなくなる）。
+ * 大トカゲ・サラマンダー・大ガエルは、大ネズミ・アリ・コウモリ・錆喰い虫を丸のみにする（骨を残すと、一匹から得る食べ物が3割減り、子を産めるほど満ちなくなる）。
  * 打ち返しで倒した人型などの大きな獲物は、ほかの捕食者と同じく肉だけを食べる
  */
-const SWALLOWERS = new Set<number>([Kind.Lizard, Kind.Salamander]);
-const SWALLOW_PREY = new Set<number>([Kind.Rat, Kind.Ant]);
+const SWALLOWERS = new Set<number>([Kind.Lizard, Kind.Salamander, Kind.Frog]);
+const SWALLOW_PREY = new Set<number>([Kind.Rat, Kind.Ant, Kind.Bat, Kind.RustBeetle]);
 
 /**
  * 物音を立てる。s は音の種類：0 大きな音（戦い、崩落、掘る音。獣を呼び、眠りを覚ます）、1 足音、2 うなり声。
