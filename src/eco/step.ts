@@ -1,6 +1,6 @@
 /** Ecology のメソッド：生き物の更新1回（step。src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 import { BONE_CAP, BONE_KINDS, BONE_PILE, KIN_RISE_MANA, KIN_ZOMBIE_CAP, KIN_ZOMBIES, ZOMBIE_KINDS } from './undead';
-import { type Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, STR, ih, STONE_DECAY_EVERY } from '../ecology';
+import { type Cr, DAY_TICKS_ECO, Ecology, KIND_COUNT, Kind, SPEC, STR, ih, STONE_DECAY_EVERY } from '../ecology';
 import { TILE } from '../mapgen';
 import { VAMP_SCATTER } from './vampire';
 import { BLESSED, CRUMBLING } from './roster';
@@ -17,7 +17,7 @@ export function update(this: Ecology, _tick: number, day: number, phase: number)
   this.updateWaterholes();
   this.corpses = this.list.filter((c) => c.dead === 1 && c.units > 0 && c.k !== Kind.Wisp && c.k !== Kind.Slime && c.k !== Kind.Myconid);
   this.carrion = this.corpses.filter((c) => this.flesh(c) > 0);
-  this.counts = new Array<number>(Kind.Ghoul + 1).fill(0);
+  this.counts = new Array<number>(KIND_COUNT).fill(0);
   for (const c of this.list) if (!c.dead) this.counts[c.k]++;
   // 飛んでいた魔法の矢と、降ってきた矢の雨を当てる（src/eco/attack.ts）
   this.resolveVolleys();

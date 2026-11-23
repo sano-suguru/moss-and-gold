@@ -47,8 +47,11 @@ export const enum Kind {
   Ghoul = 31,
 }
 
+/** 種の数（Kind の最後の番号 + 1）。種ごとの配列（数・体の大きさ・照らされた種の印など）の大きさ。種を足したら、最後の種にする */
+export const KIND_COUNT = Kind.Ghoul + 1;
+
 /** 種ごとの体の大きさ（間合いの目安。px。0 は押し合わない種）。Ecology.bodySize が引く表 */
-export const BODY_SIZE: Uint8Array = Uint8Array.from({ length: Kind.Ghoul + 1 }, (_, k) => {
+export const BODY_SIZE: Uint8Array = Uint8Array.from({ length: KIND_COUNT }, (_, k) => {
   if (k === Kind.Dragon || k === Kind.Worm) return 40;
   if (k === Kind.Golem || k === Kind.Troll || k === Kind.Minotaur || k === Kind.Wyvern) return 18;
   if (k === Kind.Orc || k === Kind.Lizardman || k === Kind.Adventurer || k === Kind.Dwarf || k === Kind.Vampire || k === Kind.Skeleton || k === Kind.Lich || k === Kind.Armor || k === Kind.Basilisk || k === Kind.Lizard || k === Kind.Zombie || k === Kind.Ghoul) return 11;
@@ -726,7 +729,7 @@ export class Ecology {
   /** 生き物の更新の通し番号（step 番号。CR_EVERY tick ごとに1増える。セーブに入れる） */
   step = 0;
   /** 種ごとのいまの数（生き物の更新ごとに数え直す） */
-  counts: number[] = new Array<number>(Kind.Ghoul + 1).fill(0);
+  counts: number[] = new Array<number>(KIND_COUNT).fill(0);
   /** ドワーフの住みか（一つまで）、坑道のランプ、外に伝わった話（1 = ゴーレムの宝物庫は危ない） */
   hold: Hold | null = null;
   lamps: number[] = [];
@@ -760,7 +763,7 @@ export class Ecology {
   /** 記録：目立つ出来事（tick、場所、一文。種の名前は {k:番号} で書き、表示のときに照らされたかどうかで置き換える） */
   events: { t: number; x: number; y: number; m: string }[] = [];
   /** 一度でも光に照らされた種 */
-  discovered = new Uint8Array(32);
+  discovered = new Uint8Array(KIND_COUNT);
   gear: Item[] = [];
   /**
    * リビングアーマーの持ち物（生き物の番号 → [体になった武具の数, 武具の種類…]）。先頭の数だけが体（生まれたときの材料）で、
