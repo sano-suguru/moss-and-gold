@@ -97,11 +97,14 @@ export const CHECKS: Check[] = [
   },
   {
     // リビングアーマーは、倒れずに強い一打を受けると手の武器を落とす（armorShed）。強くなり続けず、打ち合うたびに強さが行き来する。
-    name: 'リビングアーマーが打たれて手の武器を落とす（16シードの15〜23日目で20回以上）',
+    // リビングアーマーがいるかどうかは展開の分かれ方で大きく変わり（無害な変更だけで、いない日が16シードの割合の合計で20以上動く）、
+    // 一つの窓では10回あまりにとどまることがあるので、二つの窓の合計で見る
+    name: 'リビングアーマーが打たれて手の武器を落とす（15〜23日目の16シードと10〜18日目の15シードの合計で20回以上）',
     ...RUN_ARMOR,
+    more: [RUN_WIDE],
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === 29 && x.ev === 'shed').length);
-      return { ok: sum(n) >= 20, value: rs.filter((_r, i) => n[i]).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、') || '0' };
+      return { ok: sum(n) >= 20, value: rs.filter((_r, i) => n[i]).map((r) => `${r.seed}（${r.from}〜${r.to}日） ${n[rs.indexOf(r)]}`).join('、') || '0' };
     },
   },
   {
