@@ -70,7 +70,7 @@ export function frogTongue(this: Ecology, c: Cr, p: Cr): void {
   this.fxAttacks.push({ t: this.w.tick, style: 'tongue', col: 5, size: 1, ax: c.x, ay: c.y, dx: p.x, dy: p.y, did: p.id, aid: c.id, big: false, kill: true });
   if (this.fxAttacks.length > 160) this.fxAttacks.splice(0, 60);
   this.record('settle', { t: this.w.tick, k: Kind.Frog, ev: 'tongue', id: c.id, n: p.k, x: Math.round(p.x), y: Math.round(p.y) } as never);
-  this.eat(c, p, true);
+  this.eat(c, p);
   // 獲物の死骸が残ったら（丸のみの一口の前に）、口元まで引き寄せる
   if (c.feed === p.id && p.dead === 1) {
     const fx = c.dir === 2 ? 5 : c.dir === 3 ? -5 : 0;
