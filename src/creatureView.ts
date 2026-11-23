@@ -1111,8 +1111,9 @@ export class CreatureView {
         }
         case 'tongue': {
           // 大ガエルの舌（frogTongue）：口元から桃色の舌が獲物へまっすぐ伸び、先の粘り玉が届くと、獲物ごと縮んで口へ戻る。
-          // 獲物は同じ回に口元へ引き寄せられるので、舌の戻りは描画だけ（伸びて2 tick、戻って4 tick）
-          if (age >= 6) break;
+          // 獲物は同じ回に口元へ引き寄せられるので、舌の戻りは描画だけ（伸びて2 tick、戻って4 tick）。
+          // 打ち合いではないので、当たった瞬間の照らしや、とどめの衝撃の輪（switch のあとの共通の処理）は出さない
+          if (age >= 6) continue;
           const p = age < 2 ? (age + 1) / 3 : 1 - (age - 2) / 4;
           const sx = r.ax + ux * 4;
           const sy = r.ay + uy * 2;
@@ -1120,7 +1121,7 @@ export class CreatureView {
           const n = Math.max(1, Math.round(L / 2));
           for (let i = 0; i < n; i++) push(sx + ux * (i * 2), sy + uy * (i * 2), 4, false, A.fx('tongue:0'), 0, 4);
           push(sx + ux * L, sy + uy * L, 4, false, A.fx('tongue:1'), 0, 4);
-          break;
+          continue;
         }
         case 'silkhit':
           // 糸が届いた所：床か相手の足もとに、放射状に糸が貼りつく

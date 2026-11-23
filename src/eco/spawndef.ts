@@ -272,8 +272,8 @@ export const SPAWN_DEFS: SpawnDef[] = [
     },
     log: `打ち捨てられた鉄の武具のそばに、{k:${Kind.RustBeetle}}が這い出した`,
   },
-  // 大ガエル：大ネズミかコウモリが水を飲みに来る水場に、一匹ずつ湧き、水際に住みつく（src/eco/frog.ts）。水場ごとに一匹まで。
-  // 数は食べて産む子で増える
+  // 大ガエル：大ネズミかコウモリが水を飲みに来る水場のうち、カエルのいない所に一匹ずつ湧き、水際に住みつく（src/eco/frog.ts）。
+  // 湧くのは、子も含めた数が水場の数より少ないときだけ。子は親と同じ水場に住み、数は食べて産む子で増える
   {
     k: Kind.Frog, side: 'nutr', every: 50, phase: 33, cool: DAY_TICKS_ECO / 2, minDay: 2,
     ok: (e) => e.counts[Kind.Frog] < Math.min(FROG_CAP, e.waterholes.length),

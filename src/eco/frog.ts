@@ -28,7 +28,8 @@ export function frog(this: Ecology, c: Cr): void {
     let prey: Cr | null = null;
     let bd = FROG_TONGUE * TILE * FROG_TONGUE * TILE;
     this.nearby(c.x, c.y, FROG_TONGUE, (o) => {
-      if (o.dead || o.away || !FROG_PREY.has(o.k) || (o.k === Kind.Bat && o.st === 0)) return;
+      // クモの巣にかかった獲物は、クモの分なので取らない
+      if (o.dead || o.away || o.caught || !FROG_PREY.has(o.k) || (o.k === Kind.Bat && o.st === 0)) return;
       const d = sq(o.x - c.x) + sq(o.y - c.y);
       if (d < bd) {
         bd = d;
@@ -55,7 +56,10 @@ export function frog(this: Ecology, c: Cr): void {
   // よく食べたら、水際に子を産む（体は親の胃から）
   if (c.food >= s.cap * 0.9 && this.counts[Kind.Frog] < FROG_CAP && ih(c.id, this.step, 334) % 1500 === 0) {
     c.food -= 25;
-    const j = this.spawn(Kind.Frog, c.x + 6, c.y + 2, 25, 0);
+    // 隣が岩や深い水なら、親の足もとに産む
+    const k = this.tileOf(c.x + 6, c.y + 2);
+    const ok = k >= 0 && !this.w.map.solid[k] && !this.w.map.lava[k] && this.w.water[k] <= 40;
+    const j = this.spawn(Kind.Frog, ok ? c.x + 6 : c.x, ok ? c.y + 2 : c.y, 25, 0);
     j.hx = c.hx;
     j.hy = c.hy;
     this.counts[Kind.Frog]++;
@@ -67,22 +71,19 @@ export function frogTongue(this: Ecology, c: Cr, p: Cr): void {
   c.dir = Math.abs(p.x - c.x) > Math.abs(p.y - c.y) ? (p.x > c.x ? 2 : 3) : p.y > c.y ? 0 : 1;
   c.act = 2;
   c.actT = 0;
-  this.fxAttacks.push({ t: this.w.tick, style: 'tongue', col: 5, size: 1, ax: c.x, ay: c.y, dx: p.x, dy: p.y, did: p.id, aid: c.id, big: false, kill: true });
+  this.fxAttacks.push({ t: this.w.tick, style: 'tongue', col: 5, size: 1, ax: c.x, ay: c.y, dx: p.x, dy: p.y, did: p.id, aid: c.id, big: false, kill: false });
   if (this.fxAttacks.length > 160) this.fxAttacks.splice(0, 60);
   this.record('settle', { t: this.w.tick, k: Kind.Frog, ev: 'tongue', id: c.id, n: p.k, x: Math.round(p.x), y: Math.round(p.y) } as never);
   this.eat(c, p);
-  // 獲物の死骸が残ったら（丸のみの一口の前に）、口元まで引き寄せる
+  // 獲物の死骸が残ったら（丸のみの一口の前に）、口元まで引き寄せる。舌の縮む向き（描画）と同じ向きの、口元から4px の所へ
   if (c.feed === p.id && p.dead === 1) {
-    const fx = c.dir === 2 ? 5 : c.dir === 3 ? -5 : 0;
-    const fy = c.dir === 0 ? 4 : c.dir === 1 ? -4 : 0;
-    const k = this.tileOf(c.x + fx, c.y + fy);
-    if (k >= 0 && !this.w.map.solid[k]) {
-      p.x = c.x + fx;
-      p.y = c.y + fy;
-    } else {
-      p.x = c.x;
-      p.y = c.y;
-    }
+    const L = Math.hypot(p.x - c.x, p.y - c.y) || 1;
+    const mx = c.x + ((p.x - c.x) / L) * 4;
+    const my = c.y + ((p.y - c.y) / L) * 2;
+    const k = this.tileOf(mx, my);
+    const free = k >= 0 && !this.w.map.solid[k];
+    p.x = free ? mx : c.x;
+    p.y = free ? my : c.y;
   }
 }
 
