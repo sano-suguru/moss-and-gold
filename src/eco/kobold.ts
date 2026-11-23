@@ -265,13 +265,17 @@ export function kobold(this: Ecology, c: Cr): void {
   if (wr && wr.hide === 1 && !(c.hungry > 300 && (wr.store ?? 0) <= 0) && (c.st === 7 || sq(wr.x - c.x) + sq(wr.y - c.y) < 8 * TILE * 8 * TILE)) {
     c.st = 7;
     const d2 = sq(wr.x - c.x) + sq(wr.y - c.y);
-    if (d2 > 0.6 * TILE * 0.6 * TILE) {
-      const x0 = c.x;
-      const y0 = c.y;
+    // 奥から2.5マスの内で、すぐ前（1マスの内）に、奥により近い所でひそんでいる仲間がいれば、その後ろで身をひそめる
+    // （全員が奥の0.6マスに入ろうとすると、細い横穴で仲間に詰まり、歩く姿のまま押し合い続ける）
+    let queued = false;
+    if (d2 > 0.6 * TILE * 0.6 * TILE && d2 < 2.5 * TILE * 2.5 * TILE)
+      this.nearby(c.x, c.y, 1, (o) => {
+        if (queued || o === c || o.k !== Kind.Kobold || o.dead || o.st !== 7 || o.ref !== c.ref) return;
+        if (sq(o.x - c.x) + sq(o.y - c.y) < TILE * TILE && sq(wr.x - o.x) + sq(wr.y - o.y) < d2) queued = true;
+      });
+    if (d2 > 0.6 * TILE * 0.6 * TILE && !queued) {
       c.act = 1;
       this.goTo(c, wr.x, wr.y, s.speed * 1.2);
-      // 奥から2.5マスの内で、奥に詰まった仲間に阻まれて進めなければ、そこで身をひそめる（歩く姿のまま押し合い続けない）
-      if (d2 < 2.5 * TILE * 2.5 * TILE && sq(c.x - x0) + sq(c.y - y0) < 0.01) c.act = 0;
     } else c.act = 0;
     return;
   }
