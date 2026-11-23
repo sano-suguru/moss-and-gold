@@ -49,7 +49,7 @@ const RUN_ARMOR = { seeds: ['abc', 'かしたれ', 'はじまりの洞窟', 'see
 // まれな出来事（僧侶が亡骸の前で祈る）を見る組。数シードを選ぶと、ほかの変更で展開が分かれるたびに落ちるので、15シードの合計で見る
 const RUN_WIDE = { seeds: ['abc', 'かしたれ', 'はじまりの洞窟', 'seed4', 'seed5', 'seed6', 'seed7', 'seed8', 'seed40', 'seed41', 'seed18', 'seed27', 'seed35', 'seed30', 'seed17'], from: 10, to: 18 };
 const RUN_BLESS = RUN_WIDE;
-// 古戦場（src/eco/battle.ts）：骨は1日目ごろ、甲冑は2〜4日目に起き上がる。ベースの日次スナップショットは1日目からしか無いので（0日目からは分かれられない）、1日目から見る
+// 古戦場（seedBattle）：骨は1日目ごろ、甲冑は2〜4日目に起き上がる。ベースの日次スナップショットは1日目からしか無いので（0日目からは分かれられない）、1日目から見る
 const RUN_BATTLE = { seeds: ['abc', 'かしたれ', 'seed4', 'seed7', 'seed18', 'seed27', 'seed35', 'seed41'], from: 1, to: 6 };
 // check の項目にしないもの：オークの貢ぎ物の取り立て（collectTribute）と、倒れた冒険者がヴァンパイアの眷属として起き上がる場面（vampRaiseFallen）。
 // どちらも16シード×25日でも数回〜十数回で、どのシードを選んでも短い実行では確かめられない。ab の「見せたい場面」の表（lib/moments.ts）で起きたシードの数を追う。
@@ -557,6 +557,16 @@ export const CHECKS: Check[] = [
       const n = rs.map((r) => r.settle.filter((x) => x.k === Kind.Ghoul && x.ev === 'drag').length);
       const seeds = n.filter((v) => v > 0).length;
       return { ok: sum(n) >= 20 && seeds >= 6, value: `${sum(n)}（${seeds}シード）` };
+    },
+  },
+  {
+    // 獲物を丸のみにする種（feeding の SWALLOWERS）：大トカゲは大ネズミを骨ごと食べて満ち、子を産む。骨を残すと満ちきらず、親から生まれなくなる
+    name: '大トカゲが親から生まれる（15シードの10〜18日目の合計で10回以上・5シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.births.filter((x) => x.k === Kind.Lizard && x.origin === 'born').length);
+      const seeds = n.filter((v) => v > 0).length;
+      return { ok: sum(n) >= 10 && seeds >= 5, value: `${sum(n)}（${seeds}シード）` };
     },
   },
   {
