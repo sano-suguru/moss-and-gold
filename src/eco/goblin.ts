@@ -553,6 +553,11 @@ export function goblin(this: Ecology, c: Cr): void {
     // 腹を空かせた者は、その場で苔かキノコを食べる（集落から10マスより遠い者は、集落のまわりではなく自分のまわり6マスで探す）
     const far = !!cp && sq(cp.x - c.x) + sq(cp.y - c.y) > 10 * TILE * 10 * TILE;
     const kk = cp ? this.goblinForage(c, far ? c.x : cp.x, far ? c.y : cp.y, far ? 6 : R) : (() => {
+      // 集落の無い者：向かっている苔かキノコがまだ残っていて、同じつながった洞窟にあれば、目当てを替えない
+      // （苔とキノコを探すくじは回ごとに違う所を選ぶので、目当てが入れ替わり続けてどちらへも進めない）
+      const reg = this.regionOf(this.tileOf(c.x, c.y));
+      const prev = this.paths.get(c.id)?.gk ?? -1;
+      if (prev >= 0 && (this.w.fungus[prev] > 24 || this.w.moss[prev] > 24) && this.regionOf(prev) === reg) return prev;
       const k = this.findMoss(c, c.x, c.y, R, 91, this.step >> 7);
       return k >= 0 ? k : this.findFungus(c.x, c.y, R, c.id);
     })();
