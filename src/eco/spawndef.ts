@@ -257,6 +257,20 @@ export const SPAWN_DEFS: SpawnDef[] = [
     },
     log: `死骸の匂いの溜まる暗がりに、{k:${Kind.Ghoul}}の群れが巣を構えた`,
   },
+  // 錆喰い虫：錆びた未練の抜けた鉄の武具（rustEdible）が3つ以上床にあれば、いちばん多く溜まった所に2匹で湧く（src/eco/rust.ts）。
+  // 一度に一つの群れまで。前の群れが湧いてから1日はあける。数は鉄を食べて産む子で増える
+  {
+    k: Kind.RustBeetle, side: 'nutr', every: 50, phase: 32, cool: DAY_TICKS_ECO / 2, minDay: 3,
+    ok: (e) => e.counts[Kind.RustBeetle] === 0 && e.gear.filter((o) => e.rustEdible(o)).length >= 3,
+    chance: (e) => ih(e.step, 32, 71) % 10 === 0,
+    site: (e) => e.rustSite(),
+    band: () => 2,
+    body: 8, food: 0, mana: 0,
+    setup: (_e, c) => {
+      c.lureAt = -1;
+    },
+    log: `打ち捨てられた鉄の武具のそばに、{k:${Kind.RustBeetle}}が這い出した`,
+  },
   // ジャイアントアント：キノコが増えたら、キノコの多い壁ぎわに、巣と女王と働きアリ5匹が湧く（巣の蓄え16と女王の30も土の養分から）
   {
     k: Kind.Ant, side: 'nutr', every: 50, phase: 0, cool: 0, minDay: 5,

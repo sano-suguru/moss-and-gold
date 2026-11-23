@@ -560,7 +560,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   }
   const ENEMY = [Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Lizardman, Kind.Minotaur, Kind.Troll, Kind.Vampire, Kind.Thrall, Kind.Zombie, Kind.Basilisk, Kind.Skeleton, Kind.Lich, Kind.Armor, Kind.Ghoul];
   // ウィスプは剣では払えない光なので、雑魚に含めない（誘われても追いかけて迷うだけ。魔法使いは瓶に捕まえる）
-  const MINOR = [Kind.Rat, Kind.Bat, Kind.Ant, Kind.Myconid, Kind.Salamander, Kind.Lizard, Kind.Spider, Kind.Slime];
+  const MINOR = [Kind.Rat, Kind.Bat, Kind.Ant, Kind.Myconid, Kind.Salamander, Kind.Lizard, Kind.Spider, Kind.Slime, Kind.RustBeetle];
   if (c.sp === Job.Slayer) ENEMY.push(Kind.Dragon, Kind.Wyvern, Kind.Worm);
   let foe: Cr | null = null;
   let bd = 1e18;
@@ -1140,7 +1140,7 @@ export function dropJobItems(this: Ecology, c: Cr): void {
 /** 床に道具を置く。n は情報パネルに出すいきさつ（落とした者など。判断には使わない） */
 export function dropItem(this: Ecology, x: number, y: number, kind: number, fuel: number, n?: Note): void {
   const id = this.nextId++;
-  this.gear.push({ id, x: Math.round(x), y: Math.round(y), kind, fuel });
+  this.gear.push({ id, x: Math.round(x), y: Math.round(y), kind, fuel, t: this.w.tick });
   if (n) this.note(id, n);
   // 古い燃えさしから片づける（道具が増えすぎないように）
   if (this.gear.length > 160) {

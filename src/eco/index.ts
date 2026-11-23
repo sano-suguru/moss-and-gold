@@ -54,6 +54,7 @@ import './salamander';
 import './armor';
 import './battle';
 import './ghoul';
+import './rust';
 import './skill';
 import './attack';
 import './charge';
