@@ -373,7 +373,12 @@ export function dwarf(this: Ecology, c: Cr): void {
   }
   if (c.hungry) {
     if (this.hunt(c, 7, HUNT6, s.speed * 1.1)) return;
-    const k = this.findFungus(c.x, c.y, 10, c.id);
+    // 同じつながった洞窟にあるキノコだけを目指す（瓦礫の向こうのキノコを目指すと、飢えたまま道が見つからずに足踏みし続ける）。
+    // 向かっているキノコがまだ残っていれば、目当てを替えない（キノコを探すくじは毎回違う所を選ぶので、目当てが入れ替わり続けてどちらへも進めない）
+    const reg = this.regionOf(this.tileOf(c.x, c.y));
+    const prev = this.paths.get(c.id)?.gk ?? -1;
+    const kf = prev >= 0 && this.w.fungus[prev] > 24 && this.regionOf(prev) === reg ? prev : this.findFungus(c.x, c.y, 10, c.id);
+    const k = kf >= 0 && this.regionOf(kf) === reg ? kf : -1;
     if (k >= 0) {
       c.act = 1;
       if (this.goTo(c, (k % m.w) * TILE + 8, Math.floor(k / m.w) * TILE + 8, s.speed) || this.tileOf(c.x, c.y) === k) {

@@ -178,7 +178,8 @@ export function findFungus(this: Ecology, cx: number, cy: number, R: number, sal
     const y = ty0 + (((h >>> 8) & 255) % (2 * R + 1)) - R;
     if (x < 0 || y < 0 || x >= m.w || y >= m.h) continue;
     const k = y * m.w + x;
-    if (m.solid[k] || m.lava[k]) continue;
+    // 閉じた空洞（どこからも歩いて行けない）のキノコは選ばない（目指して道が見つからないまま足踏みする）
+    if (m.solid[k] || m.lava[k] || m.sealed[k]) continue;
     if (this.w.fungus[k] > bv) {
       bv = this.w.fungus[k];
       best = k;
