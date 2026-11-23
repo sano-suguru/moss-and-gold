@@ -1109,6 +1109,20 @@ export class CreatureView {
           }
           break;
         }
+        case 'tongue': {
+          // 大ガエルの舌（frogTongue）：口元から桃色の舌が獲物へまっすぐ伸び、先の粘り玉が届くと、獲物ごと縮んで口へ戻る。
+          // 獲物は同じ回に口元へ引き寄せられるので、舌の戻りは描画だけ（伸びて2 tick、戻って4 tick）。
+          // 打ち合いではないので、当たった瞬間の照らしや、とどめの衝撃の輪（switch のあとの共通の処理）は出さない
+          if (age >= 6) continue;
+          const p = age < 2 ? (age + 1) / 3 : 1 - (age - 2) / 4;
+          const sx = r.ax + ux * 4;
+          const sy = r.ay + uy * 2;
+          const L = Math.max(0, dist - 4) * p;
+          const n = Math.max(1, Math.round(L / 2));
+          for (let i = 0; i < n; i++) push(sx + ux * (i * 2), sy + uy * (i * 2), 4, false, A.fx('tongue:0'), 0, 4);
+          push(sx + ux * L, sy + uy * L, 4, false, A.fx('tongue:1'), 0, 4);
+          continue;
+        }
         case 'silkhit':
           // 糸が届いた所：床か相手の足もとに、放射状に糸が貼りつく
           if (age < 8) push(r.dx, r.dy + 0.04, 0, false, A.fx(`ssplat:${Math.min(3, age >> 1)}`), 0, 4);
@@ -1330,6 +1344,7 @@ export class CreatureView {
       case Kind.Lizardman: return A.named('lizardman', dir, act, f);
       case Kind.Ghoul: return A.named('ghoul', dir, act, f);
       case Kind.RustBeetle: return A.named('rust', dir, act, f);
+      case Kind.Frog: return A.named('frog', dir, act, f);
       case Kind.Minotaur: return A.named('minotaur', dir, act, f);
       case Kind.Troll: return A.named('troll', dir, act, f);
       case Kind.Basilisk: return A.named('basilisk', dir, act, f);
@@ -1919,6 +1934,19 @@ export class CreatureView {
       pushSprite(st.x, st.y, lift, st.dir === 3, this.frameOf(st.k, st.sp, dir, Math.min(2, st.act), st.f, 0, 0), 0, 3);
     }
 
+    // 大ガエルの舌に捕まった獲物：舌が縮むあいだ、舌の先に付いて口元へ戻る（シミュレーションでは同じ回に口元へ動いている。frogTongue）
+    const tongued = new Map<number, [number, number]>();
+    for (const r of eco.fxAttacks) {
+      if (r.style !== 'tongue') continue;
+      const age = eco.w.tick - r.t + alpha;
+      if (age < 0 || age >= 6) continue;
+      const p = age < 2 ? (age + 1) / 3 : 1 - (age - 2) / 4;
+      const L = Math.hypot(r.dx - r.ax, r.dy - r.ay) || 1;
+      const ux = (r.dx - r.ax) / L;
+      const uy = (r.dy - r.ay) / L;
+      const tl = Math.max(0, L - 4) * p;
+      tongued.set(r.did, [r.ax + ux * (4 + tl), r.ay + uy * (2 + tl)]);
+    }
     // 生き物は足元の位置で前後を決める
     this.order.length = 0;
     for (const c of eco.list) {
@@ -1964,8 +1992,9 @@ export class CreatureView {
       }
       if (c.dead === 2 || c.away) continue;
       const a = eco.moveAlpha(c, alpha);
-      const x = c.px + (c.x - c.px) * a;
-      const y = c.py + (c.y - c.py) * a;
+      const tg = tongued.get(c.id);
+      const x = tg ? tg[0] : c.px + (c.x - c.px) * a;
+      const y = tg ? tg[1] : c.py + (c.y - c.py) * a;
       // （ワームは胴が長いので、頭が少し画面の外でも描く）
       if (!inView(x, y, c.k === Kind.Worm ? 150 : 40)) continue;
       this.order.push({ y, c, x, yy: y });

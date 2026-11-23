@@ -234,7 +234,8 @@ function thirstInner(this: Ecology, c: Cr): boolean {
     let bigger = false;
     this.nearby(h.x, h.y, 3, (o) => {
       // 眠っている者は数えない（水場のそばで眠りこんだ大物がいると、その間だれも飲めなかった）
-      if (bigger || o === c || o.dead || o.away || o.sleep > 0 || STR[o.k] <= s) return;
+      // 水際で待ち伏せる大ガエルは数えない（気づかれずに獲物を待つ。数えると、大ネズミやコウモリ、コボルトやゴブリンが水場に寄りつかなくなる）
+      if (bigger || o === c || o.dead || o.away || o.sleep > 0 || STR[o.k] <= s || o.k === Kind.Frog) return;
       if (o.k === c.k && o.ref === c.ref) return;
       bigger = true;
     });

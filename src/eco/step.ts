@@ -213,6 +213,7 @@ export function update(this: Ecology, _tick: number, day: number, phase: number)
       case Kind.Thrall: this.thrall(c); break;
       case Kind.Ghoul: this.ghoul(c); break;
       case Kind.RustBeetle: this.rustBeetle(c); break;
+      case Kind.Frog: this.frog(c); break;
     }
     if (!c.dead) this.metabolism(c);
   }
@@ -377,7 +378,7 @@ const RING8: [number, number][] = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1
 
 /**
  * 死骸の骨の分（養分の単位）：倒れたときの大きさ（init）の3割（少なくとも2。スケルトンとリッチの残骸はすべて骨）。死骸の養分（units）のうち、これを超える分が肉。
- * 食べる者は肉だけを食べ（flesh）、骨は食べない（獲物を丸のみにする種が小さな獲物を食べるときだけは骨ごと。feeding の SWALLOWERS）。
+ * 食べる者は肉だけを食べ（flesh）、骨は食べない（獲物を丸のみにする種が小さな獲物を食べるときだけは骨ごと。feeding の SWALLOW）。
  * 骨は雨風でゆっくり土に返り（decay）、起き上がったり、僧侶に清められたりする
  */
 export function boneOf(this: Ecology, c: Cr): number {

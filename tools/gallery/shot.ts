@@ -6,7 +6,7 @@
  *   npm run shot -- --seed abc --find kind:24 --day 6 --zoom 3 --lit
  *   npm run shot -- --seed abc --find xy:120,40 --day 10
  *
- * --find：warren（横穴を掘り終え罠が2つ以上の住処）、advcorpse（白骨になる前の冒険者の亡骸）、thralladv（ヴァンパイアの眷属になった冒険者）、advsleep（焚き火のそばで眠る冒険者）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、haul（キノコの束を背負って住処へ運ぶコボルト）、gobhaul（腹を満たし、ネズミを担いで集落へ帰るゴブリン）、bless（冒険者の亡骸の前で祈る一行）、slimefeast（一つの死骸を2匹以上のスライムが食べている所）、tunnelclose（古い坑道が崩れて塞がった直後）、battle（古戦場の真ん中。--day の時点の様子）、ghouldrag（死骸を巣へ引きずっているグール）、rust（鉄の武具を齧っている錆喰い虫）、kind:番号（その種の生き物）、xy:マスx,マスy
+ * --find：warren（横穴を掘り終え罠が2つ以上の住処）、advcorpse（白骨になる前の冒険者の亡骸）、thralladv（ヴァンパイアの眷属になった冒険者）、advsleep（焚き火のそばで眠る冒険者）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、haul（キノコの束を背負って住処へ運ぶコボルト）、gobhaul（腹を満たし、ネズミを担いで集落へ帰るゴブリン）、bless（冒険者の亡骸の前で祈る一行）、slimefeast（一つの死骸を2匹以上のスライムが食べている所）、tunnelclose（古い坑道が崩れて塞がった直後）、battle（古戦場の真ん中。--day の時点の様子）、ghouldrag（死骸を巣へ引きずっているグール）、rust（鉄の武具を齧っている錆喰い虫）、frog（舌を伸ばして獲物を捕まえた大ガエル。--every 1 で探す）、kind:番号（その種の生き物）、xy:マスx,マスy
  * --day 探し始める日（既定 0）、--until 探すのをやめる日（既定 25）、--every 探す間隔（tick、既定 200）、--zoom 拡大率（既定 4）、--lit 確認用の明かり（#lit）、
  * --fog 霧をそのまま（既定は地図全体を見えたマスにする）、--name 出力の名前（既定は find から）、--out 出力先（既定 build/shots）
  *
@@ -143,6 +143,14 @@ function look(): Hit | null {
     const it = e.gear.find((g: any) => g.id === c.ref2);
     const others = e.list.filter((o: any) => o.k === 32 && !o.dead && o !== c && (o.x - c.x) ** 2 + (o.y - c.y) ** 2 < (6 * T) ** 2);
     return { cam: { x: Math.round(c.x), y: Math.round(c.y), zoom }, marks: [{ x: c.x, y: c.y, label: '錆喰い虫', color: '#ffd24a' }, { x: it.x, y: it.y, label: '鉄の武具', color: '#7fd0ff' }, ...others.map((o: any) => ({ x: o.x, y: o.y, label: '錆喰い虫', color: '#ffd24a' }))], title: '鉄の武具を齧る錆喰い虫' };
+  }
+  if (find === 'frog') {
+    // 舌を伸ばして獲物を捕まえた瞬間の大ガエル（src/eco/frog.ts）。舌は6 tick しか出ていないので --every 1 で探す
+    const r = e.fxAttacks.find((o: any) => o.style === 'tongue' && w.tick - o.t === 1);
+    if (!r) return null;
+    const c = e.byId.get(r.aid);
+    const d = e.byId.get(r.did);
+    return { cam: { x: Math.round(r.ax), y: Math.round(r.ay), zoom }, marks: [{ x: c.x, y: c.y, label: '大ガエル', color: '#ffd24a' }, ...(d ? [{ x: r.dx, y: r.dy, label: NAMES[d.k], color: '#ff5050' }] : []), { x: c.hx, y: c.hy, label: '住みか', color: '#7fd0ff', size: 2 }], title: '舌で獲物を捕まえる大ガエル' };
   }
   if (find === 'battle') {
     // 古戦場（src/eco/battle.ts）：骨と錆びた武具と、まわりの起き上がった者

@@ -31,6 +31,7 @@ Each creature follows simple rules, but together they do things I didn't expect.
 - Where the gear of fallen adventurers piles up, an empty suit of armor may rise on its own and wander off collecting weapons.
 - Somewhere in the dark lies an old battlefield; its scattered bones and rusted weapons rise again before long.
 - Ghouls drag corpses back to their den and pile up the bones, and rust beetles devour discarded iron weapons.
+- Giant frogs lie in wait at the water's edge and snatch rats and bats that come to drink with their tongues.
 
 The settlers take a while to show up, so it helps to fast-forward.
 

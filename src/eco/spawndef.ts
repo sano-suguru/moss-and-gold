@@ -9,6 +9,7 @@
 import { type Burrow, type Camp, type Colony, type Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, type Warren, ih } from '../ecology';
 import { TILE } from '../mapgen';
 import { BASILISK_MANA } from './basilisk';
+import { FROG_CAP } from './frog';
 
 export interface SpawnDef {
   k: Kind;
@@ -270,6 +271,21 @@ export const SPAWN_DEFS: SpawnDef[] = [
       c.lureAt = -1;
     },
     log: `打ち捨てられた鉄の武具のそばに、{k:${Kind.RustBeetle}}が這い出した`,
+  },
+  // 大ガエル：大ネズミかコウモリが水を飲みに来る水場のうち、カエルのいない所に一匹ずつ湧き、水際に住みつく（src/eco/frog.ts）。
+  // 湧くのは、子も含めた数が水場の数より少ないときだけ。子は親と同じ水場に住み、数は食べて産む子で増える
+  {
+    k: Kind.Frog, side: 'nutr', every: 50, phase: 33, cool: DAY_TICKS_ECO / 2, minDay: 2,
+    ok: (e) => e.counts[Kind.Frog] < Math.min(FROG_CAP, e.waterholes.length),
+    chance: (e) => ih(e.step, 33, 71) % 10 === 0,
+    site: (e) => e.frogSite(),
+    band: () => 1,
+    body: 30, food: 30, mana: 0,
+    setup: (e, c, site) => {
+      c.hx = tileX(e, site);
+      c.hy = tileY(e, site);
+    },
+    log: `水場の水際に、{k:${Kind.Frog}}が住みついた`,
   },
   // ジャイアントアント：キノコが増えたら、キノコの多い壁ぎわに、巣と女王と働きアリ5匹が湧く（巣の蓄え16と女王の30も土の養分から）
   {

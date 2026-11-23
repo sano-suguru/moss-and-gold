@@ -47,17 +47,19 @@ export const enum Kind {
   Ghoul = 31,
   /** 錆喰い虫：未練の抜けた鉄の武具を食べる甲虫（src/eco/rust.ts） */
   RustBeetle = 32,
+  /** 大ガエル：水場の水際で待ち伏せ、水を飲みに来た小さな獲物を舌で捕まえる（src/eco/frog.ts） */
+  Frog = 33,
 }
 
 /** 種の数（Kind の最後の番号 + 1）。種ごとの配列（数・体の大きさ・照らされた種の印など）の大きさ。種を足したら、最後の種にする */
-export const KIND_COUNT = Kind.RustBeetle + 1;
+export const KIND_COUNT = Kind.Frog + 1;
 
 /** 種ごとの体の大きさ（間合いの目安。px。0 は押し合わない種）。Ecology.bodySize が引く表 */
 export const BODY_SIZE: Uint8Array = Uint8Array.from({ length: KIND_COUNT }, (_, k) => {
   if (k === Kind.Dragon || k === Kind.Worm) return 40;
   if (k === Kind.Golem || k === Kind.Troll || k === Kind.Minotaur || k === Kind.Wyvern) return 18;
   if (k === Kind.Orc || k === Kind.Lizardman || k === Kind.Adventurer || k === Kind.Dwarf || k === Kind.Vampire || k === Kind.Skeleton || k === Kind.Lich || k === Kind.Armor || k === Kind.Basilisk || k === Kind.Lizard || k === Kind.Zombie || k === Kind.Ghoul) return 11;
-  if (k === Kind.Rat || k === Kind.Ant || k === Kind.RustBeetle || k === Kind.Bat || k === Kind.Kobold || k === Kind.Goblin || k === Kind.Spider || k === Kind.Myconid || k === Kind.Slime) return 8;
+  if (k === Kind.Rat || k === Kind.Ant || k === Kind.RustBeetle || k === Kind.Frog || k === Kind.Bat || k === Kind.Kobold || k === Kind.Goblin || k === Kind.Spider || k === Kind.Myconid || k === Kind.Slime) return 8;
   return 0;
 });
 
@@ -401,17 +403,17 @@ export interface Camp {
 }
 
 /** 種ごとの強さ（戦いの勝ち負けの確率に使う） */
-export const STR = [0, 1, 1, 5, 3, 2, 3, 2, 2, 1, 3, 4, 3, 10, 6, 20, 15, 8, 4, 12, 8, 30, 40, 25, 60, 5, 3, 18, 6, 6, 3, 5, 2];
+export const STR = [0, 1, 1, 5, 3, 2, 3, 2, 2, 1, 3, 4, 3, 10, 6, 20, 15, 8, 4, 12, 8, 30, 40, 25, 60, 5, 3, 18, 6, 6, 3, 5, 2, 3];
 /** ドワーフの強さ（坑夫、鍛冶屋、戦士） */
 export const DWARF_STR = [5, 6, 10];
 /**
  * 賢さの段階：0 本能だけ（傷ついても逃げない）、1 動物（体力が半分を切ると逃げる）、
  * 2 狡猾（不利なら退く。強い相手には仲間がいなければ挑まない）、3 知性（戦う前に見積もり、勝てない相手は避ける）
  */
-export const TIER = [1, 1, 1, 1, 1, 0, 0, 0, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 0, 3, 0, 0, 0, 1, 3, 3, 0, 3, 3, 0, 2, 2, 1];
+export const TIER = [1, 1, 1, 1, 1, 0, 0, 0, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 0, 3, 0, 0, 0, 1, 3, 3, 0, 3, 3, 0, 2, 2, 1, 1];
 export const FLEE_AT = [0, 0.5, 0.35, 0.4];
 /** 血の色：0 赤、1 暗い赤（爬虫類・竜）、2 緑（虫）、3 石のかけら、-1 なし */
-export const BLOOD = [-1, 0, 0, 1, 2, -1, -1, -1, -1, 2, 0, 1, 0, 0, 1, 0, 0, 1, 3, 0, -1, 3, 0, 1, 1, 0, -1, -1, 0, -1, -1, 1, 2];
+export const BLOOD = [-1, 0, 0, 1, 2, -1, -1, -1, -1, 2, 0, 1, 0, 0, 1, 0, 0, 1, 3, 0, -1, 3, 0, 1, 1, 0, -1, -1, 0, -1, -1, 1, 2, 0];
 /** 冒険者の強さ（職業）と、一行の格（駆け出し・手練れ・精鋭） */
 export const JOB_STR = [8, 5, 4, 5, 3, 6, 20];
 export const TIER_MUL = [0.7, 1.1, 1.6];
@@ -527,6 +529,8 @@ export const SPEC: Spec[] = [
   { body: 40, cap: 90, meta: 40, starve: 6000, speed: 0.9, glowDecay: 1 },
   // 錆喰い虫：養分ではなく鉄を食べるので、胃も代謝も持たない（飢えは最後に鉄を食べてからの長さで決まる。src/eco/rust.ts）
   { body: 8, cap: 0, meta: 1e9, starve: 1e9, speed: 0.7, glowDecay: 1 },
+  // 大ガエル：一度にたくさん食べ、長く待てる（水際で待ち伏せる）
+  { body: 30, cap: 60, meta: 30, starve: 5000, speed: 0.6, glowDecay: 1 },
 ];
 
 export interface Cr {
@@ -677,7 +681,7 @@ export const HUNT0: Kind[] = [Kind.Rat, Kind.Ant];
 export const HUNT1: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Adventurer, Kind.Dwarf];
 /** オークの獲物：ゴブリンは従える相手なので獲物にしない */
 export const HUNT_ORC: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Kobold, Kind.Ant, Kind.Adventurer, Kind.Dwarf];
-export const HUNT2: Kind[] = [Kind.Rat, Kind.Ant, Kind.Kobold];
+export const HUNT2: Kind[] = [Kind.Rat, Kind.Ant, Kind.Kobold, Kind.Frog];
 // ミノタウロスの獲物。スライムは狙わない（小さすぎる。突進と斧の薙ぎ払いを持たせてから、縄張りのスライムがまとめて倒され、
 // 8シードの10〜18日目でミノタウロスに倒されるスライムが main の14匹から38匹に増え、スライムが0匹の日が増えていた。ほかの獲物を狙った攻撃の巻き込みには当たる）
 export const HUNT3: Kind[] = [Kind.Rat, Kind.Lizard, Kind.Goblin, Kind.Kobold, Kind.Ant, Kind.Orc, Kind.Lizardman, Kind.Spider, Kind.Zombie, Kind.Ghoul, Kind.Adventurer];
@@ -973,7 +977,7 @@ export class Ecology {
    * 書かれていない種は夜目と同じ
    */
   static SENSE: Record<number, string> = {
-    [Kind.Adventurer]: 'eye', [Kind.Lizard]: 'eye', [Kind.Lizardman]: 'eye', [Kind.Wyvern]: 'eye',
+    [Kind.Adventurer]: 'eye', [Kind.Lizard]: 'eye', [Kind.Frog]: 'eye', [Kind.Lizardman]: 'eye', [Kind.Wyvern]: 'eye',
     // バジリスクは、濃いマナの暗がりに住むので夜目
     [Kind.Basilisk]: 'night',
     [Kind.Goblin]: 'night', [Kind.Kobold]: 'night', [Kind.Orc]: 'night', [Kind.Dwarf]: 'night', [Kind.Vampire]: 'night', [Kind.Dragon]: 'night',
@@ -1043,7 +1047,7 @@ export class Ecology {
 
   /**
    * 攻撃の演出の記録（描画専用）。style は技の種類：slash 斬る、jag 荒い振り、stab 突く、smash 殴る、bite 噛む、claw 爪、
-   * sting 刺す、arrow 矢、orb 魔法の弾、beam 光線、drain 吸う、chill 冷たい手、acid 溶かす、spore 胞子。
+   * sting 刺す、arrow 矢、orb 魔法の弾、beam 光線、drain 吸う、chill 冷たい手、acid 溶かす、spore 胞子、tongue 大ガエルの舌。
    * col は色（0 白、1 金、2 炎、3 毒、4 魔、5 血、6 石、7 霜）、size は大きさ（0〜2）。big は強い一撃、kill はとどめ
    */
   fxAttacks: { t: number; style: string; col: number; size: number; ax: number; ay: number; dx: number; dy: number; did: number; aid: number; big: boolean; kill: boolean; rad?: number; half?: number; n?: number; fly?: number }[] = [];
