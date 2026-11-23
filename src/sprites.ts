@@ -635,7 +635,7 @@ function rustBeetle(dir,act,f){
  else P.push(LN(6.4,Y(3),4+wob,Y(0.4),'rst',3,{no:1}),LN(7.6,Y(3),10-wob,Y(0.4),'rst',3,{no:1}));
  return {...raster(14,15,P),ax:7,ay:flip?11:10};
 }
-// 大ガエル：ずんぐりした緑の体に、頭の上へ盛り上がった大きな目と、淡い喉。座ると後ろ脚をたたむ。跳ぶと脚が伸び、舌を伸ばすと口を開ける
+// 大ガエル：ずんぐりした緑の体に、頭の上へ盛り上がった金色の大きな目と、淡い喉。苔の上でも目が見分けられるように。座ると後ろ脚をたたむ。跳ぶと脚が伸び、舌を伸ばすと口を開ける
 function frog(dir,act,f){
  const P=[],q=mod(f,4),mv=act==='move',at=act==='attack';
  if(act==='death'){
@@ -647,7 +647,7 @@ function frog(dir,act,f){
   P.push(LN(4,10+hop*0.3,1-ext,11.2,'frgD',3,{no:1}),E(4.4,9+hop,2.6,1.8,'frgD',{ol:1}));
   P.push(E(7.6,7.6+hop,5,3.2,'frg',{ol:1}),E(9,9.4+hop,3.4,1.4+thr,'frgB',{flat:2}));
   P.push(D(5,6.4+hop,RAMP.frgD[2]),D(7.2,5.8+hop,RAMP.frgD[2]),D(4.2,8+hop,RAMP.frgD[2]));
-  P.push(E(10.6,4.8+hop,1.7,1.6,'frg',{ol:1}),D(11.2,4.6+hop,COL.K),D(10.6,4+hop,RAMP.frg[4]));
+  P.push(E(10.6,4.8+hop,1.7,1.6,'frgB',{ol:1}),D(11.2,4.6+hop,COL.K),D(10.6,4+hop,RAMP.frgB[4]));
   P.push(LN(9.6,10+hop,10.6,11.4,'frgD',2,{no:1}),D(11.2,11.4,RAMP.frgD[3]));
   P.push(LN(12.4,7.6+hop-gape*0.5,10.6,7.8+hop-gape*0.5,'frgD',0,{no:1}));
   if(gape)P.push(LN(12.4,7.8+hop+gape*0.4,10.8,8+hop+gape*0.2,'frgD',0,{no:1}),D(12,8+hop,RAMP.pink[3]));
@@ -660,7 +660,7 @@ function frog(dir,act,f){
  if(!flip){
   P.push(E(8,Y(9.6)+hop,3,1.2+thr,'frgB',{flat:2}));
   P.push(LN(5,Y(10.4)+hop,4.4,Y(12),'frgD',2,{no:1}),LN(11,Y(10.4)+hop,11.6,Y(12),'frgD',2,{no:1}));
-  P.push(E(5.4,Y(4.4)+hop,1.7,1.6,'frg',{ol:1}),E(10.6,Y(4.4)+hop,1.7,1.6,'frg',{ol:1}),D(5.4,Y(4.6)+hop,COL.K),D(10.6,Y(4.6)+hop,COL.K),D(5,Y(4)+hop,RAMP.frg[4]),D(10.2,Y(4)+hop,RAMP.frg[4]));
+  P.push(E(5.4,Y(4.4)+hop,1.7,1.6,'frgB',{ol:1}),E(10.6,Y(4.4)+hop,1.7,1.6,'frgB',{ol:1}),D(5.4,Y(4.6)+hop,COL.K),D(10.6,Y(4.6)+hop,COL.K),D(5,Y(4)+hop,RAMP.frgB[4]),D(10.2,Y(4)+hop,RAMP.frgB[4]));
   P.push(LN(5.6,Y(8.2)+hop,10.4,Y(8.2)+hop,'frgD',0,{no:1}));
   if(gape)P.push(E(8,Y(8.6)+hop,2.2,gape*0.5,'frgD',{flat:0}),D(8,Y(8.6)+hop,RAMP.pink[3]));
  } else {
