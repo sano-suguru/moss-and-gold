@@ -1994,7 +1994,12 @@ export class CreatureView {
       const a = eco.moveAlpha(c, alpha);
       const tg = tongued.get(c.id);
       const x = tg ? tg[0] : c.px + (c.x - c.px) * a;
-      const y = tg ? tg[1] : c.py + (c.y - c.py) * a;
+      let y = tg ? tg[1] : c.py + (c.y - c.py) * a;
+      // 武具を齧る錆喰い虫は、武具の手前に描く（床の武具は足もとの位置で前後が決まるので、奥の側から齧ると武具の絵に隠れる）
+      if (c.k === Kind.RustBeetle && !c.dead && c.act === 2 && c.ref2) {
+        const it = eco.gear.find((g) => g.id === c.ref2);
+        if (it && it.y + 3 > y) y = it.y + 3;
+      }
       // （ワームは胴が長いので、頭が少し画面の外でも描く）
       if (!inView(x, y, c.k === Kind.Worm ? 150 : 40)) continue;
       this.order.push({ y, c, x, yy: y });
