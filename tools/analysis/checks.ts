@@ -562,24 +562,24 @@ export const CHECKS: Check[] = [
   {
     // 錆喰い虫（rustBeetle）：錆びた鉄の武具に群がって食べ尽くす。どのシードに武具が溜まるかは展開で変わるので、15シードの合計で見る。
     // 錆喰い虫は3日目ごろから湧くので、10日目までに溜まった武具はあらかた食べ終えている。10〜18日目は、新しく錆びる武具の分だけ。
-    // 目安は実測の半分ほど（実測 RUST_N回・RUST_Sシード）
-    name: '錆喰い虫が錆びた鉄の武具を食べ尽くす（15シードの10〜18日目の合計で RUST_T回以上・RUST_U シード以上）',
+    // 目安は実測の半分ほど（実測 50回・8シード）
+    name: '錆喰い虫が錆びた鉄の武具を食べ尽くす（15シードの10〜18日目の合計で25回以上・4シード以上）',
     ...RUN_WIDE,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === Kind.RustBeetle && x.ev === 'rust').length);
       const seeds = n.filter((v) => v > 0).length;
-      return { ok: sum(n) >= 1 && seeds >= 1, value: `${sum(n)}（${seeds}シード）` };
+      return { ok: sum(n) >= 25 && seeds >= 4, value: `${sum(n)}（${seeds}シード）` };
     },
   },
   {
     // 大ガエル（frog）：水場の水際で待ち伏せ、水を飲みに来た大ネズミやコウモリを舌で捕まえる。
-    // 目安は実測の半分ほど（実測 FROG_N回・FROG_Sシード）
-    name: '大ガエルが水際で舌を伸ばして獲物を捕まえる（15シードの10〜18日目の合計で FROG_T回以上・FROG_U シード以上）',
+    // 目安は実測の半分ほど（実測 655回・14シード）
+    name: '大ガエルが水際で舌を伸ばして獲物を捕まえる（15シードの10〜18日目の合計で320回以上・10シード以上）',
     ...RUN_WIDE,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === Kind.Frog && x.ev === 'tongue').length);
       const seeds = n.filter((v) => v > 0).length;
-      return { ok: sum(n) >= 1 && seeds >= 1, value: `${sum(n)}（${seeds}シード）` };
+      return { ok: sum(n) >= 320 && seeds >= 10, value: `${sum(n)}（${seeds}シード）` };
     },
   },
   {
