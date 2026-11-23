@@ -9,7 +9,6 @@
 import { type Burrow, type Camp, type Colony, type Cr, DAY_TICKS_ECO, Ecology, Kind, SPEC, type Warren, ih } from '../ecology';
 import { TILE } from '../mapgen';
 import { BASILISK_MANA } from './basilisk';
-import { rustEdible } from './rust';
 
 export interface SpawnDef {
   k: Kind;
@@ -258,11 +257,11 @@ export const SPAWN_DEFS: SpawnDef[] = [
     },
     log: `死骸の匂いの溜まる暗がりに、{k:${Kind.Ghoul}}の群れが巣を構えた`,
   },
-  // 錆喰い虫：未練の抜けた鉄の武具が3つ以上床にあれば、いちばん多く溜まった所に2匹で湧く（src/eco/rust.ts）。
+  // 錆喰い虫：錆びた未練の抜けた鉄の武具（rustEdible）が3つ以上床にあれば、いちばん多く溜まった所に2匹で湧く（src/eco/rust.ts）。
   // 一度に一つの群れまで。前の群れが湧いてから1日はあける。数は鉄を食べて産む子で増える
   {
     k: Kind.RustBeetle, side: 'nutr', every: 50, phase: 32, cool: DAY_TICKS_ECO / 2, minDay: 3,
-    ok: (e) => e.counts[Kind.RustBeetle] === 0 && e.gear.filter(rustEdible).length >= 3,
+    ok: (e) => e.counts[Kind.RustBeetle] === 0 && e.gear.filter((o) => e.rustEdible(o)).length >= 3,
     chance: (e) => ih(e.step, 32, 71) % 10 === 0,
     site: (e) => e.rustSite(),
     band: () => 2,

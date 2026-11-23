@@ -22,6 +22,8 @@ export function petrify(this: Ecology, c: Cr, by = -1): void {
   }
   this.record('deaths', { t: this.w.tick, id: c.id, k: c.k, cause: 'petrified', by, x: Math.round(c.x), y: Math.round(c.y) } as never);
   this.releaseMana(c);
+  // 石になった冒険者の所でも、倒れた冒険者と同じくマナが立ちのぼる（die の heroDeathMana と同じ）
+  this.heroDeathMana(c);
   const st: Statue = { id: this.nextId++, x: Math.round(c.x), y: Math.round(c.y), k: c.k, sp: c.sp, dir: c.dir, act: c.act === 3 ? 0 : c.act, f: (this.step >> 2) & 3, units: c.body + c.food + c.units, age: 0 };
   this.statues.push(st);
   // 石像の覚え書き：誰が石になったかと、石にした種（情報パネルに出る）

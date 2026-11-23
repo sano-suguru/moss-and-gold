@@ -1140,7 +1140,7 @@ export function dropJobItems(this: Ecology, c: Cr): void {
 /** 床に道具を置く。n は情報パネルに出すいきさつ（落とした者など。判断には使わない） */
 export function dropItem(this: Ecology, x: number, y: number, kind: number, fuel: number, n?: Note): void {
   const id = this.nextId++;
-  this.gear.push({ id, x: Math.round(x), y: Math.round(y), kind, fuel });
+  this.gear.push({ id, x: Math.round(x), y: Math.round(y), kind, fuel, t: this.w.tick });
   if (n) this.note(id, n);
   // 古い燃えさしから片づける（道具が増えすぎないように）
   if (this.gear.length > 160) {

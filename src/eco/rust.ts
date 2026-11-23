@@ -2,7 +2,7 @@
  * Ecology のメソッド：錆喰い虫（Kind.RustBeetle）。鉄を食べる小さな甲虫。
  *
  * 見せたい場面：
- *  1. 未練の抜けた鉄の武具（甲冑が打たれて落とした武器、崩れた甲冑の残骸、僧侶に清められた武具。床の職業の道具で fuel が負のもの）に、
+ *  1. 長く打ち捨てられて錆びた、未練の抜けた鉄の武具（甲冑が打たれて落とした武器、崩れた甲冑の残骸、僧侶に清められた武具。rustEdible）に、
  *     赤錆色の甲虫が群がって齧り、錆の粉を散らしながら食べ尽くす（rustEdible）。
  *  2. マナの宿りうる武具（fuel が0以上。古戦場の錆びた武具も含む）は、未練を嫌って食べない。甲冑の材料には手を付けず、
  *     甲冑が崩れたあとの残骸を片づける。
@@ -24,9 +24,14 @@ const RUST_RETARGET = 200;
 /** ダンジョン全体の数の上限（子を産むのはこれより少ないときだけ） */
 export const RUST_CAP = 8;
 
-/** 錆喰い虫が食べられる武具：未練の抜けた（fuel が負の）職業の道具 */
-export function rustEdible(it: Item): boolean {
-  return isJobItem(it.kind) && it.fuel < 0;
+/** 武具が錆びるまでの、床に落ちてからの tick（ゲーム内の1日） */
+export const RUST_AGE = DAY_TICKS_ECO;
+/**
+ * 錆喰い虫が食べられる武具：未練の抜けた（fuel が負の）職業の道具で、床に落ちてから RUST_AGE 以上たって錆びたもの。
+ * 甲冑が打たれて落とした武器は、たいてい錆びる前に甲冑が拾い直す（落ちてすぐの武器を食べると、甲冑が武具を取り込む場面が半分に減る）
+ */
+export function rustEdible(this: Ecology, it: Item): boolean {
+  return isJobItem(it.kind) && it.fuel < 0 && this.w.tick - it.t >= RUST_AGE;
 }
 
 export function rustBeetle(this: Ecology, c: Cr): void {
@@ -37,7 +42,7 @@ export function rustBeetle(this: Ecology, c: Cr): void {
   }
   let it = c.ref2 ? (this.gear.find((o) => o.id === c.ref2) ?? null) : null;
   // 目当ての武具が無くなった（ほかの錆喰い虫が食べた、甲冑やゴブリンが拾った）か、食べられなくなったら、探し直す
-  if (it && !rustEdible(it)) it = null;
+  if (it && !this.rustEdible(it)) it = null;
   if (!it) {
     c.ref2 = 0;
     it = this.rustTarget(c);
@@ -76,12 +81,12 @@ export function rustBeetle(this: Ecology, c: Cr): void {
 
 /** いちばん歩いて近い、食べられる武具（RUST_SMELL 歩まで。なければ null） */
 export function rustTarget(this: Ecology, c: Cr): Item | null {
-  if (!this.gear.some(rustEdible)) return null;
+  if (!this.gear.some((o) => this.rustEdible(o))) return null;
   const walk = this.walkNear(this.tileOf(c.x, c.y), RUST_SMELL);
   let best: Item | null = null;
   let bd = 1e9;
   for (const o of this.gear) {
-    if (!rustEdible(o)) continue;
+    if (!this.rustEdible(o)) continue;
     const k = this.tileOf(o.x, o.y);
     const d = k >= 0 ? walk[k] : -1;
     if (d < 0 || d >= bd) continue;
@@ -115,7 +120,7 @@ export function rustEat(this: Ecology, c: Cr, it: Item): void {
  * 状態は書き換えない（spawndef の site）
  */
 export function rustSite(this: Ecology): number {
-  const items = this.gear.filter(rustEdible);
+  const items = this.gear.filter((o) => this.rustEdible(o));
   let best = -1;
   let bn = 0;
   for (const it of items) {
@@ -137,6 +142,7 @@ declare module '../ecology' {
     rustTarget: typeof rustTarget;
     rustEat: typeof rustEat;
     rustSite: typeof rustSite;
+    rustEdible: typeof rustEdible;
   }
 }
-Object.assign(Ecology.prototype, { rustBeetle, rustTarget, rustEat, rustSite });
+Object.assign(Ecology.prototype, { rustBeetle, rustTarget, rustEat, rustSite, rustEdible });

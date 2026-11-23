@@ -294,6 +294,8 @@ export interface Item {
   y: number;
   kind: number;
   fuel: number;
+  /** 床に落ちた tick（錆喰い虫は、落ちてから長くたって錆びた武具だけを食べる。src/eco/rust.ts） */
+  t: number;
 }
 
 /** 外の世界の噂（日ごとに薄れる） */
