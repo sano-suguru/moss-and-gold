@@ -339,7 +339,8 @@ export class CreatureView {
         const fx = c.dir === 2 ? 1 : c.dir === 3 ? -1 : 0;
         const mx = c.x + fx * bs * 0.45;
         const my = c.y + (c.dir === 0 ? 2 : c.dir === 1 ? -2 : 0);
-        const col = B[i + 3] === 1 ? 1 : 3;
+        // 苔は緑、キノコは茶、錆喰い虫が齧る鉄は錆の橙
+        const col = B[i + 3] === 1 ? 1 : B[i + 3] === 2 ? 2 : 3;
         for (let j = 0; j < 3; j++) {
           const a = ((B[i] * 7 + j * 5 + c.id) % 12) * 0.52;
           this.bits.push({ x: mx, y: my + 1, z: 2 + bs * 0.25, vx: Math.cos(a) * 0.7 + fx * 0.3, vy: Math.sin(a) * 0.35, vz: 1.3 + j * 0.3, kind: 2, col, t0: now, life: 14 });
@@ -1328,6 +1329,7 @@ export class CreatureView {
       case Kind.Orc: return A.named('orc', dir, act, f, v);
       case Kind.Lizardman: return A.named('lizardman', dir, act, f);
       case Kind.Ghoul: return A.named('ghoul', dir, act, f);
+      case Kind.RustBeetle: return A.named('rust', dir, act, f);
       case Kind.Minotaur: return A.named('minotaur', dir, act, f);
       case Kind.Troll: return A.named('troll', dir, act, f);
       case Kind.Basilisk: return A.named('basilisk', dir, act, f);

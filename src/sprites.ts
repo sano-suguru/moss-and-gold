@@ -38,6 +38,9 @@ const RAMP={
  iron:[[36,38,44],[70,74,84],[110,116,128],[152,158,170],[200,206,214]],
  ant:[[24,10,8],[60,24,18],[104,44,30],[150,72,48],[190,110,80]],
  antD:[[18,8,6],[44,18,14],[76,32,22],[108,52,36],[140,78,56]],
+ // 錆喰い虫：橙の錆色の丸い甲羅と、淡い触角
+ rst:[[46,20,6],[112,50,14],[178,90,26],[222,134,52],[246,186,110]],
+ rstD:[[30,14,6],[70,34,12],[112,58,20],[150,84,34],[184,116,60]],
  // 地形の岩と同じ色の段（cK〜cd）。rockS は柔らかい層（茶色がかる）、rockH は硬い岩（青みがかる）。ワームが押し上げる岩 wormMound に使う
  rock:[[20,16,24],[34,30,40],[52,46,60],[74,66,84],[100,92,110]],
  rockS:[[24,16,18],[41,30,30],[63,46,44],[90,66,62],[122,92,81]],
@@ -445,9 +448,9 @@ function bones(sp){
  if(sp==='bat'){[[10,5,2,2],[10,5,4,7],[10,5,18,1],[10,5,17,6],[10,5,7,8]].forEach(([a,b,c,d])=>P.push(LN(a,b,c,d,'bone',2,{no:1})));P.push(E(12,4.5,1.7,1.4,'bone',{ol:1}),D(12,4,COL.K));return {...raster(20,9,P),ax:10,ay:7}}
  P.push(E(11,8,4.2,2.6,'zspi',{ol:1,flat:2}));[[8,8,5,4,7,2],[9.5,7,9,3,11,1.6],[12.5,7,13,3,11,1.6],[14,8,17,4,15,2],[7,9,3,9,4,6],[15,9,19,9,18,6]].forEach(([a,b,c,d,e,g])=>P.push(LN(a,b,c,d,'bone',1,{no:1}),LN(c,d,e,g,'bone',1,{no:1})));return {...raster(22,12,P),ax:11,ay:11};
 }
-const DEADF={rat:()=>ratDead(1),lizard:()=>lizDead(1),bat:()=>batDead(),spider:()=>spider('side','death',3),kobold:()=>kobold('side','death',3),ant:()=>ant('side','death',0),salamander:()=>salamander('side','death',3),goblin:()=>goblin('side','death',3),orc:()=>orc('side','death',3),lizardman:()=>lizardman('side','death',3),minotaur:()=>minotaur('side','death',3),troll:()=>troll('side','death',3),basilisk:()=>basilisk('side','death',3),gargoyle:()=>gargoyle('side','death',3),vampire:()=>vampire('side','death',3),mimic:()=>mimic('side','death',3),golem:()=>golem('side','death',3),wyvern:()=>wyvern('side','death',3),dragon:()=>dragon('side','death',3),adventurer:()=>heroSprite('warrior','down','death',3,false,0,1),skeleton:()=>skeleton('none','side','death',3),lich:()=>lich('side','death',3),dwarf:()=>dwarf('miner','side','death',3),ghoul:()=>ghoul('side','death',3)};
+const DEADF={rat:()=>ratDead(1),lizard:()=>lizDead(1),bat:()=>batDead(),spider:()=>spider('side','death',3),kobold:()=>kobold('side','death',3),ant:()=>ant('side','death',0),salamander:()=>salamander('side','death',3),goblin:()=>goblin('side','death',3),orc:()=>orc('side','death',3),lizardman:()=>lizardman('side','death',3),minotaur:()=>minotaur('side','death',3),troll:()=>troll('side','death',3),basilisk:()=>basilisk('side','death',3),gargoyle:()=>gargoyle('side','death',3),vampire:()=>vampire('side','death',3),mimic:()=>mimic('side','death',3),golem:()=>golem('side','death',3),wyvern:()=>wyvern('side','death',3),dragon:()=>dragon('side','death',3),adventurer:()=>heroSprite('warrior','down','death',3,false,0,1),skeleton:()=>skeleton('none','side','death',3),lich:()=>lich('side','death',3),dwarf:()=>dwarf('miner','side','death',3),ghoul:()=>ghoul('side','death',3),rust:()=>rustBeetle('side','death',3)};
 /** 死骸の段階：0 新しい、1 腐りかけ、2 骨 */
-function corpse(sp,stage){if(stage===2){if(sp==='ant')return rotFrame(ant('side','death',0),0.5,3,false);if(sp==='gargoyle')return gargoyle('side','death',3);if(sp==='wyvern'||sp==='dragon')return bones('lizard');if(sp==='adventurer'||sp==='skeleton'||sp==='lich'||sp==='dwarf')return bones('kobold');if(sp==='mimic')return mimic('side','death',3);if(sp==='golem')return golem('side','death',3);if(sp==='salamander'||sp==='lizardman'||sp==='basilisk')return bones('lizard');if(sp==='goblin'||sp==='orc'||sp==='minotaur'||sp==='troll'||sp==='vampire'||sp==='ghoul')return bones('kobold');return bones(sp)}const fr=DEADF[sp]();return stage===0?fr:rotFrame(fr,0.28,13,false)}
+function corpse(sp,stage){if(stage===2){if(sp==='ant')return rotFrame(ant('side','death',0),0.5,3,false);if(sp==='rust')return rotFrame(rustBeetle('side','death',0),0.5,3,false);if(sp==='gargoyle')return gargoyle('side','death',3);if(sp==='wyvern'||sp==='dragon')return bones('lizard');if(sp==='adventurer'||sp==='skeleton'||sp==='lich'||sp==='dwarf')return bones('kobold');if(sp==='mimic')return mimic('side','death',3);if(sp==='golem')return golem('side','death',3);if(sp==='salamander'||sp==='lizardman'||sp==='basilisk')return bones('lizard');if(sp==='goblin'||sp==='orc'||sp==='minotaur'||sp==='troll'||sp==='vampire'||sp==='ghoul')return bones('kobold');return bones(sp)}const fr=DEADF[sp]();return stage===0?fr:rotFrame(fr,0.28,13,false)}
 // ===== スライム =====
 function slime(dir,act,f,size){
  const P=[],q=mod(f,4),s=size;
@@ -604,6 +607,30 @@ function ant(dir,act,f,carry){
  P.push(E(7,Y(2.8),2.2,2,'ant',{ol:1}),E(7,Y(5.6),1.4,1.2,'ant',{ol:1}),E(7,Y(8),1.8,1.6,'ant',{ol:1}));
  if(!flip){P.push(LN(6,9,4.6,10,'antD',2,{no:1}),LN(8,9,9.4,10,'antD',2,{no:1}),D(6,8,COL.K),D(8,8,COL.K));if(carry)P.push(D(7,10,RAMP.zfur[3]))}
  return {...raster(14,11,P),ax:7,ay:flip?9:9};
+}
+// 錆喰い虫：丸い甲羅一枚（合わせ目と錆の斑点）に短い脚と、長く伸びて揺れる触角。アリ（三つの節）と見分けがつくように
+function rustBeetle(dir,act,f){
+ const P=[],q=mod(f,4),mv=act==='move',at=act==='attack';
+ const g=mv?(q%2):0, wob=at?[0,1,0,-1][q]:mv?[0,0.5,0,-0.5][q]:0;
+ if(act==='death'){
+  P.push(E(7,7,4,2.6,'rstD',{ol:1}),LN(4,8,2,10,'rstD',2,{no:1}),LN(10,8,12,10,'rstD',2,{no:1}),LN(6,5,4,3,'rstD',2,{no:1}));
+  return {...raster(15,11,P),ax:7,ay:9};
+ }
+ if(dir==='side'){
+  [[5,7],[7.4,7.4],[9.6,7]].forEach(([x,y],i)=>P.push(LN(x,y,x+((i+g)%2?0.9:-0.9),9.2,'rstD',2,{no:1})));
+  P.push(E(7,5.6,4.4,3,'rst',{ol:1}),LN(3.4,4.6,10.4,4.6,'rstD',0,{no:1}));
+  P.push(D(5.4,6,RAMP.rstD[1]),D(8.4,5.4,RAMP.rstD[1]),D(6.6,3.8,RAMP.rst[4]));
+  P.push(E(11.8,6,1.5,1.3,'rstD',{ol:1}),D(12.4,5.6,COL.K));
+  P.push(LN(12.6,5,15.6,1.4+wob,'rst',3,{no:1}),LN(12.2,5,14,0.6-wob,'rst',3,{no:1}));
+  return {...raster(17,11,P),ax:7,ay:9};
+ }
+ const flip=dir==='up',Y=(y)=>flip?12-y:y;
+ [[5,1.8],[7,1.2],[9,1.8]].forEach(([y,x0],i)=>{const o=(i+g)%2?0.8:-0.8;P.push(LN(4.4,Y(y),x0,Y(y+o),'rstD',2,{no:1}),LN(9.6,Y(y),14-x0,Y(y-o),'rstD',2,{no:1}))});
+ P.push(E(7,Y(6.4),4,3.6,'rst',{ol:1}),LN(7,Y(3.4),7,Y(9.4),'rstD',0,{no:1}));
+ P.push(D(5.4,Y(5.6),RAMP.rstD[1]),D(8.6,Y(7.2),RAMP.rstD[1]),D(6,Y(4.6),RAMP.rst[4]));
+ if(!flip){P.push(E(7,Y(10.2),1.6,1.2,'rstD',{ol:1}),D(6.2,Y(10.4),COL.K),D(7.8,Y(10.4),COL.K));P.push(LN(6.4,Y(11),3.6+wob,Y(13.4),'rst',3,{no:1}),LN(7.6,Y(11),10.4-wob,Y(13.4),'rst',3,{no:1}))}
+ else P.push(LN(6.4,Y(3),4+wob,Y(0.4),'rst',3,{no:1}),LN(7.6,Y(3),10-wob,Y(0.4),'rst',3,{no:1}));
+ return {...raster(14,15,P),ax:7,ay:flip?11:10};
 }
 function anthill(){
  const P=[];
@@ -6155,4 +6182,4 @@ function mushroomLord(act,f){
  return {...fr,ax:17,ay:36};
 }
 
-export { fxSporeCloud, fxSporePuff, fxSporeMote, fxSlingWhirl, fxSlingStone, fxStoneHit, fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, HERO_JOBS, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, haulArt, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, ghoul, RAMP, COL, E, C, PL, LN, D, GD };
+export { fxSporeCloud, fxSporePuff, fxSporeMote, fxSlingWhirl, fxSlingStone, fxStoneHit, fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, heroOrbAt, setHeroPix, vampMist, livingArmor, heroSprite, heroBed, HERO_JOBS, CREST_NAMES, graveMarker, prayLight, raster, rat, lizard, spider, bat, wisp, zrat, zlizard, slime, ghost, corpse, bones, humanoid, kobold, goblin, orc, lizardman, minotaur, goblinCamp, reedHut, supplyCache, coffin, troll, basilisk, gargoyle, vampire, petrify, treasure, golem, mimic, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, dragon, fireBreath, item, skeleton, lich, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, haulArt, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, myconid, salamander, mushrooms, ghoul, rustBeetle, RAMP, COL, E, C, PL, LN, D, GD };

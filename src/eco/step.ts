@@ -212,6 +212,7 @@ export function update(this: Ecology, _tick: number, day: number, phase: number)
       case Kind.Armor: this.armor(c); break;
       case Kind.Thrall: this.thrall(c); break;
       case Kind.Ghoul: this.ghoul(c); break;
+      case Kind.RustBeetle: this.rustBeetle(c); break;
     }
     if (!c.dead) this.metabolism(c);
   }

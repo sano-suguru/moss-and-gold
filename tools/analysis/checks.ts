@@ -560,6 +560,16 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 錆喰い虫（src/eco/rust.ts）：未練の抜けた鉄の武具に群がって食べ尽くす。どのシードに武具が溜まるかは展開で変わるので、15シードの合計で見る
+    name: '錆喰い虫が未練の抜けた鉄の武具を食べ尽くす（15シードの10〜18日目の合計で10回以上・5シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === Kind.RustBeetle && x.ev === 'rust').length);
+      const seeds = n.filter((v) => v > 0).length;
+      return { ok: sum(n) >= 10 && seeds >= 5, value: `${sum(n)}（${seeds}シード）` };
+    },
+  },
+  {
     // 獲物を丸のみにする種（feeding の SWALLOWERS）：大トカゲは大ネズミを骨ごと食べて満ち、子を産む。骨を残すと満ちきらず、親から生まれなくなる
     name: '大トカゲが親から生まれる（15シードの10〜18日目の合計で10回以上・5シード以上）',
     ...RUN_WIDE,

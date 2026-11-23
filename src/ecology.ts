@@ -45,17 +45,19 @@ export const enum Kind {
   Thrall = 30,
   /** グール：肉の残る死骸を巣へ引きずって食べる屍喰い。巣に骨塚ができる（src/eco/ghoul.ts） */
   Ghoul = 31,
+  /** 錆喰い虫：未練の抜けた鉄の武具を食べる甲虫（src/eco/rust.ts） */
+  RustBeetle = 32,
 }
 
 /** 種の数（Kind の最後の番号 + 1）。種ごとの配列（数・体の大きさ・照らされた種の印など）の大きさ。種を足したら、最後の種にする */
-export const KIND_COUNT = Kind.Ghoul + 1;
+export const KIND_COUNT = Kind.RustBeetle + 1;
 
 /** 種ごとの体の大きさ（間合いの目安。px。0 は押し合わない種）。Ecology.bodySize が引く表 */
 export const BODY_SIZE: Uint8Array = Uint8Array.from({ length: KIND_COUNT }, (_, k) => {
   if (k === Kind.Dragon || k === Kind.Worm) return 40;
   if (k === Kind.Golem || k === Kind.Troll || k === Kind.Minotaur || k === Kind.Wyvern) return 18;
   if (k === Kind.Orc || k === Kind.Lizardman || k === Kind.Adventurer || k === Kind.Dwarf || k === Kind.Vampire || k === Kind.Skeleton || k === Kind.Lich || k === Kind.Armor || k === Kind.Basilisk || k === Kind.Lizard || k === Kind.Zombie || k === Kind.Ghoul) return 11;
-  if (k === Kind.Rat || k === Kind.Ant || k === Kind.Bat || k === Kind.Kobold || k === Kind.Goblin || k === Kind.Spider || k === Kind.Myconid || k === Kind.Slime) return 8;
+  if (k === Kind.Rat || k === Kind.Ant || k === Kind.RustBeetle || k === Kind.Bat || k === Kind.Kobold || k === Kind.Goblin || k === Kind.Spider || k === Kind.Myconid || k === Kind.Slime) return 8;
   return 0;
 });
 
@@ -397,17 +399,17 @@ export interface Camp {
 }
 
 /** 種ごとの強さ（戦いの勝ち負けの確率に使う） */
-export const STR = [0, 1, 1, 5, 3, 2, 3, 2, 2, 1, 3, 4, 3, 10, 6, 20, 15, 8, 4, 12, 8, 30, 40, 25, 60, 5, 3, 18, 6, 6, 3, 5];
+export const STR = [0, 1, 1, 5, 3, 2, 3, 2, 2, 1, 3, 4, 3, 10, 6, 20, 15, 8, 4, 12, 8, 30, 40, 25, 60, 5, 3, 18, 6, 6, 3, 5, 2];
 /** ドワーフの強さ（坑夫、鍛冶屋、戦士） */
 export const DWARF_STR = [5, 6, 10];
 /**
  * 賢さの段階：0 本能だけ（傷ついても逃げない）、1 動物（体力が半分を切ると逃げる）、
  * 2 狡猾（不利なら退く。強い相手には仲間がいなければ挑まない）、3 知性（戦う前に見積もり、勝てない相手は避ける）
  */
-export const TIER = [1, 1, 1, 1, 1, 0, 0, 0, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 0, 3, 0, 0, 0, 1, 3, 3, 0, 3, 3, 0, 2, 2];
+export const TIER = [1, 1, 1, 1, 1, 0, 0, 0, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 0, 3, 0, 0, 0, 1, 3, 3, 0, 3, 3, 0, 2, 2, 1];
 export const FLEE_AT = [0, 0.5, 0.35, 0.4];
 /** 血の色：0 赤、1 暗い赤（爬虫類・竜）、2 緑（虫）、3 石のかけら、-1 なし */
-export const BLOOD = [-1, 0, 0, 1, 2, -1, -1, -1, -1, 2, 0, 1, 0, 0, 1, 0, 0, 1, 3, 0, -1, 3, 0, 1, 1, 0, -1, -1, 0, -1, -1, 1];
+export const BLOOD = [-1, 0, 0, 1, 2, -1, -1, -1, -1, 2, 0, 1, 0, 0, 1, 0, 0, 1, 3, 0, -1, 3, 0, 1, 1, 0, -1, -1, 0, -1, -1, 1, 2];
 /** 冒険者の強さ（職業）と、一行の格（駆け出し・手練れ・精鋭） */
 export const JOB_STR = [8, 5, 4, 5, 3, 6, 20];
 export const TIER_MUL = [0.7, 1.1, 1.6];
@@ -521,6 +523,8 @@ export const SPEC: Spec[] = [
   { body: 0, cap: 0, meta: 1e9, starve: 1e9, speed: 0.85, glowDecay: 1 },
   // グール：死骸の肉を食べる。一度にたくさん食べ、長く食べずにいられる（死骸はいつもあるとは限らない）
   { body: 40, cap: 90, meta: 40, starve: 6000, speed: 0.9, glowDecay: 1 },
+  // 錆喰い虫：養分ではなく鉄を食べるので、胃も代謝も持たない（飢えは最後に鉄を食べてからの長さで決まる。src/eco/rust.ts）
+  { body: 8, cap: 0, meta: 1e9, starve: 1e9, speed: 0.7, glowDecay: 1 },
 ];
 
 export interface Cr {
@@ -971,7 +975,7 @@ export class Ecology {
     // バジリスクは、濃いマナの暗がりに住むので夜目
     [Kind.Basilisk]: 'night',
     [Kind.Goblin]: 'night', [Kind.Kobold]: 'night', [Kind.Orc]: 'night', [Kind.Dwarf]: 'night', [Kind.Vampire]: 'night', [Kind.Dragon]: 'night',
-    [Kind.Rat]: 'smell', [Kind.Ant]: 'smell', [Kind.Ghoul]: 'smell', [Kind.Troll]: 'smell', [Kind.Zombie]: 'smell', [Kind.Minotaur]: 'smell', [Kind.Slime]: 'smell',
+    [Kind.Rat]: 'smell', [Kind.Ant]: 'smell', [Kind.Ghoul]: 'smell', [Kind.RustBeetle]: 'smell', [Kind.Troll]: 'smell', [Kind.Zombie]: 'smell', [Kind.Minotaur]: 'smell', [Kind.Slime]: 'smell',
     [Kind.Spider]: 'vib', [Kind.Worm]: 'vib', [Kind.Mimic]: 'vib',
     [Kind.Bat]: 'echo',
     [Kind.Ghost]: 'magic', [Kind.Lich]: 'magic', [Kind.Wisp]: 'magic', [Kind.Gargoyle]: 'magic', [Kind.Golem]: 'magic', [Kind.Skeleton]: 'magic', [Kind.Salamander]: 'magic', [Kind.Armor]: 'magic',
@@ -1087,7 +1091,7 @@ export class Ecology {
   /**
    * この生き物の更新で起きた、苔やキノコを食べた一口と、岩を掘る一振り（描画専用：src/creatureView.ts が、口元に散る苔のかけらと、岩肌から飛ぶ石のかけらと土ぼこりを描く）。
    * 直前の8回の更新の分だけ残す（描画の1フレームの間に更新が何回も進んでも、まき漏らさないように）。セーブしない。シミュレーションの判断に使わない。
-   * fxBites は [更新の通し番号, 食べた者の id, 食べたマス, 0 苔／1 キノコ] を四つずつ、fxDigs は [更新の通し番号, 掘る者の id, 掘っている岩のマス, 0 振る／1 掘り抜いた] を四つずつ並べる
+   * fxBites は [更新の通し番号, 食べた者の id, 食べたマス, 0 苔／1 キノコ／2 錆喰い虫が齧る鉄] を四つずつ、fxDigs は [更新の通し番号, 掘る者の id, 掘っている岩のマス, 0 振る／1 掘り抜いた] を四つずつ並べる
    */
   fxBites: number[] = [];
   fxDigs: number[] = [];
