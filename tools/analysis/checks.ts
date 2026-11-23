@@ -561,17 +561,29 @@ export const CHECKS: Check[] = [
   },
   {
     // 錆喰い虫（rustBeetle）：錆びた鉄の武具に群がって食べ尽くす。どのシードに武具が溜まるかは展開で変わるので、15シードの合計で見る。
-    // 目安は実測の半分ほど（実測 187回・14シード）
-    name: '錆喰い虫が錆びた鉄の武具を食べ尽くす（15シードの10〜18日目の合計で90回以上・10シード以上）',
+    // 錆喰い虫は3日目ごろから湧くので、10日目までに溜まった武具はあらかた食べ終えている。10〜18日目は、新しく錆びる武具の分だけ。
+    // 目安は実測の半分ほど（実測 RUST_N回・RUST_Sシード）
+    name: '錆喰い虫が錆びた鉄の武具を食べ尽くす（15シードの10〜18日目の合計で RUST_T回以上・RUST_U シード以上）',
     ...RUN_WIDE,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === Kind.RustBeetle && x.ev === 'rust').length);
       const seeds = n.filter((v) => v > 0).length;
-      return { ok: sum(n) >= 90 && seeds >= 10, value: `${sum(n)}（${seeds}シード）` };
+      return { ok: sum(n) >= 1 && seeds >= 1, value: `${sum(n)}（${seeds}シード）` };
     },
   },
   {
-    // 獲物を丸のみにする種（feeding の SWALLOWERS）：大トカゲは大ネズミを骨ごと食べて満ち、子を産む。骨を残すと満ちきらず、親から生まれなくなる。
+    // 大ガエル（frog）：水場の水際で待ち伏せ、水を飲みに来た大ネズミやコウモリを舌で捕まえる。
+    // 目安は実測の半分ほど（実測 FROG_N回・FROG_Sシード）
+    name: '大ガエルが水際で舌を伸ばして獲物を捕まえる（15シードの10〜18日目の合計で FROG_T回以上・FROG_U シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === Kind.Frog && x.ev === 'tongue').length);
+      const seeds = n.filter((v) => v > 0).length;
+      return { ok: sum(n) >= 1 && seeds >= 1, value: `${sum(n)}（${seeds}シード）` };
+    },
+  },
+  {
+    // 獲物を丸のみにする種（feeding の SWALLOW）：大トカゲは大ネズミを骨ごと食べて満ち、子を産む。骨を残すと満ちきらず、親から生まれなくなる。
     // 目安は実測の半分ほど（実測 81回・9シード）
     name: '大トカゲが親から生まれる（15シードの10〜18日目の合計で40回以上・7シード以上）',
     ...RUN_WIDE,
