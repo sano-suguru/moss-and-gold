@@ -264,9 +264,14 @@ export function kobold(this: Ecology, c: Cr): void {
   }
   if (wr && wr.hide === 1 && !(c.hungry > 300 && (wr.store ?? 0) <= 0) && (c.st === 7 || sq(wr.x - c.x) + sq(wr.y - c.y) < 8 * TILE * 8 * TILE)) {
     c.st = 7;
-    if (sq(wr.x - c.x) + sq(wr.y - c.y) > 0.6 * TILE * 0.6 * TILE) {
+    const d2 = sq(wr.x - c.x) + sq(wr.y - c.y);
+    if (d2 > 0.6 * TILE * 0.6 * TILE) {
+      const x0 = c.x;
+      const y0 = c.y;
       c.act = 1;
       this.goTo(c, wr.x, wr.y, s.speed * 1.2);
+      // 奥から2.5マスの内で、奥に詰まった仲間に阻まれて進めなければ、そこで身をひそめる（歩く姿のまま押し合い続けない）
+      if (d2 < 2.5 * TILE * 2.5 * TILE && sq(c.x - x0) + sq(c.y - y0) < 0.01) c.act = 0;
     } else c.act = 0;
     return;
   }
