@@ -83,6 +83,10 @@ async function main() {
     }
     process.exit(ok ? 0 : 1);
   }
+  // 無害な変更の回数（長い実行を始める前に値を確かめる）
+  const nNull = a.null !== undefined ? +a.null : a.preset ? 2 : 0;
+  const ks = a['null-ks'] !== undefined ? String(a['null-ks']).split(',').map(Number) : Array.from({ length: Number.isInteger(nNull) && nNull >= 0 ? nNull : 0 }, (_, i) => i + 1);
+  if (!(Number.isInteger(nNull) && nNull >= 0) || ks.some((k) => !Number.isInteger(k) || k < 0)) throw new Error(`--null は0以上の整数、--null-ks は0以上の整数をコンマで区切ったもの（--null ${a.null}、--null-ks ${a['null-ks']}）`);
   const base = await getBin('sim', baseRef);
   const cur = await getBin('sim');
   const adv = a['adv-max'] !== undefined ? +a['adv-max'] : defaultAdv();
@@ -92,21 +96,22 @@ async function main() {
     { seeds, days, adv, ver: cur, fork: fork ? { day: fork, base } : undefined, out: join(out, 'new') },
   ], jobs);
   // 無害な変更の実行（ベースのまま、from 日目の状態だけを少し変えて続けたもの）
-  const nNull = a.null !== undefined ? +a.null : a.preset ? 2 : 0;
-  const ks = a['null-ks'] !== undefined ? String(a['null-ks']).split(',').map(Number) : Array.from({ length: Number.isInteger(nNull) && nNull >= 0 ? nNull : 0 }, (_, i) => i + 1);
-  if (!(Number.isInteger(nNull) && nNull >= 0) || ks.some((k) => !Number.isInteger(k) || k < 0)) throw new Error(`--null は0以上の整数、--null-ks は0以上の整数をコンマで区切ったもの（--null ${a.null}、--null-ks ${a['null-ks']}）`);
-  const from = fork ?? 1;
+  // sim は0日目の状態を残さないので、分岐しない比較でも1日目から分ける（ensureNullRun）
+  const from = fork || 1;
   await pool(ks.flatMap((k) => seeds.map((s, i) => ({
     w: (days - from) * secPerDay(s),
     f: async () => materialize(await ensureNullRun(s, days, adv, base, k, from, console.log), join(out, `null${k}`, dirName(seeds, i)), days),
   }))), jobs);
   console.log(`実行終わり（${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
+  // --null-ks 0 は、状態を変えずに続けた実行がベースと1バイトも違わないかの確かめ（違えば終了コードを 1 にする）
+  let nullSame = true;
   if (ks.length && a['null-ks'] !== undefined)
     for (const k of ks)
       for (let i = 0; i < seeds.length; i++) {
         const d = (f: string) => [`${out}/base/${dirName(seeds, i)}/${f}`, `${out}/null${k}/${dirName(seeds, i)}/${f}`] as const;
         const sOk = read(d('samples.jsonl')[0]).equals(read(d('samples.jsonl')[1]));
         const cOk = read(d('checkpoint.json')[0]).equals(read(d('checkpoint.json')[1]));
+        if (k === 0) nullSame &&= sOk && cOk;
         console.log(`無害な変更 k${k}・${seeds[i]}：ベースと${sOk && cOk ? '同じ' : `違う（${sOk ? 'samples は同じ' : firstDiff(...d('samples.jsonl'))}、checkpoint ${cOk ? '同じ' : '違う'}）`}`);
       }
   let same = true;
@@ -124,6 +129,7 @@ async function main() {
     await run([cmp.path, '--runs', `${out}/base,${out}/new`, '--names', `ベース（${baseRef}）,作業ツリー`, '--out', `${out}/compare.md`, '--paired', ...(fork ? ['--since', String(fork)] : []), ...(ks.length ? ['--null', ks.map((k) => `${out}/null${k}`).join(',')] : []), ...(a.goals ? ['--goals', a.goals] : [])]);
     console.log(`比較：${out}/compare.md（${((Date.now() - t0) / 1000).toFixed(0)}秒）`);
   }
+  if (!nullSame) process.exit(1);
   if (!fork && !a.preset) process.exit(same ? 0 : 1);
 }
 main().catch((e) => {

@@ -265,14 +265,25 @@ export function kobold(this: Ecology, c: Cr): void {
   if (wr && wr.hide === 1 && !(c.hungry > 300 && (wr.store ?? 0) <= 0) && (c.st === 7 || sq(wr.x - c.x) + sq(wr.y - c.y) < 8 * TILE * 8 * TILE)) {
     c.st = 7;
     const d2 = sq(wr.x - c.x) + sq(wr.y - c.y);
-    // 奥から4マスの内で、すぐ前（1マスの内で、あいだに岩のない所）に、奥により近い所でひそんでいる仲間がいれば、その後ろで身をひそめる
-    // （全員が奥の0.6マスに入ろうとすると、細い横穴で仲間に詰まり、歩く姿のまま押し合い続ける。岩の向こうの仲間で止まると、通路に取り残される）
+    // 細い横穴（奥へ向かう向きの左右がどちらも岩のマス）で、奥から4マスの内のとき、すぐ前（奥の側の1マスの内で、あいだに岩のない所）に
+    // 止まってひそむ仲間がいれば、その後ろで身をひそめる（全員が奥の0.6マスに入ろうとすると、仲間に詰まって歩く姿のまま押し合い続ける）。
+    // 開けた所では止まらずに奥まで入る（手前で止まると、隠れたとみなされる奥から1.5マスの外に残り、冒険者に見つかる。isHidden）
     let queued = false;
-    if (d2 > 0.6 * TILE * 0.6 * TILE && d2 < 4 * TILE * 4 * TILE)
-      this.nearby(c.x, c.y, 1, (o) => {
-        if (queued || o === c || o.k !== Kind.Kobold || o.dead || o.st !== 7 || o.ref !== c.ref) return;
-        if (sq(o.x - c.x) + sq(o.y - c.y) < TILE * TILE && sq(wr.x - o.x) + sq(wr.y - o.y) < d2 && lineOfSight(this.w.map, c.x, c.y, o.x, o.y)) queued = true;
-      });
+    if (d2 > 0.6 * TILE * 0.6 * TILE && d2 < 4 * TILE * 4 * TILE) {
+      const m = this.w.map;
+      const k0 = this.tileOf(c.x, c.y);
+      const ux = wr.x - c.x;
+      const uy = wr.y - c.y;
+      const side = Math.abs(ux) > Math.abs(uy) ? m.w : 1;
+      const narrow = k0 > m.w && k0 < m.w * (m.h - 1) && m.solid[k0 - side] && m.solid[k0 + side];
+      if (narrow)
+        this.nearby(c.x, c.y, 1, (o) => {
+          if (queued || o === c || o.k !== Kind.Kobold || o.dead || o.st !== 7 || o.act !== 0 || o.ref !== c.ref) return;
+          const vx = o.x - c.x;
+          const vy = o.y - c.y;
+          if (vx * vx + vy * vy < TILE * TILE && vx * ux + vy * uy > 0 && lineOfSight(m, c.x, c.y, o.x, o.y)) queued = true;
+        });
+    }
     if (d2 > 0.6 * TILE * 0.6 * TILE && !queued) {
       c.act = 1;
       this.goTo(c, wr.x, wr.y, s.speed * 1.2);

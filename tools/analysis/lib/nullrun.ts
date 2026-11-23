@@ -5,26 +5,29 @@
  * （300行あまりを一行ずつ判定するので、一行あたりの見落とし・見誤りの割合が小さくても、何行かは引っかかる）。
  * そこで、ベースと同じシミュレーションのまま、from 日目の状態だけを少し変えて（次に生まれる生き物の番号 nextId を k だけ進める。
  * 生き物の番号はハッシュの乱数の種なので、そこから先の展開が分かれる。仕組みは何も変わらない）続けた実行を作り、
- * ベースとの差を「無害な変更でもこのくらい動く」幅として A/B 比較の表に並べる（compare.ts の --null）。
+ * ベースとの差を「無害な変更でもこのくらい動く」幅として A/B 比較の表に並べる（pairedRowNull）。
  *
- * キャッシュ：runs/.cache/null/<binHash>/a<上限>/<シード>/k<k>-f<from>/（sim の出力と同じ形。ベースの from 日目までのログを含む）。
+ * キャッシュ：runs/.cache/null/<binHash>/a<上限>/<シード>/v<NULL_VER>-k<k>-f<from>/（sim の出力と同じ形。ベースの from 日目までのログを含む）。
+ * 作り方（ずらし方、分岐した日のスナップショット、ログの切り出し）を変えたら NULL_VER を上げる（場所が変わり、古い実行を使わない）。
  * meta.json の系譜（lineage）に null-k<k> を足すので、sim はこれを「0日目から一つのバージョンだけで実行したもの」とみなさず、
  * 日次スナップショットをバージョンごとのキャッシュ（runs/.cache/snap/）に置かない（置くと、ベースから分岐する実行がこの展開から始まってしまう）。
  * k を 0 にすると、ベースと1バイトも違わない続きになる（しくみの確かめに使う）。
- * 0日目のスナップショットは無いので、分岐しない比較（final）でも from は1日目にする（A/B の新しい側より1日短く分かれるぶん、揺れの幅は少し狭く出る）。
+ * sim は0日目の状態を残さないので、分岐しない比較（final）でも from は1日目にする（A/B の新しい側より1日短く分かれるぶん、揺れの幅は少し狭く出る。比較の表の注にも書く）。
  *
  * ログの切り出しや排他は ensureRun の中の関数と同じことをするが、ensureRun のファイルを書き換えると、sim のビルドの中身が変わってキャッシュがすべて使えなくなるので、
  * ここに同じものを持つ（sim はこのファイルを読み込まない）。
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, linkSync, cpSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, linkSync, cpSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { DAY_TICKS } from './engine';
 import { readState, writeState } from './state';
 import { type Bin, CACHE, dayName, ensureRun, type Logger, RECORDS, readMeta, seedKey } from './runs';
 
+/** 無害な変更の実行の作り方の版（作り方を変えたら上げる） */
+export const NULL_VER = 2;
 /** 無害な変更の実行の場所 */
-export const nullDir = (binHash: string, adv: number, seed: string, k: number, from: number) => join(CACHE, 'null', binHash, `a${adv}`, seedKey(seed), `k${k}-f${from}`);
+export const nullDir = (binHash: string, adv: number, seed: string, k: number, from: number) => join(CACHE, 'null', binHash, `a${adv}`, seedKey(seed), `v${NULL_VER}-k${k}-f${from}`);
 
 function node(args: string[]): Promise<void> {
   return new Promise((res, rej) => {
@@ -47,10 +50,9 @@ function copyRecords(from: string, to: string, maxT: number) {
 }
 
 /**
- * ベース ver の、from 日目の状態の nextId を k 進めて days 日目まで続けた実行の場所を返す（キャッシュになければ実行し、日数が足りなければ再開する）。
- * ベースの from 日目までの実行も、なければ作る（ensureRun）
+ * 同じ実行のフォルダを、二つのプロセスが同時に作らないようにする（ロック用のフォルダで排他する。持ち主のプロセスがもういなければ外す）。
+ * ロックのフォルダを作ってから pid を書くまでの隙間に読みに来た者は、pid が読めなくても、フォルダができて5秒たつまでは持ち主がいるとみなして待つ
  */
-/** 同じ実行のフォルダを、二つのプロセスが同時に作らないようにする（ロック用のフォルダで排他する。持ち主のプロセスがもういなければ外す） */
 async function withLock<T>(dir: string, f: () => Promise<T>): Promise<T> {
   const lock = dir + '.lock';
   mkdirSync(dirname(lock), { recursive: true });
@@ -64,7 +66,12 @@ async function withLock<T>(dir: string, f: () => Promise<T>): Promise<T> {
       try {
         process.kill(+readFileSync(join(lock, 'pid'), 'utf8'), 0);
         alive = true;
-      } catch { /* プロセスがない */ }
+      } catch {
+        // pid が読めない（書く前）か、持ち主のプロセスがない
+        try {
+          alive = !existsSync(join(lock, 'pid')) && Date.now() - statSync(lock).mtimeMs < 5000;
+        } catch { /* ロックがもう無い */ }
+      }
       if (!alive) rmSync(lock, { recursive: true, force: true });
       else await new Promise((r) => setTimeout(r, 500));
     }
