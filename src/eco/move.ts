@@ -922,7 +922,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
   }
   const total = prey.body + prey.food + prey.units;
   // 倒した獲物は、まず死骸になり、捕食者がその上で数秒かけて食べる（肉を食べ、骨と食べ残しは死骸として残る。丸のみにする種が小さな獲物を食べるときは骨ごと。feeding）。
-  // はかない種（ウィスプ、スライム、ゴースト、マイコニド）と、丸のみにするワームとミミック、すでに死骸のものは、その場で食べる
+  // はかない種（ウィスプ、スライム、ゴースト、マイコニド）と小さな灯り蛾（死骸を残さない）、丸のみにするワームとミミック、すでに死骸のものは、その場で食べる
   // 獲物の体のマナは、食べた者へ受け渡される（食物連鎖で濃くなる）
   pred.mana += prey.mana;
   prey.mana = 0;
@@ -930,7 +930,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
     this.fxEats.push({ t: this.w.tick, id: prey.id, k: prey.k, sp: prey.sp, by: pred.id, bk: pred.k, x: prey.x, y: prey.y, slain });
     if (this.fxEats.length > 80) this.fxEats.splice(0, 20);
   }
-  const quick = prey.dead !== 0 || [Kind.Wisp, Kind.Slime, Kind.Ghost, Kind.Myconid].includes(prey.k) || pred.k === Kind.Worm || pred.k === Kind.Mimic || total <= 4;
+  const quick = prey.dead !== 0 || [Kind.Wisp, Kind.Slime, Kind.Ghost, Kind.Myconid, Kind.Moth].includes(prey.k) || pred.k === Kind.Worm || pred.k === Kind.Mimic || total <= 4;
   if (!quick) {
     this.record('deaths', { t: this.w.tick, id: prey.id, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(slain ? { slain: 1 } : {}), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(this.inCamp(prey) ? { camp: 1 } : {}) } as never);
     this.noteDeath(prey, 'eaten', pred.k, pred);
