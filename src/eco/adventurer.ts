@@ -906,7 +906,7 @@ export function setExit(this: Ecology, p: Party): void {
 const CAMP_SHUN_R = 10;
 /**
  * 焚き火のそばを避ける手強い魔物：住みかや寝床から離れないもの、縄張りを見回るもの。
- * 夜襲を担うオーク・トロール・ヴァンパイアは入れない（灯りに潜み、焚き火に忍び寄るのが見せたい場面。src/eco/night.ts）。ミミックは宝箱に化けているので入れない
+ * 夜襲を担うオーク・トロール・ヴァンパイアは入れない（灯りに潜み、焚き火に忍び寄るのが見せたい場面。nightRaider・campFoe）。ミミックは宝箱に化けているので入れない
  */
 const CAMP_SHUN = new Set<number>([Kind.Lizardman, Kind.Minotaur, Kind.Basilisk, Kind.Golem, Kind.Worm, Kind.Wyvern, Kind.Dragon, Kind.Lich, Kind.Armor]);
 /** 休む場所を選べなかったあと、探し直すまでの間（生き物の更新の回数） */
@@ -915,37 +915,51 @@ const CAMP_SHUN_WAIT = 150;
 /**
  * 焚き火の場所：近くの、壁に囲まれた所（袋小路や角）。水辺なら少し好む。
  * 同じ洞窟の中の手強い魔物（CAMP_SHUN の強さ6以上のもの）から CAMP_SHUN_R マスの内と、覚えている危ない区画には置かない。
- * 一行の先頭がそのような魔物から CAMP_SHUN_R マスの内にいるときと、置ける所がないときは、休まずに先へ進む
- * （場所を変えたときと、休めなかったときに、先頭がその魔物の方を見て settle の campShun を記録する）。
- * 避けないと、住みかから離れない魔物のすぐそばで焚き火を囲み、眠りに就いたとたんに襲われて倒れていた（焚き火で倒れた冒険者の8割）
+ * 一行の先頭がそのような魔物から CAMP_SHUN_R マスの内にいるときと、置ける所がないときは、休まずに先へ進み、CAMP_SHUN_WAIT のあいだ探し直さない
+ * （撤退し終えたときの休みは、待たずに探す）。
+ * 魔物のせいで場所を変えたときと、休まずに進みはじめたときに、先頭がその魔物の方を見て settle の campShun を記録する（how：moved 場所を変えた、none 休まずに進む）。
+ * 避けないと、住みかから離れない魔物のすぐそばで焚き火を囲み、眠りに就いたとたんに襲われて倒れる
  */
 export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: number; y: number }): void {
-  if (p.shunAt !== undefined && this.step - p.shunAt < CAMP_SHUN_WAIT) return;
+  const retreat = p.retreatUntil === this.step;
+  if (!retreat && p.shunAt !== undefined && this.step - p.shunAt < CAMP_SHUN_WAIT) return;
   const m = this.w.map;
   const hx = Math.floor((near ?? leader).x / TILE);
   const hy = Math.floor((near ?? leader).y / TILE);
   const R = near ? 2 : 8;
+  // 同じ洞窟か：領域が分からないマス（扉・崩れた直後・飛ぶ者の下の溶岩など）がからむときは、先頭から見通せるかで決める
   const reg = this.regionOf(this.tileOf(leader.x, leader.y));
+  const sameCave = (o: Cr) => {
+    const r = this.regionOf(this.tileOf(o.x, o.y));
+    if (reg >= 0 && r >= 0) return r === reg;
+    return lineOfSight(m, leader.x, leader.y, o.x, o.y);
+  };
   const threats: Cr[] = [];
   this.nearby(hx * TILE + 8, hy * TILE + 8, R + CAMP_SHUN_R, (o) => {
-    if (o.dead || o.away || STR[o.k] < 6 || !CAMP_SHUN.has(o.k)) return;
-    if (reg >= 0 && this.regionOf(this.tileOf(o.x, o.y)) !== reg) return;
+    if (o.dead || o.away || STR[o.k] < 6 || !CAMP_SHUN.has(o.k) || !sameCave(o)) return;
     threats.push(o);
   });
-  // 一行そのものが手強い魔物のそばにいる：どこに焚き火を置いても、眠りに就く前後に襲われるので、休まずに先へ進む
+  // 休まずに進む：先頭がその魔物の方を見る。記録は、続けて探し直したときには残さない（一つの場面を一度だけ数える）
+  const skip = (t: Cr | null) => {
+    if (t) this.setDir(leader, t.x - leader.x, t.y - leader.y);
+    if (p.shunAt === undefined || this.step - p.shunAt > CAMP_SHUN_WAIT * 2) this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'campShun', n: t?.k ?? -1, how: 'none', x: Math.round(leader.x), y: Math.round(leader.y) } as never);
+    p.shunAt = this.step;
+  };
+  // 一行そのものが手強い魔物のそばにいる：どこに焚き火を置いても、眠りに就く前後に襲われる
   const close = threats.find((o) => sq(o.x - leader.x) + sq(o.y - leader.y) < CAMP_SHUN_R * TILE * CAMP_SHUN_R * TILE);
   if (close) {
-    this.setDir(leader, close.x - leader.x, close.y - leader.y);
-    this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'campShun', n: close.k, how: 'none', x: Math.round(leader.x), y: Math.round(leader.y) } as never);
-    p.shunAt = this.step;
+    skip(close);
     return;
   }
   const strength = this.partyStr(p);
   const risky = new Set<number>();
   for (const d of p.danger ?? []) if (d[1] > strength * 0.7) risky.add(d[0]);
-  let shunned: Cr | null = null;
+  // best は避けて選んだ場所、any は避けなかったら選んでいた場所（それが避けた場所なら、魔物のせいで場所を変えた）
   let best = -1;
   let bv = -1e9;
+  let anyV = -1e9;
+  let anyShun: Cr | null = null;
+  let avoided = false;
   for (let dy = -R; dy <= R; dy++)
     for (let dx = -R; dx <= R; dx++) {
       const x = hx + dx;
@@ -953,13 +967,6 @@ export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: numbe
       if (x < 2 || y < 2 || x >= m.w - 2 || y >= m.h - 2) continue;
       const k = y * m.w + x;
       if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 10 || this.w.burn[k]) continue;
-      const fx = x * TILE + 8;
-      const fy = y * TILE + 8;
-      const t = threats.find((o) => sq(o.x - fx) + sq(o.y - fy) < CAMP_SHUN_R * TILE * CAMP_SHUN_R * TILE);
-      if (t || risky.has(this.cellOf(fx, fy))) {
-        shunned ??= t ?? null;
-        continue;
-      }
       // 置き場のそばで休むときは、木箱のマスそのものには焚き火を置かない
       if (near && k === this.tileOf(near.x, near.y)) continue;
       let walls = 0;
@@ -972,19 +979,28 @@ export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: numbe
         }
       if (walls > 5) continue;
       const v = walls * 3 + water * 4 - (Math.abs(dx) + Math.abs(dy)) * 0.5;
-      if (v > bv) {
+      const fx = x * TILE + 8;
+      const fy = y * TILE + 8;
+      const t = threats.find((o) => sq(o.x - fx) + sq(o.y - fy) < CAMP_SHUN_R * TILE * CAMP_SHUN_R * TILE) ?? null;
+      const bad = !!t || risky.has(this.cellOf(fx, fy));
+      if (bad) avoided = true;
+      if (v > anyV) {
+        anyV = v;
+        anyShun = t;
+      }
+      if (!bad && v > bv) {
         bv = v;
         best = k;
       }
     }
-  if (shunned) {
-    const t = shunned as Cr;
-    this.setDir(leader, t.x - leader.x, t.y - leader.y);
-    this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'campShun', n: t.k, how: best < 0 ? 'none' : 'moved', x: Math.round(leader.x), y: Math.round(leader.y) } as never);
-  }
   if (best < 0) {
-    if (shunned) p.shunAt = this.step;
+    if (avoided) skip(anyShun);
     return;
+  }
+  if (anyShun && anyV > bv) {
+    const t = anyShun as Cr;
+    this.setDir(leader, t.x - leader.x, t.y - leader.y);
+    this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'campShun', n: t.k, how: 'moved', x: Math.round(leader.x), y: Math.round(leader.y) } as never);
   }
   p.camp = best;
   p.campAt = this.step;
