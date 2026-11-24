@@ -2623,10 +2623,12 @@ export class CreatureView {
           const ta = eco.moveAlpha(tg, alpha);
           const tx = tg.px + (tg.x - tg.px) * ta;
           const ty = tg.py + (tg.y - tg.py) * ta;
-          const size = p < 0.35 ? 0 : p < 0.7 ? 1 : 2;
+          // 外の輪は詠唱が進むほど大きく、内の輪は縮みながら繰り返し寄せる（狙いが定まっていくように）
+          const size = p < 0.3 ? 1 : 2;
           pushSprite(tx, ty + 2, 1, false, A.fx(`ring:${size}:4:${Math.floor(t / 3) % 2}`), 0, 4);
-          if (p > 0.6) pushSprite(tx, ty + 2, 1, false, A.fx(`ring:${Math.max(0, size - 1)}:4:${2 + (Math.floor(t / 2) % 2)}`), 0, 4);
-          dyn.push({ x: tx, y: ty, r: 14 + 14 * p, i: 0.15 + 0.25 * p, c: 2 });
+          pushSprite(tx, ty + 2, 1, false, A.fx(`ring:1:4:${5 - (Math.floor(t / 2) % 4)}`), 0, 4);
+          if (p > 0.6) pushSprite(tx, ty + 2, 1, false, A.fx(`ring:0:4:${Math.floor(t / 2) % 2}`), 0, 4);
+          dyn.push({ x: tx, y: ty, r: 18 + 18 * p, i: 0.25 + 0.35 * p, c: 2 });
         }
       }
       // ゴーストの金切り声の溜め（src/eco/ghostskill.ts）：口もとに青白い冷気の玉が膨らみ、まわりから冷気の粒が渦を巻いて吸い寄せられる（体のあとに描く）
