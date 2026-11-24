@@ -245,7 +245,8 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
   }
   // 打ち返し（逃げている者と、寝込みを打たれて飛び起きたばかりの者は打ち返さない）
   // ゴーストは、人（冒険者とドワーフ）のほかには打ち返さない（モンスターとは命を取り合わない。src/eco/ghostskill.ts）
-  if (d.flee <= 0 && this.str(d) > 0 && !asleep && !(d.k === Kind.Ghost && a.k !== Kind.Adventurer && a.k !== Kind.Dwarf)) {
+  // 呪いを詠唱しているリッチは打ち返さない（詠唱の状態を上書きしない。lichSkill）
+  if (d.flee <= 0 && this.str(d) > 0 && !asleep && !(d.k === Kind.Ghost && a.k !== Kind.Adventurer && a.k !== Kind.Dwarf) && !(d.k === Kind.Lich && d.run === -1 && d.act === 2 && d.actT < 0)) {
     d.act = 2;
     d.actT = 0;
     // コウモリに群がられている者の打ち返しは弱い（batPinned）

@@ -609,7 +609,7 @@ export const CHECKS: Check[] = [
     ...RUN_WIDE,
     test: (rs) => {
       const cast = rs.map((r) => r.settle.filter((x) => x.k === Kind.Lich && x.ev === 'curseStart').length);
-      const react = rs.map((r) => r.settle.filter((x) => x.k === Kind.Lich && ((x.ev === 'curseLost' && x.n === Kind.Adventurer) || x.ev === 'windupBroken' || (x.ev === 'curse' && x.how === 'guard'))).length);
+      const react = rs.map((r) => r.settle.filter((x) => (x.k === Kind.Lich && ((x.ev === 'curseLost' && x.n === Kind.Adventurer && x.how !== 'gone') || (x.ev === 'curse' && x.how === 'guard'))) || (x.k === Kind.Adventurer && x.ev === 'curseWard' && x.how > 0)).length);
       const seeds = (n: number[]) => n.filter((v) => v > 0).length;
       return { ok: sum(cast) >= 60 && seeds(cast) >= 6 && sum(react) >= 12 && seeds(react) >= 4, value: `詠唱 ${sum(cast)}（${seeds(cast)}シード）、応じた ${sum(react)}（${seeds(react)}シード）` };
     },
