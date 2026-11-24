@@ -932,7 +932,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
   }
   const quick = prey.dead !== 0 || [Kind.Wisp, Kind.Slime, Kind.Ghost, Kind.Myconid, Kind.Moth].includes(prey.k) || pred.k === Kind.Worm || pred.k === Kind.Mimic || total <= 4;
   if (!quick) {
-    this.record('deaths', { t: this.w.tick, id: prey.id, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(slain ? { slain: 1 } : {}), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(this.inCamp(prey) ? { camp: 1, pid: prey.party } : {}) } as never);
+    this.record('deaths', { t: this.w.tick, id: prey.id, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(slain ? { slain: 1 } : {}), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(prey.k === Kind.Dragon ? { sp: prey.sp } : {}), ...(this.inCamp(prey) ? { camp: 1, pid: prey.party } : {}) } as never);
     this.noteDeath(prey, 'eaten', pred.k, pred);
     this.heroDeathMana(prey);
     this.raiseAlarm(prey, pred);
@@ -962,7 +962,7 @@ export function eat(this: Ecology, pred: Cr, prey: Cr, slain = false): void {
   }
   prey.units = 0;
   if (!prey.dead) {
-    this.record('deaths', { t: this.w.tick, id: prey.id, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(slain ? { slain: 1 } : {}), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(this.inCamp(prey) ? { camp: 1, pid: prey.party } : {}) } as never);
+    this.record('deaths', { t: this.w.tick, id: prey.id, k: prey.k, cause: 'eaten', by: pred.k, x: Math.round(prey.x), y: Math.round(prey.y), ...(slain ? { slain: 1 } : {}), ...(prey.k === Kind.Rat && prey.st === 11 ? { march: 1 } : {}), ...(prey.k === Kind.Dragon ? { sp: prey.sp } : {}), ...(this.inCamp(prey) ? { camp: 1, pid: prey.party } : {}) } as never);
     // 仲間が食べられたら、群れに警戒が伝わる
     this.raiseAlarm(prey, pred);
     this.heroDeathMana(prey);

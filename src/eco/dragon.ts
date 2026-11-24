@@ -156,9 +156,25 @@ export function dragonRelocate(this: Ecology, c: Cr): boolean {
   const m = this.w.map;
   const hoard = this.piles.find((p) => p.id === c.ref && p.gold > 0);
   if (c.sp < 1 || c.away || !this.dragonLairIsland(c, hoard)) return false;
-  // 島に寝床にできる宝の山（成竜になれるだけの金貨）があれば、若い竜は島で成竜になってから移る
-  // （若いうちに入口側へ移ると、竜退治の一行にすぐ倒されて成竜まで育たない。島の宝の山は、狩りから戻ったときに寝床に選ぶ）
-  if (c.sp === 1 && this.piles.some((p) => p.gold >= DRAGON_ADULT_GOLD && this.onIsland(p.x, p.y) && this.dragonPileOk(p))) return false;
+  // 島に寝床にできる、成竜になれるだけの金貨の宝の山があれば、若い竜は島で成竜になってから移る
+  // （若いうちに入口側へ移ると、竜退治の一行にすぐ倒されて成竜まで育たない）。その宝の山が寝床でなければ、そこへ飛んで寝床にする
+  if (c.sp === 1) {
+    let rich: Pile | null = null;
+    for (const p of this.piles) if (p.gold >= DRAGON_ADULT_GOLD && this.onIsland(p.x, p.y) && this.dragonPileOk(p) && (!rich || p.gold > rich.gold)) rich = p;
+    if (rich && hoard && hoard.gold >= DRAGON_ADULT_GOLD) return false;
+    if (rich) {
+      c.ref = rich.id;
+      c.hx = rich.x + this.dragonSide(rich) * 18;
+      c.hy = rich.y - 4;
+      c.gait = rich.gold;
+      c.st = 2;
+      c.act = 1;
+      c.actT = 0;
+      c.foe = 0;
+      this.log(c.x, c.y, `若い{k:${Kind.Dragon}}が、深部の宝の山へ寝床を移した`);
+      return true;
+    }
+  }
   const alt = this.pickDragonHoard(1);
   const toPile = !!alt && alt !== hoard && !this.onIsland(alt.x, alt.y);
   const spot = toPile ? -1 : this.dragonLairSpot();
@@ -188,10 +204,10 @@ export function dragonRelocate(this: Ecology, c: Cr): boolean {
   return true;
 }
 
-/** 寝床を移すときに、島の宝の山からくわえて運ぶ金貨の上限（成竜になるのに要る寝床の宝と同じ） */
-const DRAGON_CARRY = 60;
 /** 若い竜が成竜になるのに要る、寝床の宝の金貨 */
 const DRAGON_ADULT_GOLD = 60;
+/** 寝床を移すときに、島の宝の山からくわえて運ぶ金貨の上限（運んだ先でも成竜でいられるだけ） */
+const DRAGON_CARRY = DRAGON_ADULT_GOLD;
 
 export function dragon(this: Ecology, c: Cr, _day: number): void {
   const s = SPEC[Kind.Dragon];
@@ -316,8 +332,11 @@ export function dragon(this: Ecology, c: Cr, _day: number): void {
         // 宝の山を覚え直す（宝物庫とドワーフの広間は選ばない）
         const kept = this.piles.find((p) => p.id === c.ref);
         let hoard = kept ?? this.pickDragonHoard(1);
-        // 島の寝床へ降りた竜が、入口側の宝の山を選んだら、寝床を移す（dragonRelocate。飛んで行き、記録を残す）
-        if (!kept && hoard && !this.onIsland(hoard.x, hoard.y) && this.dragonLairIsland(c) && this.dragonRelocate(c)) return;
+        // 島の寝床へ降りた竜が、入口側の宝の山を選んだら、寝床を移す（dragonRelocate。飛んで行き、記録を残す）。移さないなら、入口側の宝を寝床にしない
+        if (!kept && hoard && !this.onIsland(hoard.x, hoard.y) && this.dragonLairIsland(c)) {
+          if (this.dragonRelocate(c)) return;
+          hoard = null;
+        }
         // 入口側へ寝床を移した竜は、島の宝の山を寝床に覚え直さない（移した寝床と行き来しない）
         if (hoard && this.onIsland(hoard.x, hoard.y) && !this.dragonLairIsland(c)) hoard = null;
         if (hoard) c.ref = hoard.id;
