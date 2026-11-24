@@ -5,8 +5,8 @@
  * 詠唱が終わると、紫の呪いが相手を打つ（重い一打ち）。狙われた冒険者は「!」を出してリッチの方を向き、職業ごとに応じる（advLich）：
  *   盗賊・狩人・魔法使い・吟遊詩人は、すぐそばの壁や柱の陰へ走り込む（陰が無ければリッチから離れる向きへ下がる）。陰へ出れば、呪いは散ってリッチの頭に「?」。
  *   戦士と竜殺しは、狙われた仲間の1マス手前へ走り込み、呪いを代わりに受ける（傷は軽い）。
- *   僧侶は、祓いの光で詠唱を打ち消す（位が高いほど早く、よく効く）。魔法使いと僧侶の一打ちが当たっても、詠唱は止まる（strike から lichWardHit）。
- * 詠唱の合間は、すぐそばの相手だけを杖で打つ。
+ *   僧侶は、祓いの光で詠唱を打ち消そうとする（位が高いほど早く、よく効く）。魔法使いと僧侶の一打ちが当たっても、詠唱は止まる（strike から lichWardHit）。
+ * 呪いは打たれた者のすぐそば（1マスの内）の者にも、軽く及ぶ。詠唱の合間は、すぐそばの相手だけを杖で打つ。
  * 襲う相手は、5マスの内の見通しの利く冒険者・ゴブリン・コボルト・オーク・リザードマン。冒険者のほかは呪いに応じない。
  *
  * 状態：詠唱しているあいだは run に −1、狙う相手は aim（どちらもセーブに入る）。
@@ -17,14 +17,17 @@ import { holyStrike } from './ghostskill';
 import type { Skill } from './skill';
 import { SKILL_PRIEST_HAMMER } from './skill';
 
-/** 死の呪い：およそ3秒詠唱し、使ったあと2秒は詠唱し直さない（詠唱が短いと、冒険者が応じる前に放たれる） */
-export const SKILL_LICH_CURSE: Skill = { windup: 16, cool: 10 };
+/** 死の呪い：およそ3秒詠唱し、使ったあと1.6秒は詠唱し直さない（詠唱が短いと、冒険者が応じる前に放たれる） */
+export const SKILL_LICH_CURSE: Skill = { windup: 16, cool: 8 };
 /** 詠唱を始める相手の遠さと、放つときに呪いが届く遠さ（px） */
 const CURSE_START = 5 * TILE;
 const CURSE_R = 6 * TILE;
 /** 呪いの重さ（ふつうの一打ちに対する倍率）と、前衛が代わりに受けたときの倍率 */
 const CURSE_MUL = 1.8;
 const GUARD_MUL = 0.6;
+/** 呪いが弾けて及ぶ、まわりの広さ（px）と重さ（打たれた者のすぐそばの者に） */
+const SPLASH_R = TILE;
+const SPLASH_MUL = 0.5;
 /** 詠唱の合間に杖で打つ間合い（px） */
 const STAFF_D = 1.5 * TILE;
 /** 応じる冒険者の走る速さ（px／生き物の更新。ふつうに歩く速さの2倍） */
@@ -117,6 +120,11 @@ export function lichCurse(this: Ecology, c: Cr): void {
   if (this.fxAttacks.length > 160) this.fxAttacks.splice(0, 60);
   const killed = this.strike(c, d, d === t ? CURSE_MUL : GUARD_MUL, false);
   if (killed) this.slay(c, d);
+  // 弾けた呪いは、打たれた者のすぐそばの者にも及ぶ（固まっている一行ほど危ない）
+  this.nearby(d.x, d.y, 1, (o) => {
+    if (o === d || o.dead || o.away || !PREY.has(o.k) || sq(o.x - d.x) + sq(o.y - d.y) > SPLASH_R * SPLASH_R) return;
+    if (this.strike(c, o, SPLASH_MUL, false)) this.slay(c, o);
+  });
   this.record('settle', { t: this.w.tick, k: Kind.Lich, ev: 'curse', id: c.id, n: d.k, how: d !== t ? 'guard' : killed ? 'kill' : 'hit', x: Math.round(d.x), y: Math.round(d.y) } as never);
 }
 
@@ -140,7 +148,7 @@ export function advLich(this: Ecology, c: Cr): boolean {
   const t = this.byId.get(l.aim);
   if (!t || t.dead) return false;
   const rank = this.heroOf(c)?.rank ?? 0;
-  const delay = Math.max(0, (c.sp === Job.Thief || c.sp === Job.Hunter ? 0 : c.sp === Job.Priest ? 3 : 4) - rank);
+  const delay = Math.max(0, (c.sp === Job.Thief || c.sp === Job.Hunter ? 0 : c.sp === Job.Priest ? 6 : 4) - rank);
   if ((this.w.tick - l.cast) / CR_EVERY < delay) return false;
   // 僧侶：見通しの利く5マスの内なら、祓いの光で詠唱を打ち消す（技の溜めと同じく、使ったあとの間が明けていれば。位が高いほどよく効く）
   if (c.sp === Job.Priest && sq(l.x - c.x) + sq(l.y - c.y) < 5 * TILE * 5 * TILE && this.skillCanStart(c, SKILL_PRIEST_HAMMER) && lineOfSight(this.w.map, c.x, c.y, l.x, l.y)) {
@@ -148,7 +156,7 @@ export function advLich(this: Ecology, c: Cr): boolean {
     c.actT = 0;
     c.cast = this.w.tick;
     this.setDir(c, l.x - c.x, l.y - c.y);
-    const ok = ih(c.id, l.id ^ this.step, 471) % 100 < 55 + rank * 15;
+    const ok = ih(c.id, l.id ^ this.step, 471) % 100 < 35 + rank * 15;
     this.fxAttacks.push({ t: this.w.tick, style: 'cross', col: 1, size: 1, ax: c.x, ay: c.y, dx: l.x, dy: l.y, did: l.id, aid: c.id, big: false, kill: false });
     if (ok) this.breakWindup(l);
     this.record('settle', { t: this.w.tick, k: Kind.Adventurer, ev: 'curseWard', id: c.id, n: Kind.Lich, how: ok ? 1 : 0, x: Math.round(c.x), y: Math.round(c.y) } as never);
