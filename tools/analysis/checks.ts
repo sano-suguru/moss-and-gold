@@ -948,6 +948,21 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 竜の物語（dragonRelocate・guessDeep）：育った竜が入口側へ寝床を移し、道探しの一行が寝床を見つけて道を持ち帰り、竜退治の一行が寝床に着いて竜を倒す。
+    // 竜の育ち方とどの一行が来るかは展開で変わるので、二つの窓の合計で見る。目安は実測の半分ほど
+    name: '竜が入口側へ寝床を移し、寝床への道が町に伝わり、冒険者が竜を倒す（10〜18日目の15シードと15〜23日目の16シードの合計で、寝床を移す3回・道が伝わる3回・竜を倒す3回、それぞれ2シード以上）',
+    ...RUN_WIDE,
+    more: [RUN_ARMOR],
+    test: (rs) => {
+      const move = rs.map((r) => r.settle.filter((x) => x.k === Kind.Dragon && x.ev === 'lairMove').length);
+      const way = rs.map((r) => r.settle.filter((x) => x.k === Kind.Adventurer && x.ev === 'way').length);
+      const slain = rs.map((r) => r.deaths.filter((x) => x.k === Kind.Dragon && x.by === Kind.Adventurer && r.seed !== 'seed23').length);
+      const seeds = (n: number[]) => new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
+      const ok = (n: number[]) => sum(n) >= 3 && seeds(n) >= 2;
+      return { ok: ok(move) && ok(way) && ok(slain), value: `寝床を移す ${sum(move)}（${seeds(move)}シード）、道が伝わる ${sum(way)}（${seeds(way)}シード）、竜を倒す ${sum(slain)}（${seeds(slain)}シード。seed23 の孵ったばかりの幼竜を除く）` };
+    },
+  },
+  {
     // ドラゴンの炎（src/eco/fire.ts）：口元から細い扇で吐き、扇の中と燃える床で焼かれた者が倒れる。
     // どのシードで起きるかは変更のたびに入れ替わるので、焼け死ぬ者すべてを、起きやすいシード（ほかの項目でも10〜18日目を実行している組）で見る
     name: 'ドラゴンの炎で焼け死ぬ（かしたれ・はじまりの洞窟・seed8・seed6 の合計で3回以上・焼け死んだシード2つ以上）',
