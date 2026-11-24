@@ -91,7 +91,7 @@ export const MOMENTS: Moment[] = [
   { key: 'petriQuest', label: '依頼：バジリスクに仲間を石にされた一行が帰ってから3日の内に、バジリスク狩りの依頼の一行が入ってきた' },
   { key: 'huntArrive', label: 'ゴブリン退治の一行が集落に着いた' },
   { key: 'reveal', label: '松明で隠れたゴブリンを見つけた' },
-  { key: 'lairMove', label: '育った竜が、入口側と切り離された深部の寝床から、入口側の宝の山へ飛んで寝床を移した（pickDragonHoard）' },
+  { key: 'lairMove', label: '育った竜が、入口側と切り離された深部の寝床から、入口側へ飛んで寝床を移した（dragonRelocate）' },
   { key: 'lairFound', label: '深部の探索の一行が竜の寝床を見つけた' },
   { key: 'wayHome', label: '竜の寝床への道が町に伝わった' },
   { key: 'lairArrive', label: '竜退治の一行が寝床に着いた' },

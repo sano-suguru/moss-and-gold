@@ -106,8 +106,8 @@ export function dragonFlightGoal(this: Ecology, c: Cr): [number, number] {
 
 /**
  * 育った竜（若い竜・成竜）の寝床が入口側と切り離された島にあれば、入口側へ飛んで寝床を移す（移しはじめたら true）。
- * 入口側に寝床にできる宝の山があればそこへ（pickDragonHoard）。無ければ（入口側の宝はたいてい宝物庫の中）、島の宝の山から金貨をくわえて、
- * 入口側で深部にいちばん近い所へ運び、降りたときにそこへ積んで寝床にする。
+ * 入口側に寝床にできる宝の山があればそこへ（pickDragonHoard）。無ければ（入口側の宝はたいてい宝物庫の中）、入口側で深部にいちばん近い所へ飛ぶ。
+ * 島の寝床に宝の山があれば、その金貨をくわえて運び、降りたときにそこへ積んで寝床の宝にする（孵った所で眠る若い竜には、たいてい宝が無い）。
  * 孵る所は深部の島のままにして、育ったとき（と、起きて寝床へ戻るとき）に移す（島の寝床では冒険者が竜を見つけられず、
  * 竜の寝床への道探しから竜退治へつながる物語が起きない。孵る所を入口側にすると、孵ったばかりの幼竜が倒され続ける）
  */
@@ -135,8 +135,9 @@ export function dragonRelocate(this: Ecology, c: Cr): boolean {
   c.act = 1;
   c.actT = 0;
   c.foe = 0;
-  this.record('settle', { t: this.w.tick, k: Kind.Dragon, ev: 'lairMove', id: c.id, n: c.sp, how: toPile ? 'pile' : 'carry', x: Math.round(c.hx), y: Math.round(c.hy) } as never);
-  this.log(c.x, c.y, toPile ? `{k:${Kind.Dragon}}が深部の寝床を離れ、宝の山へ飛んで寝床を移した` : `{k:${Kind.Dragon}}が宝をくわえて深部の寝床を離れ、新しい寝床へ飛んだ`);
+  const how = toPile ? 'pile' : c.gold > 0 ? 'carry' : 'bare';
+  this.record('settle', { t: this.w.tick, k: Kind.Dragon, ev: 'lairMove', id: c.id, n: c.sp, how, x: Math.round(c.hx), y: Math.round(c.hy) } as never);
+  this.log(c.x, c.y, how === 'pile' ? `{k:${Kind.Dragon}}が深部の寝床を離れ、宝の山へ飛んで寝床を移した` : how === 'carry' ? `{k:${Kind.Dragon}}が宝をくわえて深部の寝床を離れ、新しい寝床へ飛んだ` : `{k:${Kind.Dragon}}が深部の寝床を離れ、新しい寝床へ飛んだ`);
   return true;
 }
 

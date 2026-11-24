@@ -2575,6 +2575,12 @@ export class CreatureView {
         // 戦利品は背に担ぐ（体の輪郭の外へ突き出して、兜や武器と重ならないように）
         if (tp) pushSprite(x + (flip ? 12 : -12), yy + 0.06, lift + 12, !flip, A.trophy(TROPHY[tp]?.[1] ?? 'fang'), 0, 2);
       }
+      // 寝床を移す竜（dragonRelocate）：くわえた金貨の袋を口元に下げ、金色にきらめく
+      if (!isCorpse && sp === Kind.Dragon && !c.dead && c.gold > 0) {
+        const mx = x + (dir === 2 ? (flip ? -13 : 13) : dir === 3 ? (flip ? 13 : -13) : 0);
+        pushSprite(mx, yy + 0.07, lift + 8, flip, A.goldSack(c.gold >= 40 ? 2 : 1), 0, 2);
+        dyn.push({ x: mx, y: yy - lift - 8, r: 22, i: 0.3 + 0.1 * Math.sin(t * 0.8), c: 4 });
+      }
       // 傷を受けた瞬間は白く光る
       const flash = !isCorpse && eco.w.tick - c.hitAt < 2 ? 20 : 0;
       // リビングアーマーの武具（芯の後ろ側の分。手前の分は芯のあと）
