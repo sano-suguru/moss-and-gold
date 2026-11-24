@@ -904,13 +904,19 @@ export function setExit(this: Ecology, p: Party): void {
 
 /** 焚き火から、手強い魔物（住みかから離れないリッチやゴーレム、寝床のミノタウロスなど）までの、空けておく遠さ（マス） */
 const CAMP_SHUN_R = 10;
+/**
+ * 焚き火のそばを避ける手強い魔物：住みかや寝床から離れないもの、縄張りを見回るもの。
+ * 夜襲を担うオーク・トロール・ヴァンパイアは入れない（灯りに潜み、焚き火に忍び寄るのが見せたい場面。src/eco/night.ts）。ミミックは宝箱に化けているので入れない
+ */
+const CAMP_SHUN = new Set<number>([Kind.Lizardman, Kind.Minotaur, Kind.Basilisk, Kind.Golem, Kind.Worm, Kind.Wyvern, Kind.Dragon, Kind.Lich, Kind.Armor]);
 /** 休む場所を選べなかったあと、探し直すまでの間（生き物の更新の回数） */
 const CAMP_SHUN_WAIT = 150;
 
 /**
  * 焚き火の場所：近くの、壁に囲まれた所（袋小路や角）。水辺なら少し好む。
- * 同じ洞窟の中の手強い魔物（強さ6以上。ミミックは宝箱に化けているので除く）から CAMP_SHUN_R マスの内と、覚えている危ない区画には置かない。
- * 置ける所がなければ、休まずに先へ進む（場所を変えたときと、休めなかったときに、先頭がその魔物の方を見て settle の campShun を記録する）。
+ * 同じ洞窟の中の手強い魔物（CAMP_SHUN の強さ6以上のもの）から CAMP_SHUN_R マスの内と、覚えている危ない区画には置かない。
+ * 一行の先頭がそのような魔物から CAMP_SHUN_R マスの内にいるときと、置ける所がないときは、休まずに先へ進む
+ * （場所を変えたときと、休めなかったときに、先頭がその魔物の方を見て settle の campShun を記録する）。
  * 避けないと、住みかから離れない魔物のすぐそばで焚き火を囲み、眠りに就いたとたんに襲われて倒れていた（焚き火で倒れた冒険者の8割）
  */
 export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: number; y: number }): void {
@@ -922,10 +928,18 @@ export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: numbe
   const reg = this.regionOf(this.tileOf(leader.x, leader.y));
   const threats: Cr[] = [];
   this.nearby(hx * TILE + 8, hy * TILE + 8, R + CAMP_SHUN_R, (o) => {
-    if (o.dead || o.away || o.k === Kind.Adventurer || o.k === Kind.Dwarf || o.k === Kind.Mimic || STR[o.k] < 6) return;
+    if (o.dead || o.away || STR[o.k] < 6 || !CAMP_SHUN.has(o.k)) return;
     if (reg >= 0 && this.regionOf(this.tileOf(o.x, o.y)) !== reg) return;
     threats.push(o);
   });
+  // 一行そのものが手強い魔物のそばにいる：どこに焚き火を置いても、眠りに就く前後に襲われるので、休まずに先へ進む
+  const close = threats.find((o) => sq(o.x - leader.x) + sq(o.y - leader.y) < CAMP_SHUN_R * TILE * CAMP_SHUN_R * TILE);
+  if (close) {
+    this.setDir(leader, close.x - leader.x, close.y - leader.y);
+    this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'campShun', n: close.k, how: 'none', x: Math.round(leader.x), y: Math.round(leader.y) } as never);
+    p.shunAt = this.step;
+    return;
+  }
   const strength = this.partyStr(p);
   const risky = new Set<number>();
   for (const d of p.danger ?? []) if (d[1] > strength * 0.7) risky.add(d[0]);
