@@ -79,7 +79,7 @@ export function campWake(this: Ecology, p: Party, how: string, foe?: Cr, at?: Cr
     if (foe) o.dir = Math.abs(foe.x - o.x) > Math.abs(foe.y - o.y) ? (foe.x > o.x ? 2 : 3) : foe.y > o.y ? 0 : 1;
   }
   const w = at ?? this.byId.get(p.members[0]);
-  this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'wake', how, n: foe?.k ?? -1, doze: this.watchDozing(p) ? 1 : 0, night: this.isNight() ? 1 : 0, x: Math.round(w?.x ?? 0), y: Math.round(w?.y ?? 0) } as never);
+  this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'wake', how, n: foe?.k ?? -1, age: this.step - (p.campAt ?? this.step), doze: this.watchDozing(p) ? 1 : 0, night: this.isNight() ? 1 : 0, x: Math.round(w?.x ?? 0), y: Math.round(w?.y ?? 0) } as never);
   if (how !== 'noise' && this.step - (this.lastLogged[979] ?? -99999) > 1500) {
     this.lastLogged[979] = this.step;
     const what = foe ? `{k:${foe.k}}` : '敵';
@@ -235,7 +235,7 @@ export function nightHit(this: Ecology, a: Cr, d: Cr): boolean {
   return true;
 }
 
-/** 焚き火で休む一行の者か（死の記録の camp の印。src/eco/move.ts） */
+/** 焚き火で休む一行の者か（死の記録の camp の印。一行の id を pid に添え、settle の wake の age（焚き火を囲んでから起こされるまでの生き物の更新の回数）と突き合わせられるようにする。die） */
 export function inCamp(this: Ecology, o: Cr): boolean {
   return o.k === Kind.Adventurer && (this.parties.find((q) => q.id === o.party)?.camp ?? -1) >= 0;
 }

@@ -74,7 +74,8 @@ export const MOMENTS: Moment[] = [
   { key: 'nightAttack', label: '焚き火の夜襲：一行が起こされた（見張り・盗賊が気づいた、寝込みを打たれた）' },
   { key: 'nightWatch', label: '焚き火の夜襲：見張りか盗賊が気づいて起こした' },
   { key: 'nightHit', label: '焚き火の夜襲：寝込みの一打ち' },
-  { key: 'campDeath', label: '焚き火の夜襲：焚き火で休む間に倒れた（人数。目安は1シード25日に1〜2人まで）' },
+  { key: 'campDeath', label: '焚き火の夜襲：焚き火で休む間に倒れた（人数。焚き火を囲んだとたんに始まった戦いを含む）' },
+  { key: 'campDeathSettled', label: '焚き火の夜襲：休みに就いてから襲われて倒れた（人数。焚き火を囲んで生き物の更新60回より後に起こされたか、起こされずに倒れた。目安は1シード25日に1〜2人まで）' },
   { key: 'campBreak', label: '焚き火の夜襲：被害を受けて焚き火を消して発った' },
   { key: 'questPost', label: '依頼：町に新しい依頼が出た（src/eco/quest.ts）' },
   { key: 'questKinds', label: '依頼：入ってきた一行の依頼の種類の数（探索を除く。竜退治・道探し・魔物の狩り・ゴブリン退治・祓い・宝探しのうち）' },
@@ -354,6 +355,12 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     nightHit: ev(K.Adventurer, 'nightHit').length,
     campBreak: ev(K.Adventurer, 'campBreak').filter((x) => x.how !== 'stoned').length,
     campDeath: d.filter((x) => x.k === K.Adventurer && x.camp === 1).length,
+    // 倒れる前の、その一行の最後の起こされ（settle の wake。焚き火一回の長さの内）が、焚き火を囲んでから60回より後か。ベースに pid が無ければ数えない
+    campDeathSettled: d.filter((x) => {
+      if (x.k !== K.Adventurer || x.camp !== 1 || x.pid === undefined) return false;
+      const w = ev(K.Adventurer, 'wake').filter((y) => y.id === x.pid && y.t <= x.t && y.t > x.t - 4800 && y.how !== 'noise').pop();
+      return !w || (w.age as number) >= 60;
+    }).length,
     huntArrive: new Set(ev(K.Adventurer, 'arrive').filter((x) => x.how === 5).map((x) => x.id)).size,
     questPost: ev(K.Adventurer, 'quest').filter((x) => !x.init).length,
     questKinds: new Set(ev(K.Adventurer, 'enter').filter((x) => x.q > 0).map((x) => x.q)).size,
