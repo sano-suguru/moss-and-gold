@@ -1,10 +1,10 @@
 /**
  * Ecology のメソッド：リッチの死の呪い（詠唱の溜めと、受けた側の反応）。
  *
- * 見せたい場面：住みかに入ってきた者に、リッチが杖を掲げて詠唱する（およそ2秒）。狙われた者の足もとに紫の魔法陣が広がり、
+ * 見せたい場面：住みかに入ってきた者に、リッチが杖を掲げて詠唱する（およそ3秒）。狙われた者の足もとに紫の魔法陣が広がり、
  * 詠唱が終わると、紫の呪いが相手を打つ（重い一打ち）。狙われた冒険者は「!」を出してリッチの方を向き、職業ごとに応じる（advLich）：
- *   盗賊・狩人・魔法使い・吟遊詩人は、リッチから離れる向きへ下がる（呪いの届く所の外か、壁の陰へ出れば、呪いは散ってリッチの頭に「?」）。
- *   戦士と竜殺しは、狙われた仲間とリッチのあいだへ入り、呪いを代わりに受ける（傷は軽い）。
+ *   盗賊・狩人・魔法使い・吟遊詩人は、すぐそばの壁や柱の陰へ走り込む（陰が無ければリッチから離れる向きへ下がる）。陰へ出れば、呪いは散ってリッチの頭に「?」。
+ *   戦士と竜殺しは、狙われた仲間の1マス手前へ走り込み、呪いを代わりに受ける（傷は軽い）。
  *   僧侶は、祓いの光で詠唱を打ち消す（位が高いほど早く、よく効く）。魔法使いと僧侶の一打ちが当たっても、詠唱は止まる（strike から lichWardHit）。
  * 詠唱の合間は、すぐそばの相手だけを杖で打つ。
  * 襲う相手は、5マスの内の見通しの利く冒険者・ゴブリン・コボルト・オーク・リザードマン。冒険者のほかは呪いに応じない。
@@ -17,18 +17,24 @@ import { holyStrike } from './ghostskill';
 import type { Skill } from './skill';
 import { SKILL_PRIEST_HAMMER } from './skill';
 
-/** 死の呪い：およそ2秒詠唱し、使ったあと3秒は詠唱し直さない */
-export const SKILL_LICH_CURSE: Skill = { windup: 10, cool: 15 };
+/** 死の呪い：およそ3秒詠唱し、使ったあと2秒は詠唱し直さない（詠唱が短いと、冒険者が応じる前に放たれる） */
+export const SKILL_LICH_CURSE: Skill = { windup: 16, cool: 10 };
 /** 詠唱を始める相手の遠さと、放つときに呪いが届く遠さ（px） */
 const CURSE_START = 5 * TILE;
 const CURSE_R = 6 * TILE;
 /** 呪いの重さ（ふつうの一打ちに対する倍率）と、前衛が代わりに受けたときの倍率 */
-const CURSE_MUL = 1.5;
+const CURSE_MUL = 1.8;
 const GUARD_MUL = 0.6;
 /** 詠唱の合間に杖で打つ間合い（px） */
 const STAFF_D = 1.5 * TILE;
+/** 応じる冒険者の走る速さ（px／生き物の更新。ふつうに歩く速さの2倍） */
+const DASH = 2;
 /** 呪いを受ける種 */
 const PREY = new Set<number>([Kind.Adventurer, Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Lizardman]);
+
+/** 16方向の単位ベクトル（陰を探す向き） */
+const DIR_X = Array.from({ length: 16 }, (_, i) => Math.cos((i * Math.PI) / 8));
+const DIR_Y = Array.from({ length: 16 }, (_, i) => Math.sin((i * Math.PI) / 8));
 
 const frontLine = (c: Cr) => c.sp === Job.Warrior || c.sp === Job.Slayer || c.sp === Job.Priest;
 
@@ -102,7 +108,7 @@ export function lichCurse(this: Ecology, c: Cr): void {
       if (o === t || o.dead || o.k !== Kind.Adventurer || o.party !== t.party || !frontLine(o)) return;
       const along = (o.x - c.x) * ux + (o.y - c.y) * uy;
       const side = Math.abs((o.x - c.x) * uy - (o.y - c.y) * ux);
-      if (along < 8 || along >= ga || side > 10) return;
+      if (along < 8 || along >= ga || side > 12) return;
       ga = along;
       guard = o;
     });
@@ -151,23 +157,43 @@ export function advLich(this: Ecology, c: Cr): boolean {
   // 前衛（戦士・竜殺し）：狙われた仲間とリッチのあいだへ入って構える
   if ((c.sp === Job.Warrior || c.sp === Job.Slayer) && t !== c && t.k === Kind.Adventurer && t.party === c.party && sq(t.x - c.x) + sq(t.y - c.y) < 6 * TILE * 6 * TILE) {
     const L = Math.sqrt(sq(t.x - l.x) + sq(t.y - l.y)) || 1;
-    const k = Math.min(2 * TILE, L * 0.5) / L;
-    const bx = l.x + (t.x - l.x) * (1 - k);
-    const by = l.y + (t.y - l.y) * (1 - k);
-    if (sq(bx - c.x) + sq(by - c.y) > 16) {
+    const k = Math.min(TILE, L * 0.5) / L;
+    const bx = t.x + (l.x - t.x) * k;
+    const by = t.y + (l.y - t.y) * k;
+    if (sq(bx - c.x) + sq(by - c.y) > 9) {
       c.act = 1;
-      this.goTo(c, bx, by, 1.3);
+      this.goTo(c, bx, by, DASH);
     } else c.act = 0;
     this.setDir(c, l.x - c.x, l.y - c.y);
     return true;
   }
-  // 狙われた後衛：リッチから離れる向きへ下がる
+  // 狙われた後衛：すぐそば（2マスの内）の、リッチから見えない所へ走り込む。無ければリッチから離れる向きへ下がる
   if (t === c && !frontLine(c)) {
-    const dx = c.x - l.x;
-    const dy = c.y - l.y;
-    const L = Math.sqrt(dx * dx + dy * dy) || 1;
+    const m = this.w.map;
+    let bx = 0;
+    let by = 0;
+    let bd = Infinity;
+    for (let i = 0; i < 16; i++)
+      for (const r of [12, 20, 28]) {
+        const x = c.x + DIR_X[i] * r;
+        const y = c.y + DIR_Y[i] * r;
+        const k = this.tileOf(x, y);
+        if (k < 0 || !this.tilePassable(c, k) || !lineOfSight(m, c.x, c.y, x, y) || lineOfSight(m, l.x, l.y, x, y)) continue;
+        if (r < bd) {
+          bd = r;
+          bx = x;
+          by = y;
+        }
+        break;
+      }
     c.act = 1;
-    this.goTo(c, c.x + (dx / L) * 3 * TILE, c.y + (dy / L) * 3 * TILE, 1.3);
+    if (bd < Infinity) this.goTo(c, bx, by, DASH);
+    else {
+      const dx = c.x - l.x;
+      const dy = c.y - l.y;
+      const L = Math.sqrt(dx * dx + dy * dy) || 1;
+      this.goTo(c, c.x + (dx / L) * 3 * TILE, c.y + (dy / L) * 3 * TILE, DASH);
+    }
     this.setDir(c, l.x - c.x, l.y - c.y);
     return true;
   }
