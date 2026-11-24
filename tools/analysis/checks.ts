@@ -952,20 +952,21 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 竜の物語（dragonRelocate・guessDeep）：育った竜が入口側へ寝床を移し、道探しの一行が寝床を見つけて道を持ち帰り、竜退治の一行が寝床に着いて竜を倒す。
-    // 竜の育ち方とどの一行が来るかは展開で変わるので、二つの窓の合計で見る。目安は実測の半分ほど（実測：寝床を移す 9回・8シード、道が伝わる 7回・5シード、竜を倒す 5回・4シード）
-    name: '竜が入口側へ寝床を移し、寝床への道が町に伝わり、冒険者が竜を倒す（10〜18日目の15シードと15〜23日目の16シードの合計で、寝床を移す3回・道が伝わる3回・竜を倒す3回、それぞれ2シード以上）',
+    // 竜の物語（dragonRelocate・guessDeep）：育った竜が入口側へ寝床を移すか、島で成竜（ダンジョンの主）になり、道探しの一行が寝床を見つけて道を持ち帰り、竜退治の一行が寝床に着いて竜を倒す。
+    // 竜の育ち方とどの一行が来るかは展開で変わるので、二つの窓の合計で見る。main のスナップショットから分岐した窓では、竜がもう寝床を移し終えていて、少なく出る。
+    // 目安は少ないほうの実測の半分ほど（実測：main から分岐した実行で、寝床を移すか成竜になる 4回・4シード、道が伝わる 5回・2シード、竜を倒す 1回）
+    name: '竜が入口側へ寝床を移すか成竜になり、寝床への道が町に伝わり、冒険者が竜を倒す（10〜18日目の15シードと15〜23日目の16シードの合計で、寝床を移すか成竜になる2回・道が伝わる2回、それぞれ2シード以上、竜を倒す1回以上）',
     ...RUN_WIDE,
     more: [RUN_ARMOR],
     test: (rs) => {
       // 二つの窓は15〜18日目が重なるので、15〜23日目の窓は18日目より後だけを数える（10〜18日目の窓に無いシードは除く）。竜を倒すのは、育った竜だけ（孵ったばかりの幼竜を除く）
       const late = (r: { from: number; seed: string }, t: number) => r.from < 15 || t > 18 * DAY_TICKS || !RUN_WIDE.seeds.includes(r.seed);
-      const move = rs.map((r) => r.settle.filter((x) => x.k === Kind.Dragon && x.ev === 'lairMove' && late(r, x.t)).length);
+      const grow = rs.map((r) => r.settle.filter((x) => x.k === Kind.Dragon && (x.ev === 'lairMove' || (x.ev === 'grow' && x.n === 2)) && late(r, x.t)).length);
       const way = rs.map((r) => r.settle.filter((x) => x.k === Kind.Adventurer && x.ev === 'way' && late(r, x.t)).length);
       const slain = rs.map((r) => r.deaths.filter((x) => x.k === Kind.Dragon && x.by === Kind.Adventurer && late(r, x.t) && (x.sp as number) >= 1).length);
       const seeds = (n: number[]) => new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
-      const ok = (n: number[]) => sum(n) >= 3 && seeds(n) >= 2;
-      return { ok: ok(move) && ok(way) && ok(slain), value: `寝床を移す ${sum(move)}（${seeds(move)}シード）、道が伝わる ${sum(way)}（${seeds(way)}シード）、竜を倒す ${sum(slain)}（${seeds(slain)}シード。孵ったばかりの幼竜を除く）` };
+      const ok = (n: number[]) => sum(n) >= 2 && seeds(n) >= 2;
+      return { ok: ok(grow) && ok(way) && sum(slain) >= 1, value: `寝床を移すか成竜になる ${sum(grow)}（${seeds(grow)}シード）、道が伝わる ${sum(way)}（${seeds(way)}シード）、竜を倒す ${sum(slain)}（${seeds(slain)}シード。孵ったばかりの幼竜を除く）` };
     },
   },
   {
