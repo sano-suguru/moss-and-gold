@@ -148,6 +148,7 @@ export function dragonLairIsland(this: Ecology, c: Cr, hoard?: Pile | null): boo
  * 育った竜（若い竜・成竜）の寝床が入口側と切り離された島にあれば、入口側へ飛んで寝床を移す（移しはじめたら true）。
  * 入口側に寝床にできる宝の山があればそこへ（pickDragonHoard）。無ければ（入口側の宝はたいてい宝物庫の中）、入口側で深部にいちばん近い床へ飛ぶ（dragonLairSpot）。
  * 島の寝床に宝の山があれば、その金貨をくわえて運び、降りたときにそこへ積んで寝床の宝にする（孵った所で眠る若い竜には、たいてい宝が無い）。
+ * 島の寝床の宝で成竜になれる若い竜は、成竜になってから移る。
  * 孵る所は深部の島のままにして、育ったとき（と、起きて寝床へ戻るとき）に移す（島の寝床では冒険者が竜を見つけられず、
  * 竜の寝床への道探しから竜退治へつながる物語が起きない。孵る所を入口側にすると、孵ったばかりの幼竜が倒され続ける）
  */
@@ -155,6 +156,8 @@ export function dragonRelocate(this: Ecology, c: Cr): boolean {
   const m = this.w.map;
   const hoard = this.piles.find((p) => p.id === c.ref && p.gold > 0);
   if (c.sp < 1 || c.away || !this.dragonLairIsland(c, hoard)) return false;
+  // 島の寝床の宝で成竜になれる若い竜は、島で成竜になってから移る（若いうちに入口側へ移ると、竜退治の一行にすぐ倒されて成竜まで育たない）
+  if (c.sp === 1 && (hoard?.gold ?? 0) >= DRAGON_ADULT_GOLD) return false;
   const alt = this.pickDragonHoard(1);
   const toPile = !!alt && alt !== hoard && !this.onIsland(alt.x, alt.y);
   const spot = toPile ? -1 : this.dragonLairSpot();
@@ -184,8 +187,10 @@ export function dragonRelocate(this: Ecology, c: Cr): boolean {
   return true;
 }
 
-/** 寝床を移すときに、島の宝の山からくわえて運ぶ金貨の上限 */
+/** 寝床を移すときに、島の宝の山からくわえて運ぶ金貨の上限（成竜になるのに要る寝床の宝と同じ） */
 const DRAGON_CARRY = 60;
+/** 若い竜が成竜になるのに要る、寝床の宝の金貨 */
+const DRAGON_ADULT_GOLD = 60;
 
 export function dragon(this: Ecology, c: Cr, _day: number): void {
   const s = SPEC[Kind.Dragon];
@@ -247,11 +252,13 @@ export function dragon(this: Ecology, c: Cr, _day: number): void {
       c.sp = 1;
       this.pushGrowFx(c);
       this.log(c.x, c.y, `{k:${Kind.Dragon}}の幼子が育ち、若い竜になった`);
+      this.record('settle', { t: this.w.tick, k: Kind.Dragon, ev: 'grow', id: c.id, n: c.sp, x: Math.round(c.x), y: Math.round(c.y) } as never);
       if (c.st !== 2 && c.st !== 3) this.dragonRelocate(c);
-    } else if (c.sp === 1 && days > 13 && (hoard?.gold ?? 0) >= 60 && (c.mana >= 5000 || days > 18)) {
+    } else if (c.sp === 1 && days > 13 && (hoard?.gold ?? 0) >= DRAGON_ADULT_GOLD && (c.mana >= 5000 || days > 18)) {
       c.sp = 2;
       this.pushGrowFx(c);
       this.log(c.x, c.y, `若い{k:${Kind.Dragon}}が成竜となり、ダンジョンの主になった`);
+      this.record('settle', { t: this.w.tick, k: Kind.Dragon, ev: 'grow', id: c.id, n: c.sp, x: Math.round(c.x), y: Math.round(c.y) } as never);
       if (c.st !== 2 && c.st !== 3) this.dragonRelocate(c);
     }
   }
