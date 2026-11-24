@@ -1007,7 +1007,7 @@ export function die(this: Ecology, c: Cr, cause = '', by = -1): void {
       near = -1;
       for (let q = 0; q < d.length; q++) if (d[q] >= 0 && Math.max(this.w.moss[q], this.w.fungus[q]) >= 20 && (near < 0 || d[q] < near)) near = d[q];
     }
-    this.record('deaths', { t: this.w.tick, id: c.id, k: c.k, cause, by, x: Math.round(c.x), y: Math.round(c.y), ...(near !== undefined ? { near } : {}), ...(c.k === Kind.Rat && c.st === 11 ? { march: 1 } : {}), ...(this.inCamp(c) ? { camp: 1, pid: c.party } : {}) } as never);
+    this.record('deaths', { t: this.w.tick, id: c.id, k: c.k, cause, by, x: Math.round(c.x), y: Math.round(c.y), ...(near !== undefined ? { near } : {}), ...(c.k === Kind.Rat && c.st === 11 ? { march: 1 } : {}), ...(c.k === Kind.Dragon ? { sp: c.sp } : {}), ...(this.inCamp(c) ? { camp: 1, pid: c.party } : {}) } as never);
     this.noteDeath(c, cause, by);
     // 冒険者が倒れた所では、マナが立ちのぼる（heroDeathMana）
     this.heroDeathMana(c);

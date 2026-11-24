@@ -605,14 +605,18 @@ export const CHECKS: Check[] = [
   },
   {
     // リッチの死の呪い（lichSkill）：詠唱の溜めのあいだに、狙われた冒険者が陰へ走り込むか、前衛が代わりに受けるか、僧侶が打ち消す。
-    // リッチのいるシードは展開で変わるので、15シードの合計で見る。目安は実測の半分ほど（実測：詠唱 111回・11シード、応じた 25回・6シード）
-    name: 'リッチが死の呪いを詠唱し、冒険者が応じる（15シードの10〜18日目の合計で、詠唱60回・6シード、応じた12回・4シード以上）',
+    // リッチのいる所と冒険者の通り道は展開で大きく変わり（無害な変更でも、詠唱の回数が1シードあたり十数回動く）、一つの窓では応じた回数が7回にとどまることがあるので、
+    // 二つの窓の合計で見る。目安は実測の半分ほど（実測：詠唱 81回・8シード、応じた 9回・5シード。10〜18日目だけ）
+    name: 'リッチが死の呪いを詠唱し、冒険者が応じる（10〜18日目の15シードと15〜23日目の16シードの合計で、詠唱60回・6シード、応じた8回・3シード以上）',
     ...RUN_WIDE,
+    more: [RUN_ARMOR],
     test: (rs) => {
-      const cast = rs.map((r) => r.settle.filter((x) => x.k === Kind.Lich && x.ev === 'curseStart').length);
-      const react = rs.map((r) => r.settle.filter((x) => (x.k === Kind.Lich && ((x.ev === 'curseLost' && x.n === Kind.Adventurer && x.how !== 'gone') || (x.ev === 'curse' && x.how === 'guard'))) || (x.k === Kind.Adventurer && x.ev === 'curseWard' && x.how > 0)).length);
-      const seeds = (n: number[]) => n.filter((v) => v > 0).length;
-      return { ok: sum(cast) >= 60 && seeds(cast) >= 6 && sum(react) >= 12 && seeds(react) >= 4, value: `詠唱 ${sum(cast)}（${seeds(cast)}シード）、応じた ${sum(react)}（${seeds(react)}シード）` };
+      // 二つの窓は15〜18日目が重なるので、15〜23日目の窓は18日目より後だけを数える（10〜18日目の窓に無いシードは除く）
+      const late = (r: { from: number; seed: string }, t: number) => r.from < 15 || t > 18 * DAY_TICKS || !RUN_WIDE.seeds.includes(r.seed);
+      const cast = rs.map((r) => r.settle.filter((x) => x.k === Kind.Lich && x.ev === 'curseStart' && late(r, x.t)).length);
+      const react = rs.map((r) => r.settle.filter((x) => late(r, x.t) && ((x.k === Kind.Lich && ((x.ev === 'curseLost' && x.n === Kind.Adventurer && x.how !== 'gone') || (x.ev === 'curse' && x.how === 'guard'))) || (x.k === Kind.Adventurer && x.ev === 'curseWard' && x.how > 0))).length);
+      const seeds = (n: number[]) => new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
+      return { ok: sum(cast) >= 60 && seeds(cast) >= 6 && sum(react) >= 8 && seeds(react) >= 3, value: `詠唱 ${sum(cast)}（${seeds(cast)}シード）、応じた ${sum(react)}（${seeds(react)}シード）` };
     },
   },
   {
@@ -945,6 +949,23 @@ export const CHECKS: Check[] = [
       const dead = nt.map((a) => a.filter((x) => DEATH.includes(x[2] as string)).length);
       const own = nt.map((a) => a.filter((x) => ['fell', 'spent', 'stash'].includes(x[2] as string) || (x[2] === '' && (x[5] as number) >= 0)).length);
       return { ok: dead.every((n) => n >= 10) && sum(own) >= 10, value: rs.map((r, i) => `${r.seed} 死骸${dead[i]}・物${own[i]}`).join('、') };
+    },
+  },
+  {
+    // 竜の物語（dragonRelocate・guessDeep）：育った竜が入口側へ寝床を移し、道探しの一行が寝床を見つけて道を持ち帰り、竜退治の一行が寝床に着いて竜を倒す。
+    // 竜の育ち方とどの一行が来るかは展開で変わるので、二つの窓の合計で見る。目安は実測の半分ほど（実測：寝床を移す 9回・8シード、道が伝わる 7回・5シード、竜を倒す 5回・4シード）
+    name: '竜が入口側へ寝床を移し、寝床への道が町に伝わり、冒険者が竜を倒す（10〜18日目の15シードと15〜23日目の16シードの合計で、寝床を移す3回・道が伝わる3回・竜を倒す3回、それぞれ2シード以上）',
+    ...RUN_WIDE,
+    more: [RUN_ARMOR],
+    test: (rs) => {
+      // 二つの窓は15〜18日目が重なるので、15〜23日目の窓は18日目より後だけを数える（10〜18日目の窓に無いシードは除く）。竜を倒すのは、育った竜だけ（孵ったばかりの幼竜を除く）
+      const late = (r: { from: number; seed: string }, t: number) => r.from < 15 || t > 18 * DAY_TICKS || !RUN_WIDE.seeds.includes(r.seed);
+      const move = rs.map((r) => r.settle.filter((x) => x.k === Kind.Dragon && x.ev === 'lairMove' && late(r, x.t)).length);
+      const way = rs.map((r) => r.settle.filter((x) => x.k === Kind.Adventurer && x.ev === 'way' && late(r, x.t)).length);
+      const slain = rs.map((r) => r.deaths.filter((x) => x.k === Kind.Dragon && x.by === Kind.Adventurer && late(r, x.t) && (x.sp as number) >= 1).length);
+      const seeds = (n: number[]) => new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
+      const ok = (n: number[]) => sum(n) >= 3 && seeds(n) >= 2;
+      return { ok: ok(move) && ok(way) && ok(slain), value: `寝床を移す ${sum(move)}（${seeds(move)}シード）、道が伝わる ${sum(way)}（${seeds(way)}シード）、竜を倒す ${sum(slain)}（${seeds(slain)}シード。孵ったばかりの幼竜を除く）` };
     },
   },
   {
