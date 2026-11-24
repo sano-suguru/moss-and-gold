@@ -201,7 +201,7 @@ export function updateParties(this: Ecology): void {
       const ahead = this.cacheAhead(p, alive[0], foodAvg);
       if (hungry && ahead) hungry = false;
       // 竜の寝床への道探しと竜退治の一行は、通ってきた置き場に食料が残っていれば、帰りにそこで補えるので、もう少し奥まで進む
-      const quest = (p.aim === 2 || p.aim === 6) && !p.aimEnd;
+      const quest = (p.aim === 2 || p.aim === 6) && !p.aimEnd && !!this.questDragonCr();
       const backup = quest && (p.cacheVis ?? []).some((id) => (this.caches.find((q) => q.id === id)?.food ?? 0) > 20);
       if (foodAvg < (backup ? 0.3 : 0.45) && p.goal === 0 && !ahead) {
         p.goal = 1;
@@ -249,7 +249,7 @@ export function updateParties(this: Ecology): void {
       if ((p.camp ?? -1) >= 0 && this.step >= (p.campUntil ?? 0)) this.endCamp(p);
       if ((p.camp ?? -1) >= 0) this.watchDoze(p);
       if ((p.camp ?? -1) >= 0) this.campWatch(p, alive);
-      // 竜の寝床への道探しと竜退治の一行は、依頼の途中なら、拾った金貨で荷がいっぱいになっても引き返さない（竜の宝の山のそばで金貨を拾い、竜を見る前に帰っていた）
+      // 竜の寝床への道探しと竜退治の一行は、相手の竜がいて依頼の途中なら、拾った金貨で荷がいっぱいになっても引き返さない（引き返すと、竜の宝の山のそばで金貨を拾ったところで、竜を見る前に帰る）
       if ((held >= cap * 0.7 && !quest) || hungry || tooLong || fewer || dark || ((p.saw & 8) !== 0 && !slayer)) {
         p.goal = 1;
         if ((p.camp ?? -1) >= 0) this.endCamp(p);

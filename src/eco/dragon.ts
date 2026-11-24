@@ -105,6 +105,19 @@ export function dragonFlightGoal(this: Ecology, c: Cr): [number, number] {
 }
 
 /**
+ * 竜の寝床が入口側と切り離された島にあるか：宝の山があればそのマスで、無ければ寝床の位置（hx, hy）で見る。
+ * 寝床の位置は宝の山から左右へ18pxずらしてあり、岩のマスに重なることがあるので、岩なら宝の山の側（左右18px）のマスで見る
+ */
+export function dragonLairIsland(this: Ecology, c: Cr, hoard?: Pile | null): boolean {
+  if (hoard) return this.onIsland(hoard.x, hoard.y);
+  for (const dx of [0, -18, 18]) {
+    const r = this.regionOf(this.tileOf(c.hx + dx, c.hy + 4));
+    if (r >= 0) return r !== this.mainRegion;
+  }
+  return false;
+}
+
+/**
  * 育った竜（若い竜・成竜）の寝床が入口側と切り離された島にあれば、入口側へ飛んで寝床を移す（移しはじめたら true）。
  * 入口側に寝床にできる宝の山があればそこへ（pickDragonHoard）。無ければ（入口側の宝はたいてい宝物庫の中）、入口側で深部にいちばん近い所へ飛ぶ。
  * 島の寝床に宝の山があれば、その金貨をくわえて運び、降りたときにそこへ積んで寝床の宝にする（孵った所で眠る若い竜には、たいてい宝が無い）。
@@ -114,7 +127,7 @@ export function dragonFlightGoal(this: Ecology, c: Cr): [number, number] {
 export function dragonRelocate(this: Ecology, c: Cr): boolean {
   const m = this.w.map;
   const hoard = this.piles.find((p) => p.id === c.ref && p.gold > 0);
-  if (c.sp < 1 || c.away || !this.onIsland(hoard?.x ?? c.hx, hoard?.y ?? c.hy)) return false;
+  if (c.sp < 1 || c.away || !this.dragonLairIsland(c, hoard)) return false;
   const alt = this.pickDragonHoard(1);
   const toPile = !!alt && alt !== hoard && !this.onIsland(alt.x, alt.y);
   const spot = toPile ? -1 : this.nearestMain(m.deep.x, m.deep.y);
@@ -128,7 +141,8 @@ export function dragonRelocate(this: Ecology, c: Cr): boolean {
     if (hoard) hoard.gold -= take;
     c.gold += take;
     c.ref = 0;
-    c.hx = (spot % m.w) * TILE + 8 + 18;
+    // 見つけた床のマスそのものに降りる（左右にずらすと岩に重なることがある）。くわえた金貨は、降りた足もとに積む
+    c.hx = (spot % m.w) * TILE + 8;
     c.hy = Math.floor(spot / m.w) * TILE + 8 - 4;
   }
   c.st = 2;
@@ -257,15 +271,15 @@ export function dragon(this: Ecology, c: Cr, _day: number): void {
         // くわえてきた金貨は、降りた所に積んで寝床の宝にする（寝床を移したとき）
         if (c.gold > 0 && !this.piles.some((p) => p.id === c.ref)) {
           const before = this.piles.length;
-          this.dropGold(c.hx - 18, c.hy + 4, c.gold, this.ownerNote(c, 'stash'));
+          this.dropGold(c.hx, c.hy + 4, c.gold, this.ownerNote(c, 'stash'));
           c.gold = 0;
-          const np = this.piles.length > before ? this.piles[this.piles.length - 1] : this.piles.find((p) => sq(p.x - (c.hx - 18)) + sq(p.y - (c.hy + 4)) < 20 * 20);
+          const np = this.piles.length > before ? this.piles[this.piles.length - 1] : this.piles.find((p) => sq(p.x - c.hx) + sq(p.y - (c.hy + 4)) < 20 * 20);
           if (np) c.ref = np.id;
         }
         // 宝の山を覚え直す（宝物庫とドワーフの広間は選ばない）
         let hoard = this.piles.find((p) => p.id === c.ref) ?? this.pickDragonHoard(1);
         // 入口側へ寝床を移した竜は、島の宝の山を寝床に覚え直さない（移した寝床と行き来しない）
-        if (hoard && this.onIsland(hoard.x, hoard.y) && !this.onIsland(c.hx, c.hy)) hoard = null;
+        if (hoard && this.onIsland(hoard.x, hoard.y) && !this.dragonLairIsland(c)) hoard = null;
         if (hoard) c.ref = hoard.id;
       }
     }
@@ -345,8 +359,8 @@ export function dragon(this: Ecology, c: Cr, _day: number): void {
   // 宝を盗った者を追い、近ければ炎を吐く（金貨を落とすか倒れるまで）
   if (c.foe) {
     const f0 = this.byId.get(c.foe);
-    // ミミックは宝箱に化けた魔物で、金貨を抱えていても宝を盗った者ではない（追うと炎を吐き続けて、竜がその場から動かなくなる）
-    const f = f0 && f0.k === Kind.Mimic ? undefined : f0;
+    // ミミックは宝箱に化けた魔物で、金貨を抱えていても宝を盗った者ではない（追うと炎を吐き続けて、竜がその場から動かなくなる）。噛みつかれたばかりなら打ち返す
+    const f = f0 && f0.k === Kind.Mimic && this.w.tick - c.hitAt > 60 ? undefined : f0;
     const nearLair = f && sq(f.x - c.hx) + sq(f.y - c.hy) < 10 * TILE * 10 * TILE;
     if (!f || f.dead || (f.gold <= 0 && !nearLair) || sq(f.x - c.x) + sq(f.y - c.y) > 30 * TILE * 30 * TILE) c.foe = 0;
     else {
@@ -525,7 +539,8 @@ declare module '../ecology' {
     dragon: typeof dragon;
     dragonStepBack: typeof dragonStepBack;
     dragonRelocate: typeof dragonRelocate;
+    dragonLairIsland: typeof dragonLairIsland;
   }
 }
 
-Object.assign(Ecology.prototype, { wyvern, pickDragonHoard, pileOwner, dragonLightSleep, dragonSide, dragonFlightGoal, dragon, dragonStepBack, dragonRelocate });
+Object.assign(Ecology.prototype, { wyvern, pickDragonHoard, pileOwner, dragonLightSleep, dragonSide, dragonFlightGoal, dragon, dragonStepBack, dragonRelocate, dragonLairIsland });
