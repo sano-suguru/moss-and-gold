@@ -235,9 +235,12 @@ export function nightHit(this: Ecology, a: Cr, d: Cr): boolean {
   return true;
 }
 
-/** 焚き火で休む一行の者か（死の記録の camp の印。src/eco/move.ts） */
-export function inCamp(this: Ecology, o: Cr): boolean {
-  return o.k === Kind.Adventurer && (this.parties.find((q) => q.id === o.party)?.camp ?? -1) >= 0;
+/** 死の記録の印：焚き火で休む一行の者なら camp と、焚き火を囲んでからの生き物の更新の回数（ca） */
+export function campMark(this: Ecology, o: Cr): { camp?: 1; ca?: number } {
+  if (o.k !== Kind.Adventurer) return {};
+  const p = this.parties.find((q) => q.id === o.party);
+  if (!p || (p.camp ?? -1) < 0) return {};
+  return { camp: 1, ca: this.step - (p.campAt ?? this.step) };
 }
 
 /** 一行が焚き火で起きているか（起こされて構えている間） */
@@ -260,8 +263,8 @@ declare module '../ecology' {
     campSleeper: typeof campSleeper;
     campMight: typeof campMight;
     nightHit: typeof nightHit;
-    inCamp: typeof inCamp;
+    campMark: typeof campMark;
   }
 }
 
-Object.assign(Ecology.prototype, { campFoe, campWake, campHit, campPetty, campWatch, campAwake, campFire, nightRaider, weakCampAt, fireDaunts, campSleeper, campMight, nightHit, inCamp });
+Object.assign(Ecology.prototype, { campFoe, campWake, campHit, campPetty, campWatch, campAwake, campFire, nightRaider, weakCampAt, fireDaunts, campSleeper, campMight, nightHit, campMark });

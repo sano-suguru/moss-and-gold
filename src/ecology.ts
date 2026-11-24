@@ -166,6 +166,8 @@ export interface Party {
   camp?: number;
   campUntil?: number;
   lastCamp?: number;
+  /** 休む場所を、近くの手強い魔物を避けて選べなかった step 番号（しばらく探し直さない。startCamp） */
+  shunAt?: number;
   /**
    * 一行の目標（冒険者の作り直しの一歩目）：0 なし（探索）、1 宝、2 竜、3 大物、4 アンデッド、5 ゴブリン退治。
    * aimId は目指す相手（竜・大物の生き物、ゴブリンの集落の id。宝なら区画、アンデッドは 0）、aimX/aimY は目指す場所（px）、

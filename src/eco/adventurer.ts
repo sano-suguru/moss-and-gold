@@ -902,12 +902,34 @@ export function setExit(this: Ecology, p: Party): void {
   p.ty = best[1];
 }
 
-/** 焚き火の場所：近くの、壁に囲まれた所（袋小路や角）。水辺なら少し好む */
+/** 焚き火から、手強い魔物（住みかから離れないリッチやゴーレム、寝床のミノタウロスなど）までの、空けておく遠さ（マス） */
+const CAMP_SHUN_R = 10;
+/** 休む場所を選べなかったあと、探し直すまでの間（生き物の更新の回数） */
+const CAMP_SHUN_WAIT = 150;
+
+/**
+ * 焚き火の場所：近くの、壁に囲まれた所（袋小路や角）。水辺なら少し好む。
+ * 同じ洞窟の中の手強い魔物（強さ6以上。ミミックは宝箱に化けているので除く）から CAMP_SHUN_R マスの内と、覚えている危ない区画には置かない。
+ * 置ける所がなければ、休まずに先へ進む（場所を変えたときと、休めなかったときに、先頭がその魔物の方を見て settle の campShun を記録する）。
+ * 避けないと、住みかから離れない魔物のすぐそばで焚き火を囲み、眠りに就いたとたんに襲われて倒れていた（焚き火で倒れた冒険者の8割）
+ */
 export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: number; y: number }): void {
+  if (p.shunAt !== undefined && this.step - p.shunAt < CAMP_SHUN_WAIT) return;
   const m = this.w.map;
   const hx = Math.floor((near ?? leader).x / TILE);
   const hy = Math.floor((near ?? leader).y / TILE);
   const R = near ? 2 : 8;
+  const reg = this.regionOf(this.tileOf(leader.x, leader.y));
+  const threats: Cr[] = [];
+  this.nearby(hx * TILE + 8, hy * TILE + 8, R + CAMP_SHUN_R, (o) => {
+    if (o.dead || o.away || o.k === Kind.Adventurer || o.k === Kind.Dwarf || o.k === Kind.Mimic || STR[o.k] < 6) return;
+    if (reg >= 0 && this.regionOf(this.tileOf(o.x, o.y)) !== reg) return;
+    threats.push(o);
+  });
+  const strength = this.partyStr(p);
+  const risky = new Set<number>();
+  for (const d of p.danger ?? []) if (d[1] > strength * 0.7) risky.add(d[0]);
+  let shunned: Cr | null = null;
   let best = -1;
   let bv = -1e9;
   for (let dy = -R; dy <= R; dy++)
@@ -917,6 +939,13 @@ export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: numbe
       if (x < 2 || y < 2 || x >= m.w - 2 || y >= m.h - 2) continue;
       const k = y * m.w + x;
       if (m.solid[k] || m.sealed[k] || m.lava[k] || this.w.water[k] > 10 || this.w.burn[k]) continue;
+      const fx = x * TILE + 8;
+      const fy = y * TILE + 8;
+      const t = threats.find((o) => sq(o.x - fx) + sq(o.y - fy) < CAMP_SHUN_R * TILE * CAMP_SHUN_R * TILE);
+      if (t || risky.has(this.cellOf(fx, fy))) {
+        shunned ??= t ?? null;
+        continue;
+      }
       // 置き場のそばで休むときは、木箱のマスそのものには焚き火を置かない
       if (near && k === this.tileOf(near.x, near.y)) continue;
       let walls = 0;
@@ -934,7 +963,15 @@ export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: numbe
         best = k;
       }
     }
-  if (best < 0) return;
+  if (shunned) {
+    const t = shunned as Cr;
+    this.setDir(leader, t.x - leader.x, t.y - leader.y);
+    this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'campShun', n: t.k, how: best < 0 ? 'none' : 'moved', x: Math.round(leader.x), y: Math.round(leader.y) } as never);
+  }
+  if (best < 0) {
+    if (shunned) p.shunAt = this.step;
+    return;
+  }
   p.camp = best;
   p.campAt = this.step;
   // 夜は長めに休む（ゲーム内の夜のあいだ焚き火を囲む）
