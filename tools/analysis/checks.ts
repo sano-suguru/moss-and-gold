@@ -603,6 +603,18 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // リッチの死の呪い（lichSkill）：詠唱の溜めのあいだに、狙われた冒険者が陰へ走り込むか、前衛が代わりに受けるか、僧侶が打ち消す。
+    // リッチのいるシードは展開で変わるので、15シードの合計で見る。目安は実測の半分ほど
+    name: 'リッチが死の呪いを詠唱し、冒険者が応じる（15シードの10〜18日目の合計で、詠唱60回・6シード、応じた12回・4シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const cast = rs.map((r) => r.settle.filter((x) => x.k === Kind.Lich && x.ev === 'curseStart').length);
+      const react = rs.map((r) => r.settle.filter((x) => x.k === Kind.Lich && ((x.ev === 'curseLost' && x.n === Kind.Adventurer) || x.ev === 'windupBroken' || (x.ev === 'curse' && x.how === 'guard'))).length);
+      const seeds = (n: number[]) => n.filter((v) => v > 0).length;
+      return { ok: sum(cast) >= 60 && seeds(cast) >= 6 && sum(react) >= 12 && seeds(react) >= 4, value: `詠唱 ${sum(cast)}（${seeds(cast)}シード）、応じた ${sum(react)}（${seeds(react)}シード）` };
+    },
+  },
+  {
     // 獲物を丸のみにする種（feeding の SWALLOW）：大トカゲは大ネズミを骨ごと食べて満ち、子を産む。骨を残すと満ちきらず、親から生まれなくなる。
     // 目安は実測の半分ほど（実測 81回・9シード）
     name: '大トカゲが親から生まれる（15シードの10〜18日目の合計で40回以上・7シード以上）',
