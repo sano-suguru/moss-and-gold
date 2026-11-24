@@ -605,14 +605,16 @@ export const CHECKS: Check[] = [
   },
   {
     // リッチの死の呪い（lichSkill）：詠唱の溜めのあいだに、狙われた冒険者が陰へ走り込むか、前衛が代わりに受けるか、僧侶が打ち消す。
-    // リッチのいるシードは展開で変わるので、15シードの合計で見る。目安は実測の半分ほど（実測：詠唱 111回・11シード、応じた 25回・6シード）
-    name: 'リッチが死の呪いを詠唱し、冒険者が応じる（15シードの10〜18日目の合計で、詠唱60回・6シード、応じた12回・4シード以上）',
+    // リッチのいる所と冒険者の通り道は展開で大きく変わり（無害な変更でも、詠唱の回数が1シードあたり十数回動く）、一つの窓では応じた回数が7回にとどまることがあるので、
+    // 二つの窓の合計で見る。目安は実測の半分ほど（実測：詠唱 81回・8シード、応じた 9回・5シード。10〜18日目だけ）
+    name: 'リッチが死の呪いを詠唱し、冒険者が応じる（10〜18日目の15シードと15〜23日目の16シードの合計で、詠唱60回・6シード、応じた8回・3シード以上）',
     ...RUN_WIDE,
+    more: [RUN_ARMOR],
     test: (rs) => {
       const cast = rs.map((r) => r.settle.filter((x) => x.k === Kind.Lich && x.ev === 'curseStart').length);
       const react = rs.map((r) => r.settle.filter((x) => (x.k === Kind.Lich && ((x.ev === 'curseLost' && x.n === Kind.Adventurer && x.how !== 'gone') || (x.ev === 'curse' && x.how === 'guard'))) || (x.k === Kind.Adventurer && x.ev === 'curseWard' && x.how > 0)).length);
-      const seeds = (n: number[]) => n.filter((v) => v > 0).length;
-      return { ok: sum(cast) >= 60 && seeds(cast) >= 6 && sum(react) >= 12 && seeds(react) >= 4, value: `詠唱 ${sum(cast)}（${seeds(cast)}シード）、応じた ${sum(react)}（${seeds(react)}シード）` };
+      const seeds = (n: number[]) => new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
+      return { ok: sum(cast) >= 60 && seeds(cast) >= 6 && sum(react) >= 8 && seeds(react) >= 3, value: `詠唱 ${sum(cast)}（${seeds(cast)}シード）、応じた ${sum(react)}（${seeds(react)}シード）` };
     },
   },
   {
@@ -949,7 +951,7 @@ export const CHECKS: Check[] = [
   },
   {
     // 竜の物語（dragonRelocate・guessDeep）：育った竜が入口側へ寝床を移し、道探しの一行が寝床を見つけて道を持ち帰り、竜退治の一行が寝床に着いて竜を倒す。
-    // 竜の育ち方とどの一行が来るかは展開で変わるので、二つの窓の合計で見る。目安は実測の半分ほど
+    // 竜の育ち方とどの一行が来るかは展開で変わるので、二つの窓の合計で見る。目安は実測の半分ほど（実測：寝床を移す 13回・8シード、道が伝わる 9回・5シード、竜を倒す 6回・4シード）
     name: '竜が入口側へ寝床を移し、寝床への道が町に伝わり、冒険者が竜を倒す（10〜18日目の15シードと15〜23日目の16シードの合計で、寝床を移す3回・道が伝わる3回・竜を倒す3回、それぞれ2シード以上）',
     ...RUN_WIDE,
     more: [RUN_ARMOR],
