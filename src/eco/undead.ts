@@ -1,6 +1,6 @@
 /** Ecology のメソッド：死の気配（ゴーストが現れる）、ゾンビ、ゴースト、スケルトンとリッチ（src/ecology.ts のクラスに、prototype で足す。中身は分ける前と同じ） */
 import { type Cr, DIR16, Ecology, type Item, ItemKind, Job, Kind, SPEC, STR, ih, sq } from '../ecology';
-import { lineOfSight, TILE } from '../mapgen';
+import { TILE } from '../mapgen';
 
 /**
  * 骨になって起き上がる人型（冒険者のほか）。ゴブリン・コボルト・オーク・ドワーフ・リザードマンの亡骸も、暗く死者の多い所で骨になったあと、
@@ -450,21 +450,8 @@ export function skeleton(this: Ecology, c: Cr, _day: number): void {
 
 export function lich(this: Ecology, c: Cr, _day: number): void {
   const s = SPEC[Kind.Lich];
-  if (c.act === 2 && c.actT < 6) return;
-  // 住みかに入ってきた生きものを、死の呪いで倒す（見通しの利く相手だけ。壁の向こうへは呪いが届かない）
-  let foe: Cr | null = null;
-  this.nearby(c.x, c.y, 5, (o) => {
-    if (foe || o.dead || o.away || ![Kind.Adventurer, Kind.Goblin, Kind.Kobold, Kind.Orc, Kind.Lizardman].includes(o.k) || !lineOfSight(this.w.map, c.x, c.y, o.x, o.y)) return;
-    foe = o;
-  });
-  if (foe) {
-    const f = foe as Cr;
-    c.act = 2;
-    c.actT = 0;
-    c.dir = Math.abs(f.x - c.x) > Math.abs(f.y - c.y) ? (f.x > c.x ? 2 : 3) : f.y > c.y ? 0 : 1;
-    if (ih(c.id, f.id, this.step) % 2 === 0) this.fight(c, f);
-    return;
-  }
+  // 住みかに入ってきた生きものを、死の呪いで打つ（詠唱の溜めと、受けた側の反応は lichSkill）
+  if (this.lichSkill(c)) return;
   c.act = c.actT % 200 < 40 ? 1 : 0;
   if (c.act === 1) {
     const a = (c.actT * 0.05 + c.id) % 6.283;

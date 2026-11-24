@@ -431,7 +431,8 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
   const sk = skill ? this.skillStep(c, skill) : '';
   if (sk === 'charging') return;
   // 近くのミノタウロスの突進の溜めを見たら、通り道から下がる（戦士と僧侶は受け止めに入る。src/eco/charge.ts）
-  if (sk !== 'ready' && this.advBrace(c)) return;
+  // リッチの死の呪いの詠唱を見たら、職業ごとに応じる（advLich）
+  if (sk !== 'ready' && (this.advLich(c) || this.advBrace(c))) return;
   // 一行の撤退：後衛から先に、退く相手から離れる向きへ下がる。前衛（戦士・僧侶・竜殺し）は少し遅れて、しんがりとして下がり、すぐそばに来た相手とは打ち合う
   if ((p.retreatUntil ?? 0) > this.step && p.retreatX !== undefined && sk !== 'ready') {
     const rear = c.sp === Job.Warrior || c.sp === Job.Priest || c.sp === Job.Slayer;

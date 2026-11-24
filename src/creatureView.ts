@@ -9,6 +9,7 @@ import { SKILL_VAMP_MIST } from './eco/vampskill';
 import { SKILL_KOBOLD_SLING } from './eco/koboldskill';
 import { SKILL_MYC_SPORE } from './eco/myconidskill';
 import { SKILL_GHOST_WAIL } from './eco/ghostskill';
+import { SKILL_LICH_CURSE } from './eco/lichskill';
 import { SKILL_ORC_ROAR } from './eco/orcskill';
 import { SKILL_BASILISK_GAZE } from './eco/basilisk';
 import { BONE_KINDS, BONE_SP, LICH_RISE, RISE_N } from './eco/undead';
@@ -1187,6 +1188,16 @@ export class CreatureView {
           }
           if (once) spray(1, 0, 3, 0.5, 0.6);
           break;
+        case 'curse':
+          // リッチの死の呪い（lichSkill）：杖から相手へ紫の筋が走り、相手の足もとで紫の光が弾けて、髑髏の粒が立ちのぼる
+          if (age < 8) {
+            for (let i = 1; i < dist / 6; i++) push(r.ax + ux * i * 6, r.ay + uy * i * 6, lift + 6 + Math.sin(i * 1.3 + age) * 2, false, A.fx(`bit:2:4:${Math.min(3, age >> 1)}`), 0, 4);
+            push(r.dx, r.dy, lift, false, A.fx(`blast:2:4:${f6(age)}`), 0, 4);
+            push(r.dx, r.dy + 2, 1, false, A.fx(`ring:2:4:${f6(age)}`), 0, 4);
+          }
+          if (age < 6) dyn.push({ x: r.dx, y: r.dy - lift, r: 44, i: 0.55 * damp * (1 - age / 6), c: 2 });
+          if (once) spray(2, 4, 6, 1.0, 1.8);
+          break;
         case 'chill':
           // ゴーストの冷たい手（src/eco/ghostskill.ts）など：触れた所に霜の結晶が弾け（fxFrost）、氷のかけらが散る
           if (age < 12) push(r.dx, r.dy, lift, false, A.fx(`frost:${Math.min(5, age >> 1)}`), 0, 4);
@@ -1803,7 +1814,7 @@ export class CreatureView {
         const lag = advStrike(eco, r) ? ADV_STRIKE_LAG - 2 : 0;
         if (eco.w.tick - r.t - lag > 6 || eco.w.tick - r.t - lag < 0) continue;
         const L = Math.hypot(r.dx - r.ax, r.dy - r.ay) || 1;
-        if (r.style === 'arrow' || r.style === 'orb' || r.style === 'beam') continue;
+        if (r.style === 'arrow' || r.style === 'orb' || r.style === 'beam' || r.style === 'curse') continue;
         this.lunge.set(r.aid, { t: r.t + lag, ux: (r.dx - r.ax) / L, uy: (r.dy - r.ay) / L });
       }
       this.drawAttacks(eco, A, inView, pushSprite, dyn);
@@ -2596,6 +2607,28 @@ export class CreatureView {
         for (const [ex, el] of eyes) {
           if (p < 0.6) pushSprite(x + ex, yy + 0.06, lift + el, false, A.fx(`orb:3:${Math.floor((eco.w.tick + alpha) / 2) % 2}`), 0, 4);
           else pushSprite(x + ex, yy + 0.06, lift + el, false, A.fx(`ring:0:3:${c.run === -6 ? 2 + (Math.floor((eco.w.tick + alpha) / 3) % 4) : Math.min(5, Math.floor((p - 0.6) * 15))}`), 0, 4);
+        }
+      }
+      // リッチの死の呪いの詠唱（lichSkill）：杖のまわりに紫の光が集まって髑髏の粒が立ちのぼり、狙われた者の足もとに紫の魔法陣が広がっていく（描画専用）
+      if (sp === Kind.Lich && !c.dead && c.run === -1 && c.act === 2 && c.actT < 0) {
+        const p = Math.max(0, Math.min(1, (SKILL_LICH_CURSE.windup + c.actT + alpha) / SKILL_LICH_CURSE.windup));
+        const bh = Ecology.bodySize(sp);
+        for (let i = 0; i < 4; i++) {
+          const q = (t * 0.05 + i * 0.25) % 1;
+          pushSprite(x + Math.sin(t * 0.3 + i * 1.7) * 6, yy + 0.06, lift + bh * 0.8 + q * 12, false, A.fx(`bit:2:4:${Math.min(3, Math.floor(q * 4))}`), 0, 4);
+        }
+        dyn.push({ x, y: yy - lift - bh * 0.8, r: 20 + 18 * p, i: 0.2 + 0.35 * p, c: 2 });
+        const tg = eco.byId.get(c.aim);
+        if (tg && !tg.dead) {
+          const ta = eco.moveAlpha(tg, alpha);
+          const tx = tg.px + (tg.x - tg.px) * ta;
+          const ty = tg.py + (tg.y - tg.py) * ta;
+          // 外の輪は詠唱が進むほど大きく、内の輪は縮みながら繰り返し寄せる（狙いが定まっていくように）
+          const size = p < 0.3 ? 1 : 2;
+          pushSprite(tx, ty + 2, 1, false, A.fx(`ring:${size}:4:${Math.floor(t / 3) % 2}`), 0, 4);
+          pushSprite(tx, ty + 2, 1, false, A.fx(`ring:1:4:${5 - (Math.floor(t / 2) % 4)}`), 0, 4);
+          if (p > 0.6) pushSprite(tx, ty + 2, 1, false, A.fx(`ring:0:4:${Math.floor(t / 2) % 2}`), 0, 4);
+          dyn.push({ x: tx, y: ty, r: 18 + 18 * p, i: 0.25 + 0.35 * p, c: 2 });
         }
       }
       // ゴーストの金切り声の溜め（src/eco/ghostskill.ts）：口もとに青白い冷気の玉が膨らみ、まわりから冷気の粒が渦を巻いて吸い寄せられる（体のあとに描く）

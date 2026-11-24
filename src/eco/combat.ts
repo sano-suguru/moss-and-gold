@@ -200,6 +200,8 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1, fx = true): boolean
   d.hp -= dmg;
   // 大物の溜め（突進など）は、体力の上限の2割を超える重い一撃を受けたときだけ止まる（breakWindup）
   if (d.k !== Kind.Adventurer && d.act === 2 && d.actT < 0 && d.hp > 0 && dmg > this.maxHp(d) * 0.2) this.breakWindup(d);
+  // リッチの詠唱は、魔法か聖なる一打ちでも止まる（lichWardHit）
+  else if (d.k === Kind.Lich) this.lichWardHit(a, d);
   // リビングアーマーは、倒れずに強い一打を受けると、手の武器を落とす（src/eco/armor.ts）
   if (d.k === Kind.Armor && d.hp > 0) this.armorShed(d, dmg, a);
   // やられそうになったヴァンパイアは、コウモリの群れにばらけて逃げる（1日に1回、光の中ではできない。src/eco/vampire.ts）
@@ -243,7 +245,8 @@ export function fight(this: Ecology, a: Cr, d: Cr): boolean {
   }
   // 打ち返し（逃げている者と、寝込みを打たれて飛び起きたばかりの者は打ち返さない）
   // ゴーストは、人（冒険者とドワーフ）のほかには打ち返さない（モンスターとは命を取り合わない。src/eco/ghostskill.ts）
-  if (d.flee <= 0 && this.str(d) > 0 && !asleep && !(d.k === Kind.Ghost && a.k !== Kind.Adventurer && a.k !== Kind.Dwarf)) {
+  // 呪いを詠唱しているリッチは打ち返さない（詠唱の状態を上書きしない。lichSkill）
+  if (d.flee <= 0 && this.str(d) > 0 && !asleep && !(d.k === Kind.Ghost && a.k !== Kind.Adventurer && a.k !== Kind.Dwarf) && !(d.k === Kind.Lich && d.run === -1 && d.act === 2 && d.actT < 0)) {
     d.act = 2;
     d.actT = 0;
     // コウモリに群がられている者の打ち返しは弱い（batPinned）

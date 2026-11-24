@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { generate } from '../../../src/mapgen';
 
-const K = { Myconid: 8, Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5, Ghost: 7, Basilisk: 17, Ghoul: 31, RustBeetle: 32, Frog: 33, Moth: 34 };
+const K = { Myconid: 8, Wisp: 0, Bat: 1, Spider: 4, Gargoyle: 18, Mimic: 20, Worm: 22, Wyvern: 23, Rat: 2, Kobold: 10, Goblin: 12, Orc: 13, Minotaur: 15, Dragon: 24, Adventurer: 25, Armor: 29, Vampire: 19, Thrall: 30, Slime: 5, Ghost: 7, Basilisk: 17, Ghoul: 31, RustBeetle: 32, Frog: 33, Moth: 34, Lich: 27 };
 
 export interface Moment {
   key: string;
@@ -157,6 +157,12 @@ export const MOMENTS: Moment[] = [
   { key: 'spiderBindAdv', label: '大グモ：糸を吐いて冒険者を縛った' },
   { key: 'silkCut', label: '大グモ：糸に縛られた冒険者が、糸を切って抜けた' },
   { key: 'spiderBite', label: '大グモ：糸で縛った相手に跳びかかって噛みついた' },
+  { key: 'curseStart', label: 'リッチ：死の呪いを詠唱した（src/eco/lichskill.ts）' },
+  { key: 'curseAdv', label: 'リッチ：詠唱した呪いが冒険者を打った' },
+  { key: 'curseKill', label: 'リッチ：呪いで冒険者を倒した' },
+  { key: 'curseLost', label: 'リッチ：狙った冒険者が壁の陰か届かない所へ下がって、呪いが散った' },
+  { key: 'curseGuard', label: 'リッチ：戦士か竜殺しが、仲間への呪いを代わりに受けた' },
+  { key: 'curseWard', label: 'リッチ：僧侶の祓いの光か、魔法使い・僧侶の一打ちで、詠唱が止まった' },
   { key: 'ghostWail', label: 'ゴースト：金切り声で人を打つか、モンスターを追い払った' },
   { key: 'ghostWailAdv', label: 'ゴースト：金切り声で冒険者を打ってすくませた' },
   { key: 'ghostScare', label: 'ゴースト：金切り声か冷たい手でモンスターを追い払った' },
@@ -418,6 +424,12 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     mycSpore: ev(K.Myconid, 'spore').filter((x) => x.how === 0 && x.n > 0).length,
     mycSporeAdv: ev(K.Myconid, 'spore').filter((x) => x.how === 0 && x.adv > 0).length,
     mycBurst: ev(K.Myconid, 'spore').filter((x) => x.how === 1 && x.n > 0).length,
+    curseStart: ev(K.Lich, 'curseStart').length,
+    curseAdv: ev(K.Lich, 'curse').filter((x) => x.n === K.Adventurer).length,
+    curseKill: ev(K.Lich, 'curse').filter((x) => x.n === K.Adventurer && x.how === 'kill').length,
+    curseLost: ev(K.Lich, 'curseLost').filter((x) => x.n === K.Adventurer && x.how !== 'gone').length,
+    curseGuard: ev(K.Lich, 'curse').filter((x) => x.how === 'guard').length,
+    curseWard: ev(K.Adventurer, 'curseWard').filter((x) => x.how > 0).length,
     ghostWail: ev(K.Ghost, 'ghostWail').filter((x) => x.n > 0 || x.to > 0).length,
     ghostScare: ev(K.Ghost, 'ghostWail').filter((x) => x.to > 0).length + ev(K.Ghost, 'ghostScare').length,
     ghostWailAdv: ev(K.Ghost, 'ghostWail').filter((x) => x.how > 0).length,

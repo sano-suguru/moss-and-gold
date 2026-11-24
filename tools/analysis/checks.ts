@@ -570,13 +570,14 @@ export const CHECKS: Check[] = [
   {
     // 錆喰い虫（rustBeetle）：錆びた鉄の武具に群がって食べ尽くす。どのシードに武具が溜まるかは展開で変わるので、15シードの合計で見る。
     // 錆喰い虫は3日目ごろから湧くので、10日目までに溜まった武具はあらかた食べ終えている。10〜18日目は、新しく錆びる武具の分だけ。
-    // 目安は実測の半分ほど（実測 57回・8シード）
-    name: '錆喰い虫が錆びた鉄の武具を食べ尽くす（15シードの10〜18日目の合計で25回以上・4シード以上）',
+    // 錆びる武具の数は冒険者の倒れ方しだいで、一つの窓では展開しだいで24〜64回と揺れるので、二つの窓の合計で見る。目安は実測の6割ほど（実測 49回・10シード）
+    name: '錆喰い虫が錆びた鉄の武具を食べ尽くす（10〜18日目の15シードと15〜23日目の16シードの合計で30回以上・6シード以上）',
     ...RUN_WIDE,
+    more: [RUN_ARMOR],
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === Kind.RustBeetle && x.ev === 'rust').length);
-      const seeds = n.filter((v) => v > 0).length;
-      return { ok: sum(n) >= 25 && seeds >= 4, value: `${sum(n)}（${seeds}シード）` };
+      const seeds = new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
+      return { ok: sum(n) >= 30 && seeds >= 6, value: `${sum(n)}（${seeds}シード）` };
     },
   },
   {
@@ -600,6 +601,18 @@ export const CHECKS: Check[] = [
       const bat = rs.map((r) => r.deaths.filter((x) => x.k === Kind.Moth && x.by === Kind.Bat).length);
       const seeds = (n: number[]) => n.filter((v) => v > 0).length;
       return { ok: sum(camp) >= 240 && seeds(camp) >= 5 && sum(bat) >= 25 && seeds(bat) >= 5, value: `焚き火 ${sum(camp)}（${seeds(camp)}シード）、コウモリ ${sum(bat)}（${seeds(bat)}シード）` };
+    },
+  },
+  {
+    // リッチの死の呪い（lichSkill）：詠唱の溜めのあいだに、狙われた冒険者が陰へ走り込むか、前衛が代わりに受けるか、僧侶が打ち消す。
+    // リッチのいるシードは展開で変わるので、15シードの合計で見る。目安は実測の半分ほど（実測：詠唱 111回・11シード、応じた 25回・6シード）
+    name: 'リッチが死の呪いを詠唱し、冒険者が応じる（15シードの10〜18日目の合計で、詠唱60回・6シード、応じた12回・4シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const cast = rs.map((r) => r.settle.filter((x) => x.k === Kind.Lich && x.ev === 'curseStart').length);
+      const react = rs.map((r) => r.settle.filter((x) => (x.k === Kind.Lich && ((x.ev === 'curseLost' && x.n === Kind.Adventurer && x.how !== 'gone') || (x.ev === 'curse' && x.how === 'guard'))) || (x.k === Kind.Adventurer && x.ev === 'curseWard' && x.how > 0)).length);
+      const seeds = (n: number[]) => n.filter((v) => v > 0).length;
+      return { ok: sum(cast) >= 60 && seeds(cast) >= 6 && sum(react) >= 12 && seeds(react) >= 4, value: `詠唱 ${sum(cast)}（${seeds(cast)}シード）、応じた ${sum(react)}（${seeds(react)}シード）` };
     },
   },
   {
