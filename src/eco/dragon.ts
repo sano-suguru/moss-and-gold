@@ -156,8 +156,9 @@ export function dragonRelocate(this: Ecology, c: Cr): boolean {
   const m = this.w.map;
   const hoard = this.piles.find((p) => p.id === c.ref && p.gold > 0);
   if (c.sp < 1 || c.away || !this.dragonLairIsland(c, hoard)) return false;
-  // 島の寝床の宝で成竜になれる若い竜は、島で成竜になってから移る（若いうちに入口側へ移ると、竜退治の一行にすぐ倒されて成竜まで育たない）
-  if (c.sp === 1 && (hoard?.gold ?? 0) >= DRAGON_ADULT_GOLD) return false;
+  // 島に寝床にできる宝の山（成竜になれるだけの金貨）があれば、若い竜は島で成竜になってから移る
+  // （若いうちに入口側へ移ると、竜退治の一行にすぐ倒されて成竜まで育たない。島の宝の山は、狩りから戻ったときに寝床に選ぶ）
+  if (c.sp === 1 && this.piles.some((p) => p.gold >= DRAGON_ADULT_GOLD && this.onIsland(p.x, p.y) && this.dragonPileOk(p))) return false;
   const alt = this.pickDragonHoard(1);
   const toPile = !!alt && alt !== hoard && !this.onIsland(alt.x, alt.y);
   const spot = toPile ? -1 : this.dragonLairSpot();
