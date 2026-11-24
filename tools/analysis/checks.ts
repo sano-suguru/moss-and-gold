@@ -128,6 +128,28 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 焚き火の場所（startCamp）：住みかから離れない手強い魔物のそばを避けて焚き火を囲み、一行そのものがそばにいれば休まずに進む。
+    // 目安は実測の3分の1ほど（実測：16シード×25日で、場所を変えた 147回・休まずに進んだ 216回）
+    name: '一行が手強い魔物のそばを避けて焚き火を囲む（15シードの10〜18日目の合計で、場所を変えた15回・6シード以上）',
+    ...RUN_WIDE,
+    test: (rs) => {
+      const moved = rs.map((r) => r.settle.filter((x) => x.k === Kind.Adventurer && x.ev === 'campShun' && x.how === 'moved').length);
+      const skip = rs.map((r) => r.settle.filter((x) => x.k === Kind.Adventurer && x.ev === 'campShun' && x.how === 'none').length);
+      const seeds = moved.filter((v) => v > 0).length;
+      return { ok: sum(moved) >= 15 && seeds >= 6, value: `場所を変えた ${sum(moved)}（${seeds}シード）、休まずに進んだ ${sum(skip)}` };
+    },
+  },
+  {
+    // 焚き火を囲んで間もなく（生き物の更新60回の内）倒れるのは、手強い魔物のそばで休んだとき。避けないと、16シード×25日で焚き火で倒れた40人のうち22人がこれだった（実測は0人）
+    name: '焚き火を囲んで間もなく倒れる冒険者がほとんどいない（1〜10日目と10〜18日目の15シードの合計で2人以下）',
+    ...RUN_EARLY,
+    more: [RUN_WIDE],
+    test: (rs) => {
+      const n = rs.map((r) => r.deaths.filter((x) => x.k === Kind.Adventurer && x.camp === 1 && (x.ca as number) < 60).length);
+      return { ok: sum(n) <= 2, value: rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed}（${r.from}〜${r.to}日） ${n[rs.indexOf(r)]}`).join('、') || '0人' };
+    },
+  },
+  {
     // 三歩目：深部の探索の一行が物資の置き場を残し、次の一行がそこで食料を補う。まれな出来事なので、RUN_WIDE の15シードの合計で見る
     name: '物資の置き場が残され、次の一行が補う（15シードの合計で置き場4つ・補う2回以上）',
     ...RUN_WIDE,
