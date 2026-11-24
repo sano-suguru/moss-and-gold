@@ -953,7 +953,7 @@ export const CHECKS: Check[] = [
   },
   {
     // 竜の物語（dragonRelocate・guessDeep）：育った竜が入口側へ寝床を移し、道探しの一行が寝床を見つけて道を持ち帰り、竜退治の一行が寝床に着いて竜を倒す。
-    // 竜の育ち方とどの一行が来るかは展開で変わるので、二つの窓の合計で見る。目安は実測の半分ほど（実測：寝床を移す 13回・8シード、道が伝わる 9回・5シード、竜を倒す 6回・4シード）
+    // 竜の育ち方とどの一行が来るかは展開で変わるので、二つの窓の合計で見る。目安は実測の半分ほど（実測：寝床を移す 9回・8シード、道が伝わる 7回・5シード、竜を倒す 5回・4シード）
     name: '竜が入口側へ寝床を移し、寝床への道が町に伝わり、冒険者が竜を倒す（10〜18日目の15シードと15〜23日目の16シードの合計で、寝床を移す3回・道が伝わる3回・竜を倒す3回、それぞれ2シード以上）',
     ...RUN_WIDE,
     more: [RUN_ARMOR],
@@ -965,8 +965,9 @@ export const CHECKS: Check[] = [
       const slain = rs.map((r) =>
         r.deaths.filter((x) => {
           if (x.k !== Kind.Dragon || x.by !== Kind.Adventurer || !late(r, x.t)) return false;
+          // 窓の記録に生まれが無い竜は、窓より前に孵った竜
           const born = r.births.filter((b) => b.k === Kind.Dragon && b.t <= x.t).pop();
-          return !!born && x.t - born.t > 4 * DAY_TICKS;
+          return !born || x.t - born.t > 4 * DAY_TICKS;
         }).length,
       );
       const seeds = (n: number[]) => new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
