@@ -611,10 +611,10 @@ export const CHECKS: Check[] = [
     ...RUN_WIDE,
     more: [RUN_ARMOR],
     test: (rs) => {
-      // 二つの窓は15〜18日目が重なるので、15〜23日目の窓は18日目より後だけを数える
-      const late = (r: { from: number }, t: number) => r.from < 15 || t > 18 * DAY_TICKS;
+      // 二つの窓は15〜18日目が重なるので、15〜23日目の窓は18日目より後だけを数える（10〜18日目の窓に無いシードは除く）
+      const late = (r: { from: number; seed: string }, t: number) => r.from < 15 || t > 18 * DAY_TICKS || !RUN_WIDE.seeds.includes(r.seed);
       const cast = rs.map((r) => r.settle.filter((x) => x.k === Kind.Lich && x.ev === 'curseStart' && late(r, x.t)).length);
-      const react = rs.map((r) => r.settle.filter((x) => late(r, x.t) && (x.k === Kind.Lich && ((x.ev === 'curseLost' && x.n === Kind.Adventurer && x.how !== 'gone') || (x.ev === 'curse' && x.how === 'guard'))) || (x.k === Kind.Adventurer && x.ev === 'curseWard' && x.how > 0)).length);
+      const react = rs.map((r) => r.settle.filter((x) => late(r, x.t) && ((x.k === Kind.Lich && ((x.ev === 'curseLost' && x.n === Kind.Adventurer && x.how !== 'gone') || (x.ev === 'curse' && x.how === 'guard'))) || (x.k === Kind.Adventurer && x.ev === 'curseWard' && x.how > 0))).length);
       const seeds = (n: number[]) => new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
       return { ok: sum(cast) >= 60 && seeds(cast) >= 6 && sum(react) >= 8 && seeds(react) >= 3, value: `詠唱 ${sum(cast)}（${seeds(cast)}シード）、応じた ${sum(react)}（${seeds(react)}シード）` };
     },
@@ -958,18 +958,11 @@ export const CHECKS: Check[] = [
     ...RUN_WIDE,
     more: [RUN_ARMOR],
     test: (rs) => {
-      // 二つの窓は15〜18日目が重なるので、15〜23日目の窓は18日目より後だけを数える。竜を倒すのは、孵って4日より後の竜だけ（孵ったばかりの幼竜を除く）
-      const late = (r: { from: number }, t: number) => r.from < 15 || t > 18 * DAY_TICKS;
+      // 二つの窓は15〜18日目が重なるので、15〜23日目の窓は18日目より後だけを数える（10〜18日目の窓に無いシードは除く）。竜を倒すのは、育った竜だけ（孵ったばかりの幼竜を除く）
+      const late = (r: { from: number; seed: string }, t: number) => r.from < 15 || t > 18 * DAY_TICKS || !RUN_WIDE.seeds.includes(r.seed);
       const move = rs.map((r) => r.settle.filter((x) => x.k === Kind.Dragon && x.ev === 'lairMove' && late(r, x.t)).length);
       const way = rs.map((r) => r.settle.filter((x) => x.k === Kind.Adventurer && x.ev === 'way' && late(r, x.t)).length);
-      const slain = rs.map((r) =>
-        r.deaths.filter((x) => {
-          if (x.k !== Kind.Dragon || x.by !== Kind.Adventurer || !late(r, x.t)) return false;
-          // 窓の記録に生まれが無い竜は、窓より前に孵った竜
-          const born = r.births.filter((b) => b.k === Kind.Dragon && b.t <= x.t).pop();
-          return !born || x.t - born.t > 4 * DAY_TICKS;
-        }).length,
-      );
+      const slain = rs.map((r) => r.deaths.filter((x) => x.k === Kind.Dragon && x.by === Kind.Adventurer && late(r, x.t) && (x.sp as number) >= 1).length);
       const seeds = (n: number[]) => new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
       const ok = (n: number[]) => sum(n) >= 3 && seeds(n) >= 2;
       return { ok: ok(move) && ok(way) && ok(slain), value: `寝床を移す ${sum(move)}（${seeds(move)}シード）、道が伝わる ${sum(way)}（${seeds(way)}シード）、竜を倒す ${sum(slain)}（${seeds(slain)}シード。孵ったばかりの幼竜を除く）` };

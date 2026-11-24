@@ -201,7 +201,7 @@ export function updateParties(this: Ecology): void {
       const ahead = this.cacheAhead(p, alive[0], foodAvg);
       if (hungry && ahead) hungry = false;
       // 竜の寝床への道探しと竜退治の一行は、通ってきた置き場に食料が残っていれば、帰りにそこで補えるので、もう少し奥まで進む
-      const quest = (p.aim === 2 || p.aim === 6) && !p.aimEnd && !!this.questDragonCr();
+      const quest = (p.aim === 2 || p.aim === 6) && !p.aimEnd && this.questDragonCr()?.k === Kind.Dragon;
       const backup = quest && (p.cacheVis ?? []).some((id) => (this.caches.find((q) => q.id === id)?.food ?? 0) > 20);
       if (foodAvg < (backup ? 0.3 : 0.45) && p.goal === 0 && !ahead) {
         p.goal = 1;

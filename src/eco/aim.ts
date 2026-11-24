@@ -197,8 +197,8 @@ export function guessDeep(this: Ecology, p: Party): void {
     p.aimGuessX = r.dragonX;
     p.aimGuessY = r.dragonY;
   } else {
-    // 深部が入口側と切り離された島なら、入口側で深部にいちばん近い所を探す（島へは歩いて行けない）
-    const k = this.onIsland(m.deep.x * TILE + 8, m.deep.y * TILE + 8) ? this.nearestMain(m.deep.x, m.deep.y) : -1;
+    // 深部が入口側と切り離された島なら、入口側で深部にいちばん近い所（島から移った竜の寝床になる所。dragonLairSpot）を探す（島へは歩いて行けない）
+    const k = this.onIsland(m.deep.x * TILE + 8, m.deep.y * TILE + 8) ? this.dragonLairSpot() : -1;
     p.aimGuessX = (k >= 0 ? k % m.w : m.deep.x) * TILE + 8;
     p.aimGuessY = (k >= 0 ? Math.floor(k / m.w) : m.deep.y) * TILE + 8;
   }
