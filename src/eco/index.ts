@@ -8,6 +8,7 @@ import './move';
 import './step';
 import './thrall';
 import './undead';
+import './lichskill';
 import './wisp';
 import './bat';
 import './rat';

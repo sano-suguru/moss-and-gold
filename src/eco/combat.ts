@@ -200,6 +200,8 @@ export function strike(this: Ecology, a: Cr, d: Cr, mul = 1, fx = true): boolean
   d.hp -= dmg;
   // 大物の溜め（突進など）は、体力の上限の2割を超える重い一撃を受けたときだけ止まる（breakWindup）
   if (d.k !== Kind.Adventurer && d.act === 2 && d.actT < 0 && d.hp > 0 && dmg > this.maxHp(d) * 0.2) this.breakWindup(d);
+  // リッチの詠唱は、魔法か聖なる一打ちでも止まる（lichWardHit）
+  else if (d.k === Kind.Lich) this.lichWardHit(a, d);
   // リビングアーマーは、倒れずに強い一打を受けると、手の武器を落とす（src/eco/armor.ts）
   if (d.k === Kind.Armor && d.hp > 0) this.armorShed(d, dmg, a);
   // やられそうになったヴァンパイアは、コウモリの群れにばらけて逃げる（1日に1回、光の中ではできない。src/eco/vampire.ts）
