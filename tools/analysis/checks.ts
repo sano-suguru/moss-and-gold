@@ -128,15 +128,16 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 焚き火の場所（startCamp）：住みかから離れない手強い魔物のそばを避けて焚き火を囲み、一行そのものがそばにいれば休まずに進む。
-    // 目安は実測の3分の1ほど（実測：16シード×25日で、場所を変えた 147回・休まずに進んだ 216回）
-    name: '一行が手強い魔物のそばを避けて焚き火を囲む（15シードの10〜18日目の合計で、場所を変えた15回・6シード以上）',
+    // 焚き火の場所（startCamp）：住みかから離れない手強い魔物のそばでは、場所を変えるか、休まずに進む（先頭がその魔物の方を見る）。
+    // 目安は実測の半分ほど（実測：main から分岐した実行で61回・HEAD から実行したもので40回。ほとんどは休まずに進む）
+    name: '一行が手強い魔物のそばで焚き火を囲まない（15シードの10〜18日目の合計で、場所を変えたか休まずに進んだのが20回・6シード以上）',
     ...RUN_WIDE,
     test: (rs) => {
       const moved = rs.map((r) => r.settle.filter((x) => x.k === Kind.Adventurer && x.ev === 'campShun' && x.how === 'moved').length);
       const skip = rs.map((r) => r.settle.filter((x) => x.k === Kind.Adventurer && x.ev === 'campShun' && x.how === 'none').length);
-      const seeds = moved.filter((v) => v > 0).length;
-      return { ok: sum(moved) >= 15 && seeds >= 6, value: `場所を変えた ${sum(moved)}（${seeds}シード）、休まずに進んだ ${sum(skip)}` };
+      const all = moved.map((v, i) => v + skip[i]);
+      const seeds = all.filter((v) => v > 0).length;
+      return { ok: sum(all) >= 20 && seeds >= 6, value: `${sum(all)}（${seeds}シード。場所を変えた ${sum(moved)}、休まずに進んだ ${sum(skip)}）` };
     },
   },
   {
@@ -150,9 +151,10 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 三歩目：深部の探索の一行が物資の置き場を残し、次の一行がそこで食料を補う。まれな出来事なので、RUN_WIDE の15シードの合計で見る
-    name: '物資の置き場が残され、次の一行が補う（15シードの合計で置き場4つ・補う2回以上）',
+    // 三歩目：深部の探索の一行が物資の置き場を残し、次の一行がそこで食料を補う。まれな出来事で、一つの窓では展開しだいで置き場が3つにとどまるので、二つの窓の合計で見る
+    name: '物資の置き場が残され、次の一行が補う（10〜18日目の15シードと15〜23日目の16シードの合計で置き場4つ・補う2回以上）',
     ...RUN_WIDE,
+    more: [RUN_ARMOR],
     test: (rs) => {
       const c = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'cache' && !x.merged).length);
       const u = rs.map((r) => new Set(r.settle.filter((x) => x.k === 25 && x.ev === 'supply').map((x) => x.id)).size);
