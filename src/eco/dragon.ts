@@ -46,18 +46,26 @@ export function wyvern(this: Ecology, c: Cr): void {
 
 /**
  * ドラゴンの寝床にする宝の山：宝物庫（ゴーレムの持ち場）とドワーフの広間の宝は選ばない。
- * 金貨が多く、人の気配が薄く、深い所ほど好む（深部の古い宝が自然な寝床になる）
+ * 金貨が多く、人の気配が薄く、深い所ほど好む（深部の古い宝が自然な寝床になる）。
+ * 入口側と歩いてつながった宝があれば、その中から選ぶ（竜は飛ぶので島の宝も選べるが、そこでは冒険者が寝床を見つけられず、
+ * 竜の寝床への道探しから竜退治へつながる物語が起きない。孵る所は深部の島のままにして、育ってから寝床を移す）
  */
 export function pickDragonHoard(this: Ecology, minGold: number): Pile | null {
   const m = this.w.map;
   let best: Pile | null = null;
   let bv = -1e9;
-  for (const p of this.piles) {
+  const ok = (p: Pile) => {
     const k = this.tileOf(p.x, p.y);
-    if (p.gold < minGold || k < 0 || m.vault[k]) continue;
+    return p.gold >= minGold && k >= 0 && !m.vault[k];
+  };
+  const main = this.piles.some((p) => ok(p) && !this.onIsland(p.x, p.y));
+  for (const p of this.piles) {
+    if (!ok(p) || (main && this.onIsland(p.x, p.y))) continue;
     if (this.hold && sq(p.x - ((this.hold.hk % m.w) * TILE + 8)) + sq(p.y - (Math.floor(this.hold.hk / m.w) * TILE + 8)) < 6 * TILE * 6 * TILE) continue;
     if (this.camps.some((cp) => cp.id >= 0 && sq(cp.x - p.x) + sq(cp.y - p.y) < 6 * TILE * 6 * TILE)) continue;
-    const v = p.gold - this.presenceAt(p.x, p.y) * 300 + (Math.abs(p.x / TILE - m.deep.x) + Math.abs(p.y / TILE - m.deep.y) < 12 ? 200 : 0);
+    // 深部に近いほど好む（入口のそばの宝を寝床にしない）
+    const toDeep = Math.abs(p.x / TILE - m.deep.x) + Math.abs(p.y / TILE - m.deep.y);
+    const v = p.gold - this.presenceAt(p.x, p.y) * 300 + (toDeep < 12 ? 200 : 0) - toDeep * 3;
     if (v > bv) {
       bv = v;
       best = p;
@@ -410,7 +418,22 @@ export function dragon(this: Ecology, c: Cr, _day: number): void {
       return;
     }
     // 寝床の場所は覚えている。山が尽きていても、そこへ戻って集めてきた金貨を積み直す
-    const hoard = this.piles.find((p) => p.id === c.ref && p.gold > 0);
+    let hoard = this.piles.find((p) => p.id === c.ref && p.gold > 0);
+    // 育った竜は、寝床が入口側と切り離された島にあり、入口側に宝の山があれば、そちらへ飛んで寝床を移す（pickDragonHoard）
+    if (c.sp >= 1 && this.onIsland(hoard?.x ?? c.hx, hoard?.y ?? c.hy)) {
+      const alt = this.pickDragonHoard(1);
+      if (alt && alt !== hoard && !this.onIsland(alt.x, alt.y)) {
+        hoard = alt;
+        c.ref = alt.id;
+        c.hx = alt.x + this.dragonSide(alt) * 18;
+        c.hy = alt.y - 4;
+        c.st = 2;
+        c.actT = 0;
+        this.record('settle', { t: this.w.tick, k: Kind.Dragon, ev: 'lairMove', id: c.id, n: c.sp, x: Math.round(alt.x), y: Math.round(alt.y) } as never);
+        this.log(c.x, c.y, `{k:${Kind.Dragon}}が深部の寝床を離れ、宝の山へ飛んで寝床を移した`);
+        return;
+      }
+    }
     if (hoard) {
       c.hx = hoard.x + this.dragonSide(hoard) * 18;
       c.hy = hoard.y - 4;
