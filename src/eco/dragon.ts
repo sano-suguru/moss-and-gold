@@ -159,9 +159,18 @@ export function dragonRelocate(this: Ecology, c: Cr): boolean {
   // 島に寝床にできる、成竜になれるだけの金貨の宝の山があれば、若い竜は島で成竜になってから移る
   // （若いうちに入口側へ移ると、竜退治の一行にすぐ倒されて成竜まで育たない）。その宝の山が寝床でなければ、そこへ飛んで寝床にする
   if (c.sp === 1) {
+    // ほかの竜の寝床の宝は選ばない
+    const taken = (p: Pile) => this.list.some((o) => o !== c && o.k === Kind.Dragon && !o.dead && o.ref === p.id);
     let rich: Pile | null = null;
-    for (const p of this.piles) if (p.gold >= DRAGON_ADULT_GOLD && this.onIsland(p.x, p.y) && this.dragonPileOk(p) && (!rich || p.gold > rich.gold)) rich = p;
-    if (rich && hoard && hoard.gold >= DRAGON_ADULT_GOLD) return false;
+    for (const p of this.piles) if (p.gold >= DRAGON_ADULT_GOLD && this.onIsland(p.x, p.y) && this.dragonPileOk(p) && !taken(p) && (!rich || p.gold > rich.gold)) rich = p;
+    // 寝床の宝で成竜になれるなら、そのまま待つ
+    if (rich && hoard && hoard.gold >= DRAGON_ADULT_GOLD && this.dragonPileOk(hoard)) return false;
+    // 狩りから戻って、寝床の宝の山を覚え直すとき（寝床がその宝の山のそば）は、飛ばずに覚え直すだけ
+    if (rich && sq(rich.x - c.hx) + sq(rich.y - (c.hy + 4)) < 24 * 24) {
+      c.ref = rich.id;
+      c.gait = rich.gold;
+      return false;
+    }
     if (rich) {
       c.ref = rich.id;
       c.hx = rich.x + this.dragonSide(rich) * 18;
@@ -206,7 +215,7 @@ export function dragonRelocate(this: Ecology, c: Cr): boolean {
 
 /** 若い竜が成竜になるのに要る、寝床の宝の金貨 */
 const DRAGON_ADULT_GOLD = 60;
-/** 寝床を移すときに、島の宝の山からくわえて運ぶ金貨の上限（運んだ先でも成竜でいられるだけ） */
+/** 寝床を移すときに、島の宝の山からくわえて運ぶ金貨の上限（運んだ宝の山だけで、若い竜が成竜になれるだけの寝床の宝になる） */
 const DRAGON_CARRY = DRAGON_ADULT_GOLD;
 
 export function dragon(this: Ecology, c: Cr, _day: number): void {
@@ -335,7 +344,9 @@ export function dragon(this: Ecology, c: Cr, _day: number): void {
         // 島の寝床へ降りた竜が、入口側の宝の山を選んだら、寝床を移す（dragonRelocate。飛んで行き、記録を残す）。移さないなら、入口側の宝を寝床にしない
         if (!kept && hoard && !this.onIsland(hoard.x, hoard.y) && this.dragonLairIsland(c)) {
           if (this.dragonRelocate(c)) return;
-          hoard = null;
+          // 移さないなら、島の宝の山を寝床にする（dragonRelocate が覚え直した宝の山か、もとの寝床の宝）。無ければ寝床の宝は無し
+          hoard = this.piles.find((p) => p.id === c.ref && p.gold > 0 && this.onIsland(p.x, p.y)) ?? null;
+          if (!hoard) c.ref = 0;
         }
         // 入口側へ寝床を移した竜は、島の宝の山を寝床に覚え直さない（移した寝床と行き来しない）
         if (hoard && this.onIsland(hoard.x, hoard.y) && !this.dragonLairIsland(c)) hoard = null;

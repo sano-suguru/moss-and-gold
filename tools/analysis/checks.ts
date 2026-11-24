@@ -961,7 +961,7 @@ export const CHECKS: Check[] = [
     test: (rs) => {
       // 二つの窓は15〜18日目が重なるので、15〜23日目の窓は18日目より後だけを数える（10〜18日目の窓に無いシードは除く）。竜を倒すのは、育った竜だけ（孵ったばかりの幼竜を除く）
       const late = (r: { from: number; seed: string }, t: number) => r.from < 15 || t > 18 * DAY_TICKS || !RUN_WIDE.seeds.includes(r.seed);
-      // 成竜になってすぐ寝床を移すと二つ記録が残るので、竜ごとに一度だけ数える
+      // 成竜になってすぐ寝床を移すと二つ記録が残るので、一つの窓の中では竜ごとに一度だけ数える（二つの窓にまたがる竜は二度数えることがある）
       const grow = rs.map((r) => new Set(r.settle.filter((x) => x.k === Kind.Dragon && (x.ev === 'lairMove' || (x.ev === 'grow' && x.n === 2)) && late(r, x.t)).map((x) => x.id)).size);
       const way = rs.map((r) => r.settle.filter((x) => x.k === Kind.Adventurer && x.ev === 'way' && late(r, x.t)).length);
       const slain = rs.map((r) => r.deaths.filter((x) => x.k === Kind.Dragon && x.by === Kind.Adventurer && late(r, x.t) && (x.sp as number) >= 1).length);
