@@ -573,6 +573,15 @@ export function dragon(this: Ecology, c: Cr, _day: number): void {
       const np = this.piles.length > before ? this.piles[this.piles.length - 1] : this.piles.reduce((b: Pile | null, p) => (sq(p.x - c.hx) + sq(p.y - c.hy) < 40 * 40 && (!b || p.gold > b.gold) ? p : b), null);
       if (np) c.ref = np.id;
     }
+    // 寝床が歩いて行けない別の洞窟にあれば、飛んで戻る（歩いて向かうと、道が見つからずに足踏みする）
+    const here = this.regionOf(this.tileOf(c.x, c.y));
+    const there = [0, -18, 18].map((dx) => this.regionOf(this.tileOf(c.hx + dx, c.hy + 4))).find((r) => r >= 0) ?? -1;
+    if (here >= 0 && there >= 0 && here !== there) {
+      c.st = 2;
+      c.act = 1;
+      c.actT = 0;
+      return;
+    }
     if (this.goTo(c, c.hx, c.hy, s.speed) || sq(c.hx - c.x) + sq(c.hy - c.y) < 12 * 12) {
       c.st = 0;
       c.act = 0;
