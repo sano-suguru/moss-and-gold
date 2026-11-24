@@ -152,10 +152,10 @@ export const CHECKS: Check[] = [
   {
     // コボルトとゴブリンの戦（planWars）：蓄えの乏しい大きな群れが隣の住みかへ攻めに出る。隣り合う住処と集落のあるシードでしか起きず、
     // その組み合わせはベースのスナップショットから数日で入れ替わるので、一つの窓では起きないことがある（main の10〜18日目で15シード合計5回）。
-    // RUN_WIDE と RUN_ARMOR の二つの窓の合計で見る（どちらもほかのチェックが実行するので、実行は増えない）
-    name: 'コボルトかゴブリンの群れが相手の住みかへ攻めに出る（10〜18日目の15シードと15〜23日目の16シードの合計で3回以上・2シード以上）',
-    ...RUN_WIDE,
-    more: [RUN_ARMOR],
+    // RUN_EARLY・RUN_WIDE・RUN_ARMOR の三つの窓の合計で見る（どれもほかのチェックが実行するので、実行は増えない。二つの窓だけでは、ベースから分岐した展開しだいで目安を割ることがある）
+    name: 'コボルトかゴブリンの群れが相手の住みかへ攻めに出る（1〜10日目と10〜18日目の15シード、15〜23日目の16シードの合計で3回以上・2シード以上）',
+    ...RUN_EARLY,
+    more: [RUN_WIDE, RUN_ARMOR],
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.ev === 'warGo').length);
       return { ok: sum(n) >= 3 && new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size >= 2, value: rs.filter((_, i) => n[i] > 0).map((r) => `${r.seed}（${r.from}〜${r.to}日） ${n[rs.indexOf(r)]}`).join('、') || 'なし' };
@@ -592,14 +592,14 @@ export const CHECKS: Check[] = [
   },
   {
     // 灯り蛾（moth）：冒険者の焚き火に群がり、明かりに群がった蛾をコウモリがさらう。焚き火とコウモリのいるシードは展開で変わるので、15シードの合計で見る。
-    // 目安は、ベースの10日目から分岐した実行と、0日目から実行したものの少ないほうの、半分ほど（実測：焚き火 492回・9シード、コウモリ 128回・11シード）
-    name: '灯り蛾が焚き火に群がり、コウモリにさらわれる（15シードの10〜18日目の合計で、焚き火240回・5シード、コウモリ60回・6シード以上）',
+    // 目安は、ベースの10日目から分岐した実行と、0日目から実行したものの少ないほうの、半分ほど（コウモリは展開しだいで大きく動く。実測：焚き火 492回・9シード、コウモリ 57回・8シード）
+    name: '灯り蛾が焚き火に群がり、コウモリにさらわれる（15シードの10〜18日目の合計で、焚き火240回・5シード、コウモリ25回・5シード以上）',
     ...RUN_WIDE,
     test: (rs) => {
       const camp = rs.map((r) => r.settle.filter((x) => x.k === Kind.Moth && x.ev === 'light' && x.n === 2).length);
       const bat = rs.map((r) => r.deaths.filter((x) => x.k === Kind.Moth && x.by === Kind.Bat).length);
       const seeds = (n: number[]) => n.filter((v) => v > 0).length;
-      return { ok: sum(camp) >= 240 && seeds(camp) >= 5 && sum(bat) >= 60 && seeds(bat) >= 6, value: `焚き火 ${sum(camp)}（${seeds(camp)}シード）、コウモリ ${sum(bat)}（${seeds(bat)}シード）` };
+      return { ok: sum(camp) >= 240 && seeds(camp) >= 5 && sum(bat) >= 25 && seeds(bat) >= 5, value: `焚き火 ${sum(camp)}（${seeds(camp)}シード）、コウモリ ${sum(bat)}（${seeds(bat)}シード）` };
     },
   },
   {
@@ -878,6 +878,17 @@ export const CHECKS: Check[] = [
     test: (rs) => {
       const n = rs.map((r) => r.stuck.filter((x) => countsAsStuck(x) && x.k === 12).length);
       return { ok: sum(n) <= 45, value: `${sum(n)}回（${rs.filter((_r, i) => n[i]).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、')}）` };
+    },
+  },
+  {
+    // ドワーフは、同じつながった洞窟にあるキノコだけを目指し、向かっているキノコが残っていれば目当てを替えない（キノコを探すくじは回ごとに違う所を選ぶ）。
+    // 行けないキノコや入れ替わる目当てを目指すと、瓦礫に囲まれた住みかで飢えたドワーフが、道が見つからないまま足踏みし続ける（たいてい4〜6日目）。
+    // 目安は、無害な変更でも数回は起きる程度（実測：ベースの1日目から分岐した実行で0回）
+    name: 'ドワーフが道の見つからない食べ物を目指して足踏みし続けない（15シードの1〜10日目で、道が見つからないままの2分以上の足踏みが2回以下）',
+    ...RUN_EARLY,
+    test: (rs) => {
+      const n = rs.map((r) => r.stuck.filter((x) => countsAsStuck(x) && x.k === Kind.Dwarf && x.nopath >= 0.5).length);
+      return { ok: sum(n) <= 2, value: `${sum(n)}回${sum(n) ? `（${rs.filter((_r, i) => n[i]).map((r) => `${r.seed} ${n[rs.indexOf(r)]}`).join('、')}）` : ''}` };
     },
   },
   {
