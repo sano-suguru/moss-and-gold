@@ -570,13 +570,14 @@ export const CHECKS: Check[] = [
   {
     // 錆喰い虫（rustBeetle）：錆びた鉄の武具に群がって食べ尽くす。どのシードに武具が溜まるかは展開で変わるので、15シードの合計で見る。
     // 錆喰い虫は3日目ごろから湧くので、10日目までに溜まった武具はあらかた食べ終えている。10〜18日目は、新しく錆びる武具の分だけ。
-    // 目安は実測の半分ほど（実測 57回・8シード）
-    name: '錆喰い虫が錆びた鉄の武具を食べ尽くす（15シードの10〜18日目の合計で25回以上・4シード以上）',
+    // 錆びる武具の数は冒険者の倒れ方しだいで、一つの窓では展開しだいで24〜64回と揺れるので、二つの窓の合計で見る。目安は実測の6割ほど（実測 49回・10シード）
+    name: '錆喰い虫が錆びた鉄の武具を食べ尽くす（10〜18日目の15シードと15〜23日目の16シードの合計で30回以上・6シード以上）',
     ...RUN_WIDE,
+    more: [RUN_ARMOR],
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.k === Kind.RustBeetle && x.ev === 'rust').length);
-      const seeds = n.filter((v) => v > 0).length;
-      return { ok: sum(n) >= 25 && seeds >= 4, value: `${sum(n)}（${seeds}シード）` };
+      const seeds = new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
+      return { ok: sum(n) >= 30 && seeds >= 6, value: `${sum(n)}（${seeds}シード）` };
     },
   },
   {
