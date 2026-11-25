@@ -49,6 +49,11 @@ const RUN_ARMOR = { seeds: ['abc', 'かしたれ', 'はじまりの洞窟', 'see
 // まれな出来事（僧侶が亡骸の前で祈る）を見る組。数シードを選ぶと、ほかの変更で展開が分かれるたびに落ちるので、15シードの合計で見る
 const RUN_WIDE = { seeds: ['abc', 'かしたれ', 'はじまりの洞窟', 'seed4', 'seed5', 'seed6', 'seed7', 'seed8', 'seed40', 'seed41', 'seed18', 'seed27', 'seed35', 'seed30', 'seed17'], from: 10, to: 18 };
 const RUN_BLESS = RUN_WIDE;
+/**
+ * RUN_WIDE と RUN_ARMOR の二つの窓を合わせて数えるときに、数える出来事か。二つの窓は15〜18日目が重なるので、
+ * RUN_ARMOR の窓では18日目より後だけを数える（RUN_WIDE に無いシードは重ならないので全部数える）
+ */
+const countOnce = (r: { from: number; seed: string }, t: number) => r.from < RUN_ARMOR.from || t > RUN_WIDE.to * DAY_TICKS || !RUN_WIDE.seeds.includes(r.seed);
 // 序盤（ベースの1日目のスナップショットから）に起きやすい、まれな出来事を見る組（ゴブリンが貧しい場所に集落を作るのは、たいてい4〜9日目）
 const RUN_EARLY = { seeds: RUN_WIDE.seeds, from: 1, to: 10 };
 // 古戦場（seedBattle）：骨は1日目ごろ、甲冑は2〜4日目に起き上がる。ベースの日次スナップショットは1日目からしか無いので（0日目からは分かれられない）、1日目から見る
@@ -611,24 +616,21 @@ export const CHECKS: Check[] = [
     ...RUN_WIDE,
     more: [RUN_ARMOR],
     test: (rs) => {
-      // 二つの窓は15〜18日目が重なるので、15〜23日目の窓は18日目より後だけを数える（10〜18日目の窓に無いシードは除く）
-      const late = (r: { from: number; seed: string }, t: number) => r.from < 15 || t > 18 * DAY_TICKS || !RUN_WIDE.seeds.includes(r.seed);
-      const cast = rs.map((r) => r.settle.filter((x) => x.k === Kind.Lich && x.ev === 'curseStart' && late(r, x.t)).length);
-      const react = rs.map((r) => r.settle.filter((x) => late(r, x.t) && ((x.k === Kind.Lich && ((x.ev === 'curseLost' && x.n === Kind.Adventurer && x.how !== 'gone') || (x.ev === 'curse' && x.how === 'guard'))) || (x.k === Kind.Adventurer && x.ev === 'curseWard' && x.how > 0))).length);
+      const cast = rs.map((r) => r.settle.filter((x) => x.k === Kind.Lich && x.ev === 'curseStart' && countOnce(r, x.t)).length);
+      const react = rs.map((r) => r.settle.filter((x) => countOnce(r, x.t) && ((x.k === Kind.Lich && ((x.ev === 'curseLost' && x.n === Kind.Adventurer && x.how !== 'gone') || (x.ev === 'curse' && x.how === 'guard'))) || (x.k === Kind.Adventurer && x.ev === 'curseWard' && x.how > 0))).length);
       const seeds = (n: number[]) => new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
       return { ok: sum(cast) >= 60 && seeds(cast) >= 6 && sum(react) >= 8 && seeds(react) >= 3, value: `詠唱 ${sum(cast)}（${seeds(cast)}シード）、応じた ${sum(react)}（${seeds(react)}シード）` };
     },
   },
   {
     // 獲物を丸のみにする種（feeding の SWALLOW）：大トカゲは大ネズミを骨ごと食べて満ち、子を産む。骨を残すと満ちきらず、親から生まれなくなる。
-    // 起きるシードが半分ほどで、1シードの展開の違いで結果が分かれるので、二つの窓の合計で見る（両方に入るシードの15〜18日目は一度だけ数える）。
+    // 起きるシードが半分ほどで、1シードの展開の違いで結果が分かれるので、二つの窓の合計で見る（countOnce）。
     // 目安は実測の半分ほど（実測 121回・12シード）
     name: '大トカゲが親から生まれる（10〜18日目の15シードと15〜23日目の16シードの合計で55回以上・7シード以上）',
     ...RUN_WIDE,
     more: [RUN_ARMOR],
     test: (rs) => {
-      const late = (r: { from: number; seed: string }, t: number) => r.from < 15 || t > 18 * DAY_TICKS || !RUN_WIDE.seeds.includes(r.seed);
-      const n = rs.map((r) => r.births.filter((x) => x.k === Kind.Lizard && x.origin === 'born' && late(r, x.t)).length);
+      const n = rs.map((r) => r.births.filter((x) => x.k === Kind.Lizard && x.origin === 'born' && countOnce(r, x.t)).length);
       const seeds = new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
       return { ok: sum(n) >= 55 && seeds >= 7, value: `${sum(n)}（${seeds}シード）` };
     },
@@ -962,13 +964,11 @@ export const CHECKS: Check[] = [
     ...RUN_WIDE,
     more: [RUN_ARMOR],
     test: (rs) => {
-      // 二つの窓は15〜18日目が重なるので、15〜23日目の窓は18日目より後だけを数える（10〜18日目の窓に無いシードは除く）
-      const late = (r: { from: number; seed: string }, t: number) => r.from < 15 || t > 18 * DAY_TICKS || !RUN_WIDE.seeds.includes(r.seed);
       // 成竜になってすぐ寝床を移すと二つ記録が残るので、一つの窓の中では竜ごとに一度だけ数える（二つの窓にまたがる竜は二度数えることがある）
-      const grow = rs.map((r) => new Set(r.settle.filter((x) => x.k === Kind.Dragon && (x.ev === 'lairMove' || (x.ev === 'grow' && x.n === 2)) && late(r, x.t)).map((x) => x.id)).size);
-      const way = rs.map((r) => r.settle.filter((x) => x.k === Kind.Adventurer && x.ev === 'way' && late(r, x.t)).length);
+      const grow = rs.map((r) => new Set(r.settle.filter((x) => x.k === Kind.Dragon && (x.ev === 'lairMove' || (x.ev === 'grow' && x.n === 2)) && countOnce(r, x.t)).map((x) => x.id)).size);
+      const way = rs.map((r) => r.settle.filter((x) => x.k === Kind.Adventurer && x.ev === 'way' && countOnce(r, x.t)).length);
       // 育った竜（孵ったばかりの幼竜を除く）を冒険者が倒した数
-      const slain = rs.map((r) => r.deaths.filter((x) => x.k === Kind.Dragon && x.by === Kind.Adventurer && late(r, x.t) && (x.sp as number) >= 1).length);
+      const slain = rs.map((r) => r.deaths.filter((x) => x.k === Kind.Dragon && x.by === Kind.Adventurer && countOnce(r, x.t) && (x.sp as number) >= 1).length);
       const seeds = (n: number[]) => new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
       return { ok: sum(grow) >= 2 && seeds(grow) >= 2 && sum(way) >= 2, value: `寝床を移すか成竜になる竜 ${sum(grow)}（${seeds(grow)}シード）、道が伝わる ${sum(way)}（${seeds(way)}シード）、育った竜を倒す ${sum(slain)}（${seeds(slain)}シード）` };
     },
