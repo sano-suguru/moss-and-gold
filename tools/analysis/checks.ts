@@ -621,13 +621,16 @@ export const CHECKS: Check[] = [
   },
   {
     // 獲物を丸のみにする種（feeding の SWALLOW）：大トカゲは大ネズミを骨ごと食べて満ち、子を産む。骨を残すと満ちきらず、親から生まれなくなる。
-    // 目安は実測の半分ほど（実測 81回・9シード）
-    name: '大トカゲが親から生まれる（15シードの10〜18日目の合計で40回以上・7シード以上）',
+    // 起きるシードが半分ほどで、1シードの展開の違いで結果が分かれるので、二つの窓の合計で見る（両方に入るシードの15〜18日目は一度だけ数える）。
+    // 目安は実測の半分ほど（実測 121回・12シード）
+    name: '大トカゲが親から生まれる（10〜18日目の15シードと15〜23日目の16シードの合計で55回以上・7シード以上）',
     ...RUN_WIDE,
+    more: [RUN_ARMOR],
     test: (rs) => {
-      const n = rs.map((r) => r.births.filter((x) => x.k === Kind.Lizard && x.origin === 'born').length);
-      const seeds = n.filter((v) => v > 0).length;
-      return { ok: sum(n) >= 40 && seeds >= 7, value: `${sum(n)}（${seeds}シード）` };
+      const late = (r: { from: number; seed: string }, t: number) => r.from < 15 || t > 18 * DAY_TICKS || !RUN_WIDE.seeds.includes(r.seed);
+      const n = rs.map((r) => r.births.filter((x) => x.k === Kind.Lizard && x.origin === 'born' && late(r, x.t)).length);
+      const seeds = new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
+      return { ok: sum(n) >= 55 && seeds >= 7, value: `${sum(n)}（${seeds}シード）` };
     },
   },
   {
