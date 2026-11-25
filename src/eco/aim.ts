@@ -421,7 +421,7 @@ export function aimStep(this: Ecology, p: Party, alive: Cr[]): void {
       p.aimAt = this.step;
       this.endAim(p, lead, 1);
       p.goal = 1;
-      if ((p.camp ?? -1) >= 0) this.endCamp(p);
+      this.douseCamp(p);
       this.setExit(p);
       this.log(lead.x, lead.y, `${p.name ?? ''}の一行が深部で{k:${Kind.Dragon}}の寝床を見つけ、道を持ち帰ろうと引き返した`);
       return;
@@ -516,13 +516,13 @@ export function endAim(this: Ecology, p: Party, lead: Cr, end: number): void {
     // ゴブリン退治を果たしたら、誇らしく外へ帰る
     if (a === 5 && p.goal === 0) {
       p.goal = 1;
-      if ((p.camp ?? -1) >= 0) this.endCamp(p);
+      this.douseCamp(p);
       this.setExit(p);
     }
   } else if (a === 5 && p.goal === 0) {
     // 集落のまわりを探しても見つからない：引き返す
     p.goal = 1;
-    if ((p.camp ?? -1) >= 0) this.endCamp(p);
+    this.douseCamp(p);
     this.setExit(p);
   }
 }
