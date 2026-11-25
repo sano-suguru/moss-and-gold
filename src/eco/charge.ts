@@ -35,6 +35,8 @@ const runLen = (c: Cr) => (c.k === Kind.Armor ? BASH_LEN : RUN_LEN);
 const runN = (c: Cr) => (c.k === Kind.Armor ? BASH_N : RUN_N);
 /** 突進の重さ：ミノタウロスは打ち合いの一打ちの1.5倍、リビングアーマーの盾の体当たりは0.8倍（武具を取り込むと強さが大きく上がるので、1.5倍では冒険者を一撃で倒していた） */
 const runMul = (c: Cr) => (c.k === Kind.Armor ? 0.8 : RUN_MUL);
+/** 突進や地割れの予兆を見て横へ跳び退く速さ（px／生き物の更新） */
+const DODGE_V = 3;
 /** はね飛ばされる量（px）と、飛んでいる更新の回数 */
 const KB_LEN = 3 * TILE;
 const KB_N = 4;
@@ -311,12 +313,11 @@ export function advBrace(this: Ecology, c: Cr): boolean {
     return true;
   }
   if (along < -8 || along > runLen(mm) + 12 || Math.abs(side) > 22) return false;
-  const rank = this.heroOf(c)?.rank ?? 0;
-  const delay = Math.max(0, (c.sp === Job.Thief || c.sp === Job.Hunter ? 0 : c.sp === Job.Slayer ? 2 : 4) - rank);
-  if ((this.w.tick - mm.cast) / CR_EVERY < delay) return false;
-  // 横へ下がる（線から離れる向き。線の上ならどちらかへ）
-  const sg = Math.abs(side) > 1 ? Math.sign(side) : ih(c.id, mm.id, 332) & 1 ? 1 : -1;
-  sidestep.call(this, c, uy * sg * 1.5, -ux * sg * 1.5, false);
+  if ((this.w.tick - mm.cast) / CR_EVERY < dodgeDelay.call(this, c)) return false;
+  // 横へ跳び退く（線から離れる向き。線の上ならどちらかへ）。ふつうに歩く速さの3倍：溜めの残りの間に、通り道（線から11px）の外へ出られるように
+  const onLine = Math.abs(side) <= 1;
+  const sg = onLine ? (ih(c.id, mm.id, 332) & 1 ? 1 : -1) : Math.sign(side);
+  sidestep.call(this, c, uy * sg * DODGE_V, -ux * sg * DODGE_V, onLine);
   this.setDir(c, mm.x - c.x, mm.y - c.y);
   return true;
 }
@@ -462,15 +463,20 @@ export function golemEngage(this: Ecology, c: Cr, foe: Cr | null): boolean {
 }
 
 /**
- * 予兆を見て横（または外）へ下がる一歩：(vx, vy) の向きへ動き、壁で進めなければ反対の向き、それも無理ならその場で構える
- * （壁に向かって歩く姿のまま足踏みしないように）
+ * 予兆を見て横（または外）へ下がる一歩：(vx, vy) の向きへ動き、壁で進めなければ斜め前後（45°ずらした向き）へ、
+ * flip なら最後に反対の向きへ。どれも無理ならその場で構える（壁に向かって歩く姿のまま足踏みしないように）。
+ * 反対の向きは、線の上にいてどちらへ下がってもよいときだけにする（線の脇から反対へ動くと、通り道を横切って打たれる）
  */
-function sidestep(this: Ecology, c: Cr, vx: number, vy: number, back: boolean): void {
+function sidestep(this: Ecology, c: Cr, vx: number, vy: number, flip: boolean): void {
   const x0 = c.x;
   const y0 = c.y;
+  const still = () => Math.abs(c.x - x0) + Math.abs(c.y - y0) < 0.4;
+  const h = Math.SQRT1_2;
   this.tryMove(c, vx, vy);
-  if (Math.abs(c.x - x0) + Math.abs(c.y - y0) < 0.4 && !back) this.tryMove(c, -vx, -vy);
-  c.act = Math.abs(c.x - x0) + Math.abs(c.y - y0) < 0.4 ? 0 : 1;
+  if (still()) this.tryMove(c, (vx - vy) * h, (vx + vy) * h);
+  if (still()) this.tryMove(c, (vx + vy) * h, (vy - vx) * h);
+  if (still() && flip) this.tryMove(c, -vx, -vy);
+  c.act = still() ? 0 : 1;
 }
 
 /** 予兆を見て下がりはじめるまでの、溜めはじめからの生き物の更新の回数（盗賊と狩人はすぐ、竜殺しは2回、ほかは4回。位1つにつき1回早い） */
@@ -490,8 +496,9 @@ export function advDodgeGolem(this: Ecology, c: Cr, g: Cr): boolean {
     const along = (c.x - g.x) * g.kbx + (c.y - g.y) * g.kby;
     const side = (c.x - g.x) * g.kby - (c.y - g.y) * g.kbx;
     if (along < -4 || along > QUAKE_LEN + 8 || Math.abs(side) > QUAKE_W + 10) return false;
-    const sg = Math.abs(side) > 1 ? Math.sign(side) : ih(c.id, g.id, 333) & 1 ? 1 : -1;
-    sidestep.call(this, c, g.kby * sg * 1.5, -g.kbx * sg * 1.5, false);
+    const onLine = Math.abs(side) <= 1;
+    const sg = onLine ? (ih(c.id, g.id, 333) & 1 ? 1 : -1) : Math.sign(side);
+    sidestep.call(this, c, g.kby * sg * DODGE_V, -g.kbx * sg * DODGE_V, onLine);
     this.setDir(c, g.x - c.x, g.y - c.y);
     return true;
   }
@@ -501,7 +508,7 @@ export function advDodgeGolem(this: Ecology, c: Cr, g: Cr): boolean {
   const d2 = dx * dx + dy * dy;
   if (d2 > 3.3 * TILE * 3.3 * TILE) return false;
   const L = Math.sqrt(d2) || 1;
-  sidestep.call(this, c, (dx / L) * 1.5, (dy / L) * 1.5, true);
+  sidestep.call(this, c, (dx / L) * 1.5, (dy / L) * 1.5, false);
   this.setDir(c, g.x - c.x, g.y - c.y);
   return true;
 }
