@@ -120,7 +120,8 @@ export function campWatch(this: Ecology, p: Party, alive: Cr[]): void {
     if (lost || hp < 0.5) {
       const lead = alive[0];
       this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'campBreak', how: lost ? 'lost' : 'hurt', x: Math.round(lead.x), y: Math.round(lead.y) } as never);
-      this.douseCamp(p);
+      // 休み終えたときと同じく、しばらく焚き火を囲まない（douseCamp にしない。傷ついた一行が、消したばかりの焚き火のそばですぐ囲み直す）
+      this.endCamp(p);
       return;
     }
   }

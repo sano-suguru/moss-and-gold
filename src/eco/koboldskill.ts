@@ -151,7 +151,7 @@ export function stoneLands(this: Ecology, a: Cr, v: { x: number; y: number; r: n
       p.stoned = (p.stoned ?? 0) + 1;
       if (p.stoned >= STONED_LEAVE) {
         this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'campBreak', how: 'stoned', x: Math.round(o.x), y: Math.round(o.y) } as never);
-        this.douseCamp(p);
+        this.endCamp(p);
       }
     }
     // 溜めていた技が止まる（src/eco/adventurer.ts で、溜めの途中で打たれたときと同じ。魔法使いの呪文は散って消える）
