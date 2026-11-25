@@ -205,7 +205,7 @@ export function updateParties(this: Ecology): void {
       const backup = quest && (p.cacheVis ?? []).some((id) => (this.caches.find((q) => q.id === id)?.food ?? 0) > 20);
       if (foodAvg < (backup ? 0.3 : 0.45) && p.goal === 0 && !ahead) {
         p.goal = 1;
-        p.camp = -1;
+        this.douseCamp(p);
         this.setExit(p);
         continue;
       }
@@ -220,7 +220,11 @@ export function updateParties(this: Ecology): void {
           p.retreatX = Math.round(e.x);
           p.retreatY = Math.round(e.y);
           p.engage = 0;
-          p.camp = -1;
+          // 焚き火を囲んでいる間に戦いから退くなら、焚き火を消して発つ
+          if ((p.camp ?? -1) >= 0) {
+            this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'campBreak', how: 'retreat', x: Math.round(alive[0].x), y: Math.round(alive[0].y) } as never);
+            this.douseCamp(p);
+          }
           const dc = this.cellOf(e.x, e.y);
           (p.danger ??= []).push([dc, 9999]);
           if (p.danger.length > 30) p.danger.shift();
@@ -237,7 +241,7 @@ export function updateParties(this: Ecology): void {
       if (p.retreatUntil && p.retreatUntil === this.step && p.goal === 0 && (p.camp ?? -1) < 0) this.startCamp(p, alive[0]);
       if (avgHp < 0.35 && p.goal === 0) {
         p.goal = 1;
-        p.camp = -1;
+        this.douseCamp(p);
         this.setExit(p);
         continue;
       }
@@ -532,7 +536,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
           const wyrm = o.k === Kind.Dragon || o.k === Kind.Wyvern || o.k === Kind.Worm;
           if (wyrm && os > ps * 1.2 && !slayerHunt && p.goal === 0) {
             p.goal = 1;
-            p.camp = -1;
+            this.douseCamp(p);
             this.setExit(p);
             this.log(c.x, c.y, `冒険者の一行が{k:${o.k}}を見て、かなわないと引き返した`);
           }
@@ -946,6 +950,10 @@ export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: numbe
   p.campUntil = this.step + (this.isNight() ? 2400 : 1500);
   p.dozeT = 0;
   p.dozeNext = 0;
+  p.creeps = [];
+  // 前の焚き火で起こされた期間を持ち越さない（退いてすぐ囲み直した焚き火が、前の被害で消えないように）
+  p.wakeT = 0;
+  p.wakeN = 0;
 }
 
 /** 焚き火を囲む一行に、焚き火のそば（僧侶が癒やせる所）で傷ついている者がいるか（僧侶が起きて手当てを続けるか） */
@@ -976,15 +984,20 @@ export function campSeatOk(this: Ecology, c: Cr, fire: number, x: number, y: num
 
 export function endCamp(this: Ecology, p: Party): void {
   const k = p.camp ?? -1;
-  // 焚き火の跡に灰が残る。食べ残しも少し落ちる
-  if (k >= 0) {
-    this.w.ash[k] = Math.max(this.w.ash[k], 200);
-    this.dropScraps(p, (k % this.w.map.w) * TILE + 8, Math.floor(k / this.w.map.w) * TILE + 8, 3);
-  }
-  p.camp = -1;
+  // 食べ残しが少し落ち、休んだぶん疲れが抜ける
+  if (k >= 0) this.dropScraps(p, (k % this.w.map.w) * TILE + 8, Math.floor(k / this.w.map.w) * TILE + 8, 3);
+  this.douseCamp(p);
   p.fatigue = 0;
-  p.stoned = 0;
   p.lastCamp = this.step;
+}
+
+/** 休みを切り上げて発つ：焚き火を消して灰を残すだけで、休んだことにはしない（疲れも、次に休むまでの間も、そのまま） */
+export function douseCamp(this: Ecology, p: Party): void {
+  const k = p.camp ?? -1;
+  if (k < 0) return;
+  this.w.ash[k] = Math.max(this.w.ash[k], 200);
+  p.camp = -1;
+  p.stoned = 0;
 }
 
 /** 冒険者の食べ残し：一行の食料から少しずつ、その場所のまわりの土に落とす（キノコが生えやすくなる） */
@@ -1248,6 +1261,7 @@ declare module '../ecology' {
     setExit: typeof setExit;
     startCamp: typeof startCamp;
     endCamp: typeof endCamp;
+    douseCamp: typeof douseCamp;
     campSeatOk: typeof campSeatOk;
     campWounded: typeof campWounded;
     dropScraps: typeof dropScraps;
@@ -1261,4 +1275,4 @@ declare module '../ecology' {
   }
 }
 
-Object.assign(Ecology.prototype, { reputation, maybeParty, partyLights, seenBy, updateParties, cellOf, cellFloor, partyStr, foeStr, pickTarget, pickTargetRandom, adventurer, setExit, startCamp, endCamp, campSeatOk, campWounded, dropScraps, leaveDungeon, dropBelongings, dropJobItems, dropItem, updateItems, eachLight, lightSources });
+Object.assign(Ecology.prototype, { reputation, maybeParty, partyLights, seenBy, updateParties, cellOf, cellFloor, partyStr, foeStr, pickTarget, pickTargetRandom, adventurer, setExit, startCamp, endCamp, douseCamp, campSeatOk, campWounded, dropScraps, leaveDungeon, dropBelongings, dropJobItems, dropItem, updateItems, eachLight, lightSources });

@@ -124,6 +124,17 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // 焚き火を囲んでいる間に戦いから退く一行は、焚き火を消して灰を残して発つ（updateParties）。焚き火のそばの戦いはまれなので、二つの窓の合計で見る（実測 12回・10シード）
+    name: '焚き火を囲んでいる間に戦いから退く一行が、焚き火を消して発つ（10〜18日目の15シードと15〜23日目の16シードの合計で6回以上・3シード以上）',
+    ...RUN_WIDE,
+    more: [RUN_ARMOR],
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.k === 25 && x.ev === 'campBreak' && x.how === 'retreat' && countOnce(r, x.t)).length);
+      const seeds = new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
+      return { ok: sum(n) >= 6 && seeds >= 3, value: `${sum(n)}回（${seeds}シード）` };
+    },
+  },
+  {
     // 冒険者の作り直しの三歩目：焚き火の見張りはときどきうとうとする（焚き火を囲むたびに何度か）
     name: '焚き火の見張りがうとうとする（4シードで4回以上）',
     ...RUN_A,
