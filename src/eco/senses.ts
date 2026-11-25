@@ -409,11 +409,12 @@ export function lurk(this: Ecology, c: Cr): boolean {
   // 集落の待ち伏せ：弱い一行が集落のそば（9マス）に踏み込んだら、暗がりから群れで襲いかかる
   const ambush = !!camp && camp.hide === 2 && sq(t.x - camp.x) + sq(t.y - camp.y) < 9 * TILE * 9 * TILE;
   // 焚き火で眠る一行を狙うオークとコボルトは、見張りがうとうとするのを待つ（せっかちな者＝8匹に1匹と、待ちくたびれた者は待たない）。
-  // 潜む所（7マス）より内側（5マスの内）まで忍び寄ったら、見張りが目を覚ましても引き返さない（うとうとは短く、7マスを詰めるうちに終わることが多い。
-  // 引き返すと、見張りに見つかることも寝込みを打つこともなく、焚き火が消えるまで暗がりを行き来するだけになる）
+  // うとうとの間に潜む所（7マス）から5マスの内まで忍び寄った者は、見張りが目を覚ましても、その後しばらく（生き物の更新150回）は引き返さない
+  // （うとうとは短く、7マスを詰めるうちに終わることが多い。引き返すと、見つかることも寝込みを打つこともなく、焚き火が消えるまで暗がりを行き来するだけになる）。
+  // うとうとが最近でなければ、5マスの内にいても待つ（通りがかりや、焚き火のそばの暗がりに着いただけで打ちかからない）
   const tp = this.parties.find((q) => q.id === t.party);
   const atCamp = c.k !== Kind.Goblin && !!tp && (tp.camp ?? -1) >= 0;
-  const creeping = atCamp && sq(t.x - c.x) + sq(t.y - c.y) < 5 * TILE * 5 * TILE;
+  const creeping = atCamp && (tp?.dozeT ?? 0) > this.step - 150 && sq(t.x - c.x) + sq(t.y - c.y) < 5 * TILE * 5 * TILE;
   const sleepOk = t.sleep > 0 && (!atCamp || creeping || this.watchDozing(tp as Party) || ih(c.id, c.lureAt, 217) % 8 === 0 || this.step - c.lureAt > 1200);
   if (alone || sleepOk || ambush) {
     c.act = 1;

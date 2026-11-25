@@ -220,7 +220,7 @@ export function updateParties(this: Ecology): void {
           p.retreatX = Math.round(e.x);
           p.retreatY = Math.round(e.y);
           p.engage = 0;
-          // 焚き火を囲んだまま始まった戦いから退くなら、焚き火を消して発つ（夜襲の被害で発つのと同じ記録）
+          // 焚き火を囲んでいる間に戦いから退くなら、焚き火を消して発つ
           if ((p.camp ?? -1) >= 0) {
             this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'campBreak', how: 'retreat', x: Math.round(alive[0].x), y: Math.round(alive[0].y) } as never);
             this.douseCamp(p);
@@ -950,6 +950,9 @@ export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: numbe
   p.campUntil = this.step + (this.isNight() ? 2400 : 1500);
   p.dozeT = 0;
   p.dozeNext = 0;
+  // 前の焚き火で起こされた期間を持ち越さない（退いてすぐ囲み直した焚き火が、前の被害で消えないように）
+  p.wakeT = 0;
+  p.wakeN = 0;
 }
 
 /** 焚き火を囲む一行に、焚き火のそば（僧侶が癒やせる所）で傷ついている者がいるか（僧侶が起きて手当てを続けるか） */
