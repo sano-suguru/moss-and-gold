@@ -222,6 +222,8 @@ export interface Party {
   /** 焚き火の見張りのうとうと：うとうとしている期間の終わり（step 番号。それまで、見張りは眠りの印を出して、忍び寄る者に気づかない）、次にうとうとしはじめる step 番号 */
   dozeT?: number;
   dozeNext?: number;
+  /** 見張りがうとうとしている間に、焚き火の8マスの内まで忍び寄った生き物の id（焚き火を囲むたびに空にする。lurk） */
+  creeps?: number[];
   /** 焚き火の夜（src/eco/night.ts）：起こされて構えている期間の終わり（step 番号。0 なら眠っている）、起きたときの人数、気づいた敵のいた所 */
   wakeT?: number;
   wakeN?: number;

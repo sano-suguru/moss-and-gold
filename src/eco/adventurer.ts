@@ -169,7 +169,7 @@ export function updateParties(this: Ecology): void {
     this.cacheStep(p, alive);
     this.listenStep(p, alive);
     this.carryTrophy(p, alive);
-    if (p.goal !== 0 && (p.camp ?? -1) >= 0) this.endCamp(p);
+    if (p.goal !== 0) this.douseCamp(p);
     if (p.goal === 0) {
       const lights = this.partyLights(p);
       let cap = 0;
@@ -249,14 +249,14 @@ export function updateParties(this: Ecology): void {
       // 休むのは、探索中で食料に余裕があるときだけ（帰り道では休まずに出口を目指す。目標に着いて果たすまでの間も休まない）
       // 置き場へ向かう途中と、場所を知った集落へ退治に向かう途中は休まない（置き場に着いてから、木箱のそばで休む。cacheStep）
       if (p.goal === 0 && foodAvg >= 0.5 && (p.camp ?? -1) < 0 && !(p.aimAt && !p.aimEnd) && !((p.cacheGo || (p.aim === 5 && p.aimKnown && !p.aimAt && !p.aimEnd)) && worst >= 0.5) && this.step - (p.lastCamp ?? 0) > 2500 && ((p.fatigue ?? 0) > 3600 || worst < 0.5 || (this.isNight() && (p.fatigue ?? 0) > 1200))) this.startCamp(p, alive[0]);
-      if ((p.camp ?? -1) >= 0 && (p.goal !== 0 || foodAvg < 0.3)) this.endCamp(p);
+      if (p.goal !== 0 || foodAvg < 0.3) this.douseCamp(p);
       if ((p.camp ?? -1) >= 0 && this.step >= (p.campUntil ?? 0)) this.endCamp(p);
       if ((p.camp ?? -1) >= 0) this.watchDoze(p);
       if ((p.camp ?? -1) >= 0) this.campWatch(p, alive);
       // 竜の寝床への道探しと竜退治の一行は、相手の竜がいて依頼の途中なら、拾った金貨で荷がいっぱいになっても引き返さない（引き返すと、竜の宝の山のそばで金貨を拾ったところで、竜を見る前に帰る）
       if ((held >= cap * 0.7 && !quest) || hungry || tooLong || fewer || dark || ((p.saw & 8) !== 0 && !slayer)) {
         p.goal = 1;
-        if ((p.camp ?? -1) >= 0) this.endCamp(p);
+        this.douseCamp(p);
         this.setExit(p);
       }
     }
@@ -950,6 +950,7 @@ export function startCamp(this: Ecology, p: Party, leader: Cr, near?: { x: numbe
   p.campUntil = this.step + (this.isNight() ? 2400 : 1500);
   p.dozeT = 0;
   p.dozeNext = 0;
+  p.creeps = [];
   // 前の焚き火で起こされた期間を持ち越さない（退いてすぐ囲み直した焚き火が、前の被害で消えないように）
   p.wakeT = 0;
   p.wakeN = 0;
@@ -987,16 +988,19 @@ export function endCamp(this: Ecology, p: Party): void {
   if (k >= 0) this.dropScraps(p, (k % this.w.map.w) * TILE + 8, Math.floor(k / this.w.map.w) * TILE + 8, 3);
   this.douseCamp(p);
   p.fatigue = 0;
-  p.lastCamp = this.step;
 }
 
-/** 休みを切り上げて発つ：焚き火を消して灰を残すだけで、休んだことにはしない（疲れも、次に休むまでの間も、そのまま） */
+/**
+ * 休みを切り上げて発つ：焚き火を消して灰を残す。疲れは抜けない（次に休む間が空けば、早めにまた休む）。
+ * 焚き火を消した時を覚え、しばらくは新しい焚き火を囲まない（覚えないと、傷ついた一行が消したばかりの焚き火のそばですぐ囲み直す）
+ */
 export function douseCamp(this: Ecology, p: Party): void {
   const k = p.camp ?? -1;
   if (k < 0) return;
   this.w.ash[k] = Math.max(this.w.ash[k], 200);
   p.camp = -1;
   p.stoned = 0;
+  p.lastCamp = this.step;
 }
 
 /** 冒険者の食べ残し：一行の食料から少しずつ、その場所のまわりの土に落とす（キノコが生えやすくなる） */
