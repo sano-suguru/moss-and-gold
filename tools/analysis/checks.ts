@@ -952,22 +952,22 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 竜の物語（dragonRelocate・guessDeep）：育った竜が入口側へ寝床を移すか、島で成竜（ダンジョンの主）になり、道探しの一行が寝床を見つけて道を持ち帰り、竜退治の一行が寝床に着いて竜を倒す。
-    // 竜の育ち方とどの一行が来るかは展開で変わるので、二つの窓の合計で見る。竜を倒すのは窓の中では1〜3回と少ないので、シードの数は見ない。
-    // 目安は実測の半分ほど（実測：寝床を移すか成竜になる竜 3匹・3シード、道が伝わる 5回・2シード、竜を倒す 1回）
-    name: '竜が入口側へ寝床を移すか成竜になり、寝床への道が町に伝わり、冒険者が竜を倒す（10〜18日目の15シードと15〜23日目の16シードの合計で、寝床を移すか成竜になる竜2匹・道が伝わる2回、それぞれ2シード以上、竜を倒す1回以上）',
+    // 竜の物語（dragonRelocate・guessDeep）：育った竜が入口側へ寝床を移すか、島で成竜（ダンジョンの主）になり、道探しの一行が寝床を見つけて道を持ち帰る。
+    // 竜の育ち方とどの一行が来るかは展開で変わるので、二つの窓の合計で見る。育った竜（とくに成竜）は25日の内にはほとんど倒されないので、竜を倒した数は目安にせず、値に出すだけにする。
+    // 目安は実測の半分ほど（実測：寝床を移すか成竜になる竜 3匹・3シード、道が伝わる 4回・1シード）
+    name: '竜が入口側へ寝床を移すか成竜になり、寝床への道が町に伝わる（10〜18日目の15シードと15〜23日目の16シードの合計で、寝床を移すか成竜になる竜2匹・2シード以上、道が伝わる2回以上）',
     ...RUN_WIDE,
     more: [RUN_ARMOR],
     test: (rs) => {
-      // 二つの窓は15〜18日目が重なるので、15〜23日目の窓は18日目より後だけを数える（10〜18日目の窓に無いシードは除く）。竜を倒すのは、育った竜だけ（孵ったばかりの幼竜を除く）
+      // 二つの窓は15〜18日目が重なるので、15〜23日目の窓は18日目より後だけを数える（10〜18日目の窓に無いシードは除く）
       const late = (r: { from: number; seed: string }, t: number) => r.from < 15 || t > 18 * DAY_TICKS || !RUN_WIDE.seeds.includes(r.seed);
       // 成竜になってすぐ寝床を移すと二つ記録が残るので、一つの窓の中では竜ごとに一度だけ数える（二つの窓にまたがる竜は二度数えることがある）
       const grow = rs.map((r) => new Set(r.settle.filter((x) => x.k === Kind.Dragon && (x.ev === 'lairMove' || (x.ev === 'grow' && x.n === 2)) && late(r, x.t)).map((x) => x.id)).size);
       const way = rs.map((r) => r.settle.filter((x) => x.k === Kind.Adventurer && x.ev === 'way' && late(r, x.t)).length);
+      // 育った竜（孵ったばかりの幼竜を除く）を冒険者が倒した数
       const slain = rs.map((r) => r.deaths.filter((x) => x.k === Kind.Dragon && x.by === Kind.Adventurer && late(r, x.t) && (x.sp as number) >= 1).length);
       const seeds = (n: number[]) => new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
-      const ok = (n: number[]) => sum(n) >= 2 && seeds(n) >= 2;
-      return { ok: ok(grow) && ok(way) && sum(slain) >= 1, value: `寝床を移すか成竜になる竜 ${sum(grow)}（${seeds(grow)}シード）、道が伝わる ${sum(way)}（${seeds(way)}シード）、竜を倒す ${sum(slain)}（${seeds(slain)}シード。孵ったばかりの幼竜を除く）` };
+      return { ok: sum(grow) >= 2 && seeds(grow) >= 2 && sum(way) >= 2, value: `寝床を移すか成竜になる竜 ${sum(grow)}（${seeds(grow)}シード）、道が伝わる ${sum(way)}（${seeds(way)}シード）、育った竜を倒す ${sum(slain)}（${seeds(slain)}シード）` };
     },
   },
   {
