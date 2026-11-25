@@ -35,6 +35,8 @@ const runLen = (c: Cr) => (c.k === Kind.Armor ? BASH_LEN : RUN_LEN);
 const runN = (c: Cr) => (c.k === Kind.Armor ? BASH_N : RUN_N);
 /** 突進の重さ：ミノタウロスは打ち合いの一打ちの1.5倍、リビングアーマーの盾の体当たりは0.8倍（武具を取り込むと強さが大きく上がるので、1.5倍では冒険者を一撃で倒していた） */
 const runMul = (c: Cr) => (c.k === Kind.Armor ? 0.8 : RUN_MUL);
+/** 突進の予兆を見て横へ跳び退く速さ（px／生き物の更新） */
+const DODGE_V = 3;
 /** はね飛ばされる量（px）と、飛んでいる更新の回数 */
 const KB_LEN = 3 * TILE;
 const KB_N = 4;
@@ -314,9 +316,9 @@ export function advBrace(this: Ecology, c: Cr): boolean {
   const rank = this.heroOf(c)?.rank ?? 0;
   const delay = Math.max(0, (c.sp === Job.Thief || c.sp === Job.Hunter ? 0 : c.sp === Job.Slayer ? 2 : 4) - rank);
   if ((this.w.tick - mm.cast) / CR_EVERY < delay) return false;
-  // 横へ下がる（線から離れる向き。線の上ならどちらかへ）
+  // 横へ跳び退く（線から離れる向き。線の上ならどちらかへ）。ふつうに歩く速さの3倍：溜めの残りの間に、通り道（線から11px）の外へ出られるように
   const sg = Math.abs(side) > 1 ? Math.sign(side) : ih(c.id, mm.id, 332) & 1 ? 1 : -1;
-  sidestep.call(this, c, uy * sg * 1.5, -ux * sg * 1.5, false);
+  sidestep.call(this, c, uy * sg * DODGE_V, -ux * sg * DODGE_V, false);
   this.setDir(c, mm.x - c.x, mm.y - c.y);
   return true;
 }
