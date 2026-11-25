@@ -205,7 +205,7 @@ export function updateParties(this: Ecology): void {
       const backup = quest && (p.cacheVis ?? []).some((id) => (this.caches.find((q) => q.id === id)?.food ?? 0) > 20);
       if (foodAvg < (backup ? 0.3 : 0.45) && p.goal === 0 && !ahead) {
         p.goal = 1;
-        p.camp = -1;
+        if ((p.camp ?? -1) >= 0) this.endCamp(p);
         this.setExit(p);
         continue;
       }
@@ -220,7 +220,11 @@ export function updateParties(this: Ecology): void {
           p.retreatX = Math.round(e.x);
           p.retreatY = Math.round(e.y);
           p.engage = 0;
-          p.camp = -1;
+          // 焚き火を囲んだまま始まった戦いから退くなら、焚き火を消して発つ（夜襲の被害で発つのと同じ記録）
+          if ((p.camp ?? -1) >= 0) {
+            this.record('settle', { t: this.w.tick, k: Kind.Adventurer, id: p.id, ev: 'campBreak', how: 'retreat', x: Math.round(alive[0].x), y: Math.round(alive[0].y) } as never);
+            this.endCamp(p);
+          }
           const dc = this.cellOf(e.x, e.y);
           (p.danger ??= []).push([dc, 9999]);
           if (p.danger.length > 30) p.danger.shift();
@@ -237,7 +241,7 @@ export function updateParties(this: Ecology): void {
       if (p.retreatUntil && p.retreatUntil === this.step && p.goal === 0 && (p.camp ?? -1) < 0) this.startCamp(p, alive[0]);
       if (avgHp < 0.35 && p.goal === 0) {
         p.goal = 1;
-        p.camp = -1;
+        if ((p.camp ?? -1) >= 0) this.endCamp(p);
         this.setExit(p);
         continue;
       }
@@ -532,7 +536,7 @@ export function adventurer(this: Ecology, c: Cr, day: number): void {
           const wyrm = o.k === Kind.Dragon || o.k === Kind.Wyvern || o.k === Kind.Worm;
           if (wyrm && os > ps * 1.2 && !slayerHunt && p.goal === 0) {
             p.goal = 1;
-            p.camp = -1;
+            if ((p.camp ?? -1) >= 0) this.endCamp(p);
             this.setExit(p);
             this.log(c.x, c.y, `冒険者の一行が{k:${o.k}}を見て、かなわないと引き返した`);
           }
