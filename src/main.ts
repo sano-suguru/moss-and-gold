@@ -481,13 +481,15 @@ function boot(): void {
     const d = mimg.data;
     for (let k = 0; k < m.w * m.h; k++) {
       let c: number[];
-      if (m.rubble[k]) c = [92, 78, 64];
+      // まだ見ていない所は岩と同じ色にする（見た所だけが地図に描かれ、ダンジョンが少しずつ広がっていく）
+      if (!world.seen[k]) c = [10, 9, 14];
+      else if (m.rubble[k]) c = [92, 78, 64];
       else if (m.solid[k]) c = [10, 9, 14];
       else if (m.sealed[k] && !m.lava[k]) c = world.water[k] > 40 ? [24, 46, 62] : [30, 52, 56];
       else if (m.lava[k]) c = [190, 70, 26];
       else if (world.burn[k]) c = [255, 140, 40];
-      else if (world.water[k] > 40) c = world.seen[k] ? [52, 92, 140] : [30, 50, 80];
-      else c = world.seen[k] ? [104, 100, 118] : [52, 50, 64];
+      else if (world.water[k] > 40) c = [52, 92, 140];
+      else c = [104, 100, 118];
       d[k * 4] = c[0];
       d[k * 4 + 1] = c[1];
       d[k * 4 + 2] = c[2];
@@ -496,6 +498,7 @@ function boot(): void {
     mctx.putImageData(mimg, 0, 0);
     for (const l of world.lights()) {
       if (l.kind !== 'torch' && l.kind !== 'shaft') continue;
+      if (!world.seen[Math.floor(l.y / TILE) * m.w + Math.floor(l.x / TILE)]) continue;
       mctx.fillStyle = l.kind === 'torch' ? '#ffb050' : '#fff2c0';
       mctx.fillRect(Math.floor(l.x / TILE) - 1, Math.floor(l.y / TILE) - 1, 2, 2);
     }

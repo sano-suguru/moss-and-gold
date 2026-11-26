@@ -178,9 +178,9 @@ export class Renderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, m.w, m.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     gl.bindTexture(gl.TEXTURE_2D, this.glowTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, m.w, m.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    this.manaData = new Uint8Array(N);
+    this.manaData = new Uint8Array(N * 2);
     gl.bindTexture(gl.TEXTURE_2D, this.manaTex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, m.w, m.h, 0, gl.RED, gl.UNSIGNED_BYTE, null);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, m.w, m.h, 0, gl.RG, gl.UNSIGNED_BYTE, null);
     this.fxData = new Uint8Array(N * 4);
     gl.bindTexture(gl.TEXTURE_2D, this.fxTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, m.w, m.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -236,7 +236,7 @@ export class Renderer {
     a.dirty.length = 0;
   }
 
-  /** 苔、見たマス、水、養分 */
+  /** 苔、微生物の膜、水、養分。マナと見たマス */
   updateFields(w: World): void {
     const gl = this.gl;
     const d = this.fieldData;
@@ -248,12 +248,15 @@ export class Renderer {
     }
     gl.bindTexture(gl.TEXTURE_2D, this.fieldTex);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.mapW, this.mapH, gl.RGBA, gl.UNSIGNED_BYTE, d);
-    // マナ（0〜64 を 0〜255 に。濃い所は頭打ち）
+    // マナ（0〜64 を 0〜255 に。濃い所は頭打ち）と、見たことのあるマス（まだ見ていない所は闇に沈めて描く）
     const md = this.manaData;
-    for (let k = 0; k < w.mana.length; k++) md[k] = Math.min(255, w.mana[k] * 4);
+    for (let k = 0; k < w.mana.length; k++) {
+      md[k * 2] = Math.min(255, w.mana[k] * 4);
+      md[k * 2 + 1] = w.seen[k] ? 255 : 0;
+    }
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.bindTexture(gl.TEXTURE_2D, this.manaTex);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.mapW, this.mapH, gl.RED, gl.UNSIGNED_BYTE, md);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.mapW, this.mapH, gl.RG, gl.UNSIGNED_BYTE, md);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
   }
 

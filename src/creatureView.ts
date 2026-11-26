@@ -2602,7 +2602,11 @@ export class CreatureView {
       const stoneT = !isCorpse && c.stone > 0 && !hidden && veil !== 2 && !thrallOf ? Math.min(1, c.stone / STONE_FULL) : 0;
       if (holy > 0) pushSprite(x, yy, lift, flip, frame, holy, 7, (c.id * 0.6180339) % 1);
       else if (stoneT > 0) pushSprite(x, yy, lift, flip, frame, stoneT, (veil === 3 ? 20 : flash) + 8, (c.id * 0.6180339) % 1);
-      else pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0) + (thrallOf && !hidden && veil !== 2 ? 6 : 0), (c.id * 0.6180339) % 1);
+      else {
+        // まだ見ていない所（闇に沈めて描く所）にいる者も、閉じた空洞の中の者と同じく暗く沈める。光る模様はそのまま透ける
+        const fog = !hidden && veil === 0 && !eco.w.seen[(c.y >> 4) * eco.w.map.w + (c.x >> 4)];
+        pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 || fog ? 10 : 0) + (thrallOf && !hidden && veil !== 2 ? 6 : 0), (c.id * 0.6180339) % 1);
+      }
       if (armorGear) for (const g of armorGear) if (g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
       // バジリスクの睨みの溜め（gazeStart）：目が黄緑に光り、溜めが進むほど強まって、溜め終わる手前で目のまわりに光の輪が広がる（描画専用）。
       // 目のある向き（横向きは前の端の上、前向きは顔の左右）にだけ描く。後ろ向きは目が見えない
