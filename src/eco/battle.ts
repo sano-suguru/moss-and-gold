@@ -2,7 +2,8 @@
  * Ecology のメソッド：古戦場（遠い昔に冒険者と亜人が戦って倒れた跡。場所は MapData の battle、findBattle）。
  *
  * 見せたい場面：
- *  1. 始めた時から、暗がりに骨と錆びた武具と少しの金貨が散らばっている（情報パネルでは「遠い昔の戦いで倒れた」）。
+ *  1. 始めた時から、骨と錆びた武具と少しの金貨が散らばっている（情報パネルでは「遠い昔の戦いで倒れた」）。
+ *     古戦場は、開いた洞窟の近くの閉じた空洞の中にある（findBattle）。掘り当てられて空洞が開くと見つかる。
  *  2. 古戦場の真ん中からは怨念がマナとしてにじみ出る（World の湧き口）。マナが溜まるにつれて、亜人の骨、冒険者の骨の順に
  *     スケルトンとして起き上がり、錆びた武具がマナを吸って、リビングアーマーが立ち上がる。
  *     どちらも今ある仕組み（骨の起き上がり、武具の未練）がそのまま拾う。
@@ -33,15 +34,16 @@ export function seedBattle(this: Ecology): void {
   const fallen: { k: Kind; sp: number }[] = [];
   for (let i = 0; i < 2; i++) fallen.push({ k: Kind.Adventurer, sp: ih(h0, i, 1) % 6 });
   for (let i = 0; i < (foe === Kind.Orc ? 3 : 4); i++) fallen.push({ k: foe, sp: foe });
-  // 骨を置く床：真ん中から BATTLE_R マスの内の床を、ハッシュの順に
+  // 骨を置く床：真ん中から BATTLE_R マスの内の、真ん中と同じ空洞の床を、ハッシュの順に
+  const center = B.y * m.w + B.x;
   const spots: number[] = [];
   for (let dy = -BATTLE_R; dy <= BATTLE_R; dy++)
     for (let dx = -BATTLE_R; dx <= BATTLE_R; dx++) {
       const k = (B.y + dy) * m.w + B.x + dx;
-      if (!m.solid[k] && !m.sealed[k] && !m.lava[k] && dx * dx + dy * dy <= BATTLE_R * BATTLE_R) spots.push(k);
+      if (!m.solid[k] && m.sealed[k] === m.sealed[center] && !m.lava[k] && dx * dx + dy * dy <= BATTLE_R * BATTLE_R) spots.push(k);
     }
+  if (!spots.length) return;
   spots.sort((a, b) => ih(a, h0, 2) - ih(b, h0, 2));
-  const center = B.y * m.w + B.x;
   fallen.forEach((f, i) => {
     const k = spots[i % spots.length];
     // 肉は朽ちきって、骨だけが残っている。骨の養分は古戦場のまわりの土から取る
@@ -76,7 +78,8 @@ export function seedBattle(this: Ecology): void {
   const gk = spots[(fallen.length + 2) % spots.length];
   this.note(this.nextId, { t: 0, cause: 'old' });
   this.piles.push({ id: this.nextId++, x: (gk % m.w) * TILE + 8, y: Math.floor(gk / m.w) * TILE + 8, gold: BATTLE_GOLD, age: 0 });
-  this.log(B.x * TILE + 8, B.y * TILE + 8, '暗がりに、遠い昔の戦いの跡が残っている');
+  // 閉じた空洞の中なら、掘り当てられるまで誰も知らない（記録には残さない）
+  if (!m.sealed[center]) this.log(B.x * TILE + 8, B.y * TILE + 8, '暗がりに、遠い昔の戦いの跡が残っている');
 }
 
 declare module '../ecology' {

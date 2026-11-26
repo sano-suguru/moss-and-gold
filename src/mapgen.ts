@@ -503,8 +503,9 @@ export function generate(seed: string): MapData {
 
   const sealed = sealPockets(seed, W, H, solid, lava, vault, ex, shafts, springs, height, humidity);
   const mouths = placeMouths(seed, W, H, solid, sealed, lava, vault, deep, springs);
-  const lair = findLair(W, H, solid, lava, paved, vault, ex, shafts, springs, deep, vaultCenter);
-  const battle = findBattle(seed, W, H, solid, lava, sealed, moss, vault, ex, shafts, springs, sinks, [deep, vaultCenter, lair]);
+  const rb = rockBetween(W, H, solid, lava, sealed);
+  const lair = findLair(W, H, solid, lava, paved, vault, rb, sealed, shafts, springs, deep, vaultCenter);
+  const battle = findBattle(seed, W, H, solid, lava, sealed, moss, vault, rb, shafts, springs, sinks, [deep, vaultCenter, lair]);
   const hard = rockHardness(seed, W, H);
 
   return {
@@ -659,12 +660,14 @@ function placeMouths(seed: string, W: number, H: number, solid: Uint8Array, seal
   return out;
 }
 
-/** 開いた洞窟の広さ（地図の約12分の1） */
-export const OPEN_AREA = Math.round((MAP_W * MAP_H) / 12);
+/** 開いた洞窟の広さ（地図の30分の1。はじめは小さな洞窟から眺め、掘り当てるたびに広がっていく） */
+export const OPEN_AREA = Math.round((MAP_W * MAP_H) / 30);
+/** 開く床を選ぶときに、入口からの直線の距離を道のりの何倍とみなすか（大きいほど入口のまわりに丸くまとまる） */
+export const OPEN_PULL = 1.5;
 
 /**
  * ダンジョンの大部分を、岩の中に閉じた空洞にする。
- * 入口から歩いて近い順に OPEN_AREA マスだけを開いた洞窟として残し、その外側に厚さ2マスの岩の帯を置いて隔てる。
+ * 入口のまわりの OPEN_AREA マスだけを開いた洞窟として残し（選び方は下の「開く床を選ぶ」）、その外側に厚さ2マスの岩の帯を置いて隔てる。
  * 残りの床は、いくつかの空洞に分け（境目は厚さ1マスの岩）、すべて「閉じた空洞」とする。
  * 開いた洞窟には光の筋と湧き水を少なくとも一つずつ置く。
  */
@@ -690,8 +693,52 @@ function sealPockets(seed: string, W: number, H: number, solid: Uint8Array, lava
       q[qt++] = n;
     }
   }
+  // 開く床を選ぶ：入口からの道のりと、入口からの直線の距離（OPEN_PULL 倍）の大きい方が小さい順に nOpen マス。
+  // 道のりだけで選ぶと、通路に沿って細長く遠くまで伸びる（はじめから広すぎる）ので、入口のまわりにまとまるようにする。
+  // 選んだうち入口から歩いて行けない所は外す
   const nOpen = Math.min(OPEN_AREA, Math.floor(order.length * 0.3));
-  const dMax = dist[order[Math.max(0, nOpen - 1)]];
+  const score = (k: number) => Math.max(dist[k], Math.ceil(OPEN_PULL * Math.hypot((k % W) - ex, (k / W) | 0)));
+  const pick = order.slice().sort((a, b) => score(a) - score(b) || dist[a] - dist[b] || a - b).slice(0, nOpen);
+  const chosen = new Uint8Array(N);
+  for (const k of pick) chosen[k] = 1;
+  const isOpen = new Uint8Array(N);
+  {
+    const qq = [start];
+    isOpen[start] = 1;
+    for (let h = 0; h < qq.length; h++) {
+      const c = qq[h];
+      const x = c % W;
+      for (const n of [x + 1 < W ? c + 1 : -1, x > 0 ? c - 1 : -1, c + W < N ? c + W : -1, c - W]) {
+        if (n < 0 || isOpen[n] || !chosen[n]) continue;
+        isOpen[n] = 1;
+        qq.push(n);
+      }
+    }
+  }
+  // 後の処理（岩の帯、光の筋と湧き水の置き場所）のために、dist を付け直す：開いた床は道のりのまま（dMax 以下）、
+  // 開かない床は dMax ＋（開いた床から何歩か）。入口から歩いて行けない床は -1 のまま
+  let dMax = 0;
+  for (const k of order) if (isOpen[k]) dMax = Math.max(dMax, dist[k]);
+  {
+    const step = new Int32Array(N).fill(-1);
+    const qq: number[] = [];
+    for (const k of order) if (isOpen[k]) {
+      step[k] = 0;
+      qq.push(k);
+    }
+    for (let h = 0; h < qq.length; h++) {
+      const c = qq[h];
+      const x = c % W;
+      for (const n of [x + 1 < W ? c + 1 : -1, x > 0 ? c - 1 : -1, c + W < N ? c + W : -1, c - W]) {
+        if (n < 0 || step[n] >= 0 || dist[n] < 0) continue;
+        step[n] = step[c] + 1;
+        qq.push(n);
+      }
+    }
+    for (const k of order) if (!isOpen[k]) dist[k] = dMax + step[k];
+    // 宝物庫は岩の帯にしないので、開いた床から2マス以内に来たら、宝物庫ごと開いた洞窟に入れる（帯に穴が開かないように）
+    if (order.some((k) => vault[k] && !isOpen[k] && step[k] <= 2)) for (const k of order) if (vault[k]) dist[k] = Math.min(dist[k], dMax);
+  }
   const sealed = new Uint8Array(N);
   // 開いた洞窟の外側に、厚さ2マスの岩の帯
   for (let k = 0; k < N; k++) {
@@ -919,37 +966,64 @@ function findDeep(W: number, H: number, solid: Uint8Array, lava: Uint8Array, vau
   return best < 0 ? { x: -1, y: -1 } : { x: best % W, y: (best / W) | 0 };
 }
 
+/**
+ * 開いた床から、そのマスまで掘って届くのに崩す岩のマスの数（いちばん少ない道で）。床（閉じた空洞の床も）は0で通れ、溶岩は通れない。
+ * 寝床と古戦場を、掘り手が掘り当てられる近さの閉じた空洞に置くのに使う
+ */
+function rockBetween(W: number, H: number, solid: Uint8Array, lava: Uint8Array, sealed: Uint8Array): Int32Array {
+  const N = W * H;
+  const d = new Int32Array(N).fill(-1);
+  // 崩す岩の数ごとに段を進める：同じ段の中では床をたどって広げ、隣の岩は次の段に入れる
+  let cur: number[] = [];
+  for (let k = 0; k < N; k++)
+    if (!solid[k] && !sealed[k] && !lava[k]) {
+      d[k] = 0;
+      cur.push(k);
+    }
+  for (let level = 0; cur.length; level++) {
+    const next: number[] = [];
+    for (let i = 0; i < cur.length; i++) {
+      const c = cur[i];
+      const x = c % W;
+      const y = (c / W) | 0;
+      for (const n of [x + 1 < W - 1 ? c + 1 : -1, x > 1 ? c - 1 : -1, y + 1 < H - 1 ? c + W : -1, y > 1 ? c - W : -1]) {
+        if (n < 0 || d[n] >= 0 || lava[n]) continue;
+        if (solid[n]) {
+          d[n] = level + 1;
+          next.push(n);
+        } else {
+          d[n] = level;
+          cur.push(n);
+        }
+      }
+    }
+    cur = next;
+  }
+  return d;
+}
+
+/** 寝床と古戦場を置く閉じた空洞：開いた床から崩す岩がこのマス数の範囲（岩の帯の2マスから、一つ奥の空洞まで） */
+const DIG_MIN = 2;
+const DIG_MAX = 6;
+
 /** ミノタウロスの縄張りの半径（マス）。寝床からこの距離の内の床が縄張り */
 export const LAIR_R = 8;
 
 /**
- * ミノタウロスの寝床：入口から歩いて遠く、日の光（光の筋の照り返しは10マスほど届く）が届かず、
+ * ミノタウロスの寝床：開いた洞窟の近く（崩す岩が DIG_MIN〜DIG_MAX マス）の閉じた空洞の中で、日の光（光の筋の照り返しは10マスほど届く）が届かず、
  * 地表から離れた深い所（上から30マスより下）にあり、宝物庫・深部の一点から離れた、行き止まりの奥の床。
+ * ミノタウロスは、掘り当てられて空洞が開くまで湧かない（掘ると見つかるものの一つ）。
  * 行き止まりの判定：その床から歩いて LAIR_REACH 歩の所に並ぶ床（外へ出る道の断面）が少なく（LAIR_EXIT マス以下）、ひとつながりで、
- * その内側にある程度の広さ（寝床の部屋）があること。入口からいちばん遠いものを選ぶ（部屋のいちばん奥になる）。
+ * その内側にある程度の広さ（寝床の部屋）があること。暗く、開いた洞窟から掘って近いものを選ぶ。
  * 見つからなければ、出口の条件をゆるめて探し直す
  */
-function findLair(W: number, H: number, solid: Uint8Array, lava: Uint8Array, paved: Uint8Array, vault: Uint8Array, ex: number, shafts: Shaft[], springs: { x: number; y: number }[], deep: { x: number; y: number }, vaultCenter: { x: number; y: number }): { x: number; y: number } {
+function findLair(W: number, H: number, solid: Uint8Array, lava: Uint8Array, paved: Uint8Array, vault: Uint8Array, rb: Int32Array, sealed: Uint8Array, shafts: Shaft[], springs: { x: number; y: number }[], deep: { x: number; y: number }, vaultCenter: { x: number; y: number }): { x: number; y: number } {
   const N = W * H;
-  const dist = new Int32Array(N).fill(-1);
-  const q = new Int32Array(N);
-  let qh = 0;
-  let qt = 0;
-  dist[W + ex] = 0;
-  q[qt++] = W + ex;
   const nb = (c: number) => {
     const x = c % W;
     const y = (c / W) | 0;
     return [x + 1 < W ? c + 1 : -1, x > 0 ? c - 1 : -1, y + 1 < H ? c + W : -1, y > 0 ? c - W : -1];
   };
-  while (qh < qt) {
-    const c = q[qh++];
-    for (const n of nb(c)) {
-      if (n < 0 || dist[n] >= 0 || solid[n] || lava[n]) continue;
-      dist[n] = dist[c] + 1;
-      q[qt++] = n;
-    }
-  }
   const LAIR_REACH = 9;
   const local = new Int32Array(N).fill(-1);
   const touched: number[] = [];
@@ -993,7 +1067,7 @@ function findLair(W: number, H: number, solid: Uint8Array, lava: Uint8Array, pav
     let best = -1;
     let bv = -1;
     for (let k = 0; k < N; k++) {
-      if (dist[k] < 60 || vault[k] || paved[k]) continue;
+      if (!sealed[k] || solid[k] || lava[k] || rb[k] < DIG_MIN || rb[k] > DIG_MAX || vault[k] || paved[k]) continue;
       const x = k % W;
       const y = (k / W) | 0;
       if (y < 30) continue;
@@ -1006,7 +1080,8 @@ function findLair(W: number, H: number, solid: Uint8Array, lava: Uint8Array, pav
       let hot = false;
       for (let dy = -4; dy <= 4 && !hot; dy++) for (let dx = -4; dx <= 4; dx++) if (lava[k + dy * W + dx]) hot = true;
       if (hot) continue;
-      const v = dist[k] + Math.min(sd, 40);
+      // 暗いほど、開いた床から掘って近いほどよい
+      const v = Math.min(sd, 40) - rb[k] * 3;
       if (v <= bv || !deadEnd(k, maxExit)) continue;
       bv = v;
       best = k;
@@ -1020,35 +1095,18 @@ function findLair(W: number, H: number, solid: Uint8Array, lava: Uint8Array, pav
 export const BATTLE_R = 4;
 
 /**
- * 古戦場の場所：入口から歩いてほどほどの所（BATTLE_NEAR〜BATTLE_FAR 歩）にある、開けた暗がりの床。
+ * 古戦場の場所：開いた洞窟の近く（崩す岩が DIG_MIN〜DIG_MAX マス）の閉じた空洞の中の、開けた暗がりの床。掘り当てられると見つかる。
  * 骨が起き上がるには暗さが要る（日の光も光る苔も無い）ので、光の筋と苔から離し、溶岩と水場からも離す。
  * 宝物庫・深部・ミノタウロスの寝床の近くは、ほかの場面と重ならないよう避ける。
  * 条件を満たすマスの中から、シードごとの別の乱数で選ぶ（ほかの地形は変えない）
  */
-const BATTLE_NEAR = 45;
-const BATTLE_FAR = 140;
-function findBattle(seed: string, W: number, H: number, solid: Uint8Array, lava: Uint8Array, sealed: Uint8Array, moss: Uint8Array, vault: Uint8Array, ex: number, shafts: Shaft[], springs: { x: number; y: number }[], sinks: { x: number; y: number }[], avoid: { x: number; y: number }[]): { x: number; y: number } {
+function findBattle(seed: string, W: number, H: number, solid: Uint8Array, lava: Uint8Array, sealed: Uint8Array, moss: Uint8Array, vault: Uint8Array, rb: Int32Array, shafts: Shaft[], springs: { x: number; y: number }[], sinks: { x: number; y: number }[], avoid: { x: number; y: number }[]): { x: number; y: number } {
   const N = W * H;
-  const dist = new Int32Array(N).fill(-1);
-  const q = new Int32Array(N);
-  let qh = 0;
-  let qt = 0;
-  dist[W + ex] = 0;
-  q[qt++] = W + ex;
-  while (qh < qt) {
-    const c = q[qh++];
-    const x = c % W;
-    for (const n of [x + 1 < W ? c + 1 : -1, x > 0 ? c - 1 : -1, c + W < N ? c + W : -1, c - W]) {
-      if (n < 0 || dist[n] >= 0 || solid[n] || lava[n] || sealed[n]) continue;
-      dist[n] = dist[c] + 1;
-      q[qt++] = n;
-    }
-  }
   const far = (x: number, y: number, ps: { x: number; y: number }[], r: number) => ps.every((p) => p.x < 0 || Math.abs(p.x - x) + Math.abs(p.y - y) >= r);
   const cands: number[] = [];
   const R = BATTLE_R;
   for (let k = 0; k < N; k++) {
-    if (dist[k] < BATTLE_NEAR || dist[k] > BATTLE_FAR || vault[k]) continue;
+    if (!sealed[k] || solid[k] || lava[k] || rb[k] < DIG_MIN || rb[k] > DIG_MAX || vault[k]) continue;
     const x = k % W;
     const y = (k / W) | 0;
     if (y < 20 || x < R + 2 || x >= W - R - 2 || y >= H - R - 2) continue;
@@ -1063,7 +1121,7 @@ function findBattle(seed: string, W: number, H: number, solid: Uint8Array, lava:
           bad = true;
           break;
         }
-        if (Math.abs(dx) <= R && Math.abs(dy) <= R && !solid[n] && !sealed[n]) open++;
+        if (Math.abs(dx) <= R && Math.abs(dy) <= R && !solid[n] && sealed[n]) open++;
       }
     if (!bad && open >= (2 * R + 1) * (2 * R + 1) * 0.7) cands.push(k);
   }
