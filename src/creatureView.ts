@@ -1337,8 +1337,6 @@ export class CreatureView {
     if (this.heroLooks.size < 64) return;
     for (const id of [...this.heroLooks.keys()]) if (!eco.byId.has(id)) this.heroLooks.delete(id);
   }
-  /** 積み上げ表示（#stack）か。立体にした物のコマを使う */
-  stack = false;
   constructor(private atlas: Atlas) {}
 
   /** 種・向き・動作・コマから、アトラスのコマ番号を引く */
@@ -1427,8 +1425,6 @@ export class CreatureView {
         if (tk >= 0 && tk < mm.sealed.length && mm.sealed[tk] && kind % 20 < 9.5) kind += 10;
       }
       if (o.nSprites >= MAX_SPRITES) return;
-      // 積み上げ表示では、立体にした物のコマに差し替える
-      if (this.stack && frame < A.stacked.length && A.stacked[frame] >= 0) frame = A.stacked[frame];
       const fr = A.frames[frame];
       const k = o.nSprites * 12;
       o.sprites[k] = x;

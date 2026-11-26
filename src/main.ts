@@ -700,7 +700,6 @@ function boot(): void {
     }
 
     const alpha = Math.min(1, ((world.tick % CR_EVERY) + acc) / CR_EVERY);
-    view.stack = STACK;
     const cf = view.build(world.eco, { x0: ox, y0: oy, x1: ox + artW, y1: oy + artH }, t, alpha, dayIntensity(world.tick) <= 0);
     renderer.flushAtlas(atlas);
     renderer.render({ originX: ox, originY: oy, artW, artH, scale, time: t, lights, halos, shafts, nShafts: ns, debug: DEBUG, stack: STACK, ...cf });
