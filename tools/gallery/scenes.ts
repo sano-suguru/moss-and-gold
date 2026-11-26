@@ -48,7 +48,7 @@ const SCENES: Scene[] = [
   { name: 'ash', title: '焼け跡', seed: 'abc', day: 6, phase: 0.5, zoom: 4, search: 10, find: (w) => { const m = w.map; let b = -1, bv = 300; for (let k = m.w * 3; k < m.solid.length - m.w * 3; k++) { if (w.ash[k] < 30) continue; let v = 0; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) v += w.ash[k + dy * m.w + dx] ?? 0; if (v > bv) { bv = v; b = k; } } return b >= 0 ? { x: (b % m.w) * T + 8, y: Math.floor(b / m.w) * T + 8, zoom: 4 } : null; } },
   // まだ見ていない所の闇（光が届き、生き物が通った所から少しずつ描かれていく）。入口にいちばん近い光の筋のまわり
   { name: 'fog', title: 'まだ見ていない所の闇（1日目）', seed: 'abc', day: 0, phase: 0.6, zoom: 2, fog: true, find: (w) => fogCam(w, 2) },
-  { name: 'fog5', title: 'まだ見ていない所の闇（5日目）', seed: 'abc', day: 4, phase: 0.5, zoom: 1, fog: true, find: (w) => fogCam(w, 1) },
+  { name: 'fog5', title: 'まだ見ていない所の闇（5日目）', seed: 'abc', day: 4, phase: 0.5, zoom: 2, fog: true, find: (w) => fogCam(w, 2) },
   { name: 'phone', title: 'スマホの画面全体', seed: 'かしたれ', day: 2, phase: 0.6, zoom: 2, device: 'phone', find: (w) => ({ x: w.map.entrance.x * T + 8, y: 30 * T, zoom: 2 }) },
 ];
 
