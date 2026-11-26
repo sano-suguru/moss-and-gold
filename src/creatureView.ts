@@ -1417,10 +1417,11 @@ export class CreatureView {
     o.nDyn = 0;
     const A = this.atlas;
     const pushSprite = (x: number, y: number, lift: number, flip: boolean, frame: number, glow: number, kind: number, phase = 0) => {
-      // 閉じた空洞の中にあるものは、岩越しに暗く見える
+      // まだ見ていない所（闇に沈めて描く所）にあるものは描かない。閉じた空洞の中にあるものは、岩越しに暗く見える
       {
         const mm = eco.w.map;
         const tk = Math.floor((y - 2) / 16) * mm.w + Math.floor(x / 16);
+        if (tk >= 0 && tk < mm.sealed.length && !eco.w.seen[tk]) return;
         // （すでに暗く描くもの＝隠れている生き物には重ねない。kind の 20 は傷の光なので、足して 20 にならないように）
         if (tk >= 0 && tk < mm.sealed.length && mm.sealed[tk] && kind % 20 < 9.5) kind += 10;
       }
@@ -2387,6 +2388,8 @@ export class CreatureView {
         if (p > 0.55 && p < 0.7) veil = 3;
       }
       if (veil === 1) continue;
+      // まだ見ていない所（闇に沈めて描く所）にいる者は描かない（闇の広がりを教えてしまわないように）
+      if (!eco.w.seenAt(c.x, c.y)) continue;
       // クモの巣の糸の中：捕まった者はもがいて小刻みに揺れ、足を取られた者は糸を引きずって揺れる。どちらも白い糸がまとわりつく
       if (!c.dead && eco.webs.length && (c.caught || (eco.webEffect(c) === 2 && eco.inWeb(c)))) {
         const k = c.caught ? 1.2 : 0.6;
@@ -2602,11 +2605,7 @@ export class CreatureView {
       const stoneT = !isCorpse && c.stone > 0 && !hidden && veil !== 2 && !thrallOf ? Math.min(1, c.stone / STONE_FULL) : 0;
       if (holy > 0) pushSprite(x, yy, lift, flip, frame, holy, 7, (c.id * 0.6180339) % 1);
       else if (stoneT > 0) pushSprite(x, yy, lift, flip, frame, stoneT, (veil === 3 ? 20 : flash) + 8, (c.id * 0.6180339) % 1);
-      else {
-        // まだ見ていない所（闇に沈めて描く所）にいる者も、閉じた空洞の中の者と同じく暗く沈める。光る模様はそのまま透ける
-        const fog = !hidden && veil === 0 && !eco.w.seen[(c.y >> 4) * eco.w.map.w + (c.x >> 4)];
-        pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 || fog ? 10 : 0) + (thrallOf && !hidden && veil !== 2 ? 6 : 0), (c.id * 0.6180339) % 1);
-      }
+      else pushSprite(x, yy, lift, flip, frame, hidden || veil === 2 ? 0 : glow, (veil === 3 ? 20 : flash) + (hidden || veil === 2 ? 10 : 0) + (thrallOf && !hidden && veil !== 2 ? 6 : 0), (c.id * 0.6180339) % 1);
       if (armorGear) for (const g of armorGear) if (g.front) pushSprite(g.x, g.y, g.lift, g.flip, g.frame, 0, 2);
       // バジリスクの睨みの溜め（gazeStart）：目が黄緑に光り、溜めが進むほど強まって、溜め終わる手前で目のまわりに光の輪が広がる（描画専用）。
       // 目のある向き（横向きは前の端の上、前向きは顔の左右）にだけ描く。後ろ向きは目が見えない

@@ -5,6 +5,7 @@
  * - 見どころの点数：画面と同じ大きさの範囲について、生き物の種類の数 × 4 ＋ 生き物の数（30まで）× 0.3 ＋ 最近の出来事
  *   （攻撃の演出 3、捕食 2、水を飲んだ 1、底の層を食べた 0.2。合わせて15まで）。冒険者は種類の一つとして数える。
  * - 候補は、生きている生き物（外に出ている者を除く）の位置から最大60か所。
+ * - まだ見ていない所（闇に沈めて描く所）の生き物と出来事は数えない（闇の中の見えないものへ寄らないように）。
  * - 3秒ごとに見直す。今の場所にいる生き物の重心へ少しずつ寄せ直し、別の場所が今の場所の1.3倍より高ければ、
  *   今の場所に10秒以上いたときだけ移る。45秒いたら、今の場所から離れた、点数のいちばん高い場所へ移る。
  *   最近（90秒の内）見た場所のそばは、点数を6割にして、同じ所ばかり見ないようにする。
@@ -39,18 +40,19 @@ export class AutoCam {
     let sx = 0;
     let sy = 0;
     for (const c of eco.list) {
-      if (c.dead || c.away || c.x < x0 || c.x >= x1 || c.y < y0 || c.y >= y1) continue;
+      if (c.dead || c.away || c.x < x0 || c.x >= x1 || c.y < y0 || c.y >= y1 || !eco.w.seenAt(c.x, c.y)) continue;
       kinds.add(c.k);
       n++;
       sx += c.x;
       sy += c.y;
     }
     const t = eco.w.tick;
+    const inside = (ax: number, ay: number) => ax >= x0 && ax < x1 && ay >= y0 && ay < y1 && eco.w.seenAt(ax, ay);
     let ev = 0;
-    for (const a of eco.fxAttacks) if (t - a.t < 40 && a.ax >= x0 && a.ax < x1 && a.ay >= y0 && a.ay < y1) ev += 3;
-    for (const a of eco.fxEats) if (t - a.t < 60 && a.x >= x0 && a.x < x1 && a.y >= y0 && a.y < y1) ev += 2;
-    for (const a of eco.fxGraze) if (t - a.t < 30 && a.x >= x0 && a.x < x1 && a.y >= y0 && a.y < y1) ev += 0.2;
-    for (const a of eco.fxDrinks) if (t - a.t < 60 && a.x >= x0 && a.x < x1 && a.y >= y0 && a.y < y1) ev += 1;
+    for (const a of eco.fxAttacks) if (t - a.t < 40 && inside(a.ax, a.ay)) ev += 3;
+    for (const a of eco.fxEats) if (t - a.t < 60 && inside(a.x, a.y)) ev += 2;
+    for (const a of eco.fxGraze) if (t - a.t < 30 && inside(a.x, a.y)) ev += 0.2;
+    for (const a of eco.fxDrinks) if (t - a.t < 60 && inside(a.x, a.y)) ev += 1;
     const s = kinds.size * 4 + Math.min(30, n) * 0.3 + Math.min(15, ev);
     return { s, cx: n ? sx / n : x, cy: n ? sy / n : y };
   }
@@ -66,7 +68,7 @@ export class AutoCam {
     if (!this.on) return;
     if (now - this.lastEval > 3000) {
       this.lastEval = now;
-      const live = eco.list.filter((c) => !c.dead && !c.away);
+      const live = eco.list.filter((c) => !c.dead && !c.away && eco.w.seenAt(c.x, c.y));
       // 今の場所を、そこにいる生き物の重心へ寄せ直して点数を付け直す
       let cur: Spot | null = null;
       if (this.target) {
