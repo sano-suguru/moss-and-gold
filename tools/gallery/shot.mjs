@@ -13,7 +13,7 @@ await ctx.addInitScript((d) => localStorage.setItem('dungeon-aquarium-v2', d), J
 const page = await ctx.newPage();
 const errs = [];
 page.on('pageerror', (e) => errs.push(String(e)));
-await page.goto('file://' + root + '/dist/index.html#clean' + (sc.lit ? ',lit' : '') + (sc.stack ? ',stack' : ''));
+await page.goto('file://' + root + '/dist/index.html#clean' + (sc.lit ? ',lit' : ''));
 // 固定の時間ではなく、20フレーム描き終わるまで待つ（ページの読み込みのあと0.3秒ほど）
 await page.waitForFunction(() => (window.__frames ?? 0) >= 20, null, { timeout: 15000 });
 await page.evaluate(() => { window.__hold = true; });

@@ -24,8 +24,6 @@ export interface FrameParams {
   shafts: Float32Array;
   nShafts: number;
   debug?: number;
-  /** 積み上げ表示（#stack）：壁に高さを付け、壁の裏の生き物をシルエットにする */
-  stack?: boolean;
   /** 光を帯びた生き物の光（x, y, r, 強さ） */
   dyn: Float32Array;
   nDyn: number;
@@ -107,9 +105,6 @@ export class Renderer {
   private artTex: WebGLTexture;
   private lightFb: WebGLFramebuffer;
   private artFb: WebGLFramebuffer;
-  /** 積み上げ表示で、画素ごとに見えている壁の足もとの y（FS_SCENE の oOcc）と、場面をそれと一緒に描く先 */
-  private occTex: WebGLTexture;
-  private sceneFb: WebGLFramebuffer;
   private mapData: Uint8Array = new Uint8Array(0);
   private fieldData: Uint8Array = new Uint8Array(0);
   private glowData: Uint8Array = new Uint8Array(0);
@@ -125,8 +120,8 @@ export class Renderer {
     if (!gl) throw new Error('この端末やブラウザではWebGL2が使えないため、ダンジョンを描けません。最新のブラウザで開いてください。');
     this.gl = gl;
     this.light = program(gl, FS_LIGHT, '光', ['uMap', 'uGlow', 'uFx', 'uMapSize', 'uLmOrigin', 'uNum', 'uL', 'uC', 'uAmbient', 'uMossCol', 'uLavaCol', 'uNumD', 'uDL', 'uDCol', 'uTime']);
-    this.sprite = program(gl, FS_SPRITE, '生き物', ['uOrigin', 'uArtSize', 'uAtlas', 'uLight', 'uLmOrigin', 'uLmSize', 'uTime', 'uOcc', 'uStack', 'uMap'], VS_SPRITE);
-    this.shadow = program(gl, FS_SHADOW, '影', ['uOrigin', 'uArtSize', 'uLight', 'uLmOrigin', 'uLmSize', 'uOcc', 'uStack'], VS_SHADOW);
+    this.sprite = program(gl, FS_SPRITE, '生き物', ['uOrigin', 'uArtSize', 'uAtlas', 'uLight', 'uLmOrigin', 'uLmSize', 'uTime'], VS_SPRITE);
+    this.shadow = program(gl, FS_SHADOW, '影', ['uOrigin', 'uArtSize', 'uLight', 'uLmOrigin', 'uLmSize'], VS_SHADOW);
     this.atlasTex = makeTex(gl, gl.NEAREST);
     this.spriteBuf = gl.createBuffer()!;
     this.spriteVao = gl.createVertexArray()!;
@@ -147,7 +142,7 @@ export class Renderer {
     gl.bindVertexArray(null);
     this.scene = program(gl, FS_SCENE, '場面', [
       'uMap', 'uField', 'uGlow', 'uLight', 'uFx', 'uMana', 'uTile', 'uMapSize', 'uOrigin', 'uArtSize', 'uLmOrigin', 'uLmSize', 'uTime',
-      'uNumHalo', 'uH', 'uHC', 'uNumShaft', 'uS', 'uDebug', 'uStack',
+      'uNumHalo', 'uH', 'uHC', 'uNumShaft', 'uS', 'uDebug',
     ]);
     this.blit = program(gl, FS_BLIT, '拡大', ['uTex', 'uBloom', 'uScale', 'uBloomStr']);
     this.bright = program(gl, FS_BRIGHT, 'にじみの取り出し', ['uTex']);
@@ -165,8 +160,6 @@ export class Renderer {
     this.artTex = makeTex(gl, gl.NEAREST);
     this.lightFb = gl.createFramebuffer()!;
     this.artFb = gl.createFramebuffer()!;
-    this.occTex = makeTex(gl, gl.NEAREST);
-    this.sceneFb = gl.createFramebuffer()!;
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
   }
 
@@ -332,12 +325,6 @@ export class Renderer {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, artW, artH, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.artFb);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.artTex, 0);
-      gl.bindTexture(gl.TEXTURE_2D, this.occTex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, artW, artH, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFb);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.artTex, 0);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, this.occTex, 0);
-      gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
     }
   }
 
@@ -380,9 +367,8 @@ export class Renderer {
     gl.uniform1f(u.uTime, f.time);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-    // 2. 場面（積み上げ表示では、見えている壁の足もとの y も書き出す）
-    const stack = f.stack ? 1 : 0;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, stack ? this.sceneFb : this.artFb);
+    // 2. 場面
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.artFb);
     gl.viewport(0, 0, f.artW, f.artH);
     ({ p, u } = this.scene);
     gl.useProgram(p);
@@ -420,11 +406,7 @@ export class Renderer {
     gl.uniform1i(u.uNumShaft, f.nShafts);
     gl.uniform4fv(u.uS, f.shafts);
     gl.uniform1i(u.uDebug, f.debug ?? 0);
-    gl.uniform1i(u.uStack, stack);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.artFb);
-    gl.activeTexture(gl.TEXTURE2);
-    gl.bindTexture(gl.TEXTURE_2D, this.occTex);
 
     // 2b. 足元の影と生き物（場面の上に重ねる）
     if (f.nShadows > 0) {
@@ -437,8 +419,6 @@ export class Renderer {
       gl.uniform1i(u.uLight, 1);
       gl.uniform2f(u.uLmOrigin, lmX, lmY);
       gl.uniform2f(u.uLmSize, this.lmW, this.lmH);
-      gl.uniform1i(u.uOcc, 2);
-      gl.uniform1i(u.uStack, stack);
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.DST_COLOR, gl.ZERO);
       gl.bindVertexArray(this.shadowVao);
@@ -461,22 +441,10 @@ export class Renderer {
       gl.uniform2f(u.uLmOrigin, lmX, lmY);
       gl.uniform2f(u.uLmSize, this.lmW, this.lmH);
       gl.uniform1f(u.uTime, f.time);
-      gl.uniform1i(u.uOcc, 2);
-      gl.uniform1i(u.uStack, stack);
-      gl.activeTexture(gl.TEXTURE3);
-      gl.bindTexture(gl.TEXTURE_2D, this.mapTex);
-      gl.uniform1i(u.uMap, 3);
-      gl.activeTexture(gl.TEXTURE0);
-      // 積み上げ表示では、壁に隠れた部分を半透明のシルエットにするので重ね合わせる（ほかの画素は不透明のまま）
-      if (stack) {
-        gl.enable(gl.BLEND);
-        gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ZERO);
-      }
       gl.bindVertexArray(this.spriteVao);
       gl.bindBuffer(gl.ARRAY_BUFFER, this.spriteBuf);
       gl.bufferData(gl.ARRAY_BUFFER, f.sprites.subarray(0, f.nSprites * 12), gl.STREAM_DRAW);
       gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, f.nSprites);
-      gl.disable(gl.BLEND);
     }
     gl.bindVertexArray(this.vao);
 
