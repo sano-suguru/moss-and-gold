@@ -1654,12 +1654,26 @@ export class World {
     return x1 < 0 ? null : { x0, y0, x1, y1 };
   }
 
+  private revealMemo = new Uint8Array(0);
+  private revealDigs = -1;
   /**
    * マス k を「見た」にしてよいか：開いた床と、そこから2マス以内の岩だけ。閉じた空洞（岩をかぶった空洞）とそのまわりの岩は、
    * 中で苔や溶岩が光っていても、掘り当てられるまで闇のまま（そうしないと、はじめから地図の端々に見た所が散らばり、
    * ダンジョンの広さがわかってしまう）
    */
   private revealable(k: number): boolean {
+    // 結果は地形だけで決まるので覚えておき、地形変更ログの長さ（digs.length）が変わったときだけ捨てる（キャッシュはセーブしない）
+    if (this.revealDigs !== this.digs.length || this.revealMemo.length !== this.seen.length) {
+      this.revealMemo = new Uint8Array(this.seen.length);
+      this.revealDigs = this.digs.length;
+    }
+    const v = this.revealMemo[k];
+    if (v) return v === 1;
+    const r = this.revealableNow(k);
+    this.revealMemo[k] = r ? 1 : 2;
+    return r;
+  }
+  private revealableNow(k: number): boolean {
     const m = this.map;
     const open = (q: number) => !m.solid[q] && !m.sealed[q] && !m.lava[q];
     if (m.sealed[k]) return false;

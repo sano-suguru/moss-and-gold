@@ -154,6 +154,9 @@ function boot(): void {
   // 見たことのある所を囲む枠（タイル）。カメラはこの枠（と少しの余白）の中だけを動け、地図もこの枠のまわりだけを描く。
   // 見た所が広がるにつれて、眺められる範囲も地図も広がっていく
   const SEEN_PAD = 4;
+  // 画面に映る範囲の大きさ（ワールドのピクセル。毎フレームの描画で求めたもの）。カメラを止める位置に使う
+  let viewW = 0;
+  let viewH = 0;
   let seenBox = { x0: 0, y0: 0, x1: MAP_W - 1, y1: MAP_H - 1 };
   function updateSeenBox() {
     const b = world.seenBox();
@@ -173,6 +176,7 @@ function boot(): void {
   const input = new Input(canvas, {
     cam,
     dpr: () => window.devicePixelRatio || 1,
+    view: () => ({ w: viewW, h: viewH }),
     bounds: () => ({
       x0: Math.max(0, seenBox.x0 - SEEN_PAD) * TILE,
       y0: Math.max(0, seenBox.y0 - SEEN_PAD) * TILE,
@@ -440,6 +444,8 @@ function boot(): void {
       t.textContent = timeLabel(ev.t);
       b.append(t, renderEvent(ev.m, e.discovered));
       b.addEventListener('click', () => {
+        // まだ見ていない所で起きた出来事へは飛ばない（カメラはそこを映せない）
+        if (!world.seenAt(ev.x, ev.y)) return;
         // 別の場所へ飛ぶので、追いかけていた生き物からは離れる（おまかせカメラも切る）
         closeCard();
         autoOff();
@@ -688,6 +694,8 @@ function boot(): void {
     const artW = Math.ceil(canvas.width / scale);
     const artH = Math.ceil(canvas.height / scale);
     auto.update(now, Math.min(0.1, raw), world.eco, cam, artW, artH);
+    viewW = artW;
+    viewH = artH;
     input.clamp();
     const ox = Math.round(cam.x - artW / 2);
     const oy = Math.round(cam.y - artH / 2);

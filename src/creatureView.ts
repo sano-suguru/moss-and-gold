@@ -1417,7 +1417,8 @@ export class CreatureView {
     o.nDyn = 0;
     const A = this.atlas;
     const pushSprite = (x: number, y: number, lift: number, flip: boolean, frame: number, glow: number, kind: number, phase = 0) => {
-      // まだ見ていない所（闇に沈めて描く所）にあるものは描かない。閉じた空洞の中にあるものは、岩越しに暗く見える
+      // まだ見ていない所（闇に沈めて描く所）にあるものは描かない。
+      // 閉じた空洞は掘り当てられるまで「見た」にならないので、岩越しに暗く描くのは、前の条件で「見た」になったセーブの空洞だけ
       {
         const mm = eco.w.map;
         const tk = Math.floor((y - 2) / 16) * mm.w + Math.floor(x / 16);
@@ -2073,6 +2074,8 @@ export class CreatureView {
       const c = ord.c;
       let x = ord.x;
       let yy = ord.yy;
+      // まだ見ていない所（闇に沈めて描く所）にいる者は、姿も光も描かない（闇の広がりや、そこに何かいることを教えてしまわないように）
+      if (!eco.w.seenAt(c.x, c.y)) continue;
       // ヴァンパイアの眷属は、元の種の姿で描き、青白く塗り替える（シェーダーの kind 6。src/eco/thrall.ts）。冒険者の眷属は生前の姿のまま
       const thrallOf = c.k === Kind.Thrall && !c.dead;
       const sp = thrallOf ? c.sp : c.k;
@@ -2388,8 +2391,6 @@ export class CreatureView {
         if (p > 0.55 && p < 0.7) veil = 3;
       }
       if (veil === 1) continue;
-      // まだ見ていない所（闇に沈めて描く所）にいる者は描かない（闇の広がりを教えてしまわないように）
-      if (!eco.w.seenAt(c.x, c.y)) continue;
       // クモの巣の糸の中：捕まった者はもがいて小刻みに揺れ、足を取られた者は糸を引きずって揺れる。どちらも白い糸がまとわりつく
       if (!c.dead && eco.webs.length && (c.caught || (eco.webEffect(c) === 2 && eco.inWeb(c)))) {
         const k = c.caught ? 1.2 : 0.6;
