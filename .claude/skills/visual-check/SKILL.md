@@ -11,10 +11,12 @@ description: 見た目や動きの確認：ギャラリーの固定シーンの�
 npm run gallery -- --label before    # 変更前に撮って build/gallery/before/ に残す
 npm run gallery -- --compare before  # 変更後、before と左右に並べた build/gallery/compare-before.png を作る
 node tools/gallery/shoot.mjs --only dragon,camp     # 一部のシーンだけ撮り直す
+npm run gallery -- --stack           # 積み上げ表示（#stack）で撮る（--compare before と組み合わせると、見下ろし表示と並べられる）
 npm run shot -- --seed かしたれ --find warren         # 見たいものが現れるまで進めて撮る（build/shots/）
+npm run shot -- --seed かしたれ --find behindwall:2 --day 2 --stack   # 壁の裏に隠れたネズミのシルエット
 npm run film -- --seed abc --at 12.3 --frames 6 --every 40 --follow party:12345 --name adv-enter   # 連続フレーム → build/img/<name>.png
 ```
 
 - シーンの定義は `tools/gallery/scenes.ts` の `SCENES`。
 - film は、その版で実行した ab の結果を `--run` に渡すと、記録にある場面の tick で撮れる。
-- URL の末尾に `#lit`（全体を明るくする）、`#albedo`（地形の色だけ）、`#clean`（UI を隠す）、`#fxdemo`（攻撃エフェクトの見本）を付けられる。`#clean,lit` のように組み合わせてもよい。
+- URL の末尾に `#lit`（全体を明るくする）、`#albedo`（地形の色だけ）、`#clean`（UI を隠す）、`#fxdemo`（攻撃エフェクトの見本）、`#stack`（壁を積み上げて高さを付けた表示）を付けられる。`#clean,lit` のように組み合わせてもよい。
