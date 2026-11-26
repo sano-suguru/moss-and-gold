@@ -5,7 +5,6 @@
 //   node tools/gallery/shoot.mjs --label before     撮った画像を build/gallery/before/ に残す
 //   node tools/gallery/shoot.mjs --compare before   現在の画像と before を左右に並べた build/gallery/compare-before.png を作る
 //   node tools/gallery/shoot.mjs --light            確認用の明かり（#lit：全体を明るく照らす）をつけて撮る（暗さと絵の出来を分けて見る）
-//   node tools/gallery/shoot.mjs --stack            積み上げ表示（#stack）で撮る
 //   node tools/gallery/shoot.mjs --no-shoot         撮らずに一覧画像だけ作り直す
 //   node tools/gallery/shoot.mjs --fresh            シーンを必ず作り直す（通常はシミュレーションのコードが同じなら前回のシーンを使う）
 //   シーンの作成（build/scenes.js）は、ここから呼ぶ（npm run gallery -- の後ろのオプションがここに届くように）
@@ -26,14 +25,13 @@ if (opt('--only')) {
   scenes = scenes.filter((s) => keep.includes(s.name));
 }
 const light = args.includes('--light');
-const stack = args.includes('--stack');
 
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 
 if (!args.includes('--no-shoot')) {
   // 2つのページで並列に撮る。ページはシーンごとにリロードせず、window.__openScene でシーンだけを入れ替える
   // （テクスチャアトラスと WebGL を作り直さないので、1枚あたり約1.5秒）。スマホのシーンはビューポートの大きさが違うので別のページで撮る。
-  const hash = (phone) => [phone ? '' : 'clean', light ? 'lit' : '', stack ? 'stack' : ''].filter(Boolean).join(',');
+  const hash = (phone) => [phone ? '' : 'clean', light ? 'lit' : ''].filter(Boolean).join(',');
   const url = (phone) => 'file://' + join(ROOT, 'dist', 'index.html') + (hash(phone) ? '#' + hash(phone) : '');
   // 20フレーム描き終わるまで待ち、描画を止める（止めるとスクリーンショットが速い）
   const waitFrames = async (page) => {

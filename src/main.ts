@@ -18,14 +18,10 @@ const debugMode = (): number => {
   return h.includes('albedo') || q === 'albedo' ? 1 : h.includes('lit') || q === 'lit' ? 2 : 0;
 };
 let DEBUG = debugMode();
-// #stack を付けると、壁を積み上げて高さを付けた表示にする（スプライトスタッキング）
-const stackMode = (): boolean => location.hash.slice(1).split(',').includes('stack');
-let STACK = stackMode();
 // #clean を付けるとUI を隠す（見た目の確認用）
 const applyClean = () => document.body.classList.toggle('clean', location.hash.includes('clean') || location.hash.includes('fxdemo'));
 window.addEventListener('hashchange', () => {
   DEBUG = debugMode();
-  STACK = stackMode();
   applyClean();
 });
 window.addEventListener('DOMContentLoaded', applyClean);
@@ -702,7 +698,7 @@ function boot(): void {
     const alpha = Math.min(1, ((world.tick % CR_EVERY) + acc) / CR_EVERY);
     const cf = view.build(world.eco, { x0: ox, y0: oy, x1: ox + artW, y1: oy + artH }, t, alpha, dayIntensity(world.tick) <= 0);
     renderer.flushAtlas(atlas);
-    renderer.render({ originX: ox, originY: oy, artW, artH, scale, time: t, lights, halos, shafts, nShafts: ns, debug: DEBUG, stack: STACK, ...cf });
+    renderer.render({ originX: ox, originY: oy, artW, artH, scale, time: t, lights, halos, shafts, nShafts: ns, debug: DEBUG, ...cf });
 
     viewRect = { x0: ox, y0: oy, x1: ox + artW, y1: oy + artH };
     updateCard(now);
