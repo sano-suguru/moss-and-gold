@@ -349,7 +349,7 @@ vec4 stones(vec2 p, vec2 cs, uint salt) {
   return vec4(d1, d2, id, pos);
 }
 
-float seenSoft(vec2 wp) { return texture(uField, wp / 16.0 / vec2(uMapSize)).g; }
+float seenSoft(vec2 wp) { return texture(uMana, wp / 16.0 / vec2(uMapSize)).g; }
 float waterAt(vec2 p) { return texture(uField, p / 16.0 / vec2(uMapSize)).b; }
 
 vec3 ramp(int i) {
@@ -1068,6 +1068,14 @@ void main() {
     col = mix(cold, col * vec3(0.96, 0.9, 0.86), lk);
     float k = smoothstep(0.0, 9.0, de + bq * 2.0);
     col = mix(vec3(0.035, 0.034, 0.048), col, 0.35 + 0.65 * max(k, lk * 0.7));
+  }
+
+  // まだ見ていない所：闇に沈める（ダンジョンは、光が届き、生き物が通った所から少しずつ描かれていく）。
+  // 境目はなめらかに補間し、まだらなノイズで揺らす。ほんのわずかに輪郭を残し、そこに何かがあることだけは匂わせる
+  {
+    float sn = seenSoft(wp) + (vnoise(wp / 5.0, 851u) - 0.5) * 0.35;
+    float fog = 1.0 - smoothstep(0.15, 0.75, sn);
+    if (fog > 0.0) col = mix(col, col * 0.07 + vec3(0.012, 0.011, 0.018), fog);
   }
 
   o = vec4(softClip(col), 1.0);

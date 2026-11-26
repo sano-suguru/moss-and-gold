@@ -12,7 +12,10 @@ export interface Camera {
 export interface InputHooks {
   cam: Camera;
   dpr: () => number;
-  bounds: () => { w: number; h: number };
+  /** 画面に映る範囲の大きさ（ワールドのピクセル） */
+  view: () => { w: number; h: number };
+  /** 画面に映してよい範囲（ワールドのピクセル） */
+  bounds: () => { x0: number; y0: number; x1: number; y1: number };
   onTap?: (wx: number, wy: number) => void;
   onZoom?: () => void;
   onInteract?: () => void;
@@ -65,8 +68,12 @@ export class Input {
   clamp(): void {
     const b = this.h.bounds();
     const c = this.h.cam;
-    c.x = Math.min(Math.max(c.x, 0), b.w);
-    c.y = Math.min(Math.max(c.y, 0), b.h);
+    // 画面の端が範囲の外へ出ないように止める。範囲が画面より狭ければ、範囲の真ん中に置く
+    const v = this.h.view();
+    const hw = v.w / 2;
+    const hh = v.h / 2;
+    c.x = b.x1 - b.x0 <= hw * 2 ? (b.x0 + b.x1) / 2 : Math.min(Math.max(c.x, b.x0 + hw), b.x1 - hw);
+    c.y = b.y1 - b.y0 <= hh * 2 ? (b.y0 + b.y1) / 2 : Math.min(Math.max(c.y, b.y0 + hh), b.y1 - hh);
   }
 
   /** 指定位置（CSSピクセル、画面左上基準）を固定したまま拡大縮小 */

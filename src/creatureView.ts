@@ -1417,10 +1417,12 @@ export class CreatureView {
     o.nDyn = 0;
     const A = this.atlas;
     const pushSprite = (x: number, y: number, lift: number, flip: boolean, frame: number, glow: number, kind: number, phase = 0) => {
-      // 閉じた空洞の中にあるものは、岩越しに暗く見える
+      // まだ見ていない所（闇に沈めて描く所）にあるものは描かない。
+      // 閉じた空洞は掘り当てられるまで「見た」にならないので、岩越しに暗く描くのは、前の条件で「見た」になったセーブの空洞だけ
       {
         const mm = eco.w.map;
         const tk = Math.floor((y - 2) / 16) * mm.w + Math.floor(x / 16);
+        if (tk >= 0 && tk < mm.sealed.length && !eco.w.seen[tk]) return;
         // （すでに暗く描くもの＝隠れている生き物には重ねない。kind の 20 は傷の光なので、足して 20 にならないように）
         if (tk >= 0 && tk < mm.sealed.length && mm.sealed[tk] && kind % 20 < 9.5) kind += 10;
       }
@@ -2072,6 +2074,8 @@ export class CreatureView {
       const c = ord.c;
       let x = ord.x;
       let yy = ord.yy;
+      // まだ見ていない所（闇に沈めて描く所）にいる者は、姿も光も描かない（闇の広がりや、そこに何かいることを教えてしまわないように）
+      if (!eco.w.seenAt(c.x, c.y)) continue;
       // ヴァンパイアの眷属は、元の種の姿で描き、青白く塗り替える（シェーダーの kind 6。src/eco/thrall.ts）。冒険者の眷属は生前の姿のまま
       const thrallOf = c.k === Kind.Thrall && !c.dead;
       const sp = thrallOf ? c.sp : c.k;

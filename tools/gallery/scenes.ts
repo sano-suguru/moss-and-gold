@@ -6,6 +6,7 @@
  *   npm run gallery -- --compare before （現在の画像と before を左右に並べた比較画像を作る）
  *
  * シーンは SCENES に並べる。find は、その時刻のワールドから見たい場所を探してカメラ位置を返す関数。
+ * 描き方を確かめるため、地図の全体を見たマスにして撮る（まだ見ていない所の闇は描かない）。闇の見え方を確かめるシーンだけ fog を付ける。
  *
  * 高速化：シミュレーションのコード（src の world, ecology, mapgen, rng, names）とこのファイルが前回と同じなら、
  * シーンは作り直さない（描画だけ直したときは、スクリーンショットを撮るだけになる。--fresh で必ず作り直す）。シードごとに別のプロセスで並列に作る。
@@ -16,7 +17,7 @@ import { spawn } from 'node:child_process';
 import { DAY_TICKS, World } from '../../src/world';
 
 type Cam = { x: number; y: number; zoom: number };
-type Scene = { name: string; title: string; seed: string; day: number; phase?: number; zoom: number; device?: 'desktop' | 'phone'; search?: number; find: (w: World) => Cam | null };
+type Scene = { name: string; title: string; seed: string; day: number; phase?: number; zoom: number; device?: 'desktop' | 'phone'; search?: number; fog?: boolean; find: (w: World) => Cam | null };
 
 const T = 16;
 const first = <T>(a: T[], f: (x: T) => boolean) => a.find(f);
@@ -45,13 +46,22 @@ const SCENES: Scene[] = [
   { name: 'pavededge', title: '石畳と岩床の境目', seed: 'かしたれ', day: 2, phase: 0.5, zoom: 4, find: (w) => { const m = w.map; const fl = (k: number) => !m.solid[k] || m.rubble[k]; let b = -1, bv = 0; for (let y = 4; y < m.h - 4; y++) for (let x = 4; x < m.w - 4; x++) { const k = y * m.w + x; if (!m.paved[k] || !fl(k)) continue; let v = 0; for (let dy = -2; dy <= 2; dy++) for (let dx = -3; dx <= 3; dx++) { const q = k + dy * m.w + dx; if (m.paved[q] && fl(q)) for (const d of [1, -1, m.w, -m.w]) if (fl(q + d) && !m.paved[q + d]) v++; } if (v > bv) { bv = v; b = k; } } return b >= 0 ? { x: (b % m.w) * T + 8, y: Math.floor(b / m.w) * T + 8, zoom: 4 } : null; } },
   // 床の上の状態（焼け跡）。灰の多いマスがまとまっている所
   { name: 'ash', title: '焼け跡', seed: 'abc', day: 6, phase: 0.5, zoom: 4, search: 10, find: (w) => { const m = w.map; let b = -1, bv = 300; for (let k = m.w * 3; k < m.solid.length - m.w * 3; k++) { if (w.ash[k] < 30) continue; let v = 0; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) v += w.ash[k + dy * m.w + dx] ?? 0; if (v > bv) { bv = v; b = k; } } return b >= 0 ? { x: (b % m.w) * T + 8, y: Math.floor(b / m.w) * T + 8, zoom: 4 } : null; } },
+  // まだ見ていない所の闇（光が届き、生き物が通った所から少しずつ描かれていく）。入口にいちばん近い光の筋のまわり
+  { name: 'fog', title: 'まだ見ていない所の闇（1日目）', seed: 'abc', day: 0, phase: 0.6, zoom: 2, fog: true, find: (w) => fogCam(w, 2) },
+  { name: 'fog5', title: 'まだ見ていない所の闇（5日目）', seed: 'abc', day: 4, phase: 0.5, zoom: 2, fog: true, find: (w) => fogCam(w, 2) },
   { name: 'phone', title: 'スマホの画面全体', seed: 'かしたれ', day: 2, phase: 0.6, zoom: 2, device: 'phone', find: (w) => ({ x: w.map.entrance.x * T + 8, y: 30 * T, zoom: 2 }) },
 ];
+
+function fogCam(w: World, zoom: number): Cam {
+  const e = w.map.entrance;
+  const s = [...w.map.shafts].sort((a, b) => (a.x - e.x) ** 2 + (a.y - e.y) ** 2 - ((b.x - e.x) ** 2 + (b.y - e.y) ** 2))[0] ?? { x: e.x, y: e.y + 4 };
+  return { x: s.x * T + 8, y: s.y * T + 8, zoom };
+}
 
 const b64 = (u: Uint8Array) => Buffer.from(u.buffer, u.byteOffset, u.byteLength).toString('base64');
 const bits = (a: Uint8Array) => { const b = new Uint8Array(Math.ceil(a.length / 8)); for (let i = 0; i < a.length; i++) if (a[i]) b[i >> 3] |= 1 << (i & 7); return b64(b); };
 // マナもセーブデータに入れる（入れないと、ロードしたシーンのマナがすべて0になり、マナの描画が出ない）
-const save = (w: World, cam: Cam) => ({ v: 5, seed: w.map.seed, tick: w.tick, cam, speed: 0, seen: bits(w.seen), water: b64(new Uint8Array(w.water.buffer)), nutr: b64(new Uint8Array(w.nutr.buffer)), moss: b64(w.moss), fungus: b64(w.fungus), burn: b64(w.burn), ash: b64(w.ash), mat: b64(w.mat), trod: b64(w.trod), mana: b64(new Uint8Array(w.mana.buffer)), manaBorn: w.manaBorn, manaLeaked: w.manaLeaked, manaFaded: w.manaFaded, born: w.born, washed: w.washed, digs: w.digs.slice(), eco: w.eco.serialize() });
+const save = (w: World, cam: Cam, fog: boolean) => ({ v: 5, seed: w.map.seed, tick: w.tick, cam, speed: 0, seen: bits(fog ? w.seen : new Uint8Array(w.seen.length).fill(1)), water: b64(new Uint8Array(w.water.buffer)), nutr: b64(new Uint8Array(w.nutr.buffer)), moss: b64(w.moss), fungus: b64(w.fungus), burn: b64(w.burn), ash: b64(w.ash), mat: b64(w.mat), trod: b64(w.trod), mana: b64(new Uint8Array(w.mana.buffer)), manaBorn: w.manaBorn, manaLeaked: w.manaLeaked, manaFaded: w.manaFaded, born: w.born, washed: w.washed, digs: w.digs.slice(), eco: w.eco.serialize() });
 
 mkdirSync('build/gallery/scenes', { recursive: true });
 type Out = { name: string; title: string; device: string; file: string };
@@ -76,7 +86,7 @@ function makeSeed(seed: string): Out[] {
     }
     if (!cam) { console.log(`シーンの場所が見つからない：${s.title}`); continue; }
     const file = `build/gallery/scenes/${s.name}.json`;
-    writeFileSync(file, JSON.stringify(save(w, cam)));
+    writeFileSync(file, JSON.stringify(save(w, cam, !!s.fog)));
     out.push({ name: s.name, title: s.title, device: s.device ?? 'desktop', file });
     console.log(`シーン：${s.title}（${(w.tick / DAY_TICKS).toFixed(2)}日）`);
   }

@@ -179,6 +179,7 @@ export class World {
     const N = m.w * m.h;
     this.tick = state?.tick ?? Math.floor(DAY_TICKS * 0.3);
     this.seen = state?.seen && state.seen.length === N ? state.seen : new Uint8Array(N);
+    if (!(state?.seen && state.seen.length === N)) this.revealStart();
     this.water = state?.water && state.water.length === N ? state.water : new Int32Array(N);
     this.nutr = state?.nutr && state.nutr.length === N ? state.nutr : Int32Array.from(m.nutrients);
     this.moss = state?.moss && state.moss.length === N ? state.moss : Uint8Array.from(m.moss);
@@ -1629,7 +1630,101 @@ export class World {
     return out;
   }
 
-  /** 光の届いたマスを「見た」として記録する。変化があれば true */
+  /**
+   * 新しく始めたダンジョンでは、入口から歩いて行ける洞窟（とそのまわり2マスの岩）を、はじめから見たことにする（描画だけで使う）。
+   * 冒険者たちが知っている範囲として最初から眺められ、闇が晴れていくのは、掘り当てた空洞や外とつながる口の先だけになる。
+   * 入口とつながった所を「いつも」見たことにはしない（大きな空洞を掘り当てた瞬間に、全体が一度に明るくなってしまう）
+   */
+  private revealStart(): void {
+    const m = this.map;
+    const { w, h } = m;
+    const reach = new Uint8Array(w * h);
+    const q: number[] = [m.entrance.y * w + m.entrance.x];
+    reach[q[0]] = 1;
+    for (let i = 0; i < q.length; i++) {
+      const k = q[i];
+      const x = k % w;
+      for (const n of [x + 1 < w ? k + 1 : -1, x > 0 ? k - 1 : -1, k + w < w * h ? k + w : -1, k - w]) {
+        if (n < 0 || reach[n] || m.solid[n] || m.sealed[n]) continue;
+        reach[n] = 1;
+        q.push(n);
+      }
+    }
+    for (const k of q) {
+      const x = k % w;
+      const y = (k - x) / w;
+      for (let dy = -2; dy <= 2; dy++)
+        for (let dx = -2; dx <= 2; dx++) {
+          const xx = x + dx;
+          const yy = y + dy;
+          if (xx >= 0 && yy >= 0 && xx < w && yy < h && !m.sealed[yy * w + xx]) this.seen[yy * w + xx] = 1;
+        }
+    }
+  }
+
+  /** ワールドのピクセル (x, y) のマスを見たことがあるか（描画だけで使う。シミュレーションの判断には使わない） */
+  seenAt(x: number, y: number): boolean {
+    const tx = Math.floor(x / TILE);
+    const ty = Math.floor(y / TILE);
+    return tx >= 0 && ty >= 0 && tx < this.map.w && ty < this.map.h && this.seen[ty * this.map.w + tx] === 1;
+  }
+
+  /** 見たことのあるマスを囲む枠（タイル。見たマスが無ければ null）。カメラの動ける範囲と地図の描く範囲に使う */
+  seenBox(): { x0: number; y0: number; x1: number; y1: number } | null {
+    const { w, h } = this.map;
+    let x0 = w;
+    let y0 = h;
+    let x1 = -1;
+    let y1 = -1;
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++)
+        if (this.seen[y * w + x]) {
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+    return x1 < 0 ? null : { x0, y0, x1, y1 };
+  }
+
+  private revealMemo = new Uint8Array(0);
+  private revealDigs = -1;
+  /**
+   * マス k を「見た」にしてよいか：開いた床と、そこから2マス以内の岩だけ。閉じた空洞（岩をかぶった空洞）とそのまわりの岩は、
+   * 中で苔や溶岩が光っていても、掘り当てられるまで闇のまま（そうしないと、はじめから地図の端々に見た所が散らばり、
+   * ダンジョンの広さがわかってしまう）
+   */
+  private revealable(k: number): boolean {
+    // 結果は地形だけで決まるので覚えておき、地形変更ログの長さ（digs.length）が変わったときだけ捨てる（キャッシュはセーブしない）
+    if (this.revealDigs !== this.digs.length || this.revealMemo.length !== this.seen.length) {
+      this.revealMemo = new Uint8Array(this.seen.length);
+      this.revealDigs = this.digs.length;
+    }
+    const v = this.revealMemo[k];
+    if (v) return v === 1;
+    const r = this.revealableNow(k);
+    this.revealMemo[k] = r ? 1 : 2;
+    return r;
+  }
+  private revealableNow(k: number): boolean {
+    const m = this.map;
+    const open = (q: number) => !m.solid[q] && !m.sealed[q] && !m.lava[q];
+    if (m.sealed[k]) return false;
+    if (open(k)) return true;
+    // 溶岩は、溶岩でない開いた床から4マス以内だけ（岩に囲まれた溶岩だまりは、閉じた空洞と同じく掘り当てられるまで闇のまま）
+    const r = m.lava[k] && !m.solid[k] ? 4 : 2;
+    const x = k % m.w;
+    const y = (k - x) / m.w;
+    for (let dy = -r; dy <= r; dy++)
+      for (let dx = -r; dx <= r; dx++) {
+        const xx = x + dx;
+        const yy = y + dy;
+        if (xx >= 0 && yy >= 0 && xx < m.w && yy < m.h && open(yy * m.w + xx)) return true;
+      }
+    return false;
+  }
+
+  /** 光の届いたマスと、生き物が通ったマスを「見た」として記録する。変化があれば true */
   private unseen: Int32Array | null = null;
   private unseenN = 0;
   updateSeen(): boolean {
@@ -1648,7 +1743,7 @@ export class World {
       for (let i = 0; i < this.unseenN; i++) {
         const k = U[i];
         if (this.seen[k]) continue;
-        if (this.lightBase[k] * d > 60 || this.mossGlow[k] > 0.08 || this.lavaGlow[k] > 0.08 || this.fungusGlow[k] > 0.06) {
+        if ((this.lightBase[k] * d > 60 || this.mossGlow[k] > 0.08 || this.lavaGlow[k] > 0.08 || this.fungusGlow[k] > 0.06) && this.revealable(k)) {
           this.seen[k] = 1;
           changed = true;
         } else U[n++] = k;
@@ -1668,7 +1763,7 @@ export class World {
           const y = ty + dy;
           if (x < 0 || y < 0 || x >= m.w || y >= m.h || dx * dx + dy * dy > R * R) continue;
           const k = y * m.w + x;
-          if (this.seen[k] || !lineOfSight(m, tx, ty, x, y)) continue;
+          if (this.seen[k] || !lineOfSight(m, tx, ty, x, y) || !this.revealable(k)) continue;
           this.seen[k] = 1;
           changed = true;
         }
@@ -1686,14 +1781,14 @@ export class World {
           }
       if (lit) this.eco.discover(c.k, c.x, c.y);
     }
-    // 光を帯びた生き物が通った所も記憶に残る（ダンジョンのつながりが少しずつ描かれる）
+    // 生き物が通った所も記憶に残る（ダンジョンは生き物の足取りに沿って少しずつ描かれる。光を帯びた者ほど広く）
     for (const c of this.eco.list) {
       if (c.dead || c.away) continue;
-      const g = c.k === 0 ? 70 + c.glow : c.glow;
-      if (g < 20) continue;
-      const R = g > 150 ? 2 : 1;
       const tx = Math.floor(c.x / TILE);
       const ty = Math.floor(c.y / TILE);
+      if (m.sealed[ty * m.w + tx]) continue;
+      const g = c.k === 0 ? 70 + c.glow : c.glow;
+      const R = g > 150 ? 2 : 1;
       for (let dy = -R; dy <= R; dy++)
         for (let dx = -R; dx <= R; dx++) {
           const x = tx + dx;
@@ -1701,7 +1796,7 @@ export class World {
           if (x < 0 || y < 0 || x >= m.w || y >= m.h) continue;
           if (dx * dx + dy * dy > R * R + 1) continue;
           const k = y * m.w + x;
-          if (!this.seen[k]) {
+          if (!this.seen[k] && this.revealable(k)) {
             this.seen[k] = 1;
             changed = true;
           }

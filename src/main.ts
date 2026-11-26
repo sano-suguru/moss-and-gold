@@ -144,12 +144,25 @@ function boot(): void {
     }
     world.computeGlow();
     world.updateSeen();
+    updateSeenBox();
     renderer.setWorld(world);
     world.fieldsDirty = false;
     ($('seedInput') as HTMLInputElement).value = seed;
     updateZoomLabel();
   };
 
+  // 見たことのある所を囲む枠（タイル）。カメラはこの枠（と少しの余白）の中だけを動け、地図もこの枠のまわりだけを描く。
+  // 見た所が広がるにつれて、眺められる範囲も地図も広がっていく
+  const SEEN_PAD = 4;
+  // 画面に映る範囲の大きさ（ワールドのピクセル。毎フレームの描画で求めたもの）。カメラを止める位置に使う
+  let viewW = 0;
+  let viewH = 0;
+  let seenBox = { x0: 0, y0: 0, x1: MAP_W - 1, y1: MAP_H - 1 };
+  function updateSeenBox() {
+    const b = world.seenBox();
+    const e = world.map.entrance;
+    seenBox = b ?? { x0: e.x, y0: e.y, x1: e.x + 1, y1: e.y + 1 };
+  }
   // おまかせカメラ（src/autocam.ts）：見る人が地図を動かす・拡大縮小する・触れると切れる。操作盤のボタンで入れ直す
   const auto = new AutoCam();
   const autoOff = () => {
@@ -163,7 +176,13 @@ function boot(): void {
   const input = new Input(canvas, {
     cam,
     dpr: () => window.devicePixelRatio || 1,
-    bounds: () => ({ w: MAP_W * TILE, h: MAP_H * TILE }),
+    view: () => ({ w: viewW, h: viewH }),
+    bounds: () => ({
+      x0: Math.max(0, seenBox.x0 - SEEN_PAD) * TILE,
+      y0: Math.max(0, seenBox.y0 - SEEN_PAD) * TILE,
+      x1: Math.min(MAP_W, seenBox.x1 + 1 + SEEN_PAD) * TILE,
+      y1: Math.min(MAP_H, seenBox.y1 + 1 + SEEN_PAD) * TILE,
+    }),
     onZoom: () => {
       updateZoomLabel();
       autoOff();
@@ -203,7 +222,8 @@ function boot(): void {
     clearTimeout(tapTimer);
     tapTimer = window.setTimeout(() => {
       // 生き物 → 死骸 → 金貨・道具 → 墓標・石像・置き場・集落・焚き火 の順に選ぶ（src/eco/inspect.ts）
-      const s = world.eco.pickThing(wx, wy);
+      // まだ見ていない所（闇に沈めて描く所）は選べない
+      const s = world.seenAt(wx, wy) ? world.eco.pickThing(wx, wy) : null;
       if (s) {
         selected = s;
         card.hidden = false;
@@ -424,6 +444,8 @@ function boot(): void {
       t.textContent = timeLabel(ev.t);
       b.append(t, renderEvent(ev.m, e.discovered));
       b.addEventListener('click', () => {
+        // まだ見ていない所で起きた出来事へは飛ばない（カメラはそこを映せない）
+        if (!world.seenAt(ev.x, ev.y)) return;
         // 別の場所へ飛ぶので、追いかけていた生き物からは離れる（おまかせカメラも切る）
         closeCard();
         autoOff();
@@ -469,47 +491,68 @@ function boot(): void {
   let mimg = mctx.createImageData(mini.width, mini.height);
   let lastMini = 0;
   let viewRect = { x0: 0, y0: 0, x1: 0, y1: 0 };
+  // 地図に描く範囲（タイル）：見た所を囲む枠に余白を足し、地図と同じ縦横の比（4:3）に広げる。小さすぎると読めないので、幅48マスより狭くしない
+  let miniR = { x: 0, y: 0, w: MAP_W, h: MAP_H };
+  function miniRegion() {
+    const m = world.map;
+    const b = seenBox;
+    let w = Math.max(48, b.x1 - b.x0 + 1 + SEEN_PAD * 2, Math.ceil(((b.y1 - b.y0 + 1 + SEEN_PAD * 2) * m.w) / m.h));
+    w = Math.min(m.w, w);
+    const h = Math.min(m.h, Math.round((w * m.h) / m.w));
+    const x = Math.min(Math.max(0, Math.round((b.x0 + b.x1 + 1 - w) / 2)), m.w - w);
+    const y = Math.min(Math.max(0, Math.round((b.y0 + b.y1 + 1 - h) / 2)), m.h - h);
+    return { x, y, w, h };
+  }
   function drawMini(now: number) {
     if (now - lastMini < 400) return;
     lastMini = now;
     const m = world.map;
-    if (mini.width !== m.w || mini.height !== m.h) {
-      mini.width = m.w;
-      mini.height = m.h;
-      mimg = mctx.createImageData(m.w, m.h);
+    const R = miniRegion();
+    miniR = R;
+    if (mini.width !== R.w || mini.height !== R.h) {
+      mini.width = R.w;
+      mini.height = R.h;
+      mimg = mctx.createImageData(R.w, R.h);
     }
     const d = mimg.data;
-    for (let k = 0; k < m.w * m.h; k++) {
-      let c: number[];
-      if (m.rubble[k]) c = [92, 78, 64];
-      else if (m.solid[k]) c = [10, 9, 14];
-      else if (m.sealed[k] && !m.lava[k]) c = world.water[k] > 40 ? [24, 46, 62] : [30, 52, 56];
-      else if (m.lava[k]) c = [190, 70, 26];
-      else if (world.burn[k]) c = [255, 140, 40];
-      else if (world.water[k] > 40) c = world.seen[k] ? [52, 92, 140] : [30, 50, 80];
-      else c = world.seen[k] ? [104, 100, 118] : [52, 50, 64];
-      d[k * 4] = c[0];
-      d[k * 4 + 1] = c[1];
-      d[k * 4 + 2] = c[2];
-      d[k * 4 + 3] = 255;
-    }
+    for (let ry = 0; ry < R.h; ry++)
+      for (let rx = 0; rx < R.w; rx++) {
+        const k = (R.y + ry) * m.w + R.x + rx;
+        const i = ry * R.w + rx;
+        let c: number[];
+        // まだ見ていない所は岩と同じ色にする（見た所だけが地図に描かれ、ダンジョンが少しずつ広がっていく）
+        if (!world.seen[k]) c = [10, 9, 14];
+        else if (m.rubble[k]) c = [92, 78, 64];
+        else if (m.solid[k]) c = [10, 9, 14];
+        else if (m.sealed[k] && !m.lava[k]) c = world.water[k] > 40 ? [24, 46, 62] : [30, 52, 56];
+        else if (m.lava[k]) c = [190, 70, 26];
+        else if (world.burn[k]) c = [255, 140, 40];
+        else if (world.water[k] > 40) c = [52, 92, 140];
+        else c = [104, 100, 118];
+        d[i * 4] = c[0];
+        d[i * 4 + 1] = c[1];
+        d[i * 4 + 2] = c[2];
+        d[i * 4 + 3] = 255;
+      }
     mctx.putImageData(mimg, 0, 0);
     for (const l of world.lights()) {
       if (l.kind !== 'torch' && l.kind !== 'shaft') continue;
+      if (!world.seenAt(l.x, l.y)) continue;
       mctx.fillStyle = l.kind === 'torch' ? '#ffb050' : '#fff2c0';
-      mctx.fillRect(Math.floor(l.x / TILE) - 1, Math.floor(l.y / TILE) - 1, 2, 2);
+      mctx.fillRect(Math.floor(l.x / TILE) - R.x - 1, Math.floor(l.y / TILE) - R.y - 1, 2, 2);
     }
     mctx.strokeStyle = 'rgba(255,255,255,0.85)';
     mctx.lineWidth = 1;
-    mctx.strokeRect(Math.floor(viewRect.x0 / TILE) + 0.5, Math.floor(viewRect.y0 / TILE) + 0.5, Math.max(2, Math.floor((viewRect.x1 - viewRect.x0) / TILE)), Math.max(2, Math.floor((viewRect.y1 - viewRect.y0) / TILE)));
+    mctx.strokeRect(Math.floor(viewRect.x0 / TILE) - R.x + 0.5, Math.floor(viewRect.y0 / TILE) - R.y + 0.5, Math.max(2, Math.floor((viewRect.x1 - viewRect.x0) / TILE)), Math.max(2, Math.floor((viewRect.y1 - viewRect.y0) / TILE)));
   }
   mini.addEventListener('pointerdown', (ev) => {
     // 別の場所へ飛ぶので、追いかけていた生き物からは離れる（情報パネルを閉じる）。おまかせカメラも切る
     closeCard();
     autoOff();
     const r = mini.getBoundingClientRect();
-    cam.x = ((ev.clientX - r.left) / r.width) * world.map.w * TILE;
-    cam.y = ((ev.clientY - r.top) / r.height) * world.map.h * TILE;
+    cam.x = (miniR.x + ((ev.clientX - r.left) / r.width) * miniR.w) * TILE;
+    cam.y = (miniR.y + ((ev.clientY - r.top) / r.height) * miniR.h) * TILE;
+    input.clamp();
     ev.stopPropagation();
   });
 
@@ -638,7 +681,7 @@ function boot(): void {
     }
     if (sinceSeen >= 20) {
       sinceSeen = 0;
-      world.updateSeen();
+      if (world.updateSeen()) updateSeenBox();
     }
     if (world.fieldsDirty) {
       renderer.updateFields(world);
@@ -651,6 +694,8 @@ function boot(): void {
     const artW = Math.ceil(canvas.width / scale);
     const artH = Math.ceil(canvas.height / scale);
     auto.update(now, Math.min(0.1, raw), world.eco, cam, artW, artH);
+    viewW = artW;
+    viewH = artH;
     input.clamp();
     const ox = Math.round(cam.x - artW / 2);
     const oy = Math.round(cam.y - artH / 2);
