@@ -1,4 +1,5 @@
 import { fxTongue, fxSporeCloud, fxSporePuff, fxSporeMote, fxSlingWhirl, fxSlingStone, fxStoneHit, fxWailArc, fxWailCore, fxFrost, fxGhostSmear, fxSilkBall, fxSilkDot, fxSilkHead, fxSilkWrap, fxSilkBit, fxSilkSplat, fxBoneDust, fxGoldMote, fxRoarArc, fxThrownAxe, fxChainLink, fxAxeHit, beastSkeleton, BSKEL_KINDS, zgoblin, zkobold, zorc, zlizardman, fxLichPillar, fxShard, fxShadowPuff, fxShadowCloud, fxBloodOrb, fxBloodDisc, fxCrescent2, fxSlashHit, fxGreatBlade, fxHolyCross, fxMissileHead, fxMissileDisc, fxMissileSpark, fxMissileBurst, fxPoisonCloud, fxPoisonPuff, fxPoisonBubble, fxDustCloud, fxDustPuff, fxSnort, fxMinoSweep, fxMinoImpact, fxStunStar, fxArmorSweep, fxShieldWall, fxGolemSlam, fxRuneGlow, fxShockRing, fxPebble, vampMist, livingArmor, heroSprite, heroBed, HERO_JOBS, graveMarker, prayLight, skeleton, lich, item, dust, dwarf, forge, wallLamp, blood, campfire, outside, outsideTop, gate, fissure, mote, inlet, eggSac, clutch, ratPup, zMark, halfEye, dragonSleep, batSleep, wormCoil, speck, halo, hoardArt, mark, slash, fxArc, fxJag, fxArrow, fxOrb, fxBite, fxClaw, fxBurst, fxSplash, fxCrack, fxStain, fxSlash2, fxClaw2, fxBite2, fxRing, fxBlast, fxOrb2, fxArrow2, fxBit, dragonling, dragonlingSleep, eggShell, manaMote, dragonEgg, fireSpirit, phantomKnight, crownS, chiefHelm, tributeSack, haulArt, goldSack, trophyArt, packArt, waterSpirit, lightSpirit, mushroomLord, ant, anthill, basilisk, bat, corpse, dragon, fireBreath, gargoyle, ghost, golem, mimic, ghoul, rustBeetle, frog, moth, treasure, wormHead, wormSeg, wormBody, wormMouth, wormMound, wyvern, goblin, goblinCamp, kobold, lizard, lizardman, minotaur, myconid, orc, rat, reedHut, salamander, slime, spider, troll, vampire, wisp, zlizard, zrat, supplyCache, coffin } from './sprites';
+import { anthill3, campfire3, coffin3, grave3, hoard3, supply3, treasure3 } from './stack3d';
 
 /** 種の並び（シミュレーションの Kind と同じ順） */
 export const SPECIES = ['wisp', 'bat', 'rat', 'lizard', 'spider'] as const;
@@ -34,6 +35,8 @@ export interface Atlas {
   /** RGBA。アルファは 255 = 体、254 = 輪郭など、253 = それ自体が光る（ウィスプ）、252 = 光を帯びたときに光る模様、251 = ゴースト（暗闇でもかすかに見える） */
   data: Uint8Array;
   frames: FrameInfo[];
+  /** 積み上げ表示（#stack）で差し替える立体のコマ（元のコマの番号 → 立体のコマの番号。無ければ -1）。src/stack3d.ts */
+  stacked: Int32Array;
   /** 種・向き・動作・コマ（ウィスプは明るさの段階も）からコマ番号を引く */
   index: (species: number, dir: number, act: number, f: number, bright?: number) => number;
   web: number;
@@ -820,6 +823,23 @@ export function buildAtlas(): Atlas {
       graveFrames.push(raws.length);
       raws.push(graveMarker(r, c) as RawFrame);
     }
+  // 積み上げ表示の立体の物：元のコマの番号から引けるよう、別のコマとして足す
+  const stacked = new Int32Array(raws.length).fill(-1);
+  const alt = (i: number, fr: RawFrame) => {
+    stacked[i] = raws.length;
+    raws.push(fr);
+  };
+  fireFrames.forEach((i, f) => alt(i, campfire3(f)));
+  alt(coffinFrames[0], coffin3(false));
+  alt(coffinFrames[1], coffin3(true));
+  graveFrames.forEach((i, k) => alt(i, grave3(Math.floor(k / 6) + 1, k % 6)));
+  cacheFrames.forEach((i, t) => alt(i, supply3(t)));
+  alt(anthillFrame, anthill3());
+  treasureFrames.forEach((i, k) => alt(i, treasure3(Math.floor(k / 4), k % 4)));
+  for (const [key, i] of Object.entries(hoardFrames)) {
+    const [o, t, f] = key.split(':');
+    alt(i, hoard3(+t, o, +f));
+  }
   // 棚詰め
   // 高さの順に棚へ詰める（コマの番号はそのまま）
   const width = 2048;
@@ -916,6 +936,7 @@ export function buildAtlas(): Atlas {
     height,
     data,
     frames,
+    stacked,
     web,
     webBig,
     webTorn,
