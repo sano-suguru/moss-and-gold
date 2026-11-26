@@ -2,6 +2,11 @@ import { floorGlsl } from './floors';
 
 export const MAX_LIGHTS = 64;
 export const MAX_SHAFTS = 24;
+// 積み上げ表示（#stack）の壁の高さ（層の数。1層 1px）
+const STACK_H = 16;
+// 積み上げ表示で、見えている壁の足もとの y が生き物や影の足もとの y より何 px 南（手前）なら隠れるか。
+// 丸めた角の岩は床のマスへ最大 6px 張り出すので、すぐ南に立つ者が隠れないよう、その分の余裕を持たせる
+const STACK_HIDE = 6;
 
 export const VS_FULL = `#version 300 es
 void main() {
@@ -311,7 +316,7 @@ bool topPx(ivec2 p) { return wallPx(p) && wallBelow(p); }
 bool facePx(ivec2 p) { return wallPx(p) && !wallBelow(p); }
 
 // ---- 積み上げ表示（#stack）：壁を、足もとの形を1pxずつ上へずらした層として STACK_H 枚重ねる（南から見下ろすスプライトスタッキング） ----
-const int STACK_H = 16;
+const int STACK_H = ${STACK_H};
 // 層 z の、自然の岩の輪郭の横のずれ（px）。下の3層はずらさず（足もとは床の描き方とそろえる）、上ほど大きく、
 // 縦にも横にもなめらかに変わるので、輪切りを重ねたでこぼこの崖に見える。人の手の床に面した石積みの壁はずらさない
 int layerJx(ivec2 g, int z) {
@@ -443,6 +448,12 @@ void main() {
   if (uStack == 1) {
     ivec2 gp;
     stackZ = stackHit(w, gp);
+    // 地図の外は岩とみなして調べるので、地図の端の点では足もとが地図の外に出る。そこは画面の点の岩の上面として描く
+    // （縦は画面の点のまま。端の一行へ寄せると、同じ点が縦に伸びて筋になる。画面の点そのものが地図の外なら、見下ろし表示と同じく黒）
+    if (stackZ >= 0 && inMap(tileOfPx(w)) && !inMap(tileOfPx(gp))) {
+      ivec2 c = ivec2(clamp(gp.x, 0, uMapSize.x * 16 - 1), w.y);
+      if (wallPxE(c, c.y)) gp = c;
+    }
     if (stackZ >= 0) {
       wp += vec2(gp - w);
       w = gp;
@@ -1222,20 +1233,34 @@ layout(location = 1) in vec4 aRect;
 layout(location = 2) in vec4 aInfo;
 uniform vec2 uOrigin;
 uniform vec2 uArtSize;
+uniform sampler2D uMap;
+uniform int uStack;
 out vec2 vLocal;
 flat out vec4 vRect;
 flat out vec4 vInfo;
 flat out vec4 vPos;
+// 積み上げ表示で、足もとが壁（瓦礫を除く岩）の中にあるもの（岩の中を掘り進むワームなど）。壁の上面に載せて描き、壁に隠さない
+flat out float vInRock;
 const vec2 CORNER[6] = vec2[6](vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(1.0, 1.0), vec2(0.0, 0.0), vec2(1.0, 1.0), vec2(0.0, 1.0));
 void main() {
   vec2 local = CORNER[gl_VertexID] * aRect.zw;
   float axf = aPos.w > 0.5 ? aRect.z - aInfo.x : aInfo.x;
-  vec2 p = vec2(floor(aPos.x) - axf, floor(aPos.y) - aPos.z - aInfo.y) - uOrigin + local;
+  vec4 pos = aPos;
+  vInRock = 0.0;
+  if (uStack == 1) {
+    ivec2 t = ivec2(floor(aPos.xy / 16.0));
+    ivec2 ms = textureSize(uMap, 0);
+    if (t.x >= 0 && t.y >= 0 && t.x < ms.x && t.y < ms.y) {
+      vec4 m = texelFetch(uMap, t, 0);
+      if (m.r > 0.5 && (int(m.a * 255.0 + 0.5) & 64) == 0) { vInRock = 1.0; pos.z += ${STACK_H}.0; }
+    }
+  }
+  vec2 p = vec2(floor(pos.x) - axf, floor(pos.y) - pos.z - aInfo.y) - uOrigin + local;
   gl_Position = vec4(p.x / uArtSize.x * 2.0 - 1.0, 1.0 - p.y / uArtSize.y * 2.0, 0.0, 1.0);
   vLocal = local;
   vRect = aRect;
   vInfo = aInfo;
-  vPos = aPos;
+  vPos = pos;
 }
 `;
 
@@ -1253,15 +1278,14 @@ in vec2 vLocal;
 flat in vec4 vRect;
 flat in vec4 vInfo;
 flat in vec4 vPos;
+flat in float vInRock;
 out vec4 o;
 // 積み上げ表示で、この画素に見えている壁の足もとの y が、足もとの y より STACK_HIDE px 以上南（手前）なら、その壁に隠れている
-// （丸めた角の岩は床のマスへ数 px 張り出すので、すぐ南に立つ者が隠れないよう少し余裕を持たせる）
-const float STACK_HIDE = 3.0;
 bool hiddenBehindWall(float footY) {
-  if (uStack != 1) return false;
+  if (uStack != 1 || vInRock > 0.5) return false;
   vec4 v = texelFetch(uOcc, ivec2(gl_FragCoord.xy), 0) * 255.0 + 0.5;
   float gy = floor(v.r) * 256.0 + floor(v.g);
-  return gy > 0.0 && gy - 1.0 > footY + STACK_HIDE;
+  return gy > 0.0 && gy - 1.0 > footY + ${STACK_HIDE}.0;
 }
 uint hash2(ivec2 p, uint s) {
   uint h = uint(p.x) * 374761393u + uint(p.y) * 668265263u + s * 2246822519u;
@@ -1296,6 +1320,12 @@ void main() {
   // 壁に隠れた部分は、体の色を沈めた半透明のシルエットにし、輪郭を淡い青で縁取る（暗い岩の上でも形が読め、どの種かは色で分かる）。
   // それ自体が光るもの（ウィスプ）は、壁越しにぼんやり明るく透ける
   if (hiddenBehindWall(floor(vPos.y))) {
+    // 閉じた空洞の中のもの（kind に 10 を足したもの。傷の光の 20 は除く）は、見下ろし表示と同じく岩越しに暗く沈めたまま、縁取りもしない
+    if (mod(floor(vInfo.w), 20.0) > 9.5) {
+      float g = dot(tx.rgb, vec3(0.3, 0.5, 0.2));
+      o = vec4(mix(vec3(g), tx.rgb, 0.4) * vec3(0.42, 0.46, 0.60), 0.45);
+      return;
+    }
     if (a8 > 252.5 && a8 < 253.5) { o = vec4(tx.rgb * 0.8, 0.6); return; }
     if (a8 > 253.5 && a8 < 254.5) { o = vec4(0.6, 0.68, 0.92, 0.7); return; }
     float g = dot(tx.rgb, vec3(0.3, 0.5, 0.2));
@@ -1487,7 +1517,7 @@ void main() {
   if (uStack == 1) {
     vec4 v = texelFetch(uOcc, ivec2(gl_FragCoord.xy), 0) * 255.0 + 0.5;
     float gy = floor(v.r) * 256.0 + floor(v.g);
-    if (gy > 0.0 && gy - 1.0 > vFoot + 3.0) discard;
+    if (gy > 0.0 && gy - 1.0 > vFoot + ${STACK_HIDE}.0) discard;
   }
   vec3 L = texture(uLight, ((vW - uLmOrigin - 2.0) / 4.0 + 0.5) / uLmSize).rgb * 2.0;
   float lum = (L.r + L.g + L.b) / 3.0;

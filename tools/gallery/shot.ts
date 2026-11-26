@@ -6,7 +6,7 @@
  *   npm run shot -- --seed abc --find kind:24 --day 6 --zoom 3 --lit
  *   npm run shot -- --seed abc --find xy:120,40 --day 10
  *
- * --find：warren（横穴を掘り終え罠が2つ以上の住処）、advcorpse（白骨になる前の冒険者の亡骸）、thralladv（ヴァンパイアの眷属になった冒険者）、advsleep（焚き火のそばで眠る冒険者）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、haul（キノコの束を背負って住処へ運ぶコボルト）、gobhaul（腹を満たし、ネズミを担いで集落へ帰るゴブリン）、bless（冒険者の亡骸の前で祈る一行）、slimefeast（一つの死骸を2匹以上のスライムが食べている所）、tunnelclose（古い坑道が崩れて塞がった直後）、battle（古戦場の真ん中。--day の時点の様子）、ghouldrag（死骸を巣へ引きずっているグール）、rust（鉄の武具を齧っている錆喰い虫）、frog（舌を伸ばして獲物を捕まえた大ガエル。--every 1 で探す）、moth（明かりのまわりを4匹以上で回る灯り蛾）、mothcamp（冒険者の焚き火のまわりを3匹以上で回る灯り蛾）、behindwall（すぐ南が壁の生き物。behindwall:番号 でその種だけ。--stack で壁の裏のシルエットを見る）、kind:番号（その種の生き物）、xy:マスx,マスy
+ * --find：warren（横穴を掘り終え罠が2つ以上の住処）、advcorpse（白骨になる前の冒険者の亡骸）、thralladv（ヴァンパイアの眷属になった冒険者）、advsleep（焚き火のそばで眠る冒険者）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、haul（キノコの束を背負って住処へ運ぶコボルト）、gobhaul（腹を満たし、ネズミを担いで集落へ帰るゴブリン）、bless（冒険者の亡骸の前で祈る一行）、slimefeast（一つの死骸を2匹以上のスライムが食べている所）、tunnelclose（古い坑道が崩れて塞がった直後）、battle（古戦場の真ん中。--day の時点の様子）、ghouldrag（死骸を巣へ引きずっているグール）、rust（鉄の武具を齧っている錆喰い虫）、frog（舌を伸ばして獲物を捕まえた大ガエル。--every 1 で探す）、moth（明かりのまわりを4匹以上で回る灯り蛾）、mothcamp（冒険者の焚き火のまわりを3匹以上で回る灯り蛾）、behindwall（すぐ南が壁の生き物。behindwall:番号 でその種だけ。--stack で壁の裏のシルエットを見る）、wormrock（岩の中を掘り進むワーム）、kind:番号（その種の生き物）、xy:マスx,マスy
  * --day 探し始める日（既定 0）、--until 探すのをやめる日（既定 25）、--every 探す間隔（tick、既定 200）、--zoom 拡大率（既定 4）、--lit 確認用の明かり（#lit）、--stack 積み上げ表示（#stack）、
  * --fog 霧をそのまま（既定は地図全体を見えたマスにする）、--name 出力の名前（既定は find から）、--out 出力先（既定 build/shots）
  *
@@ -188,6 +188,11 @@ function look(): Hit | null {
       return ty + 1 < m.h && m.solid[k] && !m.rubble[k] && !m.sealed[ty * m.w + tx] && o.y - ty * T > 6;
     });
     return c ? { cam: { x: Math.round(c.x), y: Math.round(c.y) + 8, zoom }, marks: [{ x: c.x, y: c.y, label: `${NAMES[c.k]} ${c.id}`, color: '#ffd24a', size: 2 }], title: '壁の裏の生き物' } : null;
+  }
+  if (find === 'wormrock') {
+    // 岩の中を掘り進むワーム（--stack では壁の上面に載って見える）
+    const c = e.list.find((o: any) => o.k === 22 && !o.dead && !o.away && m.solid[Math.floor(o.y / T) * m.w + Math.floor(o.x / T)] && !m.rubble[Math.floor(o.y / T) * m.w + Math.floor(o.x / T)]);
+    return c ? { cam: { x: Math.round(c.x), y: Math.round(c.y), zoom }, marks: [{ x: c.x, y: c.y, label: `${NAMES[c.k]} ${c.id}`, color: '#ffd24a', size: 2 }], title: '岩の中のワーム' } : null;
   }
   if (find.startsWith('kind:')) {
     const k = +find.slice(5);

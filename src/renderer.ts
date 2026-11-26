@@ -125,7 +125,7 @@ export class Renderer {
     if (!gl) throw new Error('この端末やブラウザではWebGL2が使えないため、ダンジョンを描けません。最新のブラウザで開いてください。');
     this.gl = gl;
     this.light = program(gl, FS_LIGHT, '光', ['uMap', 'uGlow', 'uFx', 'uMapSize', 'uLmOrigin', 'uNum', 'uL', 'uC', 'uAmbient', 'uMossCol', 'uLavaCol', 'uNumD', 'uDL', 'uDCol', 'uTime']);
-    this.sprite = program(gl, FS_SPRITE, '生き物', ['uOrigin', 'uArtSize', 'uAtlas', 'uLight', 'uLmOrigin', 'uLmSize', 'uTime', 'uOcc', 'uStack'], VS_SPRITE);
+    this.sprite = program(gl, FS_SPRITE, '生き物', ['uOrigin', 'uArtSize', 'uAtlas', 'uLight', 'uLmOrigin', 'uLmSize', 'uTime', 'uOcc', 'uStack', 'uMap'], VS_SPRITE);
     this.shadow = program(gl, FS_SHADOW, '影', ['uOrigin', 'uArtSize', 'uLight', 'uLmOrigin', 'uLmSize', 'uOcc', 'uStack'], VS_SHADOW);
     this.atlasTex = makeTex(gl, gl.NEAREST);
     this.spriteBuf = gl.createBuffer()!;
@@ -463,6 +463,10 @@ export class Renderer {
       gl.uniform1f(u.uTime, f.time);
       gl.uniform1i(u.uOcc, 2);
       gl.uniform1i(u.uStack, stack);
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, this.mapTex);
+      gl.uniform1i(u.uMap, 3);
+      gl.activeTexture(gl.TEXTURE0);
       // 積み上げ表示では、壁に隠れた部分を半透明のシルエットにするので重ね合わせる（ほかの画素は不透明のまま）
       if (stack) {
         gl.enable(gl.BLEND);
