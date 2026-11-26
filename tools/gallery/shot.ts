@@ -6,7 +6,7 @@
  *   npm run shot -- --seed abc --find kind:24 --day 6 --zoom 3 --lit
  *   npm run shot -- --seed abc --find xy:120,40 --day 10
  *
- * --find：warren（横穴を掘り終え罠が2つ以上の住処）、advcorpse（白骨になる前の冒険者の亡骸）、thralladv（ヴァンパイアの眷属になった冒険者）、advsleep（焚き火のそばで眠る冒険者）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、haul（キノコの束を背負って住処へ運ぶコボルト）、gobhaul（腹を満たし、ネズミを担いで集落へ帰るゴブリン）、bless（冒険者の亡骸の前で祈る一行）、slimefeast（一つの死骸を2匹以上のスライムが食べている所）、tunnelclose（古い坑道が崩れて塞がった直後）、battle（古戦場の真ん中。--day の時点の様子）、ghouldrag（死骸を巣へ引きずっているグール）、rust（鉄の武具を齧っている錆喰い虫）、frog（舌を伸ばして獲物を捕まえた大ガエル。--every 1 で探す）、moth（明かりのまわりを4匹以上で回る灯り蛾）、mothcamp（冒険者の焚き火のまわりを3匹以上で回る灯り蛾）、behindwall（すぐ南が壁の生き物。--stack で壁の裏のシルエットを見る）、kind:番号（その種の生き物）、xy:マスx,マスy
+ * --find：warren（横穴を掘り終え罠が2つ以上の住処）、advcorpse（白骨になる前の冒険者の亡骸）、thralladv（ヴァンパイアの眷属になった冒険者）、advsleep（焚き火のそばで眠る冒険者）、hide（奥に隠れているコボルトのいる住処）、camp（3匹以上いるゴブリンの集落）、gobhide（暗がりに散って隠れたゴブリン）、tribute（貢ぎ物の袋を担いで帰るオーク）、haul（キノコの束を背負って住処へ運ぶコボルト）、gobhaul（腹を満たし、ネズミを担いで集落へ帰るゴブリン）、bless（冒険者の亡骸の前で祈る一行）、slimefeast（一つの死骸を2匹以上のスライムが食べている所）、tunnelclose（古い坑道が崩れて塞がった直後）、battle（古戦場の真ん中。--day の時点の様子）、ghouldrag（死骸を巣へ引きずっているグール）、rust（鉄の武具を齧っている錆喰い虫）、frog（舌を伸ばして獲物を捕まえた大ガエル。--every 1 で探す）、moth（明かりのまわりを4匹以上で回る灯り蛾）、mothcamp（冒険者の焚き火のまわりを3匹以上で回る灯り蛾）、behindwall（すぐ南が壁の生き物。behindwall:番号 でその種だけ。--stack で壁の裏のシルエットを見る）、kind:番号（その種の生き物）、xy:マスx,マスy
  * --day 探し始める日（既定 0）、--until 探すのをやめる日（既定 25）、--every 探す間隔（tick、既定 200）、--zoom 拡大率（既定 4）、--lit 確認用の明かり（#lit）、--stack 積み上げ表示（#stack）、
  * --fog 霧をそのまま（既定は地図全体を見えたマスにする）、--name 出力の名前（既定は find から）、--out 出力先（既定 build/shots）
  *
@@ -177,10 +177,11 @@ function look(): Hit | null {
     ];
     return { cam: { x: cx, y: cy, zoom }, marks, title: '古戦場' };
   }
-  if (find === 'behindwall') {
+  if (find === 'behindwall' || find.startsWith('behindwall:')) {
+    const want = find.includes(':') ? +find.split(':')[1] : -1;
     // 積み上げ表示（--stack）で壁の裏に隠れる者：すぐ南のマスが壁（瓦礫を除く）で、閉じた空洞にいない生き物
     const c = e.list.find((o: any) => {
-      if (o.dead || o.away) return false;
+      if (o.dead || o.away || (want >= 0 && o.k !== want)) return false;
       const tx = Math.floor(o.x / T);
       const ty = Math.floor(o.y / T);
       const k = (ty + 1) * m.w + tx;

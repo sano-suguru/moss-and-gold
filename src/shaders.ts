@@ -1293,12 +1293,13 @@ void main() {
   vec4 tx = texelFetch(uAtlas, ivec2(vRect.xy) + ivec2(lx, l.y), 0);
   if (tx.a < 0.5) discard;
   float a8 = floor(tx.a * 255.0 + 0.5);
-  // 壁に隠れた部分は、体の色を暗く沈めた半透明のシルエットにする（どの種が隠れているかは色で分かる）。
+  // 壁に隠れた部分は、体の色を沈めた半透明のシルエットにし、輪郭を淡い青で縁取る（暗い岩の上でも形が読め、どの種かは色で分かる）。
   // それ自体が光るもの（ウィスプ）は、壁越しにぼんやり明るく透ける
   if (hiddenBehindWall(floor(vPos.y))) {
     if (a8 > 252.5 && a8 < 253.5) { o = vec4(tx.rgb * 0.8, 0.6); return; }
+    if (a8 > 253.5 && a8 < 254.5) { o = vec4(0.6, 0.68, 0.92, 0.7); return; }
     float g = dot(tx.rgb, vec3(0.3, 0.5, 0.2));
-    o = vec4(mix(vec3(g), tx.rgb, 0.55) * vec3(0.62, 0.66, 0.86), a8 > 253.5 && a8 < 254.5 ? 0.7 : 0.5);
+    o = vec4(max(mix(vec3(g), tx.rgb, 0.6) * vec3(0.78, 0.82, 1.0), vec3(0.16, 0.17, 0.24)), 0.55);
     return;
   }
   float axf = vPos.w > 0.5 ? vRect.z - vInfo.x : vInfo.x;
