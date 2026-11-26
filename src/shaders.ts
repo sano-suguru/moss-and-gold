@@ -161,7 +161,11 @@ uniform vec4 uHC[${MAX_LIGHTS}];
 uniform int uNumShaft;
 uniform vec4 uS[${MAX_SHAFTS}];
 uniform int uDebug;
-out vec4 o;
+uniform int uStack;
+layout(location = 0) out vec4 o;
+// 積み上げ表示で、この画素に見えている壁の足もとの y（ワールドの px に 1 を足し、上位と下位の8ビットに分ける。床は 0）。
+// 生き物の描画が、自分の足もとより手前（南）の壁に隠れるかを決めるのに使う
+layout(location = 1) out vec4 oOcc;
 
 const vec3 cK = vec3(20.0, 16.0, 24.0) / 255.0;
 const vec3 ca = vec3(34.0, 30.0, 40.0) / 255.0;
@@ -305,6 +309,42 @@ bool wallBelow(ivec2 p) { return wallPxE(p + ivec2(0, FACE), p.y); }
 bool topPx(ivec2 p) { return wallPx(p) && wallBelow(p); }
 // 点 p が壁の正面か
 bool facePx(ivec2 p) { return wallPx(p) && !wallBelow(p); }
+
+// ---- 積み上げ表示（#stack）：壁を、足もとの形を1pxずつ上へずらした層として STACK_H 枚重ねる（南から見下ろすスプライトスタッキング） ----
+const int STACK_H = 16;
+// 層 z の、自然の岩の輪郭の横のずれ（px）。下の3層はずらさず（足もとは床の描き方とそろえる）、上ほど大きく、
+// 縦にも横にもなめらかに変わるので、輪切りを重ねたでこぼこの崖に見える。人の手の床に面した石積みの壁はずらさない
+int layerJx(ivec2 g, int z) {
+  if (z < 3) return 0;
+  if (handmadeAt(tileOfPx(g) + ivec2(0, 1))) return 0;
+  float n = vnoise(vec2(float(g.x) / 11.0, float(z) / 2.5 + float(g.y >> 4) * 5.3), 871u);
+  return int(floor((n - 0.5) * (1.5 + float(z) * 0.18) + 0.5));
+}
+// 画面の点 s に見えている壁の層（STACK_H なら上面、0〜STACK_H−1 なら正面、−1 なら床）。gp は当たった層の足もとの点。
+// 南（手前）の層ほどカメラに近いので、高い層から順に調べ、最初に当たったものが見える
+int stackHit(ivec2 s, out ivec2 gp) {
+  gp = s;
+  // 調べる範囲（縦 STACK_H px、横 ±3px）のマスに壁も丸めた角も張り出しも無ければ床
+  ivec2 a = tileOfPx(s - ivec2(3, 0));
+  ivec2 b = tileOfPx(s + ivec2(3, STACK_H));
+  bool any = false;
+  for (int ty = a.y; ty <= b.y; ty++)
+    for (int tx = a.x; tx <= b.x; tx++)
+      if (cornerAt(ivec2(tx, ty)) != 0) any = true;
+  if (!any) return -1;
+  for (int z = STACK_H; z >= 0; z--) {
+    ivec2 g = s + ivec2(0, z);
+    ivec2 q = g + ivec2(layerJx(g, z), 0);
+    if (wallPxE(q, q.y)) { gp = q; return z; }
+  }
+  return -1;
+}
+// 画面の点 s の上面の層が岩か（上面の縁の線を引くのに使う）
+bool stackTopAt(ivec2 s) {
+  ivec2 g = s + ivec2(0, STACK_H);
+  ivec2 q = g + ivec2(layerJx(g, STACK_H), 0);
+  return wallPxE(q, q.y);
+}
 // 上面の点（マス t の中の位置 l）が、人の手の床の縁を囲む切り石の天端か：石積みの正面の天端と、人の手の床から CAP px の内の上面
 bool copingPx(ivec2 t, ivec2 l) {
   if (handmadeAt(t + ivec2(0, 1))) return true;
@@ -393,7 +433,25 @@ void main() {
   vec2 fc = vec2(gl_FragCoord.x - 0.5, uArtSize.y - gl_FragCoord.y - 0.5);
   vec2 wp = uOrigin + fc;
   ivec2 w = ivec2(wp);
+  oOcc = vec4(0.0);
   if (wp.x < 0.0 || wp.y < 0.0) { o = vec4(0.0, 0.0, 0.0, 1.0); return; }
+  // 画面の点（光暈・光の筋・網点は空中のものなので、こちらで描く）。積み上げ表示では、壁の点は w と wp を当たった層の足もとへ移し、
+  // 地形の判定と光はそこで行う。正面の模様は、正面の一列がどれも同じ足もとに当たるので、画面の点（tp, wt）で描く
+  vec2 sp = wp;
+  ivec2 ws = w;
+  int stackZ = -1;
+  if (uStack == 1) {
+    ivec2 gp;
+    stackZ = stackHit(w, gp);
+    if (stackZ >= 0) {
+      wp += vec2(gp - w);
+      w = gp;
+      oOcc = vec4(float((w.y + 1) >> 8), float((w.y + 1) & 255), 0.0, 255.0) / 255.0;
+    }
+  }
+  bool sFace = stackZ >= 0 && stackZ < STACK_H;
+  vec2 tp = sFace ? sp : wp;
+  ivec2 wt = sFace ? ws : w;
   ivec2 t = w / 16;
   ivec2 l = w - t * 16;
   if (!inMap(t)) { o = vec4(0.0, 0.0, 0.0, 1.0); return; }
@@ -405,7 +463,7 @@ void main() {
   bool moved = wpx != ((tiOwn.r & 1) != 0);
   if (moved) { t = cnH(w); l = w - t * 16; }
   int s = wpx ? 1 : 0;
-  float h = h01(w, 1u);
+  float h = h01(wt, 1u);
   vec3 alb;
   bool emis = false;
   bool isTerrain = true;
@@ -441,7 +499,9 @@ void main() {
     // 岩の内部（まわり8マスもすべて壁）なら、どの点も上面で縁も無いので、判定を省く
     ivec4 tw = moved ? tileAt(t) : tiOwn;
     bool inner = (tw.a & 8) != 0;
-    bool wF = inner || wallBelow(w);
+    // 積み上げ表示では、上面か正面かは当たった層で決まり、左右の隣は同じ層の足もとの形で見る
+    bool stk = stackZ >= 0;
+    bool wF = stk ? stackZ == STACK_H : inner || wallBelow(w);
     bool wL = inner || wallPx(w - ivec2(1, 0));
     bool wR = inner || wallPx(w + ivec2(1, 0));
     bool top = wF;
@@ -472,6 +532,16 @@ void main() {
       bool lf = inner || (wL && wallBelow(w - ivec2(1, 0)));
       bool rt = inner || (wR && wallBelow(w + ivec2(1, 0)));
       bool dn = inner || (wallPx(w + ivec2(0, 1)) && wallBelow(w + ivec2(0, 1)));
+      if (stk) {
+        // 上面の縁は、画面の隣の点が上面かで決める（南の隣が上面でなければ、そこから正面へ落ちる）
+        wU = inner || stackTopAt(ws - ivec2(0, 1));
+        wL = inner || stackTopAt(ws - ivec2(1, 0));
+        wR = inner || stackTopAt(ws + ivec2(1, 0));
+        up = wU;
+        lf = wL;
+        rt = wR;
+        dn = inner || stackTopAt(ws + ivec2(0, 1));
+      }
       // 床と接する縁は黒い線。正面へ落ちる縁（天端の手前の角）は明るい線。
       // へこんだ角で正面が回り込む曲線では、横が正面でも、すぐ下が上面でなければ明るい線にする（曲線が途切れて点線にならないように）
       bool flrU = !wU;
@@ -486,18 +556,21 @@ void main() {
       // 正面の中での高さ（上端が CAP、床に接する下端が 15）。真下へ何 px で床になるかで決める。
       // 使うのは下端の3段と上端だけなので、その分だけ調べる（途中の段は 10。石積みの壁は角を丸めないので、マスの中の位置を使う）
       int fy = 10;
-      if (!wallPxE(w + ivec2(0, 1), w.y)) fy = 15;
+      if (stk) {
+        // 積み上げ表示：当たった層の高さで決める（いちばん下の層が 15、いちばん上の層が天端のすぐ下）
+        fy = stackZ == STACK_H - 1 ? CAP : stackZ <= 2 ? 15 - stackZ : 10;
+      } else if (!wallPxE(w + ivec2(0, 1), w.y)) fy = 15;
       else if (!wallPxE(w + ivec2(0, 2), w.y)) fy = 14;
       else if (!wallPxE(w + ivec2(0, 3), w.y)) fy = 13;
       else if (wallPxE(w + ivec2(0, FACE - 1), w.y)) fy = CAP;
       if (brick) {
         // 石積みの壁（いちばん下の段の下端がマスの下端にそろうよう、行をずらす）
-        idx = faceIdx(ivec2(l.x, l.y - CAP + 1));
+        idx = faceIdx(stk ? ivec2(w.x & 15, STACK_H - 1 - stackZ) : ivec2(l.x, l.y - CAP + 1));
         if (idx == 3 && h < 0.12) idx = 4;
         if (idx == 3 && h > 0.92) idx = 2;
       } else {
         // 自然の岩肌
-        vec4 st = stones(wp + 0.5, vec2(10.0, 5.0), 23u);
+        vec4 st = stones(tp + 0.5, vec2(10.0, 5.0), 23u);
         if (st.y - st.x < 1.0) idx = 1;
         else {
           idx = st.z < 0.35 ? 2 : 3;
@@ -508,31 +581,34 @@ void main() {
       // 天端のすぐ下は影、足もとは暗く
       if (fy == CAP) idx = min(idx, 2);
       if (fy >= 13) idx -= 1;
-      bool lf = wL && !wallBelow(w - ivec2(1, 0));
-      bool rt = wR && !wallBelow(w + ivec2(1, 0));
+      bool lf = stk ? wL : wL && !wallBelow(w - ivec2(1, 0));
+      bool rt = stk ? wR : wR && !wallBelow(w + ivec2(1, 0));
       // 左右の縁の黒い線は、床と接する所だけ（へこんだ角で上面と接する所には引かない）
       if (!wL || !wR) idx = 0;
       tkind = 1;
       edgeLine = fy == 15 || !lf || !rt;
     }
     alb = ramp(idx);
+    // 積み上げ表示の正面は、下の層ほど少し暗く（足もとの陰り）
+    if (sFace) alb *= mix(0.8, 1.0, float(stackZ) / float(STACK_H - 1));
     // 岩の硬さ：柔らかい層は茶色がかった細かい肌、硬い岩は青みがかった暗い大きな岩肌（石積みと切り石は人の手のものなので色を分けない）
     if (!brick && !cope) {
       // 硬さは、その点が属する石の中心があるマスで決める（中心が壁でなければ自分のマス）。境目がマスの直線でなく、石のひび割れに沿う
-      ivec2 mt = tileOfPx(ivec2(floor(stoneC)));
+      // （正面の模様は画面の点で描いたので、石の中心を当たった層の分だけ足もとへずらす）
+      ivec2 mt = tileOfPx(ivec2(floor(stoneC)) + ivec2(0, sFace ? stackZ : 0));
       int hb = wallAt(mt) ? abits(mt) : abits(t);
       if ((hb & 8) != 0) {
         alb *= vec3(1.22, 1.0, 0.74);
-        if (h01(w, 501u) < 0.2) alb *= 1.12;
-        else if (h01(w, 502u) < 0.12) alb *= 0.86;
+        if (h01(wt, 501u) < 0.2) alb *= 1.12;
+        else if (h01(wt, 502u) < 0.12) alb *= 0.86;
       } else if ((hb & 16) != 0) {
         alb *= vec3(0.74, 0.84, 1.10);
         // 硬い岩の、かすかな鉱物のきらめき（ゆっくり明滅する点。光る）
-        if (h01(w, 520u) < 0.004) {
-          float tw = 0.5 + 0.5 * sin(uTime * (1.2 + h01(w, 521u) * 2.0) + h01(w, 522u) * 6.28);
+        if (h01(wt, 520u) < 0.004) {
+          float tw = 0.5 + 0.5 * sin(uTime * (1.2 + h01(wt, 521u) * 2.0) + h01(wt, 522u) * 6.28);
           if (tw > 0.75) { alb = mix(alb, vec3(0.75, 0.85, 1.0), (tw - 0.75) * 3.0); glint = (tw - 0.75) * 2.0; }
         }
-        vec4 st2 = stones(wp + 0.5, vec2(10.0, 8.0), 503u);
+        vec4 st2 = stones(tp + 0.5, vec2(10.0, 8.0), 503u);
         if (st2.y - st2.x < 1.0) alb *= 0.62;
         else if (st2.z > 0.7) alb *= 1.12;
       }
@@ -925,12 +1001,14 @@ void main() {
   }
 
   if (uDebug == 1) { o = vec4(alb, 1.0); return; }
-  vec2 luv = ((wp + 0.5 - uLmOrigin - 2.0) / 4.0 + 0.5) / uLmSize;
+  // 光を引く点：積み上げ表示の正面は、足もとのすぐ南の床（手前の明かりが正面を照らし、壁の向こうの光は映り込まない）
+  vec2 lwp = sFace ? wp + vec2(0.0, 2.0) : wp;
+  vec2 luv = ((lwp + 0.5 - uLmOrigin - 2.0) / 4.0 + 0.5) / uLmSize;
   vec4 Lt = texture(uLight, luv);
   vec3 L = Lt.rgb * 2.0;
   // 溶岩から来た光の強さ（閉じた空洞の色抜きから外す分）
   float lavaA = Lt.a;
-  float bq = bayer(w);
+  float bq = bayer(ws);
   vec3 col;
   if (emis) {
     col = alb;
@@ -944,7 +1022,7 @@ void main() {
       vec3 bounce = vec3(0.0);
       for (int i = 0; i < 8; i++) {
         float a = float(i) * 0.785398 + 0.39;
-        bounce += texture(uLight, ((wp + vec2(cos(a), sin(a)) * 30.0 + 0.5 - uLmOrigin - 2.0) / 4.0 + 0.5) / uLmSize).rgb * 2.0;
+        bounce += texture(uLight, ((lwp + vec2(cos(a), sin(a)) * 30.0 + 0.5 - uLmOrigin - 2.0) / 4.0 + 0.5) / uLmSize).rgb * 2.0;
       }
       bounce /= 8.0;
       col += alb * bounce * (s == 1 ? 0.10 : 0.16);
@@ -985,7 +1063,7 @@ void main() {
   for (int i = 0; i < ${MAX_LIGHTS}; i++) {
     if (i >= uNumHalo) break;
     vec4 H = uH[i];
-    float d = distance(wp + 0.5, H.xy);
+    float d = distance(sp + 0.5, H.xy);
     if (d >= H.z) continue;
     float a = 1.0 - d / H.z;
     col += uHC[i].rgb * (a * a * a * 0.8 + a * a * 0.2) * H.w * (120.0 / 255.0);
@@ -996,16 +1074,16 @@ void main() {
     if (i >= uNumShaft) break;
     vec4 S = uS[i];
     if (S.z <= 0.0) continue;
-    float u = (S.y - wp.y) / 96.0;
+    float u = (S.y - sp.y) / 96.0;
     if (u < 0.0 || u > 1.0) continue;
     float cx = S.x - u * 12.0;
     float hw = 14.0 - u * 6.0;
-    float e = abs(wp.x + 0.5 - cx) / hw;
+    float e = abs(sp.x + 0.5 - cx) / hw;
     if (e >= 1.0) continue;
     float a0 = pow(1.0 - e, 1.3) * (0.55 + 0.45 * (1.0 - u)) * (u > 0.9 ? (1.0 - u) / 0.1 : 1.0);
     float bb = floor(a0 * S.z * 0.3 * 5.0 + bq) / 5.0;
     col += vec3(255.0, 240.0, 205.0) / 255.0 * bb * 0.9;
-    vec2 dpos = wp + vec2(0.0, -uTime * 5.0) + vec2(S.x * 3.1, 0.0);
+    vec2 dpos = sp + vec2(0.0, -uTime * 5.0) + vec2(S.x * 3.1, 0.0);
     ivec2 dc = ivec2(floor(dpos / 5.0));
     uint dh = hash2(dc, 31u);
     if ((dh & 63u) < 3u && a0 > 0.15) {
@@ -1053,7 +1131,7 @@ void main() {
         col += vec3(0.15, 0.05, 0.26) * mi * mist * (0.45 + 0.55 * mpatch) * (1.0 - 0.75 * smoothstep(0.03, 0.4, lavaA));
         if (h01(w, 734u + uint(floor(uTime * 2.0))) < mi * 0.006) col = max(col, vec3(0.75, 0.55, 1.0));
       } else {
-        if (h01(w / 2, 735u) < 0.06) col += vec3(0.05, 0.0, 0.09) * mi;
+        if (h01(wt / 2, 735u) < 0.06) col += vec3(0.05, 0.0, 0.09) * mi;
       }
     }
   }
@@ -1169,11 +1247,22 @@ uniform sampler2D uLight;
 uniform vec2 uLmOrigin;
 uniform vec2 uLmSize;
 uniform float uTime;
+uniform sampler2D uOcc;
+uniform int uStack;
 in vec2 vLocal;
 flat in vec4 vRect;
 flat in vec4 vInfo;
 flat in vec4 vPos;
 out vec4 o;
+// 積み上げ表示で、この画素に見えている壁の足もとの y が、足もとの y より STACK_HIDE px 以上南（手前）なら、その壁に隠れている
+// （丸めた角の岩は床のマスへ数 px 張り出すので、すぐ南に立つ者が隠れないよう少し余裕を持たせる）
+const float STACK_HIDE = 3.0;
+bool hiddenBehindWall(float footY) {
+  if (uStack != 1) return false;
+  vec4 v = texelFetch(uOcc, ivec2(gl_FragCoord.xy), 0) * 255.0 + 0.5;
+  float gy = floor(v.r) * 256.0 + floor(v.g);
+  return gy > 0.0 && gy - 1.0 > footY + STACK_HIDE;
+}
 uint hash2(ivec2 p, uint s) {
   uint h = uint(p.x) * 374761393u + uint(p.y) * 668265263u + s * 2246822519u;
   h = (h ^ (h >> 13u)) * 1274126177u;
@@ -1204,6 +1293,14 @@ void main() {
   vec4 tx = texelFetch(uAtlas, ivec2(vRect.xy) + ivec2(lx, l.y), 0);
   if (tx.a < 0.5) discard;
   float a8 = floor(tx.a * 255.0 + 0.5);
+  // 壁に隠れた部分は、体の色を暗く沈めた半透明のシルエットにする（どの種が隠れているかは色で分かる）。
+  // それ自体が光るもの（ウィスプ）は、壁越しにぼんやり明るく透ける
+  if (hiddenBehindWall(floor(vPos.y))) {
+    if (a8 > 252.5 && a8 < 253.5) { o = vec4(tx.rgb * 0.8, 0.6); return; }
+    float g = dot(tx.rgb, vec3(0.3, 0.5, 0.2));
+    o = vec4(mix(vec3(g), tx.rgb, 0.55) * vec3(0.62, 0.66, 0.86), a8 > 253.5 && a8 < 254.5 ? 0.7 : 0.5);
+    return;
+  }
   float axf = vPos.w > 0.5 ? vRect.z - vInfo.x : vInfo.x;
   vec2 wp = vec2(floor(vPos.x) - axf + float(l.x), floor(vPos.y) - vPos.z - vInfo.y + float(l.y));
   ivec2 wi = ivec2(wp);
@@ -1358,6 +1455,7 @@ uniform vec2 uOrigin;
 uniform vec2 uArtSize;
 out vec2 vD;
 out vec2 vW;
+flat out float vFoot;
 const vec2 CORNER[6] = vec2[6](vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, 1.0));
 void main() {
   vec2 c = CORNER[gl_VertexID];
@@ -1366,6 +1464,7 @@ void main() {
   gl_Position = vec4(p.x / uArtSize.x * 2.0 - 1.0, 1.0 - p.y / uArtSize.y * 2.0, 0.0, 1.0);
   vD = c * (aPos.zw + 1.0) / aPos.zw;
   vW = wp;
+  vFoot = floor(aPos.y);
 }
 `;
 // 足元の影は、光の中にいるときだけ落とす（暗闇の生き物の居場所を影で明かさない）
@@ -1374,12 +1473,21 @@ precision highp float;
 uniform sampler2D uLight;
 uniform vec2 uLmOrigin;
 uniform vec2 uLmSize;
+uniform sampler2D uOcc;
+uniform int uStack;
 in vec2 vD;
 in vec2 vW;
+flat in float vFoot;
 out vec4 o;
 void main() {
   float d = dot(vD, vD);
   if (d > 1.0) discard;
+  // 積み上げ表示で、手前の壁に隠れた所には落とさない（生き物の hiddenBehindWall と同じ判定）
+  if (uStack == 1) {
+    vec4 v = texelFetch(uOcc, ivec2(gl_FragCoord.xy), 0) * 255.0 + 0.5;
+    float gy = floor(v.r) * 256.0 + floor(v.g);
+    if (gy > 0.0 && gy - 1.0 > vFoot + 3.0) discard;
+  }
   vec3 L = texture(uLight, ((vW - uLmOrigin - 2.0) / 4.0 + 0.5) / uLmSize).rgb * 2.0;
   float lum = (L.r + L.g + L.b) / 3.0;
   if (lum < 0.1) discard;
