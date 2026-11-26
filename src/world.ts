@@ -179,6 +179,7 @@ export class World {
     const N = m.w * m.h;
     this.tick = state?.tick ?? Math.floor(DAY_TICKS * 0.3);
     this.seen = state?.seen && state.seen.length === N ? state.seen : new Uint8Array(N);
+    if (!(state?.seen && state.seen.length === N)) this.revealStart();
     this.water = state?.water && state.water.length === N ? state.water : new Int32Array(N);
     this.nutr = state?.nutr && state.nutr.length === N ? state.nutr : Int32Array.from(m.nutrients);
     this.moss = state?.moss && state.moss.length === N ? state.moss : Uint8Array.from(m.moss);
@@ -1627,6 +1628,38 @@ export class World {
       else if (mo.kind === 1) out.push({ kind: 'torch', x: mo.x * TILE + 8, y: mo.y * TILE + 8, r: 90, i: 0.75, c: [0.75, 0.45, 1.0], occ: true });
     }
     return out;
+  }
+
+  /**
+   * 新しく始めたダンジョンでは、入口から歩いて行ける洞窟（とそのまわり2マスの岩）を、はじめから見たことにする（描画だけで使う）。
+   * 冒険者たちが知っている範囲として最初から眺められ、闇が晴れていくのは、掘り当てた空洞や外とつながる口の先だけになる。
+   * 入口とつながった所を「いつも」見たことにはしない（大きな空洞を掘り当てた瞬間に、全体が一度に明るくなってしまう）
+   */
+  private revealStart(): void {
+    const m = this.map;
+    const { w, h } = m;
+    const reach = new Uint8Array(w * h);
+    const q: number[] = [m.entrance.y * w + m.entrance.x];
+    reach[q[0]] = 1;
+    for (let i = 0; i < q.length; i++) {
+      const k = q[i];
+      const x = k % w;
+      for (const n of [x + 1 < w ? k + 1 : -1, x > 0 ? k - 1 : -1, k + w < w * h ? k + w : -1, k - w]) {
+        if (n < 0 || reach[n] || m.solid[n] || m.sealed[n]) continue;
+        reach[n] = 1;
+        q.push(n);
+      }
+    }
+    for (const k of q) {
+      const x = k % w;
+      const y = (k - x) / w;
+      for (let dy = -2; dy <= 2; dy++)
+        for (let dx = -2; dx <= 2; dx++) {
+          const xx = x + dx;
+          const yy = y + dy;
+          if (xx >= 0 && yy >= 0 && xx < w && yy < h && !m.sealed[yy * w + xx]) this.seen[yy * w + xx] = 1;
+        }
+    }
   }
 
   /** ワールドのピクセル (x, y) のマスを見たことがあるか（描画だけで使う。シミュレーションの判断には使わない） */
