@@ -465,6 +465,7 @@ export function heldNutrients(this: Ecology, openOnly = false): number {
   for (const o of this.warrens) if (o.id >= 0 && ok(o.x, o.y)) s += o.store ?? 0;
   for (const o of this.statues) if (ok(o.x, o.y)) s += o.units;
   if (this.hold) s += this.hold.store;
+  s += this.shroomNutrients(openOnly);
   for (const cp of this.camps) if (cp.id >= 0 && ok(cp.x, cp.y)) s += (cp.fuel ?? 0) + (cp.store ?? 0);
   for (const e of this.eggs) if (ok(e.x, e.y)) s += e.units;
   for (const o of this.caches) if (ok(o.x, o.y)) s += o.food;

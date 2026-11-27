@@ -2,18 +2,18 @@
  * Ecology のメソッド：触れた物を選んで、情報パネルの言葉にする（src/ecology.ts のクラスに、prototype で足す。シミュレーションには関わらない）。
  *
  * 画面で見えること：生き物のほかに、死骸、金貨の山、床の道具（松明・武器・荷・戦利品）、墓標、石像、物資の置き場、
- * ゴブリンの集落やリザードマンの小屋、冒険者の焚き火に触れると、その上に情報パネルが出て、カメラがそこへ寄る。
+ * ゴブリンの集落やリザードマンの小屋、冒険者の焚き火、キノコの森の大キノコに触れると、その上に情報パネルが出て、カメラがそこへ寄る。
  * 死骸や道具のいきさつ（何に倒されたか、誰が落としたか）は src/eco/notes.ts の覚え書きから。
- * 重なっているときは、生き物 → 死骸 → 金貨・道具 → 墓標・石像・置き場・集落・焚き火 の順に選ぶ（同じ段の中では指にいちばん近いもの）。
+ * 重なっているときは、生き物 → 死骸 → 金貨・道具 → 墓標・石像・置き場・集落・焚き火 → 大キノコ の順に選ぶ（同じ段の中では指にいちばん近いもの）。
  */
 import { type Cr, DAY_TICKS_ECO, Ecology, ItemKind, Kind, type Note, sq } from '../ecology';
 import { TILE } from '../mapgen';
 import { JOB_NAMES, NAMES, UNKNOWN } from '../names';
 import { TROPHY } from './loot';
 
-/** 触れて選べる物の種類（cr 生き物、corpse 死骸、gear 床の道具、pile 金貨の山、grave 墓標、statue 石像、cache 物資の置き場、camp 集落・小屋、fire 冒険者の焚き火） */
-export type ThingKind = 'cr' | 'corpse' | 'gear' | 'pile' | 'grave' | 'statue' | 'cache' | 'camp' | 'fire';
-/** 選んだ物。id は種類ごとの番号（camp は集落のタイル、fire は一行の番号） */
+/** 触れて選べる物の種類（cr 生き物、corpse 死骸、gear 床の道具、pile 金貨の山、grave 墓標、statue 石像、cache 物資の置き場、camp 集落・小屋、fire 冒険者の焚き火、shroom 大キノコ） */
+export type ThingKind = 'cr' | 'corpse' | 'gear' | 'pile' | 'grave' | 'statue' | 'cache' | 'camp' | 'fire' | 'shroom';
+/** 選んだ物。id は種類ごとの番号（camp は集落のタイル、fire は一行の番号、shroom は大キノコのタイル） */
 export interface Thing {
   t: ThingKind;
   id: number;
@@ -53,6 +53,9 @@ export function pickThing(this: Ecology, wx: number, wy: number): Thing | null {
     const k = p.camp ?? -1;
     if (k >= 0) near('fire', p.id, (k % mw) * TILE + 8, Math.floor(k / mw) * TILE + 12, 12);
   }
+  if (best) return best;
+  // 大キノコは傘の真ん中（足もとより上）で選ぶ
+  for (const sh of this.shrooms.values()) near('shroom', sh.k, (sh.k % mw) * TILE + 8, Math.floor(sh.k / mw) * TILE + 2, 12);
   return best;
 }
 
@@ -97,6 +100,8 @@ export function thingPos(this: Ecology, s: Thing): { x: number; y: number } | nu
       const k = p ? (p.camp ?? -1) : -1;
       return k >= 0 ? { x: (k % mw) * TILE + 8, y: Math.floor(k / mw) * TILE + 16 } : null;
     }
+    case 'shroom':
+      return this.shrooms.has(s.id) ? { x: (s.id % mw) * TILE + 8, y: Math.floor(s.id / mw) * TILE + 14 } : null;
   }
 }
 
@@ -254,6 +259,18 @@ export function describeThing(this: Ecology, s: Thing): { title: string; lines: 
       const t = this.partyTitle(p);
       lines.push(`${t ? `${t}の一行` : '冒険者の一行'}が休んでいる`);
       return { title: '焚き火', lines };
+    }
+    case 'shroom': {
+      const sh = this.shrooms.get(s.id)!;
+      const g = this.groveAt(s.id);
+      if (g) {
+        let n = 0;
+        for (const o of this.shrooms.values()) if (o.g === g.id) n++;
+        lines.push(g.named ? `${g.name}の大キノコ（${n}本の林）` : `生えはじめた林の大キノコ（まだ${n}本）`);
+        lines.push(`森の芽が出たのは${ago(this, g.t)}`);
+      }
+      lines.push(sh.s < 45 ? 'まだ若く、背が低い' : sh.s < 90 ? '育ちかけている' : '育ちきって、光る胞子を降らせている');
+      return { title: '大キノコ', lines };
     }
     default:
       return { title: '', lines };

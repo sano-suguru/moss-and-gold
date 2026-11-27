@@ -54,6 +54,8 @@ export interface Atlas {
   supply: (tier: number) => number;
   coffin: (open: boolean) => number;
   furrow: (grown: number) => number;
+  /** キノコの森の大キノコ（size 0 若い、1 育ちかけ、2 育ちきった。v は見た目の違い 0〜1） */
+  shroom: (size: number, v: number) => number;
   eyes: (f: number) => number;
   redEyes: (f: number) => number;
   /** 眷属になった冒険者の赤い目（side は横向きの片目） */
@@ -183,6 +185,63 @@ function makeWeb(R = 16, torn = false): RawFrame {
     }
   });
   return { W, H, px, mat, ax: c, ay: c };
+}
+
+/**
+ * 大キノコ：丸い傘と、傘の裏でほのかに光るひだと、白い柄。r は傘の半分の幅（px）。v は色違い（0 紫、1 青）。足もとは柄の根元
+ */
+function makeShroom(r: number, v: number): RawFrame {
+  const capH = Math.round(r * 0.75) + 1;
+  const stemH = Math.round(r * 0.9) + 2;
+  const sw = Math.max(1, Math.round(r * 0.28));
+  const W = 2 * r + 3;
+  const H = capH + 1 + stemH;
+  const cx = r + 1;
+  const px = new Uint8ClampedArray(W * H * 4);
+  const mat: (string | null)[] = new Array(W * H).fill(null);
+  const put = (x: number, y: number, c: number[], glow = false) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    const p = y * W + x;
+    px[p * 4] = c[0];
+    px[p * 4 + 1] = c[1];
+    px[p * 4 + 2] = c[2];
+    px[p * 4 + 3] = 255;
+    mat[p] = glow ? 'wisp' : 'ol';
+  };
+  const pal =
+    v === 0
+      ? { k: [34, 16, 44], C: [112, 58, 150], c: [80, 38, 110], H: [156, 100, 200], S: [228, 210, 244], g: [190, 150, 250] }
+      : { k: [14, 26, 44], C: [52, 92, 150], c: [36, 62, 110], H: [92, 142, 200], S: [214, 236, 248], g: [140, 230, 230] };
+  const hash = (x: number, y: number) => (((x * 73856093) ^ (y * 19349663) ^ (r * 83492791) ^ (v * 2654435761)) >>> 0) % 997 / 997;
+  // 傘（半分の楕円の丸屋根）
+  const half: number[] = [];
+  for (let y = 0; y < capH; y++) {
+    const ny = (capH - y - 0.5) / capH;
+    half.push(Math.round(r * Math.sqrt(Math.max(0, 1 - ny * ny * 0.92)) + 0.3));
+  }
+  for (let y = 0; y < capH; y++)
+    for (let dx = -half[y]; dx <= half[y]; dx++) {
+      const edge = Math.abs(dx) === half[y] || y === 0 || Math.abs(dx) > half[y - 1];
+      if (edge) {
+        put(cx + dx, y, pal.k);
+        continue;
+      }
+      const lit = dx < 0 && y < capH * 0.6 && dx > -half[y] * 0.8;
+      let c = dx > half[y] * 0.45 || y === capH - 1 ? pal.c : lit ? pal.H : pal.C;
+      if (r >= 5 && hash(cx + dx, y) < 0.09 && y < capH - 1) c = pal.S;
+      put(cx + dx, y, c);
+    }
+  // 傘の裏のひだ：光る筋と暗い筋が交互に並ぶ
+  for (let dx = -r; dx <= r; dx++) put(cx + dx, capH, Math.abs(dx) === r ? pal.k : (dx & 1) === 0 ? pal.g : pal.c, Math.abs(dx) < r && (dx & 1) === 0);
+  // 柄：根元が少し広がる。右側は影
+  for (let y = capH + 1; y < H; y++) {
+    const wHalf = sw + (y >= H - 2 ? 1 : 0);
+    for (let dx = -wHalf; dx <= wHalf; dx++) {
+      const c = Math.abs(dx) === wHalf ? [70, 60, 58] : dx > 0 ? [176, 166, 158] : y === capH + 1 ? [150, 140, 136] : [222, 214, 200];
+      put(cx + dx, y, c);
+    }
+  }
+  return { W, H, px, mat, ax: cx, ay: H - 1 };
 }
 
 function makeBurrow(): RawFrame {
@@ -784,6 +843,12 @@ export function buildAtlas(): Atlas {
   raws.push(TOTEM);
   const nestFrame = raws.length;
   raws.push(NEST);
+  const shroomFrames: number[] = [];
+  for (const v of [0, 1])
+    for (const r of [5, 8, 12]) {
+      shroomFrames.push(raws.length);
+      raws.push(makeShroom(r, v));
+    }
   const furrowFrames = FURROW.map((f) => {
     raws.push(f);
     return raws.length - 1;
@@ -930,6 +995,7 @@ export function buildAtlas(): Atlas {
     supply: (tier) => cacheFrames[Math.max(0, Math.min(2, tier))],
     coffin: (open) => coffinFrames[open ? 1 : 0],
     furrow: (g) => furrowFrames[g ? 1 : 0],
+    shroom: (size, v) => shroomFrames[(v ? 3 : 0) + Math.max(0, Math.min(2, size))],
     eyes: (f) => eyeFrames[f & 3],
     redEyes: (f) => redEyeFrames[f & 3],
     heroRedEyes: (side, f) => heroRedEyeFrames[(side ? 4 : 0) + (f & 3)],

@@ -195,6 +195,8 @@ export const MOMENTS: Moment[] = [
   // 灯り蛾（src/eco/moth.ts）
   { key: 'mothCamp', label: '灯り蛾：冒険者の焚き火に群がった' },
   { key: 'mothBat', label: '灯り蛾：明かりに群がった蛾を、コウモリがさらった' },
+  // キノコの森（src/eco/grove.ts）
+  { key: 'grove', label: 'キノコの森：大キノコが林になり、森が生まれた' },
   { key: 'armorAbsorb', label: 'リビングアーマー：武具を取り込んだ（床の物と奪った物）' },
   { key: 'armorRob', label: 'リビングアーマー：倒した相手の武具を奪って取り込んだ' },
   { key: 'armorShed', label: 'リビングアーマー：打たれて手の武器を落とした' },
@@ -524,6 +526,7 @@ export function countMoments(dir: string, since = -1): Record<string, number> {
     frogTongue: s.filter((x) => x.k === K.Frog && x.ev === 'tongue').length,
     mothCamp: s.filter((x) => x.k === K.Moth && x.ev === 'light' && x.n === 2).length,
     mothBat: d.filter((x) => x.k === K.Moth && x.by === K.Bat).length,
+    grove: s.filter((x) => x.ev === 'grove').length,
     ghoulSkel: d.filter((x) => (x.k === K.Ghoul && x.by === 26) || (x.k === 26 && x.by === K.Ghoul)).length,
     armorAbsorb: ev(K.Armor, 'absorb').length,
     armorRob: ev(K.Armor, 'absorb').filter((x) => x.how === 'rob').length,

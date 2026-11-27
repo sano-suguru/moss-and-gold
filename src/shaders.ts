@@ -605,6 +605,10 @@ void main() {
       idx = floorIdx(ivec2(w.x & 15, w.y & 15));
       if (idx == 3 && h < 0.07) idx = 2;
       else if (idx == 3 && h > 0.95) idx = 4;
+    } else if (mat == 2) {
+      // 菌床：柔らかく盛り上がった黒紫の土（色はあとで塗る。ここでは凹凸の段だけ）
+      float n = vnoise(wp / 5.0, 41u) + (h - 0.5) * 0.25;
+      idx = n < 0.32 ? 1 : n < 0.62 ? 2 : 3;
     } else {
       // 岩床
       vec4 st = stones(wp + 0.5, vec2(7.0, 6.0), 11u);
@@ -647,6 +651,13 @@ void main() {
       if (wallPx(w - ivec2(2, 0)) || wallPx(w + ivec2(2, 0))) idx -= 1;
     }
     alb = ramp(idx);
+    // 菌床の色：紫がかった黒い土に、白い菌糸の筋が網のように走り、ところどころの粒がほのかに光る
+    if (mat == 2) {
+      alb *= vec3(1.02, 0.8, 1.12);
+      float thr = abs(vnoise(wp / 3.0, 44u) - 0.5);
+      if (thr < 0.035) alb = mix(alb, vec3(196.0, 182.0, 210.0) / 255.0, 0.75);
+      if (h01(w, 45u) < 0.012) { alb = vec3(170.0, 236.0, 226.0) / 255.0; emis = true; }
+    }
     vec2 fuv = (wp + 0.5) / 16.0 / vec2(uMapSize);
     vec4 fld = texture(uField, fuv);
     vec2 glw = texture(uGlow, fuv).rg;

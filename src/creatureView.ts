@@ -2070,7 +2070,24 @@ export class CreatureView {
       const side = (r.did + r.t) % 2 ? 1 : -1;
       ghostPhaseAt.set(r.did, { age, sx: (-(r.dy - r.ay) / L) * side, sy: ((r.dx - r.ax) / L) * side });
     }
+    // キノコの森の大キノコ：生き物と同じく南北の順に重ねる（傘の北側、つまり傘の下にいる者は傘に隠れ、南にいる者は手前に描く）。
+    // 傘の色は森ごとに紫か青。大きさは体の養分で三段階
+    const shr: { x: number; y: number; f: number }[] = [];
+    const mw0 = eco.w.map.w;
+    for (const sh of eco.shrooms.values()) {
+      const jit = Math.imul(sh.k, 374761393) >>> 0;
+      const sx = (sh.k % mw0) * 16 + 4 + (jit % 9);
+      const sy = Math.floor(sh.k / mw0) * 16 + 10 + ((jit >>> 8) % 5);
+      if (!inView(sx, sy, 40)) continue;
+      shr.push({ x: sx, y: sy, f: A.shroom(sh.s < 45 ? 0 : sh.s < 90 ? 1 : 2, sh.g & 1) });
+    }
+    shr.sort((a, b) => a.y - b.y || a.x - b.x);
+    let si = 0;
     for (const ord of this.order) {
+      while (si < shr.length && shr[si].y <= ord.y) {
+        pushSprite(shr[si].x, shr[si].y, 0, false, shr[si].f, 0, 0);
+        si++;
+      }
       const c = ord.c;
       let x = ord.x;
       let yy = ord.yy;
@@ -2752,6 +2769,22 @@ export class CreatureView {
         else if (sp === Kind.Salamander && !c.dead) dyn.push({ x, y: yy - 6, r: 34, i: 0.55, c: 1 });
         else if (sp === Kind.Myconid && !c.dead) dyn.push({ x, y: yy - 14, r: 30, i: 0.42, c: 2 });
         else if (c.glow > 16) dyn.push({ x, y: yy - lift - 4, r: 14 + glow * 16, i: glow * 0.32 });
+      }
+    }
+    for (; si < shr.length; si++) pushSprite(shr[si].x, shr[si].y, 0, false, shr[si].f, 0, 0);
+    // キノコの森を歩く者の足もとから、光る胞子が舞い上がる（描画だけ。シミュレーションは見ない）
+    if (eco.shrooms.size) {
+      const now = eco.w.tick + alpha;
+      for (const c of eco.list) {
+        if (c.dead || c.away || (c.x === c.px && c.y === c.py) || !inView(c.x, c.y, 20)) continue;
+        const k = Math.floor(c.y / 16) * mw0 + Math.floor(c.x / 16);
+        let near = false;
+        for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1 && !near; dx++) near = eco.shrooms.has(k + dy * mw0 + dx);
+        if (!near) continue;
+        for (let i = 0; i < 3; i++) {
+          const ph = (now * 0.05 + i / 3 + (c.id % 7) / 7) % 1;
+          pushSprite(c.x + Math.sin(i * 2.1 + c.id) * 6 * (0.4 + ph), c.y - 1, 2 + ph * 16, false, A.speck(2, Math.floor(ph * 3.99)), 0, 2);
+        }
       }
     }
     dyn.sort((a, b) => b.i - a.i);

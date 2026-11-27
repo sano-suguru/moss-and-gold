@@ -356,6 +356,23 @@ export interface Pile {
   age: number;
 }
 
+/** 大キノコ（src/eco/grove.ts）：マス k に生えた森の木。s は体に取り込んだ養分（大きさ）、g は属する森の番号 */
+export interface Shroom {
+  k: number;
+  s: number;
+  g: number;
+}
+
+/** キノコの森（src/eco/grove.ts）：芽のマス（x, y はタイル）を中心に大キノコが集まる一帯。named は名前をログに出したか */
+export interface Grove {
+  id: number;
+  x: number;
+  y: number;
+  name: string;
+  t: number;
+  named: number;
+}
+
 /** 石像：石になった瞬間の姿のまま残り、通り道をふさぐ。体の養分を閉じ込めたまま、ゆっくり風化する */
 export interface Statue {
   id: number;
@@ -896,6 +913,10 @@ export class Ecology {
   /** 底の層の密度（区画ごと。src/eco/swarm.ts）：粒スライムと光る胞子。値は養分の量。セーブに入れる */
   grains = new Int32Array(0);
   spores = new Int32Array(0);
+  /** 大キノコ（マス → 大キノコ）とキノコの森（src/eco/grove.ts）。セーブに入れる */
+  shrooms = new Map<number, Shroom>();
+  groves: Grove[] = [];
+  nextGrove = 1;
   /** 冒険者の亡骸の墓（区画ごと。ゲーム内の約6日残る） */
   advGrave = new Int32Array(24 * 18);
 

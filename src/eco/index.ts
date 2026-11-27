@@ -65,6 +65,7 @@ import './standoff';
 import './vampskill';
 import './orcskill';
 import './swarm';
+import './grove';
 import './water';
 import './spiderskill';
 import './koboldskill';

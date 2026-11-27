@@ -624,17 +624,28 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // キノコの森（grove）：下草の濃い暗がりに大キノコが生え、林になって名前が付く。たいてい4〜7日目に生まれるので、序盤の窓で見る。
+    // 目安は実測の4分の3ほど（実測：15シード中 12シード、18回）
+    name: 'キノコの森が生まれる（15シードの1〜10日目で9シード以上）',
+    ...RUN_EARLY,
+    test: (rs) => {
+      const n = rs.map((r) => r.settle.filter((x) => x.ev === 'grove').length);
+      const seeds = n.filter((v) => v > 0).length;
+      return { ok: seeds >= 9, value: `${sum(n)}回（${seeds}シード）` };
+    },
+  },
+  {
     // リッチの死の呪い（lichSkill）：詠唱の溜めのあいだに、狙われた冒険者が陰へ走り込むか、前衛が代わりに受けるか、僧侶が打ち消す。
     // リッチのいる所と冒険者の通り道は展開で大きく変わり（無害な変更でも、詠唱の回数が1シードあたり十数回動く）、一つの窓では応じた回数が7回にとどまることがあるので、
-    // 二つの窓の合計で見る。目安は実測の半分ほど（実測：詠唱 81回・8シード、応じた 9回・5シード。10〜18日目だけ）
-    name: 'リッチが死の呪いを詠唱し、冒険者が応じる（10〜18日目の15シードと15〜23日目の16シードの合計で、詠唱60回・6シード、応じた8回・3シード以上）',
+    // 二つの窓の合計で見る。応じた回数は1シードの一つの窓に4回かたまることもある。目安は実測の半分ほど（実測：二つの窓の合計で、詠唱 153回・8シード、応じた 9回・3シード）
+    name: 'リッチが死の呪いを詠唱し、冒険者が応じる（10〜18日目の15シードと15〜23日目の16シードの合計で、詠唱60回・6シード、応じた5回・2シード以上）',
     ...RUN_WIDE,
     more: [RUN_ARMOR],
     test: (rs) => {
       const cast = rs.map((r) => r.settle.filter((x) => x.k === Kind.Lich && x.ev === 'curseStart' && countOnce(r, x.t)).length);
       const react = rs.map((r) => r.settle.filter((x) => countOnce(r, x.t) && ((x.k === Kind.Lich && ((x.ev === 'curseLost' && x.n === Kind.Adventurer && x.how !== 'gone') || (x.ev === 'curse' && x.how === 'guard'))) || (x.k === Kind.Adventurer && x.ev === 'curseWard' && x.how > 0))).length);
       const seeds = (n: number[]) => new Set(rs.filter((_, i) => n[i] > 0).map((r) => r.seed)).size;
-      return { ok: sum(cast) >= 60 && seeds(cast) >= 6 && sum(react) >= 8 && seeds(react) >= 3, value: `詠唱 ${sum(cast)}（${seeds(cast)}シード）、応じた ${sum(react)}（${seeds(react)}シード）` };
+      return { ok: sum(cast) >= 60 && seeds(cast) >= 6 && sum(react) >= 5 && seeds(react) >= 2, value: `詠唱 ${sum(cast)}（${seeds(cast)}シード）、応じた ${sum(react)}（${seeds(react)}シード）` };
     },
   },
   {

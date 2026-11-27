@@ -2,6 +2,7 @@ import type { World } from './world';
 import type { Atlas } from './atlas';
 import { FLOORS, floorId } from './floors';
 import { forBreathFan } from './eco/fire';
+import { SHROOM_MAX } from './eco/grove';
 import { Kind } from './ecology';
 import { FS_BLIT, FS_BLUR, FS_BRIGHT, FS_LIGHT, FS_SCENE, FS_SHADOW, FS_SPRITE, MAX_DYN, MAX_LIGHTS, MAX_SHAFTS, VS_FULL, VS_SHADOW, VS_SPRITE } from './shaders';
 
@@ -36,6 +37,8 @@ export interface FrameParams {
 }
 
 const GLOW_SCALE = 120;
+/** 育ちきった大キノコの真下の、キノコの光の強さ（光のテクスチャの値。まわり4マスで薄れる） */
+const GROVE_GLOW = 70;
 
 type Uniforms = Record<string, WebGLUniformLocation | null>;
 
@@ -108,6 +111,7 @@ export class Renderer {
   private mapData: Uint8Array = new Uint8Array(0);
   private fieldData: Uint8Array = new Uint8Array(0);
   private glowData: Uint8Array = new Uint8Array(0);
+  private groveKey = -1;
   private mapW = 0;
   private mapH = 0;
   private lmW = 0;
@@ -207,7 +211,7 @@ export class Renderer {
     }
     gl.bindTexture(gl.TEXTURE_2D, this.mapTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, m.w, m.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.mapData);
-    tileInfo(m, this.tileData);
+    tileInfo({ ...m, mycel: mycelOf(w) }, this.tileData);
     gl.bindTexture(gl.TEXTURE_2D, this.tileTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, m.w, m.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.tileData);
   }
@@ -260,7 +264,17 @@ export class Renderer {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
   }
 
-  /** 苔と溶岩の光のにじみ */
+  /** 大キノコが変わったら（数か場所か大きさの段が変われば）、菌床の床と森の光を送り直す。毎フレーム呼ぶ */
+  updateGrove(w: World): void {
+    let key = w.eco.shrooms.size;
+    for (const sh of w.eco.shrooms.values()) key = (Math.imul(key, 31) + sh.k * 4 + (sh.s < 45 ? 0 : sh.s < 90 ? 1 : 2)) | 0;
+    if (key === this.groveKey) return;
+    this.groveKey = key;
+    this.uploadMap(w);
+    this.updateGlow(w);
+  }
+
+  /** 苔と溶岩の光のにじみ。キノコの光には、キノコの森の光（描画だけ。大キノコのまわりがぼんやり光る）を重ねる */
   updateGlow(w: World): void {
     const gl = this.gl;
     const d = this.glowData;
@@ -269,6 +283,17 @@ export class Renderer {
       d[k * 4 + 1] = Math.min(255, w.lavaGlow[k] * GLOW_SCALE);
       d[k * 4 + 2] = w.fungus[k];
       d[k * 4 + 3] = Math.min(255, w.fungusGlow[k] * GLOW_SCALE);
+    }
+    const mw = w.map.w;
+    for (const sh of w.eco.shrooms.values()) {
+      const a = (sh.s / SHROOM_MAX) * GROVE_GLOW;
+      for (let dy = -3; dy <= 3; dy++)
+        for (let dx = -3; dx <= 3; dx++) {
+          const q = sh.k + dy * mw + dx;
+          if (q < 0 || q >= w.mossGlow.length || w.map.solid[q]) continue;
+          const v = Math.round(a * Math.max(0, 1 - Math.hypot(dx, dy) / 4));
+          if (v > d[q * 4 + 3]) d[q * 4 + 3] = Math.min(255, v);
+        }
     }
     gl.bindTexture(gl.TEXTURE_2D, this.glowTex);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.mapW, this.mapH, gl.RGBA, gl.UNSIGNED_BYTE, d);
@@ -538,6 +563,22 @@ export function sealedLook(m: { w: number; h: number; solid: ArrayLike<number>; 
   return out;
 }
 
+/** 菌床の床：大キノコのまわり（育ったものほど広く）の、石畳でない床。描画だけのもの */
+export function mycelOf(w: World): Uint8Array {
+  const m = w.map;
+  const out = new Uint8Array(m.w * m.h);
+  for (const sh of w.eco.shrooms.values()) {
+    const R = sh.s < 45 ? 1 : 2;
+    for (let dy = -R; dy <= R; dy++)
+      for (let dx = -R; dx <= R; dx++) {
+        if (Math.abs(dx) + Math.abs(dy) > R + 1) continue;
+        const q = sh.k + dy * m.w + dx;
+        if (q >= 0 && q < out.length && !m.solid[q] && !m.paved[q]) out[q] = 1;
+      }
+  }
+  return out;
+}
+
 /**
  * マスごとの描き方の情報を求める（地形シェーダーが uTile として読む。地形が変わるたびに uploadMap から呼ぶ）。
  * 見た目だけのもので、シミュレーションには使わない。1マス4バイト：
@@ -563,6 +604,7 @@ export function tileInfo(
     solid: ArrayLike<number>;
     rubble: ArrayLike<number>;
     paved: ArrayLike<number>;
+    mycel?: ArrayLike<number>;
     dug: ArrayLike<number>;
     lava: ArrayLike<number>;
     springs: { x: number; y: number }[];
