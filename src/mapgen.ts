@@ -1005,12 +1005,14 @@ function rockBetween(W: number, H: number, solid: Uint8Array, lava: Uint8Array, 
 /** 寝床と古戦場を置く閉じた空洞：開いた床から崩す岩がこのマス数の範囲（岩の帯の2マスから、一つ奥の空洞まで） */
 const DIG_MIN = 2;
 const DIG_MAX = 6;
+/** ミノタウロスの寝床は、岩の帯のすぐ裏の空洞（崩す岩が DIG_MIN マス）だけ。奥の空洞では、25日のうちに掘り当てられないことが多い */
+const LAIR_DIG_MAX = DIG_MIN;
 
 /** ミノタウロスの縄張りの半径（マス）。寝床からこの距離の内の床が縄張り */
 export const LAIR_R = 8;
 
 /**
- * ミノタウロスの寝床：開いた洞窟の近く（崩す岩が DIG_MIN〜DIG_MAX マス）の閉じた空洞の中で、日の光（光の筋の照り返しは10マスほど届く）が届かず、
+ * ミノタウロスの寝床：岩の帯のすぐ裏（崩す岩が DIG_MIN マス）の閉じた空洞の中で、日の光（光の筋の照り返しは10マスほど届く）が届かず、
  * 地表から離れた深い所（上から30マスより下）にあり、宝物庫・深部の一点から離れた、行き止まりの奥の床。
  * ミノタウロスは、掘り当てられて空洞が開くまで湧かない（掘ると見つかるものの一つ）。
  * 行き止まりの判定：その床から歩いて LAIR_REACH 歩の所に並ぶ床（外へ出る道の断面）が少なく（LAIR_EXIT マス以下）、ひとつながりで、
@@ -1067,7 +1069,7 @@ function findLair(W: number, H: number, solid: Uint8Array, lava: Uint8Array, pav
     let best = -1;
     let bv = -1;
     for (let k = 0; k < N; k++) {
-      if (!sealed[k] || solid[k] || lava[k] || rb[k] < DIG_MIN || rb[k] > DIG_MAX || vault[k] || paved[k]) continue;
+      if (!sealed[k] || solid[k] || lava[k] || rb[k] < DIG_MIN || rb[k] > LAIR_DIG_MAX || vault[k] || paved[k]) continue;
       const x = k % W;
       const y = (k / W) | 0;
       if (y < 30) continue;
