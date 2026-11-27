@@ -56,7 +56,7 @@ const RUN_BLESS = RUN_WIDE;
 const countOnce = (r: { from: number; seed: string }, t: number) => r.from < RUN_ARMOR.from || t > RUN_WIDE.to * DAY_TICKS || !RUN_WIDE.seeds.includes(r.seed);
 // 序盤（ベースの1日目のスナップショットから）に起きやすい、まれな出来事を見る組（ゴブリンが貧しい場所に集落を作るのは、たいてい4〜9日目）
 const RUN_EARLY = { seeds: RUN_WIDE.seeds, from: 1, to: 10 };
-// 古戦場（seedBattle）：骨は1日目ごろ、甲冑は2〜4日目に起き上がる。ベースの日次スナップショットは1日目からしか無いので（0日目からは分かれられない）、1日目から見る
+// 古戦場（seedBattle）：閉じた空洞の中でも、暗がりにマナが溜まって骨は1日目ごろから起き上がる。ベースの日次スナップショットは1日目からしか無いので、1日目から見る
 const RUN_BATTLE = { seeds: ['abc', 'かしたれ', 'seed4', 'seed7', 'seed18', 'seed27', 'seed35', 'seed41'], from: 1, to: 6 };
 // check の項目にしないもの：オークの貢ぎ物の取り立て（collectTribute）と、倒れた冒険者がヴァンパイアの眷属として起き上がる場面（vampRaiseFallen）。
 // どちらも16シード×25日でも数回〜十数回で、どのシードを選んでも短い実行では確かめられない。ab の「見せたい場面」の表（lib/moments.ts）で起きたシードの数を追う。
@@ -557,20 +557,24 @@ export const CHECKS: Check[] = [
     },
   },
   {
-    // 古戦場（src/eco/battle.ts）：始めから散らばっている骨がスケルトンとして起き上がり、錆びた武具がマナを吸ってリビングアーマーとして立ち上がる
-    name: '古戦場の骨がスケルトンとして起き上がり、錆びた武具から甲冑が立ち上がる（8シードの1〜6日目で、それぞれ6シード以上）',
+    // 古戦場（src/eco/battle.ts）：始めから散らばっている骨がスケルトンとして起き上がり、錆びた武具がマナを吸ってリビングアーマーとして立ち上がる。
+    // 古戦場は開いた洞窟の近くの閉じた空洞の中にある。骨は序盤に起き上がるので1〜6日目の8シードで、甲冑はマナが濃くなってからなので、
+    // 1〜6日目の8シードと10〜18日目の15シードと15〜23日目の16シードの合計で見る（16シード×25日で5シード）
+    name: '古戦場の骨がスケルトンとして起き上がり、錆びた武具から甲冑が立ち上がる（骨は1〜6日目の8シードのうち6シード以上、甲冑は三つの窓の合計で2シード以上）',
     ...RUN_BATTLE,
+    more: [RUN_WIDE, RUN_ARMOR],
     test: (rs) => {
       // 真ん中から10マスの内（古戦場の位置は、シードから地形を作り直して求める）
       const near = (r: Recs) => {
         const B = generate(r.seed).battle;
         return (x: { x: number; y: number }) => B.x >= 0 && (x.x - B.x * 16 - 8) ** 2 + (x.y - B.y * 16 - 8) ** 2 <= (10 * 16) ** 2;
       };
-      const bone = rs.map((r) => r.births.filter((x) => x.origin === 'raised').filter(near(r)).length);
-      const armor = rs.map((r) => r.births.filter((x) => x.k === 29 && x.origin === 'gear').filter(near(r)).length);
-      const nb = bone.filter((n) => n > 0).length;
-      const na = armor.filter((n) => n > 0).length;
-      return { ok: nb >= 6 && na >= 6, value: `骨の起き上がり ${sum(bone)}（${nb}シード）、甲冑 ${sum(armor)}（${na}シード）` };
+      const bone = rs.map((r) => (r.from === RUN_BATTLE.from ? r.births.filter((x) => x.origin === 'raised').filter(near(r)).length : 0));
+      const armor = rs.map((r) => r.births.filter((x) => x.k === 29 && x.origin === 'gear' && countOnce(r, x.t)).filter(near(r)).length);
+      const seedsOf = (ns: number[]) => new Set(rs.filter((_, i) => ns[i] > 0).map((r) => r.seed)).size;
+      const nb = seedsOf(bone);
+      const na = seedsOf(armor);
+      return { ok: nb >= 6 && na >= 2, value: `骨の起き上がり ${sum(bone)}（${nb}シード）、甲冑 ${sum(armor)}（${na}シード）` };
     },
   },
   {
@@ -1118,10 +1122,8 @@ export const CHECKS: Check[] = [
     // （溶岩を通れる床として扱うと同じ領域になり、溶岩の向こうのコボルトの住処が島とみなされず、入口から来たコボルトが溶岩の手前で立ち往生する）。
     // 10日目（始めの日）の地形（日次スナップショットの掘削のログを作業ツリーのコードで再生したもの）で、まわりの床が二つ以上の領域に分かれる溶岩の溜まりを数える。
     // 溜まりが場所を分けるかは生き物が掘った跡で変わるので、18日目ではなく10日目の地形で見る
-    name: '溶岩の溜まりをはさんだ場所が別の領域になる（seed18・seed4・seed6・seed5 の合計で、場所を分ける溶岩の溜まりが2つ以上）',
-    seeds: ['seed18', 'seed4', 'seed6', 'seed5'],
-    from: 10,
-    to: 18,
+    name: '溶岩の溜まりをはさんだ場所が別の領域になる（15シードの合計で、場所を分ける溶岩の溜まりが2つ以上）',
+    ...RUN_WIDE,
     test: (rs) => {
       const n = rs.map((r) => {
         const w = new World(r.seed);
