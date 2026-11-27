@@ -36,6 +36,12 @@ const SHROOM_SPREAD = 40;
 const GROW_RATE = 2;
 /** 1本の大キノコが、キノコの更新1回分に生え増えを試すくじ（MOSS_R / この数） */
 const SPREAD_ODDS = 40;
+/** 根が土に残す養分（下草が育つ分）と、根が吸ってよい下草（これを超えた、育ちきった分）。
+ * 下草を吸い尽くすと、キノコを食べるアリやコボルトが減り、アリが食べ物を探して足踏みする */
+const SOIL_KEEP = 6;
+const FUNGUS_TOP = 90;
+/** 育ちきった大キノコが、キノコの更新1回分に胞子を降らせるくじ（MOSS_R / この数） */
+const SPORE_ODDS = 18;
 /** まわり3×3の下草の合計がこれ未満なら、支えを失って細る */
 const SUPPORT = 90;
 /** 森に名前が付く大キノコの数 */
@@ -151,23 +157,24 @@ export function groveStep(this: Ecology, step: number, day: number): void {
       continue;
     }
     if (sh.s < SHROOM_MAX) {
-      // まわり3×3の土から根で養分を吸って育つ（土が尽きていれば、濃い下草の分を吸う）
+      // まわり3×3の土から根で養分を吸って育つ。下草が育つ分（SOIL_KEEP）は土に残す。
+      // 土が足りなければ、育ちきった下草（FUNGUS_TOP を超えた分。いずれ一部が枯れて土に戻る分）を吸う
       let want = GROW_RATE * MOSS_R;
       for (let i = 0; i < 9 && want > 0; i++) {
         const q = k + (Math.floor(i / 3) - 1) * W + (i % 3) - 1;
-        const g = Math.min(want, Nu[q]);
+        const g = Math.max(0, Math.min(want, Nu[q] - SOIL_KEEP));
         Nu[q] -= g;
         sh.s += g;
         want -= g;
       }
       for (let i = 0; i < 9 && want > 0; i++) {
         const q = k + (Math.floor(i / 3) - 1) * W + (i % 3) - 1;
-        if (fu[q] <= SEED_FUNGUS) continue;
+        if (fu[q] <= FUNGUS_TOP) continue;
         fu[q]--;
         sh.s++;
         want--;
       }
-    } else if (ih(k, step, 0x6f3) % 6 < MOSS_R) {
+    } else if (ih(k, step, 0x6f3) % SPORE_ODDS < MOSS_R) {
       // 育ちきった大キノコは、体の養分を少しずつ光る胞子にして降らせる（胞子は漂って薄れ、土に返る）
       const cell = this.swarmCell((k % W) * TILE + 8, Math.floor(k / W) * TILE + 8);
       if (cell >= 0 && this.spores[cell] < SPORE_MAX) {
