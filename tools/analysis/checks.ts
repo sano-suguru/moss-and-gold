@@ -625,13 +625,13 @@ export const CHECKS: Check[] = [
   },
   {
     // キノコの森（grove）：下草の濃い暗がりに大キノコが生え、林になって名前が付く。たいてい4〜7日目に生まれるので、序盤の窓で見る。
-    // 目安は実測の4分の3ほど（実測：15シード中 ? シード、? 回）
-    name: 'キノコの森が生まれる（15シードの1〜10日目で10シード以上）',
+    // 目安は実測の4分の3ほど（実測：15シード中 12シード、18回）
+    name: 'キノコの森が生まれる（15シードの1〜10日目で9シード以上）',
     ...RUN_EARLY,
     test: (rs) => {
       const n = rs.map((r) => r.settle.filter((x) => x.ev === 'grove').length);
       const seeds = n.filter((v) => v > 0).length;
-      return { ok: seeds >= 10, value: `${sum(n)}回（${seeds}シード）` };
+      return { ok: seeds >= 9, value: `${sum(n)}回（${seeds}シード）` };
     },
   },
   {
