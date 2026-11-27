@@ -16,8 +16,7 @@
  * built（人の手のものか）：人の手の床に接する壁の角は丸めず直角にし、その床に面した壁の正面は石積みにする。
  *
  * 材質を足すときは、この一覧に1行足し、シェーダーの floorPattern に模様の描き方を足す。
- * 地図の上のどこがどの材質かは floorId が決める（今は地図の石畳の情報から作る。材質を本当に増やすときは、
- * 地形の生成（MapData）に材質の配列を持たせる。それはシミュレーションの変更なので、そのときに扱う）。
+ * 地図の上のどこがどの材質かは floorId が決める（石畳は地図の石畳の情報から、菌床は大キノコのまわりから。どちらもシミュレーションは見ない）。
  */
 export interface Floor {
   name: string;
@@ -28,12 +27,13 @@ export interface Floor {
 
 export const FLOORS: Floor[] = [
   { name: '岩床', prio: 0, edge: 'natural', built: false },
-  { name: '石畳', prio: 1, edge: 'built', built: true },
+  { name: '石畳', prio: 2, edge: 'built', built: true },
+  { name: '菌床', prio: 1, edge: 'natural', built: false },
 ];
 
-/** マス k の床の材質の番号（FLOORS の位置） */
-export function floorId(m: { paved: ArrayLike<number> }, k: number): number {
-  return m.paved[k] ? 1 : 0;
+/** マス k の床の材質の番号（FLOORS の位置）。mycel はキノコの森の床（描画側が大キノコのまわりから作る。src/renderer.ts の mycelOf） */
+export function floorId(m: { paved: ArrayLike<number>; mycel?: ArrayLike<number> }, k: number): number {
+  return m.paved[k] ? 1 : m.mycel?.[k] ? 2 : 0;
 }
 
 /** シェーダーに埋め込む、材質ごとの性質の定数（GLSL） */

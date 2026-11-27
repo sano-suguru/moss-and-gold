@@ -527,10 +527,11 @@ export class World {
     this.digs.push(k * 8 + 5);
   }
 
-  /** 岩になるマスの土と苔とキノコとマナを、隣の床 to へ押し出す（岩の中に閉じこめると、生き物が使えないまま残る） */
+  /** 岩になるマスの土と苔とキノコと大キノコとマナを、隣の床 to へ押し出す（岩の中に閉じこめると、生き物が使えないまま残る） */
   private pushSoil(k: number, to: number): void {
     if (to < 0) return;
     this.nutr[to] += this.nutr[k] + this.moss[k] + this.fungus[k];
+    this.eco.dropShroom(k, to);
     this.mana[to] += this.mana[k];
     this.nutr[k] = 0;
     this.moss[k] = 0;
@@ -1575,6 +1576,8 @@ export class World {
       // 豊かなキノコの群落からマイコニドが生まれる（数の上限は eco 側。キノコが多すぎても止めない）
       if (fu[k] >= 90) this.eco.maybeSpawnMyconid(k, step);
     }
+    // 下草の濃い一帯に生える大キノコの林（src/eco/grove.ts）
+    this.eco.groveStep(step, day);
     return changed;
   }
 

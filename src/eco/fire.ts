@@ -12,7 +12,7 @@ export function ignite(this: Ecology, k: number, dur: number): void {
   this.w.fxDirty = true;
 }
 
-/** マスの苔とキノコを焼く（燃える床は作らない。焼けた分は土の養分に返る。魔法使いの炎の呪文から） */
+/** マスの苔とキノコと大キノコを焼く（燃える床は作らない。焼けた分は土の養分に返る。魔法使いの炎の呪文から） */
 export function scorchMoss(this: Ecology, k: number): void {
   if (k < 0 || k >= this.w.map.solid.length) return;
   if (this.w.moss[k]) {
@@ -25,6 +25,7 @@ export function scorchMoss(this: Ecology, k: number): void {
     this.w.fungus[k] = 0;
     this.mossTouched = true;
   }
+  this.dropShroom(k);
 }
 
 /** 燃える床の上にいる者が受けるダメージ（生き物の更新4回ごとに、最大の体力のこの割合。逃げ遅れると数回で倒れる） */
@@ -85,6 +86,7 @@ export function updateFire(this: Ecology): void {
       this.w.fungus[k] = 0;
       this.mossTouched = true;
     }
+    this.dropShroom(k);
     if (b % 4 === 0) {
       const x = (k % m.w) * TILE + 8;
       const y = Math.floor(k / m.w) * TILE + 8;

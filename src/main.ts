@@ -675,6 +675,7 @@ function boot(): void {
       world.fxDirty = false;
       fxBreathing = renderer.updateFx(world);
     }
+    renderer.updateGrove(world);
     if (world.glowVersion !== lastGlowV) {
       lastGlowV = world.glowVersion;
       renderer.updateGlow(world);
