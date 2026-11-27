@@ -558,7 +558,7 @@ function boot(): void {
 
   function persist() {
     save({
-      v: 5,
+      v: 6,
       seed: world.map.seed,
       tick: world.tick,
       cam: { x: cam.x, y: cam.y, zoom: cam.zoom },
